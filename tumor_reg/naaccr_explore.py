@@ -1,28 +1,71 @@
 
+import sys
 import csv
 from collections import namedtuple
 from string import strip
 
 Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
+
+def main(argv,
+         record_layout_filename='record_layout.csv',
+         table='NAACR.EXTRACT',
+         ctl='naacr_extract.ctl',
+         ddl='naacr_extract.sql'):
+    #record_layout_filename = argv[1]
+    spec = to_schema(open(record_layout_filename))
+    write_iter(open(ctl, "w"), make_ctl(spec, table))
+    write_iter(open(ddl, "w"), table_ddl(spec, table))
+
+    
+def explore(record_layout_filename, data_filename):
+    import pprint
+    naaccr_schema = to_schema(open(record_layout_filename))
+    pprint.pprint(naaccr_schema)
+
+    lines = open(data_filename)
+    for line in lines:
+        cols = parse_record(line, naaccr_schema)
+        record = dict(zip([i.name for i in naaccr_schema], cols))
+        print
+        print '==============='
+        print
+        pprint.pprint(record)
+
+
 def to_schema(infp):
     rows = csv.reader(infp)
     header = rows.next()
-    return [map(int, [start, end, length or 0, num.replace(',' ,'')])
-            + map(strip, [name, section, note])
+    return [Item._make(map(int, [start, end, length or 0, num.replace(',' ,'')])
+                       + map(strip, [name, section, note]))
             for (start, end, length, num, name, section, note) in
             [(row[0].split('-') + row[1:]) for row in rows]]
 
-def parse_data_dict(line):
-    '''
-      >>> parse_data_dict('1-1 1 10 Record Type')
-      Item(start=1, end=1, length=1, num=10, name='Record Type', section=None, note=None)
 
-    .. todo: handle section, not
-    '''
-    cols, length, num, rest = line.split(' ', 3)
-    start, end = cols.split('-')
-    return Item(int(start), int(end), int(length), int (num), rest, None, None)
+
+def make_ctl(spec, table):
+    yield '''LOAD DATA
+APPEND
+INTO TABLE "%s" (
+''' % table
+
+    for i in spec:
+        if i.length:
+            yield '"%s" position(%d:%d) CHAR\n' % (i.name, i.start, i.end)
+
+    yield ")\n"
+
+def table_ddl(spec, table):
+    yield 'create table "%s" (' % table
+    for i in spec:
+        if i.length:
+            yield '"%s" varchar2(%d)' % (i.name, i.length)
+            yield '\n'
+
+
+def write_iter(outfp, itr):
+    for chunk in itr:
+        outfp.write(chunk)
 
 
 def parse_record(line, schema):
@@ -32,10 +75,11 @@ def parse_record(line, schema):
       >>> parse_record('123 xyz', [n, s])
       ['123', 'xyz']
     '''
-    return [line[i.start-1:i.end] for i in schema]
+    return [line[i.start-1:i.end].strip() for i in schema]
 
 
 if __name__ == '__main__':
-    import sys, pprint
-    record_layout_filename = sys.argv[1]
-    pprint.pprint(to_schema(open(record_layout_filename)))
+    #record_layout_filename, data_filename = sys.argv[1:3]
+    #explore(record_layout_filename, data_filename)
+    main(sys.argv)
+
