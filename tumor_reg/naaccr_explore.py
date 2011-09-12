@@ -9,13 +9,14 @@ Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
 def main(argv,
          record_layout_filename='record_layout.csv',
-         table='NAACR.EXTRACT',
+         schema='NAACR',
+         table='EXTRACT',
          ctl='naacr_extract.ctl',
          ddl='naacr_extract.sql'):
     #record_layout_filename = argv[1]
     spec = to_schema(open(record_layout_filename))
-    write_iter(open(ctl, "w"), make_ctl(spec, table))
-    write_iter(open(ddl, "w"), table_ddl(spec, table))
+    write_iter(open(ctl, "w"), make_ctl(spec, table, schema))
+    write_iter(open(ddl, "w"), table_ddl(spec, table, schema))
 
     
 def explore(record_layout_filename, data_filename):
@@ -43,24 +44,26 @@ def to_schema(infp):
 
 
 
-def make_ctl(spec, table):
+def make_ctl(spec, table, schema):
     yield '''LOAD DATA
 APPEND
-INTO TABLE "%s" (
-''' % table
+INTO TABLE "%s"."%s" (
+''' % (schema, table)
 
-    for i in spec:
-        if i.length:
-            yield '"%s" position(%d:%d) CHAR\n' % (i.name, i.start, i.end)
+    # itertools join, perhaps?
+    yield ',\n'.join([
+            '"%s" position(%d:%d) CHAR' % (i.name, i.start, i.end)
+            for i in spec if i.length])
 
     yield ")\n"
 
-def table_ddl(spec, table):
-    yield 'create table "%s" (' % table
-    for i in spec:
-        if i.length:
-            yield '"%s" varchar2(%d)' % (i.name, i.length)
-            yield '\n'
+
+def table_ddl(spec, table, schema):
+    yield 'create table "%s"."%s" (\n' % (schema, table)
+    first = True
+    yield ',\n'.join(['"%s" varchar2(%d)' % (i.name, i.length)
+                      for i in spec if i.length])
+    yield '\n)\n'
 
 
 def write_iter(outfp, itr):
