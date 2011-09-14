@@ -9,12 +9,14 @@ Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
 def main(argv,
          record_layout_filename='record_layout.csv',
+         spec_text_filename='naaccr12_1.txt',
          schema='NAACR',
          table='EXTRACT',
-         ctl='naacr_extract.ctl',
-         ddl='naacr_extract.sql'):
+         ctl='naaccr_extract.ctl',
+         ddl='naaccr_extract.sql'):
     #record_layout_filename = argv[1]
-    spec = to_schema(open(record_layout_filename))
+    #spec = to_schema(open(record_layout_filename))
+    spec = list(grok_schema(open(spec_text_filename)))
     write_iter(open(ctl, "w"), make_ctl(spec, table, schema))
     write_iter(open(ddl, "w"), table_ddl(spec, table, schema))
 
@@ -27,7 +29,9 @@ def explore(record_layout_filename, data_filename):
     lines = open(data_filename)
     for line in lines:
         cols = parse_record(line, naaccr_schema)
-        record = dict(zip([i.name for i in naaccr_schema], cols))
+        record = dict([(k, v)
+                       for (k, v) in zip([(i.num, i.name) for i in naaccr_schema], cols)
+                       if v])
         print
         print '==============='
         print
@@ -42,6 +46,65 @@ def to_schema(infp):
             for (start, end, length, num, name, section, note) in
             [(row[0].split('-') + row[1:]) for row in rows]]
 
+
+def grok_schema(infp):
+    meta = ('Column #', 'Length', 'Item #', 'Item Name', 'Section', 'Note')  # oops... use Item
+
+    # skip to record layout table
+    for line in infp:
+        if [c for c in meta if c not in line]:
+            continue
+        #print "found record layout table"
+        break
+
+    for line in infp:
+        if line.startswith('CHAPTER VIII:'):
+            break
+        elif 'Chapter VII:  Record Layout Table' in line:
+            continue
+        elif line.strip() and line.strip()[0].isdigit():
+            yield grok_item(line)
+        #else:
+        #    print "skipping: ", line.strip()
+
+
+def grok_item(txt):
+    r'''
+      >>> grok_item('1-1   1  10  Record Type  Record ID \n')
+      Item(start=1, end=1, length=1, num=10, name='Record Type', section='Record ID', note=None)
+
+      >>> grok_item('428-433   6  135  Census Tract 2010  Demographic  New')
+      Item(start=428, end=433, length=6, num=135, name='Census Tract 2010', section='Demographic', note='New')
+
+    @raises IndexError on unknown section
+    '''
+
+    def match_tail(tails):
+        for t in tails:
+            if txt.endswith(t):
+                return txt[:-len(t)].strip(), t
+        else:
+            return txt, None
+
+    txt = txt.strip()
+    txt, note = match_tail(('New', 'Revised', 'Group', 'Subfield'))
+
+    txt, section = match_tail(('Record ID', 'Demographic', 'Cancer Identification',
+                               'Hospital-Specific', 'Stage/Prognostic Factors',
+                               'Treatment-1st Course', 'Treatment-Subsequent & Other',
+                               'Edit Overrides/Conversion History/System Admin',
+                               'Follow-up/Recurrence/Death', 'Special Use',
+                               'Patient-Confidential', 'Hospital-Confidential', 'Other-Confidential',
+                               'Pathology', 'Text-Diagnosis', 'Text-Treatment',
+                               'Text-Miscellaneous'))
+    if not section:
+        raise ValueError, 'unknown section: ' + txt
+
+    cols, length, num, name = txt.split(None, 3)
+    s, e = cols.split('-')
+    return Item(int(s), int(e), int(length), 
+                int(num)  if num != 'Reserved' else None,
+                name.strip(), section, note)
 
 
 def make_ctl(spec, table, schema):

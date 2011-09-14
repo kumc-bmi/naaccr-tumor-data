@@ -1,3 +1,4 @@
+CURL=curl
 PERL=perl
 
 record_layout.csv: Vol\ II\ Version\ 12.1\ with\ cover.xlsx
@@ -9,5 +10,16 @@ Vol\ II\ Version\ 12.1\ with\ cover.xlsx: Vol\ II\ Version\ 12.1\ with\ cover.xl
 Vol\ II\ Version\ 12.1\ with\ cover.xls: Vol\ II\ Version\ 12.1\ with\ cover.pdf
 	echo "use http://www.pdftoexcelonline.com/"
 
+
+naaccr12_1.txt: naaccr12_1.ps
+	ps2ascii <naaccr12_1.ps >$@
+
+naaccr12_1.ps: Vol\ II\ Version\ 12.1\ with\ cover.pdf
+	pdf2ps Vol\ II\ Version\ 12.1\ with\ cover.pdf $@
+
 Vol\ II\ Version\ 12.1\ with\ cover.pdf:
-	curl --output "$@" 'http://www.naaccr.org/LinkClick.aspx?fileticket=LJJNRVo4lT4%3d&tabid=133&mid=473'
+	$(CURL) --output "$@" 'http://www.naaccr.org/LinkClick.aspx?fileticket=LJJNRVo4lT4%3d&tabid=133&mid=473'
+
+
+naaccr12_1.mdb:
+	$(CURL) --output $@ 'http://www.naaccr.org/LinkClick.aspx?fileticket=h6_MTYvGFLU%3d&tabid=133&mid=473'
