@@ -29,7 +29,7 @@ having count(*) > 1
 
 
 
-/* Grade: how many of each kind?
+/* Grade: how many of each kind? */
 select count(*), ne."Grade", codedcrp
 from naacr.extract@kumc ne
 left join (
@@ -42,7 +42,6 @@ on ne."Grade" = nc.codenbr
 group by ne."Grade", codedcrp
 order by 1 desc
 ;
-*/
  
 
 /**
@@ -86,7 +85,7 @@ order by "Accession Number--Hosp", "Sequence Number--Hospital", concept_cd
 
 /**
  * Treatments: in progress. @@TODO
- */
+
 select "Accession Number--Hosp"
      , "Sequence Number--Hospital"
      , ItemName
@@ -111,21 +110,20 @@ where ItemName in (
 , 'RX Hosp--Other'
 , 'RX Hosp--DX/Stg Proc'
 , 'RX Hosp--Palliative Proc'
-/*, 'RX Hosp--Surg Site 98-02'
-, 'RX Hosp--Scope Reg 98-02' -- @@ '0' code has no codedcrp
-, 'RX Hosp--Surg Oth 98-02' -- @@ '0' code has no codedcrp
-*/
+--, 'RX Hosp--Surg Site 98-02'
+--, 'RX Hosp--Scope Reg 98-02' -- @@ '0' code has no codedcrp
+--, 'RX Hosp--Surg Oth 98-02' -- @@ '0' code has no codedcrp
 )
 and value is not null
 order by 1, 2;
 
-/* Codes for treatments. */
+-- Codes for treatments.
 select *
 from naacr.t_item ni
 join naacr.t_code nc
   on nc.itemid = ni."ItemID"
 where ni."ItemName" like '%RX Hosp%';
-
+*/
 
 
 /**
@@ -204,9 +202,8 @@ where d."Accession Number--Hosp" is not null
 and value is not null
 ;
 
-select *
-from tumor_demo_admin
-order by "Accession Number--Hosp";
+-- eyeball it:
+-- select * from tumor_demo_admin order by "Accession Number--Hosp";
 
 /* TODO: what's up with these uncoded items? esp. Class of Case
 select distinct itemname, value
@@ -227,7 +224,18 @@ where ni."ItemName" = 'Class of Case';
 */
 
 
+/**
+ * i2b2 style visit info
+ */
+create or replace view tumor_reg_visits as
+select ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital"
+       as encounter_ide
+     , ne."Patient ID Number" as MRN
+from naacr.extract ne;
 
+/**
+ * i2b2 style facts
+ */
 create or replace view tumor_reg_facts as
 select
   ne."Patient ID Number" as MRN,
@@ -276,6 +284,5 @@ from tumor_demo_admin tda
  on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
 and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital";
 
-select *
-from tumor_reg_facts
-order by mrn, encounter_ide;
+-- eyeball it:
+-- select * from tumor_reg_facts order by mrn, encounter_ide;
