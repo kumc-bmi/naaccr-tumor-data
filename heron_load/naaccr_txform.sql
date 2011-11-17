@@ -1,9 +1,17 @@
+/** naaccr_txform -- transform NAACCR data to fit i2b2 star schema
+ */
 
+-- test that we're in the KUMC sid with the NAACCR data
+-- note mis-spelling of schema name: naacr
+select "Accession Number--Hosp" from naacr.extract where 1=0;
+
+whenever sqlerror continue; -- in case index is already there
 create index patient_id on naacr.extract (
   "Patient ID Number");
   
 create index accession on naacr.extract (
   "Accession Number--Hosp", "Sequence Number--Hospital");
+whenever sqlerror exit;
 
 /* would be unique but for a handful of dups:
 select * from
@@ -231,7 +239,16 @@ create or replace view tumor_reg_visits as
 select ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital"
        as encounter_ide
      , ne."Patient ID Number" as MRN
-from naacr.extract ne;
+from naacr.extract ne
+where ne."Accession Number--Hosp" is not null
+and ne."Accession Number--Hosp" not in (
+  '200801856'
+, '199601553'
+, '200200890'
+);
+
+-- select count(*) from tumor_reg_visits;
+-- 65576
 
 /**
  * i2b2 style facts
@@ -282,7 +299,10 @@ from tumor_demo_admin tda
 
 ) av
  on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
-and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital";
+and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital"
+/* TODO: figure out what's up with the 42 records with no Date of Diagnosis */
+where ne."Date of Diagnosis" is not null
+;
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by mrn, encounter_ide;
