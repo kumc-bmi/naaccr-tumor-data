@@ -12,15 +12,20 @@ def main(argv,
          spec_text_filename='naaccr12_1.txt',
          schema='NAACR',
          table='EXTRACT',
+         view='EXTRACT_EAV',
          ctl='naaccr_extract.ctl',
          ddl='naaccr_extract.sql'):
     #record_layout_filename = argv[1]
     #spec = to_schema(open(record_layout_filename))
     spec = list(grok_schema(open(spec_text_filename)))
     write_iter(open(ctl, "w"), make_ctl(spec, table, schema))
-    write_iter(open(ddl, "w"), table_ddl(spec, table, schema))
+    ddlfp = open(ddl, "w")
+    write_iter(ddlfp, table_ddl(spec, table, schema))
+    ddlfp.write(';\n')
+    write_iter(ddlfp, eav_view_ddl(spec, table, view, schema))
+    ddlfp.write(';\n')
 
-    
+
 def explore(record_layout_filename, data_filename):
     import pprint
     naaccr_schema = to_schema(open(record_layout_filename))
@@ -40,7 +45,7 @@ def explore(record_layout_filename, data_filename):
 
 def to_schema(infp):
     rows = csv.reader(infp)
-    header = rows.next()
+    rows.next() # skip header
     return [Item._make(map(int, [start, end, length or 0, num.replace(',' ,'')])
                        + map(strip, [name, section, note]))
             for (start, end, length, num, name, section, note) in
@@ -123,10 +128,26 @@ INTO TABLE "%s"."%s" (
 
 def table_ddl(spec, table, schema):
     yield 'create table "%s"."%s" (\n' % (schema, table)
-    first = True
     yield ',\n'.join(['"%s" varchar2(%d)' % (i.name, i.length)
                       for i in spec if i.length])
     yield '\n)\n'
+
+
+def eav_view_ddl(spec, table, view, schema):
+    yield 'create or replace view "%s"."%s" as \n' % (schema, view)
+    for item in spec:
+        if (item.length < 1
+            or item.name in ('Accession Number--Hosp',
+                             'Sequence Number--Hospital')
+            or not item.num):
+            continue
+        if item.num != 10:
+            yield '\nunion all\n'
+        yield 'select "Accession Number--Hosp", "Sequence Number--Hospital", \n'
+        yield '%s as ItemNbr,\n' % item.num
+        yield '\'%s\' as ItemName,\n' % item.name
+        yield '"%s" as value\n' % item.name
+        yield 'from "%s"."%s"\n' % (schema, table)
 
 
 def write_iter(outfp, itr):
