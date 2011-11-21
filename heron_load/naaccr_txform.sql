@@ -38,6 +38,19 @@ having count(*) > 1
 );
 
 
+/* Race analysis/sanity check: How many of each?
+ odd: no codecrp for 16, 17 */
+select count(*), ne."Race 1", nc.codedcrp
+from naacr.extract@kumc ne
+join naacr.t_code nc
+  on ne."Race 1" = nc.codenbr
+join naacr.t_item ni
+  on ni."ItemID" = nc.itemid
+where ni."ItemName" = 'Race 1'
+group by ne."Race 1", nc.codedcrp
+order by 1 desc
+;
+
 
 /* Grade: how many of each kind? */
 select count(*), ne."Grade", codedcrp
@@ -102,143 +115,268 @@ order by "Accession Number--Hosp", "Sequence Number--Hospital", concept_cd
 ;
 
 
-/**
- * Treatments: in progress. @@TODO
 
-select "Accession Number--Hosp"
-     , "Sequence Number--Hospital"
-     , ItemName
-     , value as codenbr
-     , '@' as tval_char
-     , nc.codedcrp
-from "NAACR"."EXTRACT_EAV" ne
-join naacr.t_item ni on ne.ItemName = ni."ItemName"
+/********
+ * "the big flat approach"
+
+TODO: ISSUE: There are lots of codes for lack of information, e.g.
+  - Grade/differentiation unknown, not stated, or not applicable
+  - No further race documented
+  - Unknown whether Spanish or not
+  - Insurance status unknown
+Do we want to record these as facts?
+
+-- tricky: Cause of Death. ICD7-10 codes.
+
+ */
+
+
+/* Review sections based on ItemName, CodedCRP
+select ns.sectionid, ns.section
+     , ni."ItemNbr" as ItemNbr, ni."ItemName"
+     , nc.codenbr, nc.codedcrp
+     , ni."AllowValue", ni."Format"
+from naacr.t_item ni
+join NAACR.t_section ns on ns.sectionid = ni."SectionID"
+left join naacr.t_code nc on nc.itemid = ni."ItemID"
+where ni."SectionID" in (
+   -- This list was built a la:
+   -- select ', ' || sectionid || ' -- ' || section
+   -- from naacr.t_section;
+  1 -- Cancer Identification
+, 2 -- Demographic
+-- , 3 -- Edit Overrides/Conversion History/System Admin
+, 4 -- Follow-up/Recurrence/Death
+-- , 5 -- Hospital-Confidential
+, 6 -- Hospital-Specific
+-- , 7 -- Other-Confidential
+-- , 8 -- Patient-Confidential
+-- , 9 -- Record ID
+-- , 10 -- Special Use
+, 11 -- Stage/Prognostic Factors
+-- , 12 -- Text-Diagnosis
+-- , 13 -- Text-Miscellaneous
+-- , 14 -- Text-Treatment
+-- , 15 -- Treatment-1st Course
+, 16 -- Treatment-Subsequent & Other
+, 17 -- Pathology
+)
+and length(nc.codenbr) < 8  -- exclude case where description of code is given rather than a code
+and nc.codenbr <> 'Blank'
+order by ns.sectionid, to_number(ni."ItemNbr"), nc.codenbr
+;
+*/
+
+
+/**
+ * Review distinct attributes, values; eliminate PHI.
+ * TODO: store these in the ID repository and de-id later
+ * -- TODO: numeric values for section 11 -- Stage/Prognostic Factors
+ * -- Tumor Size: what the heck do the values mean???
+ * -- select * from naacr.t_item ni where ni."ItemNbr" = '780';
+ * -- Regional Nodes Positive
+ *    seems to be a mixture of numeric and coded (90-99) data. ugh.
+
+select distinct ns.SectionID, ns.section, to_number(ne.ItemNbr), ne.ItemName
+     , ne.value, nc.codedcrp
+from NAACR.extract_eav ne
+join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
+join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
 left join naacr.t_code nc
   on nc.itemid = ni."ItemID"
  and nc.codenbr = ne.value
-where ItemName in (
-  'RX Hosp--Surg App 2010'
-, 'RX Hosp--Surg Prim Site'
-, 'RX Hosp--Scope Reg LN Sur'
-, 'RX Hosp--Surg Oth Reg/Dis'
-, 'RX Hosp--Reg LN Removed'
-, 'RX Hosp--Radiation'
-, 'RX Hosp--Chemo'
-, 'RX Hosp--Hormone'
-, 'RX Hosp--BRM'
-, 'RX Hosp--Other'
-, 'RX Hosp--DX/Stg Proc'
-, 'RX Hosp--Palliative Proc'
---, 'RX Hosp--Surg Site 98-02'
---, 'RX Hosp--Scope Reg 98-02' -- @@ '0' code has no codedcrp
---, 'RX Hosp--Surg Oth 98-02' -- @@ '0' code has no codedcrp
+where ne.value is not null
+-- and ni."Format" != 'YYYYMMDD'
+and ns.SectionID in (
+  1 -- Cancer Identification
+ , 2 -- Demographic
+-- , 3 -- Edit Overrides/Conversion History/System Admin
+ , 4 -- Follow-up/Recurrence/Death
+-- , 5 -- Hospital-Confidential
+ , 6 -- Hospital-Specific
+-- , 7 -- Other-Confidential
+-- , 8 -- Patient-Confidential
+-- , 9 -- Record ID
+-- , 10 -- Special Use
+-- , 11 -- Stage/Prognostic Factors -- TODO: numeric stuff
+-- , 12 -- Text-Diagnosis
+-- , 13 -- Text-Miscellaneous
+-- , 14 -- Text-Treatment
+-- , 15 -- Treatment-1st Course
+, 16 -- Treatment-Subsequent & Other
+, 17 -- Pathology
 )
-and value is not null
-order by 1, 2;
-
--- Codes for treatments.
-select *
-from naacr.t_item ni
-join naacr.t_code nc
-  on nc.itemid = ni."ItemID"
-where ni."ItemName" like '%RX Hosp%';
-*/
-
-
-/**
- * Demographic, Administrative data
+-- TODO: store these in the ID repository and de-id later
+and ni."AllowValue" not like 'City name or UNKNOWN'
+and ni."AllowValue" not like 'Reference to EDITS table BPLACE.DBF in Appendix B'
+and ni."AllowValue" not like '5-digit or 9-digit U.S. ZIP codes%'
+and ni."AllowValue" not like 'Census Tract Codes%'
+and ni."AllowValue" not like 'See Appendix A for standard FIPS county codes%'
+and ni."AllowValue" not like 'See Appendix A for county codes for each state.%'
+and ni."ItemName" not like 'Age at Diagnosis'
+and ni."ItemName" not like 'Text--%'
+and ni."ItemName" not like 'Place of Death'
+order by 1, 2, 3, 4, 5
+;
  */
 
-/* Race analysis: How many of each?
- odd: no codecrp for 16, 17 */
-select count(*), ne."Race 1", nc.codedcrp
-from naacr.extract@kumc ne
-join naacr.t_code nc
-  on ne."Race 1" = nc.codenbr
-join naacr.t_item ni
-  on ni."ItemID" = nc.itemid
-where ni."ItemName" = 'Race 1'
-group by ne."Race 1", nc.codedcrp
-order by 1 desc
+
+
+/*****
+ * Date parsing. Ugh.
+ 
+ p. 97:
+ "Below are the common formats to handle the situation where only
+  certain components of date are known.
+  YYYYMMDD – when complete date is known and valid
+  YYYYMM – when year and month are known and valid, and day is unknown
+  YYYY – when year is known and valid, and month and day are unknown
+  Blank – when no known date applies"
+
+But we also see wierdness such as '    2009' and '19719999'; see
+test cases below.
+*/
+select itemname,  to_date(
+  case
+  when value in ('00000000', '99999999', '99990') then null
+  when length(trim(value)) = 4 then value || '0101'
+  when length(value) = 6 then value || '01'
+  when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
+  else value
+  end,
+  'yyyymmdd') as start_date
+from (
+select 'normal' as itemname, '19700101' as value from dual
+union all
+select 'no day' as itemname, '197001' as value from dual
+union all
+select 'no month' as itemname, '1970' as value from dual
+union all
+select 'leading space' as itemname, '    1970' as value from dual
+union all
+select 'no month, variation' as itemname, '19709999' as value from dual
+union all
+select 'all 9s' as itemname, '99999999' as value from dual
+union all
+select 'all 0s' as itemname, '00000000' as value from dual
+union all
+select 'almost all 9s' as itemname, '99990' as value from dual
+)
 ;
 
-
-create or replace view tumor_demo_admin as
-select d."Accession Number--Hosp"
-     , d."Sequence Number--Hospital"
-     , d.start_date
-     , d.value
-     , d.ItemNbr
-     , d.ItemName
-     , nc.codedcrp
-     , 'NAACCR|' || d.ItemNbr || ':' || d.codenbr as concept_cd
-     , d.codenbr
-from (
+/* This is the main big flat view. */
+create or replace view tumor_item_value as
 select "Accession Number--Hosp"
      , "Sequence Number--Hospital"
-     , to_date(null) as start_date
-     , ItemNbr
-     , ItemName
-     , value
-     , value as codenbr
-from "NAACR"."EXTRACT_EAV"
-where ItemName in (
-  'Race 1', 'Sex'
-, 'Laterality'
-, 'Diagnostic Confirmation'
-, 'Inpatient Status'
-, 'Class of Case' -- @@ no concept name (codedcrp) for codenbr 10
-, 'Primary Payer at DX'
+     , ns.sectionid
+     , ne.ItemNbr
+     , ne.value
+     , case when ni."Format" = 'YYYYMMDD'
+       then to_date(case
+         when value in ('00000000', '99999999', '99990') then null
+         when length(trim(value)) = 4 then value || '0101'
+         when length(value) = 6 then value || '01'
+         when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
+         else value
+         end, 'yyyymmdd')
+       else null end
+       as start_date
+     , 'NAACR|' || ne.ItemNbr || ':' || (
+         case when ni."Format" = 'YYYYMMDD' then null
+         else value end) as concept_cd
+     , ns.section
+     , ni."ItemName" as ItemName
+     , nc.codedcrp
+from NAACR.extract_eav ne
+join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
+join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
+left join naacr.t_code nc
+  on nc.itemid = ni."ItemID"
+ and nc.codenbr = ne.value
+where ne.value is not null
+
+and ni."SectionID" in (
+  1 -- Cancer Identification
+ , 2 -- Demographic
+-- , 3 -- Edit Overrides/Conversion History/System Admin
+ , 4 -- Follow-up/Recurrence/Death
+-- , 5 -- Hospital-Confidential
+ , 6 -- Hospital-Specific
+-- , 7 -- Other-Confidential
+-- , 8 -- Patient-Confidential
+-- , 9 -- Record ID
+-- , 10 -- Special Use
+-- , 11 -- Stage/Prognostic Factors -- TODO: numeric stuff
+-- , 12 -- Text-Diagnosis
+-- , 13 -- Text-Miscellaneous
+-- , 14 -- Text-Treatment
+-- , 15 -- Treatment-1st Course
+, 16 -- Treatment-Subsequent & Other
+, 17 -- Pathology
+)
+-- TODO: store these in the ID star schema and de-id later.
+and ni."AllowValue" not like 'City name or UNKNOWN'
+and ni."AllowValue" not like 'Reference to EDITS table BPLACE.DBF in Appendix B'
+and ni."AllowValue" not like '5-digit or 9-digit U.S. ZIP codes%'
+and ni."AllowValue" not like 'Census Tract Codes%'
+and ni."AllowValue" not like 'See Appendix A for standard FIPS county codes%'
+and ni."AllowValue" not like 'See Appendix A for county codes for each state.%'
+and ni."AllowValue" not like '10-digit number'
+and ni."ItemName" not like 'Age at Diagnosis'
+and ni."ItemName" not like 'Text--%'
+and ni."ItemName" not like 'Place of Death'
+and ni."ItemName" not like 'Abstracted By'
+and ni."ItemName" not like 'NPI--Archive FIN'
+and ni."ItemName" not like 'NPI--Reporting Facility'
+
+and ne."Accession Number--Hosp" is not null
+and ne."Accession Number--Hosp" not in (
+  '200801856'
+, '199601553'
+, '200200890'
 )
 
-union all
-
-select "Accession Number--Hosp"
-     , "Sequence Number--Hospital"
-     , to_date(case length(value)
-       when 8 then value
-       when 6 then value || '01'
-       when 4 then value || '0101' end, 'yyyymmdd') as start_date
-     , ItemNbr
-     , ItemName
-     , value
-     , null as codenbr
-
-from "NAACR"."EXTRACT_EAV" ne
-where ItemName in (
-  'Date of Birth'
-, 'Date of 1st Contact'
-, 'Date of Inpatient Adm'
-, 'Date of Inpatient Disch'
-  )
-and length(value) in (4, 6, 8)
-) d
-join naacr.t_item ni on ni."ItemName" = d.itemname
-left join naacr.t_code nc on nc.itemid = ni."ItemID" and nc.codenbr = d.codenbr
-where d."Accession Number--Hosp" is not null
-and value is not null
 ;
+/* eyeball it:
 
--- eyeball it:
--- select * from tumor_demo_admin order by "Accession Number--Hosp";
+select * from tumor_item_value
+where "Accession Number--Hosp"='193800001'
+ and "Sequence Number--Hospital" = 1
+order by to_number(SectionID), 1, 2, 3;
+*/
 
-/* TODO: what's up with these uncoded items? esp. Class of Case
-select distinct itemname, value
-from tumor_demo_admin
-where codedcrp is null
-and valtype_cd = '@'
-order by 1, 2;
 
+/* ontology exploration
+
+todo: check that facts such as Class of Case have ontology metadata
+
+create database link deid
+using '(DESCRIPTION=
+            (ADDRESS_LIST=
+              (ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=5521)) )
+            (CONNECT_DATA= (SERVICE_NAME=BHeronFB) ) )';
+select 1+1 from dual@deid;
+
+select *
+from i2b2metadata2.naaccr_ontology@deid
+where c_hlevel=2
+order by c_name;
+
+select *
+from i2b2metadata2.naaccr_ontology@deid
+where c_fullname like '%Married%'
+order by c_name;
 
 select *
 from naacr.t_item ni
-where ni."ItemName" = 'Class of Case';
+where ni."ItemName" like '%Stage%';
 
-select ni."ItemName", nc.*
-from naacr.t_item ni
-join naacr.t_code nc on ni."ItemID" = nc.itemid
-where ni."ItemName" = 'Class of Case';
+select *
+from naacr.t_code nc
+where nc.codenbr='I';
 */
+
+
 
 
 /**
@@ -295,15 +433,15 @@ select tgsh."Accession Number--Hosp"
      , tgsh.concept_cd
      , tgsh.ItemName
      , tgsh.codedcrp
-from tumor_grade_site_histology tgsh
+from tumor_item_value tgsh
 union all
-select tda."Accession Number--Hosp"
-     , tda."Sequence Number--Hospital"
-     , tda.start_date
-     , tda.concept_cd
-     , tda.ItemName
-     , tda.codedcrp
-from tumor_demo_admin tda
+select tiv."Accession Number--Hosp"
+     , tiv."Sequence Number--Hospital"
+     , tiv.start_date
+     , tiv.concept_cd
+     , tiv.ItemName
+     , tiv.codedcrp
+from tumor_item_value tiv
 
 ) av
  on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
@@ -313,4 +451,4 @@ where length(ne."Date of Diagnosis") in (4, 6, 8)
 ;
 
 -- eyeball it:
--- select * from tumor_reg_facts order by start_date desc, mrn, encounter_ide;
+-- select * from tumor_reg_facts order by mrn desc, start_date desc, encounter_ide;
