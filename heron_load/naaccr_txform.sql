@@ -114,7 +114,10 @@ where "Accession Number--Hosp" is not null
 order by "Accession Number--Hosp", "Sequence Number--Hospital", concept_cd
 ;
 
+/* eyeball it
 
+select * from tumor_grade_site_histology;
+*/
 
 /********
  * "the big flat approach"
@@ -281,7 +284,7 @@ select "Accession Number--Hosp"
          end, 'yyyymmdd')
        else null end
        as start_date
-     , 'NAACR|' || ne.ItemNbr || ':' || (
+     , 'NAACCR|' || ne.ItemNbr || ':' || (
          case when ni."Format" = 'YYYYMMDD' then null
          else value end) as concept_cd
      , ns.section
@@ -433,7 +436,7 @@ select tgsh."Accession Number--Hosp"
      , tgsh.concept_cd
      , tgsh.ItemName
      , tgsh.codedcrp
-from tumor_item_value tgsh
+from tumor_grade_site_histology tgsh
 union all
 select tiv."Accession Number--Hosp"
      , tiv."Sequence Number--Hospital"
@@ -452,3 +455,12 @@ where length(ne."Date of Diagnosis") in (4, 6, 8)
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by mrn desc, start_date desc, encounter_ide;
+
+/* count facts by scheme
+
+select count(*), scheme from(
+select substr(f.concept_cd, 1, instr(f.concept_cd, ':')) scheme
+from tumor_reg_facts f)
+group by scheme
+order by 1 desc;
+*/
