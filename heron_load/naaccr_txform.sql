@@ -399,6 +399,20 @@ and ne."Accession Number--Hosp" not in (
  * i2b2 style facts
  */
 create or replace view tumor_reg_facts as
+select MRN, encounter_ide
+     , concept_cd, ItemName
+     , '@' provider_id
+     , start_date
+     , '@' modifier_cd
+     , '@' as valtype_cd
+     , '@' as tval_char
+     , to_number(null) as nval_num
+     , null as valueflag_cd
+     , null as units_cd
+     , start_date as end_date
+     , '@' location_cd
+     , to_date(null) as update_date
+from (
 select
   ne."Patient ID Number" as MRN,
   ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide,
@@ -406,24 +420,12 @@ select
   av.ItemName,
 -- codedcrp is not unique; causes duplicate key errors in observation_fact
 --  av.codedcrp,
-  '@' provider_id,
   case when av.start_date is not null then av.start_date
   else to_date(case length(ne."Date of Diagnosis")
                when 8 then ne."Date of Diagnosis"
                when 6 then ne."Date of Diagnosis" || '01'
                when 4 then ne."Date of Diagnosis" || '0101'
-               end, 'yyyymmdd') end as start_date,
-  '@' modifier_cd,
-  '@' as valtype_cd,
-  '@' as tval_char,
-  to_number(null) as nval_num,
-  null as valueflag_cd,
-  null as units_cd,
-  av.start_date as end_date,
-  '@' location_cd,
-  to_date(null) as update_date
-  /* to_date(ne."Date of Last Contact", 'yyyymmdd') as update_date
-     gives: ORA-01843: not a valid month */
+               end, 'yyyymmdd') end as start_date
 from naacr.extract ne
 join (
 select tgsh."Accession Number--Hosp"
@@ -452,7 +454,7 @@ and ne."Accession Number--Hosp" not in (
   '200801856'
 , '199601553'
 , '200200890'
-)
+))
 ;
 
 -- eyeball it:
