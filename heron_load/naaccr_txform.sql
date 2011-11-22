@@ -289,13 +289,10 @@ select "Accession Number--Hosp"
          else value end) as concept_cd
      , ns.section
      , ni."ItemName" as ItemName
-     , nc.codedcrp
+     , ni."ItemID" as ItemID
 from NAACR.extract_eav ne
 join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
 join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-left join naacr.t_code nc
-  on nc.itemid = ni."ItemID"
- and nc.codenbr = ne.value
 where ne.value is not null
 
 and ni."SectionID" in (
@@ -331,18 +328,16 @@ and ni."ItemName" not like 'Place of Death'
 and ni."ItemName" not like 'Abstracted By'
 and ni."ItemName" not like 'NPI--Archive FIN'
 and ni."ItemName" not like 'NPI--Reporting Facility'
-
-and ne."Accession Number--Hosp" is not null
-and ne."Accession Number--Hosp" not in (
-  '200801856'
-, '199601553'
-, '200200890'
-)
-
 ;
 /* eyeball it:
 
-select * from tumor_item_value
+select tiv.*
+     , nc.codedcrp
+ from tumor_item_value tiv
+left join naacr.t_code nc
+  on tiv.itemid = tiv.ItemID
+ and nc.codenbr = tiv.value
+
 where "Accession Number--Hosp"='193800001'
  and "Sequence Number--Hospital" = 1
 order by to_number(SectionID), 1, 2, 3;
@@ -409,7 +404,8 @@ select
   ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide,
   av.concept_cd,
   av.ItemName,
-  av.codedcrp,
+-- codedcrp is not unique; causes duplicate key errors in observation_fact
+--  av.codedcrp,
   '@' provider_id,
   case when av.start_date is not null then av.start_date
   else to_date(case length(ne."Date of Diagnosis")
@@ -435,7 +431,7 @@ select tgsh."Accession Number--Hosp"
      , to_date(null) as start_date
      , tgsh.concept_cd
      , tgsh.ItemName
-     , tgsh.codedcrp
+--     , tgsh.codedcrp
 from tumor_grade_site_histology tgsh
 union all
 select tiv."Accession Number--Hosp"
@@ -443,18 +439,50 @@ select tiv."Accession Number--Hosp"
      , tiv.start_date
      , tiv.concept_cd
      , tiv.ItemName
-     , tiv.codedcrp
+--     , tiv.codedcrp
 from tumor_item_value tiv
 
 ) av
  on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
 and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital"
-where length(ne."Date of Diagnosis") in (4, 6, 8)
+where ne."Date of Diagnosis" is not null
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis */
+and ne."Accession Number--Hosp" is not null
+and ne."Accession Number--Hosp" not in (
+  '200801856'
+, '199601553'
+, '200200890'
+)
 ;
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by mrn desc, start_date desc, encounter_ide;
+
+/* Duplicate keys? */
+select case when count(*) > 0 then 1/0 else 1 end as tumor_fact_keys_unique
+from (
+select count(*), ENCOUNTER_ide, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD
+from tumor_reg_facts f
+group by ENCOUNTER_ide, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD
+having count(*) > 1
+order by 1 desc);
+
+/*ugh: multiple codedcrp s:
+select tiv."Accession Number--Hosp"
+     , tiv."Sequence Number--Hospital"
+     , tiv.start_date
+     , tiv.concept_cd
+     , tiv.ItemName
+     , tiv.codedcrp
+from tumor_item_value tiv
+where tiv."Accession Number--Hosp"='196900417'
+and tiv."Sequence Number--Hospital"='00'
+and tiv.concept_cd='NAACCR|190:6';
+
+Spanish, NOS
+Hispanic, NOS
+Latino, NOS
+*/
 
 /* count facts by scheme
 
