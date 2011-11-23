@@ -287,6 +287,8 @@ select "Accession Number--Hosp"
      , 'NAACCR|' || ne.ItemNbr || ':' || (
          case when ni."Format" = 'YYYYMMDD' then null
          else value end) as concept_cd
+     , case when ni."Format" = 'YYYYMMDD' then null
+       else value end as codenbr
      , ns.section
      , ni."ItemName" as ItemName
      , ni."ItemID" as ItemID
@@ -342,39 +344,6 @@ where "Accession Number--Hosp"='193800001'
  and "Sequence Number--Hospital" = 1
 order by to_number(SectionID), 1, 2, 3;
 */
-
-
-/* ontology exploration
-
-todo: check that facts such as Class of Case have ontology metadata
-
-create database link deid
-using '(DESCRIPTION=
-            (ADDRESS_LIST=
-              (ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=5521)) )
-            (CONNECT_DATA= (SERVICE_NAME=BHeronFB) ) )';
-select 1+1 from dual@deid;
-
-select *
-from i2b2metadata2.naaccr_ontology@deid
-where c_hlevel=2
-order by c_name;
-
-select *
-from i2b2metadata2.naaccr_ontology@deid
-where c_fullname like '%Married%'
-order by c_name;
-
-select *
-from naacr.t_item ni
-where ni."ItemName" like '%Stage%';
-
-select *
-from naacr.t_code nc
-where nc.codenbr='I';
-*/
-
-
 
 
 /**
