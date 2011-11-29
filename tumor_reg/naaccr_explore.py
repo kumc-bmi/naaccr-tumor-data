@@ -1,3 +1,4 @@
+# see Makefile for usage
 
 import sys
 import csv
@@ -8,15 +9,12 @@ Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
 
 def main(argv,
-         record_layout_filename='record_layout.csv',
          spec_text_filename='naaccr12_1.txt',
          schema='NAACR',
          table='EXTRACT',
          view='EXTRACT_EAV',
          ctl='naaccr_extract.ctl',
          ddl='naaccr_extract.sql'):
-    #record_layout_filename = argv[1]
-    #spec = to_schema(open(record_layout_filename))
     spec = list(grok_schema(open(spec_text_filename)))
     write_iter(open(ctl, "w"), make_ctl(spec, table, schema))
     ddlfp = open(ddl, "w")
@@ -166,7 +164,5 @@ def parse_record(line, schema):
 
 
 if __name__ == '__main__':
-    #record_layout_filename, data_filename = sys.argv[1:3]
-    #explore(record_layout_filename, data_filename)
     main(sys.argv)
 
