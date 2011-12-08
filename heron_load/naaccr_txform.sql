@@ -4,6 +4,10 @@
 -- test that we're in the KUMC sid with the NAACCR data
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
+select "Accession Number--Hosp" from naacr.extract_eav where 1=0;
+
+-- check for metadata tables
+select * from naacr.t_item where 1=0;
 
 alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 
@@ -41,7 +45,7 @@ having count(*) > 1
 /* Race analysis/sanity check: How many of each?
  odd: no codecrp for 16, 17 */
 select count(*), ne."Race 1", nc.codedcrp
-from naacr.extract@kumc ne
+from naacr.extract ne
 join naacr.t_code nc
   on ne."Race 1" = nc.codenbr
 join naacr.t_item ni
@@ -54,7 +58,7 @@ order by 1 desc
 
 /* Grade: how many of each kind? */
 select count(*), ne."Grade", codedcrp
-from naacr.extract@kumc ne
+from naacr.extract ne
 left join (
  select nc.codenbr, nc.codedcrp
  from naacr.t_code nc
@@ -65,59 +69,7 @@ on ne."Grade" = nc.codenbr
 group by ne."Grade", codedcrp
 order by 1 desc
 ;
- 
 
-/**
- * Grade, Site, Histology
- * concept_cd follows ontology from Jack London
- *  <jack.london@KimmelCancerCenter.org> 8/18/2011 11:13 AM
- */
-create or replace view tumor_grade_site_histology as
-select d.*, nc.codedcrp from (
-select ne."Accession Number--Hosp"
-     , ne."Sequence Number--Hospital"
-     , 'TR|Grade:' || ne."Grade" as concept_cd
-     , 'Grade' as ItemName
-     , ne."Grade" as value
-
-from naacr.extract ne
-
-union all
-
-select ne."Accession Number--Hosp"
-     , ne."Sequence Number--Hospital"
-     , 'TR|Site:' || ne."Primary Site" as concept_cd
-     , 'Primary Site' as ItemName
-     , ne."Primary Site" as value
-from naacr.extract ne
-
-
-union all
-select ne."Accession Number--Hosp"
-     , ne."Sequence Number--Hospital"
-     , 'TR|S:' || ne."Primary Site" || '|H:' || ne."Morph--Type&Behav ICD-O-3" as concept_cd
-     , 'Morph--Type&Behav ICD-O-3' as ItemName
-     , ne."Morph--Type&Behav ICD-O-3" as value
-from naacr.extract ne
-
-/*
-separate facts for , 'Histologic Type ICD-O-3'
-, 'Behavior Code ICD-O-3'
-?
-There don't seem to be codes on t_code.
-*/
-
-) d
-join naacr.t_item ni on ni."ItemName" = d.itemname
-left join naacr.t_code nc on nc.itemid = ni."ItemID" and nc.codenbr = d.value
-where "Accession Number--Hosp" is not null
-order by "Accession Number--Hosp", "Sequence Number--Hospital", concept_cd
-;
-
-/* eyeball it
-
-select * from tumor_grade_site_histology;
-*/
 
 /********
  * "the big flat approach"
@@ -239,7 +191,7 @@ order by 1, 2, 3, 4, 5
 But we also see wierdness such as '    2009' and '19719999'; see
 test cases below.
 */
-select itemname,  to_date(
+select itemname,  value, to_date(
   case
   when value in ('00000000', '99999999', '99990') then null
   when length(trim(value)) = 4 then value || '0101'
@@ -339,6 +291,7 @@ select tiv.*
 left join naacr.t_code nc
   on tiv.itemid = tiv.ItemID
  and nc.codenbr = tiv.value
+order by to_number(SectionID), 1, 2, 3;
 
 where "Accession Number--Hosp"='193800001'
  and "Sequence Number--Hospital" = 1
@@ -361,6 +314,7 @@ and ne."Accession Number--Hosp" not in (
 , '200200890'
 );
 
+-- select * from tumor_reg_visits;
 -- select count(*) from tumor_reg_visits;
 -- 65576
 
@@ -373,6 +327,7 @@ select MRN, encounter_ide
      , '@' provider_id
      , start_date
      , '@' modifier_cd
+     , 1 instance_num
      , '@' as valtype_cd
      , '@' as tval_char
      , to_number(null) as nval_num
