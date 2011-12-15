@@ -352,14 +352,6 @@ select
                end, 'yyyymmdd') end as start_date
 from naacr.extract ne
 join (
-select tgsh."Accession Number--Hosp"
-     , tgsh."Sequence Number--Hospital"
-     , to_date(null) as start_date
-     , tgsh.concept_cd
-     , tgsh.ItemName
---     , tgsh.codedcrp
-from tumor_grade_site_histology tgsh
-union all
 select tiv."Accession Number--Hosp"
      , tiv."Sequence Number--Hospital"
      , tiv.start_date
