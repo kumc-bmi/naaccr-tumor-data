@@ -2,6 +2,7 @@
 '''
 
 import logging
+import pprint
 
 from lxml import etree
 
@@ -9,31 +10,45 @@ log = logging.getLogger(__name__)
 
 
 def main(argv):
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     pgfn = argv[1]
-    seer_parse(open(pgfn))
+
+    terms, rules = seer_parse(open(pgfn))
+
+    log.info('terms:\n%s', pprint.pformat(terms))
+    log.info('rules:\n%s', pprint.pformat(rules))
 
 
 def seer_parse(fp):
     doc = etree.HTML(fp.read())
-    t1 = doc.xpath('.//table')[0]
-    log.debug('rows in main table: %s', len(t1))
+    tbl1 = doc.xpath('.//table')[0]
 
+    terms = []
     parents = []
     prev_label = None
-    rowspan = 0
+    term_id = 0
+
+    rules = []
+    hist_span = 0
     icdo3histology = None
+    recode_span = 0
+    recode = None
 
-    for site_row in t1.xpath('tr[td/@headers="site"]'):
-        icdo3site, icdo3histology, recode, rowspan = grok_row(
-            site_row, rowspan, icdo3histology)
-
+    for site_row in tbl1:
         indent, label = build_site_tree(site_row, prev_label, parents)
+        if label:
+            term_id += 1
+            log.debug('term: %s', (term_id, label, parents))
+            terms.append((term_id, label, [l for i, l in parents]))
 
-        log.debug('site: %s %s\n%s', '*' * indent, label, parents)
-        log.debug('recode: %s, %s -> %s', icdo3site, icdo3histology, recode)
+        icdo3site, icdo3histology, recode, hist_span, recode_span = grok_row(
+            site_row, icdo3histology, recode, hist_span, recode_span)
+        if recode:
+            rules.append((term_id, label, icdo3site, icdo3histology, recode))
 
         prev_label = label
+
+    return terms, rules
 
 
 def build_site_tree(site_row, prev_label, parents):
@@ -42,9 +57,15 @@ def build_site_tree(site_row, prev_label, parents):
     ... #doctest: +NORMALIZE_WHITESPACE
     (23, 'Lip')
     '''
-    indent_txt = site_row.xpath('td[1]/table/tr/td')[0].text
+    tds = site_row.xpath('td[@headers="site"]')
+    if tds:
+        site_td = tds[0]
+    else:
+        return None, None
+
+    indent_txt = site_td.xpath('table/tr/td')[0].text
     indent = len(indent_txt) if indent_txt else 0
-    label = site_row.xpath('td[1]/table/tr/td')[1].text.strip()
+    label = t(site_td.xpath('table/tr/td')[1])
 
     while parents and indent < parents[-1][0]:
         parents.pop()
@@ -54,29 +75,41 @@ def build_site_tree(site_row, prev_label, parents):
     return indent, label
 
 
-def grok_row(site_row, rowspan, icdo3histology):
+def grok_row(site_row, icdo3histology, recode, hist_span, recode_span):
     '''
     >>> grok_row(etree.fromstring(TEST_ROW_LIP), 1, None)
     ... #doctest: +NORMALIZE_WHITESPACE
     ('C000-C009', 'excluding 9590-9989, and sometimes 9050-9055, 9140',
      '20010', 10)
     '''
+    if not site_row.xpath('td[@headers]'):
+        log.debug('not a recode row: %s', etree.tostring(site_row))
+        return None, None, None, None, None
+
     def td(n):
         tds = [td for td in site_row if n in td.attrib['headers']]
         return tds[0] if tds else None
 
-    def t(elt):
-        return ' '.join(elt.text.split()) if elt else None
+    def spanning(span, txt, n):
+        if span > 1:
+            span -= 1
+        else:
+            n_td = td(n)
+            txt = t(n_td)
+            if n_td is not None:
+                span = int(n_td.attrib.get('rowspan', '1'))
+        return span, txt
 
-    if rowspan > 1:
-        rowspan -= 1
-    else:
-        hist_td = td('icdo3histology')
-        icdo3histology = t(hist_td)
-        if hist_td:
-            rowspan = int(hist_td.attrib.get('rowspan', '1'))
+    hist_span, icdo3histology = spanning(hist_span,
+                                         icdo3histology, 'icdo3histology')
+    recode_span, recode = spanning(recode_span,
+                                   recode, 'recode')
 
-    return (t(td('icdo3site')), icdo3histology, t(td('recode')), rowspan)
+    return (t(td('icdo3site')), icdo3histology, recode, hist_span, recode_span)
+
+
+def t(elt):
+    return ' '.join(elt.text.split()) if elt is not None else None
 
 
 TEST_ROW_LIP = '''
