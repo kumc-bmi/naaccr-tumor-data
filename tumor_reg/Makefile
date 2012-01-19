@@ -3,6 +3,7 @@ CURL=curl
 PERL=perl
 PS2PDF=pdf2ps
 PS2ASCII=ps2ascii
+TIDY=tidy
 
 naaccr_extract.sql naaccr_extract.ctl: naaccr_explore.py naaccr12_1.txt
 
@@ -20,6 +21,9 @@ Vol\ II\ Version\ 12.1\ with\ cover.pdf:
 naaccr12_1.mdb:
 	$(CURL) --output $@ 'http://www.naaccr.org/LinkClick.aspx?fileticket=h6_MTYvGFLU%3d&tabid=133&mid=473'
 
+
+,seer_site_recode_t.html: ,seer_site_recode.html
+	$(TIDY) -q -i -n -ascii -asxml $< > $@
 
 ,seer_site_recode.html:
 	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_d01272003/'
