@@ -21,6 +21,12 @@ naaccr12_1.mdb:
 	$(CURL) --output $@ 'http://www.naaccr.org/LinkClick.aspx?fileticket=h6_MTYvGFLU%3d&tabid=133&mid=473'
 
 
+,seer_site_recode.html:
+	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_d01272003/'
+
+
+
+
 # Tested with the following:
 
 # Package: ghostscript
