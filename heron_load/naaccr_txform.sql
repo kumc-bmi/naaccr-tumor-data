@@ -153,7 +153,7 @@ and ns.SectionID in (
 -- , 8 -- Patient-Confidential
 -- , 9 -- Record ID
 -- , 10 -- Special Use
--- , 11 -- Stage/Prognostic Factors -- TODO: numeric stuff
+  11 -- Stage/Prognostic Factors -- TODO: numeric stuff
 -- , 12 -- Text-Diagnosis
 -- , 13 -- Text-Miscellaneous
 -- , 14 -- Text-Treatment
@@ -260,7 +260,10 @@ and ni."SectionID" in (
 -- , 8 -- Patient-Confidential
 -- , 9 -- Record ID
 -- , 10 -- Special Use
--- , 11 -- Stage/Prognostic Factors -- TODO: numeric stuff
+ , 11 -- Stage/Prognostic Factors
+     -- TODO: for long lists of numeric codes, find metadata
+     -- and chunking strategy
+     -- TODO: consider normalizing complication 1, complication 2, ...
 -- , 12 -- Text-Diagnosis
 -- , 13 -- Text-Miscellaneous
 -- , 14 -- Text-Treatment
@@ -289,9 +292,9 @@ select tiv.*
      , nc.codedcrp
  from tumor_item_value tiv
 left join naacr.t_code nc
-  on tiv.itemid = tiv.ItemID
+  on nc.itemid = tiv.ItemID
  and nc.codenbr = tiv.value
-order by to_number(SectionID), 1, 2, 3;
+-- order by to_number(SectionID), 1, 2, 3
 
 where "Accession Number--Hosp"='193800001'
  and "Sequence Number--Hospital" = 1
