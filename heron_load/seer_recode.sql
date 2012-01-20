@@ -13,11 +13,28 @@ by way of seer_recode.py
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
 
-
+create or replace view seer_recode_facts as
 select MRN
-     , tr."Accession Number--Hosp"
-     , tr."Sequence Number--Hospital"
-     , tr.site, tr.histology,
+     , ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide
+     , 'SEER_SITE:' || recode concept_cd
+     , '@' provider_id
+     , start_date
+     , '@' modifier_cd
+     , 1 instance_num
+     , '@' as valtype_cd
+     , '@' as tval_char
+     , to_number(null) as nval_num
+     , null as valueflag_cd
+     , null as units_cd
+     , start_date as end_date
+     , '@' location_cd
+     , to_date(null) as update_date
+from (
+select MRN
+     , ne."Accession Number--Hosp"
+     , ne."Sequence Number--Hospital"
+     , start_date
+     , ne.site, ne.histology,
 case
 /* Lip */ when (site between 'C000' and 'C009')
   and  not (histology between '9590' and '9989'
@@ -518,10 +535,23 @@ end
 
 as recode
 from
- (select tr."Patient ID Number" as MRN
-       , tr."Accession Number--Hosp"
-       , tr."Sequence Number--Hospital"
-       , tr."Primary Site" as site
-       , tr."Histology (92-00) ICD-O-2" histology
-  from naacr.extract tr) tr
-;
+ (select ne."Patient ID Number" as MRN
+       , ne."Accession Number--Hosp"
+       , ne."Sequence Number--Hospital"
+       , ne."Primary Site" as site
+       , ne."Histology (92-00) ICD-O-2" histology
+       , to_date(case length(ne."Date of Diagnosis")
+               when 8 then ne."Date of Diagnosis"
+               when 6 then ne."Date of Diagnosis" || '01'
+               when 4 then ne."Date of Diagnosis" || '0101'
+               end, 'yyyymmdd') as start_date
+  from naacr.extract ne
+  where ne."Date of Diagnosis" is not null
+    and ne."Accession Number--Hosp" is not null) ne
+) ne;
+
+
+select count(*), concept_cd
+from seer_recode_facts
+group by concept_cd
+order by 1 desc;
