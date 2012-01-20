@@ -2,7 +2,9 @@
 '''
 
 import logging
-import pprint
+from collections import namedtuple
+import itertools
+import csv
 
 from lxml import etree
 
@@ -11,12 +13,16 @@ log = logging.getLogger(__name__)
 
 def main(argv):
     logging.basicConfig(level=logging.INFO)
-    pgfn = argv[1]
+    pgfn, termfn, rulesfn = argv[1:4]
 
     terms, rules = seer_parse(open(pgfn))
 
-    log.info('terms:\n%s', pprint.pformat(terms))
-    log.info('rules:\n%s', pprint.pformat(rules))
+    open(rulesfn, 'w').write('case\n' + '\n'.join(rules)
+                             + "\n/* Invalid */ else '9999'\nend")
+    write_csv(open(termfn, 'w'), Term, terms)
+
+
+Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
 
 
 def seer_parse(fp):
@@ -26,7 +32,6 @@ def seer_parse(fp):
     terms = []
     parents = []
     prev_label = None
-    term_id = 0
 
     rules = []
     hist_span = 0
@@ -35,16 +40,23 @@ def seer_parse(fp):
     recode = None
 
     for site_row in tbl1:
-        indent, label = build_site_tree(site_row, prev_label, parents)
-        if label:
-            term_id += 1
-            log.debug('term: %s', (term_id, label, parents))
-            terms.append((term_id, label, [l for i, l in parents]))
-
         icdo3site, icdo3histology, recode, hist_span, recode_span = grok_row(
             site_row, icdo3histology, recode, hist_span, recode_span)
-        if recode:
-            rules.append((term_id, label, icdo3site, icdo3histology, recode))
+        indent, label = build_site_tree(site_row, prev_label, parents)
+        if recode and label != 'Invalid':
+            rules.append("/* %s */ when %s then '%s'\n" % (
+                label,
+                mk_rule(icdo3site, icdo3histology),
+                recode))
+
+        if label:
+            log.debug('term: %s', (recode, label, parents))
+            terms.append(
+                Term(hlevel=len(parents),
+                     path='\\'.join([seg[:20] for i, seg in parents] + [label]),
+                     name=label,
+                     basecode=recode,
+                     visualattributes='LA' if recode else 'FA'))
 
         prev_label = label
 
@@ -72,15 +84,15 @@ def build_site_tree(site_row, prev_label, parents):
     if indent > (parents[-1][0] if parents else 0):
         parents.append((indent, prev_label))
 
-    return indent, label
+    return indent, label or prev_label
 
 
 def grok_row(site_row, icdo3histology, recode, hist_span, recode_span):
     '''
-    >>> grok_row(etree.fromstring(TEST_ROW_LIP), 1, None)
+    >>> grok_row(etree.fromstring(TEST_ROW_LIP), 'h1', 'r1', 1, 1)
     ... #doctest: +NORMALIZE_WHITESPACE
     ('C000-C009', 'excluding 9590-9989, and sometimes 9050-9055, 9140',
-     '20010', 10)
+     '20010', 10, 1)
     '''
     if not site_row.xpath('td[@headers]'):
         log.debug('not a recode row: %s', etree.tostring(site_row))
@@ -110,6 +122,67 @@ def grok_row(site_row, icdo3histology, recode, hist_span, recode_span):
 
 def t(elt):
     return ' '.join(elt.text.split()) if elt is not None else None
+
+
+def mk_rule(sites, histologies, site_col='site', hist_col='histology'):
+    return '\n  and '.join(mk_clause(ranges(sites), site_col)
+                           + mk_clause(ranges(histologies), hist_col))
+
+
+def mk_clause(eb, col):
+    excl, bounds = eb
+    if not bounds:
+        return []
+    ground = [(("%s between '%s' and '%s'" % (col, lo, hi))
+               if hi else
+               "%s = '%s'" % (col, lo))
+               for lo, hi in bounds]
+    return [((' not ' if excl else '')
+             + '('
+             + '\n   or '.join(ground)
+             + ')')]
+                
+
+    
+def ranges(txt, sometimes=True):
+    '''
+    >>> ranges('')
+    (False, [])
+    >>> ranges('C530-C539', False)
+    (False, [('C530', 'C539')])
+    >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140')
+    (True, [('9590', '9989'), ('9050', '9055'), ('9140', None)])
+    >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140',
+    ...        sometimes=False)
+    (True, [('9590', '9989')])
+    >>> ranges('All sites except C024, C098-C099, C111, C142, '
+    ...        'C379, C422, C770-C779')
+    ... #doctest: +NORMALIZE_WHITESPACE
+    (True,
+     [('C024', None), ('C098', 'C099'), ('C111', None),
+      ('C142', None), ('C379', None), ('C422', None), ('C770', 'C779')])
+
+    '''
+    exc = [pfx for pfx in ('All sites except ', 'excluding ')
+           if txt.startswith(pfx)]
+    atoms = txt[len(exc[0]):] if exc else txt
+    ti0 = atoms.split(', and sometimes ')
+    t1 = ','.join(ti0 if sometimes else ti0[:1])
+    hilos = [t.strip() for t in t1.split(',')]
+    return (len(exc) > 0,
+            [(lo, hi) for lo, hi in
+             [t.split('-') if '-' in t else [t, None] for t in hilos if t]])
+
+
+def flatten(lists):
+    return list(itertools.chain(lists))
+
+
+def write_csv(fp, klass, items):
+    fields = klass._fields
+    o = csv.DictWriter(fp, fields, lineterminator='\n')
+    o.writerow(dict(zip(fields, fields)))
+    o.writerows([item._asdict() for item in items])
 
 
 TEST_ROW_LIP = '''
