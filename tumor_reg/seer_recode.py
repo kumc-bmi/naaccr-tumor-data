@@ -5,6 +5,7 @@ import logging
 import pprint
 from collections import namedtuple
 import itertools
+import csv
 
 from lxml import etree
 
@@ -13,16 +14,16 @@ log = logging.getLogger(__name__)
 
 def main(argv):
     logging.basicConfig(level=logging.INFO)
-    pgfn = argv[1]
+    pgfn, termfn, rulesfn = argv[1:4]
 
     terms, rules = seer_parse(open(pgfn))
 
-    print 'rules:\n', pprint.pformat(rules)
-    print 'terms:\n', pprint.pformat(terms)
+    write_csv(open(termfn, 'w'), Term, terms)
+    write_csv(open(rulesfn, 'w'), Rule, rules)
 
 
 Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
-Rule = namedtuple('Rule', 'name kind bounds recode')
+Rule = namedtuple('Rule', 'name kind lo hi recode')
 
 
 def seer_parse(fp):
@@ -45,14 +46,13 @@ def seer_parse(fp):
         indent, label = build_site_tree(site_row, prev_label, parents)
         if recode and icdo3histology:
             for ex, lo, hi in ranges(icdo3site):
-                if ex:
-                    raise ValueError
-                rules.append(Rule(name=label, kind='site_between',
-                                  bounds=[lo, hi], recode=recode))
+                rules.append(Rule(name=label,
+                                  kind='site_excl' if ex else 'site_between',
+                                  lo=lo, hi=hi, recode=recode))
             for ex, lo, hi in ranges(icdo3histology):
                 rules.append(Rule(name=label,
                                   kind='hist_excl' if ex else 'hist_between',
-                                  bounds=[lo, hi], recode=recode))
+                                  lo=lo, hi=hi, recode=recode))
         elif recode and (label != 'Invalid'):
             raise ValueError
 
@@ -131,28 +131,42 @@ def t(elt):
     return ' '.join(elt.text.split()) if elt is not None else None
 
 
-def ranges(txt, excluding=False, sometimes=True):
+def ranges(txt, sometimes=True):
     '''
     >>> ranges('C530-C539', False)
     [(False, 'C530', 'C539')]
-    >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140',
-    ...        excluding=True)
+    >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140')
     [(True, '9590', '9989'), (True, '9050', '9055'), (True, '9140', '9140')]
     >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140',
-    ...        excluding=True, sometimes=False)
+    ...        sometimes=False)
     [(True, '9590', '9989')]
+    >>> ranges('All sites except C024, C098-C099, C111, C142, '
+    ...        'C379, C422, C770-C779')
+    ... #doctest: +NORMALIZE_WHITESPACE
+    [(True, 'C024', 'C024'), (True, 'C098', 'C099'),
+     (True, 'C111', 'C111'), (True, 'C142', 'C142'),
+     (True, 'C379', 'C379'), (True, 'C422', 'C422'),
+     (True, 'C770', 'C779')]
+
     '''
-    ex = txt.startswith('excluding ')
-    atoms = txt[len('excluding '):] if ex else txt
+    exc = [pfx for pfx in ('All sites except ', 'excluding ')
+           if txt.startswith(pfx)]
+    atoms = txt[len(exc[0]):] if exc else txt
     ti0 = atoms.split(', and sometimes ')
     t1 = ','.join(ti0 if sometimes else ti0[:1])
     hilos = [t.strip() for t in t1.split(',')]
-    return [(ex, lo, hi) for lo, hi in
+    return [(len(exc) > 0, lo, hi) for lo, hi in
             [t.split('-') if '-' in t else [t, t] for t in hilos]]
-
 
 def flatten(lists):
     return list(itertools.chain(lists))
+
+
+def write_csv(fp, klass, items):
+    fields = klass._fields
+    o = csv.DictWriter(fp, fields)
+    o.writerow(dict(zip(fields, fields)))
+    o.writerows([item._asdict() for item in items])
 
 
 TEST_ROW_LIP = '''
