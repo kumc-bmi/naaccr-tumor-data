@@ -16,7 +16,7 @@ select "Accession Number--Hosp" from naacr.extract where 1=0;
 create or replace view seer_recode_facts as
 select MRN
      , ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide
-     , 'SEER_SITE:' || recode concept_cd
+     , 'SEER_SITE:' || recode concept_cd, '@' item_name
      , '@' provider_id
      , start_date
      , '@' modifier_cd
