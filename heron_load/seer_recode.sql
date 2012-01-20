@@ -1,43 +1,23 @@
-create database heron;
-use heron;
+/** seer_recode -- recode primary site, histology into SEER site summary
 
-drop table seer_rules;
-create table seer_rules (
-name varchar(100),
-kind varchar(40),
-lo varchar(10),
-hi varchar(10),
-recode varchar(10));
+Largely derived from:
+  SEER Site Recode ICD-O-3 (1/27/2003) Definition 
+  http://seer.cancer.gov/siterecode/icdo3_d01272003/
 
-load data infile '/home/connolly/qtrx/dm93finance/,rules.csv'
-into table seer_rules
-fields terminated by ',' optionally enclosed by '"'
-ignore 1 lines;
+by way of seer_recode.py
 
-drop table if exists cases;
-create table cases (
-id integer primary key auto_increment,
-site varchar(10),
-histology varchar(10)
-);
+  http://informatics.kumc.edu/work/browser/tumor_reg/seer_recode.py
+ */
 
-insert into cases (site, histology) values ('C500', '9590');
-insert into cases (site, histology) values ('C500', '9500');
-insert into cases (site, histology) values ('C009', '9500');
-insert into cases (site, histology) values ('C009', '9590');
-insert into cases (site, histology) values ('C440', '9590');
-insert into cases (site, histology) values ('C440', '8720');
-insert into cases (site, histology) values ('C024', '9729');
-insert into cases (site, histology) values ('C021', '9729');
-insert into cases (site, histology) values ('C021', '9826');
--- ugh. design doesn't handle this Misc case
-insert into cases (site, histology) values ('C021', '9740');
+-- test that we're in the KUMC sid with the NAACCR data
+-- note mis-spelling of schema name: naacr
+select "Accession Number--Hosp" from naacr.extract where 1=0;
 
 
-select distinct kind from seer_rules;
-
-select cases.site, cases.histology,
-
+select MRN
+     , tr."Accession Number--Hosp"
+     , tr."Sequence Number--Hospital"
+     , tr.site, tr.histology,
 case
 /* Lip */ when (site between 'C000' and 'C009')
   and  not (histology between '9590' and '9989'
@@ -389,8 +369,7 @@ case
    or site between 'C770' and 'C779')
   and (histology between '9650' and '9667') then '33011'
 
-/* Hodgkin - Extranodal */ when (site = 'All other sites')
-  and (histology between '9650' and '9667') then '33012'
+/* Hodgkin - Extranodal */ when (histology between '9650' and '9667') then '33012'
 
 /* NHL - Nodal */ when (site = 'C024'
    or site = 'C098'
@@ -538,9 +517,11 @@ case
 end
 
 as recode
-from cases;
-
-select * from seer_rules where recode='25010' and kind='hist_between';
-select * from seer_rules where recode='33012';
-select * from seer_rules where recode='35011';
-select * from seer_rules where recode='37000';
+from
+ (select tr."Patient ID Number" as MRN
+       , tr."Accession Number--Hosp"
+       , tr."Sequence Number--Hospital"
+       , tr."Primary Site" as site
+       , tr."Histology (92-00) ICD-O-2" histology
+  from naacr.extract tr) tr
+;
