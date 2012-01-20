@@ -2,7 +2,6 @@
 '''
 
 import logging
-import pprint
 from collections import namedtuple
 import itertools
 import csv
@@ -18,12 +17,12 @@ def main(argv):
 
     terms, rules = seer_parse(open(pgfn))
 
+    open(rulesfn, 'w').write('case\n' + '\n'.join(rules)
+                             + "\n/* Invalid */ else '9999'\nend")
     write_csv(open(termfn, 'w'), Term, terms)
-    write_csv(open(rulesfn, 'w'), Rule, rules)
 
 
 Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
-Rule = namedtuple('Rule', 'name kind lo hi recode')
 
 
 def seer_parse(fp):
@@ -44,17 +43,11 @@ def seer_parse(fp):
         icdo3site, icdo3histology, recode, hist_span, recode_span = grok_row(
             site_row, icdo3histology, recode, hist_span, recode_span)
         indent, label = build_site_tree(site_row, prev_label, parents)
-        if recode and icdo3histology:
-            for ex, lo, hi in ranges(icdo3site):
-                rules.append(Rule(name=label,
-                                  kind='site_excl' if ex else 'site_between',
-                                  lo=lo, hi=hi, recode=recode))
-            for ex, lo, hi in ranges(icdo3histology):
-                rules.append(Rule(name=label,
-                                  kind='hist_excl' if ex else 'hist_between',
-                                  lo=lo, hi=hi, recode=recode))
-        elif recode and (label != 'Invalid'):
-            raise ValueError
+        if recode and label != 'Invalid':
+            rules.append("/* %s */ when %s then '%s'\n" % (
+                label,
+                mk_rule(icdo3site, icdo3histology),
+                recode))
 
         if label:
             log.debug('term: %s', (recode, label, parents))
@@ -131,24 +124,43 @@ def t(elt):
     return ' '.join(elt.text.split()) if elt is not None else None
 
 
+def mk_rule(sites, histologies, site_col='site', hist_col='histology'):
+    return '\n  and '.join(mk_clause(ranges(sites), site_col)
+                           + mk_clause(ranges(histologies), hist_col))
+
+
+def mk_clause(eb, col):
+    excl, bounds = eb
+    if not bounds:
+        return []
+    ground = [(("%s between '%s' and '%s'" % (col, lo, hi))
+               if hi else
+               "%s = '%s'" % (col, lo))
+               for lo, hi in bounds]
+    return [((' not ' if excl else '')
+             + '('
+             + '\n   or '.join(ground)
+             + ')')]
+                
+
+    
 def ranges(txt, sometimes=True):
     '''
     >>> ranges('')
-    []
+    (False, [])
     >>> ranges('C530-C539', False)
-    [(False, 'C530', 'C539')]
+    (False, [('C530', 'C539')])
     >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140')
-    [(True, '9590', '9989'), (True, '9050', '9055'), (True, '9140', '9140')]
+    (True, [('9590', '9989'), ('9050', '9055'), ('9140', None)])
     >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140',
     ...        sometimes=False)
-    [(True, '9590', '9989')]
+    (True, [('9590', '9989')])
     >>> ranges('All sites except C024, C098-C099, C111, C142, '
     ...        'C379, C422, C770-C779')
     ... #doctest: +NORMALIZE_WHITESPACE
-    [(True, 'C024', 'C024'), (True, 'C098', 'C099'),
-     (True, 'C111', 'C111'), (True, 'C142', 'C142'),
-     (True, 'C379', 'C379'), (True, 'C422', 'C422'),
-     (True, 'C770', 'C779')]
+    (True,
+     [('C024', None), ('C098', 'C099'), ('C111', None),
+      ('C142', None), ('C379', None), ('C422', None), ('C770', 'C779')])
 
     '''
     exc = [pfx for pfx in ('All sites except ', 'excluding ')
@@ -157,8 +169,10 @@ def ranges(txt, sometimes=True):
     ti0 = atoms.split(', and sometimes ')
     t1 = ','.join(ti0 if sometimes else ti0[:1])
     hilos = [t.strip() for t in t1.split(',')]
-    return [(len(exc) > 0, lo, hi) for lo, hi in
-            [t.split('-') if '-' in t else [t, t] for t in hilos if t]]
+    return (len(exc) > 0,
+            [(lo, hi) for lo, hi in
+             [t.split('-') if '-' in t else [t, None] for t in hilos if t]])
+
 
 def flatten(lists):
     return list(itertools.chain(lists))
