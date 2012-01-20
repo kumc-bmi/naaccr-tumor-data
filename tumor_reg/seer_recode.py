@@ -53,7 +53,8 @@ def seer_parse(fp):
             log.debug('term: %s', (recode, label, parents))
             terms.append(
                 Term(hlevel=len(parents),
-                     path='\\'.join([seg[:20] for i, seg in parents] + [label]),
+                     path='\\'.join([seg[:20] for i, seg in parents]
+                                    + [label[:20]]),
                      name=label,
                      basecode=recode,
                      visualattributes='LA' if recode else 'FA'))
