@@ -133,6 +133,8 @@ def t(elt):
 
 def ranges(txt, sometimes=True):
     '''
+    >>> ranges('')
+    []
     >>> ranges('C530-C539', False)
     [(False, 'C530', 'C539')]
     >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140')
@@ -156,7 +158,7 @@ def ranges(txt, sometimes=True):
     t1 = ','.join(ti0 if sometimes else ti0[:1])
     hilos = [t.strip() for t in t1.split(',')]
     return [(len(exc) > 0, lo, hi) for lo, hi in
-            [t.split('-') if '-' in t else [t, t] for t in hilos]]
+            [t.split('-') if '-' in t else [t, t] for t in hilos if t]]
 
 def flatten(lists):
     return list(itertools.chain(lists))
@@ -164,7 +166,7 @@ def flatten(lists):
 
 def write_csv(fp, klass, items):
     fields = klass._fields
-    o = csv.DictWriter(fp, fields)
+    o = csv.DictWriter(fp, fields, lineterminator='\n')
     o.writerow(dict(zip(fields, fields)))
     o.writerows([item._asdict() for item in items])
 
