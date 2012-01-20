@@ -3,6 +3,8 @@
 
 import logging
 import pprint
+from collections import namedtuple
+import itertools
 
 from lxml import etree
 
@@ -15,8 +17,12 @@ def main(argv):
 
     terms, rules = seer_parse(open(pgfn))
 
-    log.info('terms:\n%s', pprint.pformat(terms))
-    log.info('rules:\n%s', pprint.pformat(rules))
+    print 'rules:\n', pprint.pformat(rules)
+    print 'terms:\n', pprint.pformat(terms)
+
+
+Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
+Rule = namedtuple('Rule', 'name kind bounds recode')
 
 
 def seer_parse(fp):
@@ -26,7 +32,6 @@ def seer_parse(fp):
     terms = []
     parents = []
     prev_label = None
-    term_id = 0
 
     rules = []
     hist_span = 0
@@ -35,16 +40,30 @@ def seer_parse(fp):
     recode = None
 
     for site_row in tbl1:
-        indent, label = build_site_tree(site_row, prev_label, parents)
-        if label:
-            term_id += 1
-            log.debug('term: %s', (term_id, label, parents))
-            terms.append((term_id, label, [l for i, l in parents]))
-
         icdo3site, icdo3histology, recode, hist_span, recode_span = grok_row(
             site_row, icdo3histology, recode, hist_span, recode_span)
-        if recode:
-            rules.append((term_id, label, icdo3site, icdo3histology, recode))
+        indent, label = build_site_tree(site_row, prev_label, parents)
+        if recode and icdo3histology:
+            for ex, lo, hi in ranges(icdo3site):
+                if ex:
+                    raise ValueError
+                rules.append(Rule(name=label, kind='site_between',
+                                  bounds=[lo, hi], recode=recode))
+            for ex, lo, hi in ranges(icdo3histology):
+                rules.append(Rule(name=label,
+                                  kind='hist_excl' if ex else 'hist_between',
+                                  bounds=[lo, hi], recode=recode))
+        elif recode and (label != 'Invalid'):
+            raise ValueError
+
+        if label:
+            log.debug('term: %s', (recode, label, parents))
+            terms.append(
+                Term(hlevel=len(parents),
+                     path='\\'.join([seg[:20] for i, seg in parents] + [label]),
+                     name=label,
+                     basecode=recode,
+                     visualattributes='LA' if recode else 'FA'))
 
         prev_label = label
 
@@ -72,15 +91,15 @@ def build_site_tree(site_row, prev_label, parents):
     if indent > (parents[-1][0] if parents else 0):
         parents.append((indent, prev_label))
 
-    return indent, label
+    return indent, label or prev_label
 
 
 def grok_row(site_row, icdo3histology, recode, hist_span, recode_span):
     '''
-    >>> grok_row(etree.fromstring(TEST_ROW_LIP), 1, None)
+    >>> grok_row(etree.fromstring(TEST_ROW_LIP), 'h1', 'r1', 1, 1)
     ... #doctest: +NORMALIZE_WHITESPACE
     ('C000-C009', 'excluding 9590-9989, and sometimes 9050-9055, 9140',
-     '20010', 10)
+     '20010', 10, 1)
     '''
     if not site_row.xpath('td[@headers]'):
         log.debug('not a recode row: %s', etree.tostring(site_row))
@@ -110,6 +129,30 @@ def grok_row(site_row, icdo3histology, recode, hist_span, recode_span):
 
 def t(elt):
     return ' '.join(elt.text.split()) if elt is not None else None
+
+
+def ranges(txt, excluding=False, sometimes=True):
+    '''
+    >>> ranges('C530-C539', False)
+    [(False, 'C530', 'C539')]
+    >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140',
+    ...        excluding=True)
+    [(True, '9590', '9989'), (True, '9050', '9055'), (True, '9140', '9140')]
+    >>> ranges('excluding 9590-9989, and sometimes 9050-9055, 9140',
+    ...        excluding=True, sometimes=False)
+    [(True, '9590', '9989')]
+    '''
+    ex = txt.startswith('excluding ')
+    atoms = txt[len('excluding '):] if ex else txt
+    ti0 = atoms.split(', and sometimes ')
+    t1 = ','.join(ti0 if sometimes else ti0[:1])
+    hilos = [t.strip() for t in t1.split(',')]
+    return [(ex, lo, hi) for lo, hi in
+            [t.split('-') if '-' in t else [t, t] for t in hilos]]
+
+
+def flatten(lists):
+    return list(itertools.chain(lists))
 
 
 TEST_ROW_LIP = '''
