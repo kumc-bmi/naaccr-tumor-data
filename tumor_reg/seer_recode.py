@@ -18,7 +18,7 @@ def main(argv):
     terms, rules = seer_parse(open(pgfn))
 
     open(rulesfn, 'w').write('case\n' + '\n'.join(rules)
-                             + "\n/* Invalid */ else '9999'\nend")
+                             + "\n/* Invalid */ else '99999'\nend")
     write_csv(open(termfn, 'w'), Term, terms)
 
 

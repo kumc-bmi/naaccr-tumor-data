@@ -530,7 +530,7 @@ case
    or histology between '9050' and '9055'
    or histology = '9140') then '37000'
 
-/* Invalid */ else '9999'
+/* Invalid */ else '99999'
 end
 
 as recode
@@ -539,7 +539,7 @@ from
        , ne."Accession Number--Hosp"
        , ne."Sequence Number--Hospital"
        , ne."Primary Site" as site
-       , ne."Histology (92-00) ICD-O-2" histology
+       , ne."Morph--Type&Behav ICD-O-3" histology
        , to_date(case length(ne."Date of Diagnosis")
                when 8 then ne."Date of Diagnosis"
                when 6 then ne."Date of Diagnosis" || '01'
@@ -555,3 +555,11 @@ select count(*), concept_cd
 from seer_recode_facts
 group by concept_cd
 order by 1 desc;
+
+select distinct ne."Histology (92-00) ICD-O-2", f.concept_cd
+from seer_recode_facts f
+join naacr.extract ne
+ on f.encounter_ide = (ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital")
+where f.concept_cd = 'SEER_SITE:9999'
+order by ne."Primary Site"
+;
