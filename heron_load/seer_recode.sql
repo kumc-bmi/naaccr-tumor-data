@@ -551,15 +551,9 @@ from
 ) ne;
 
 
+/*
 select count(*), concept_cd
 from seer_recode_facts
 group by concept_cd
 order by 1 desc;
-
-select distinct ne."Histology (92-00) ICD-O-2", f.concept_cd
-from seer_recode_facts f
-join naacr.extract ne
- on f.encounter_ide = (ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital")
-where f.concept_cd = 'SEER_SITE:9999'
-order by ne."Primary Site"
-;
+*/
