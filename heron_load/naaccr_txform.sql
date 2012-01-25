@@ -219,6 +219,57 @@ select 'almost all 9s' as itemname, '99990' as value from dual
 )
 ;
 
+/* Breakdown by year */
+SELECT COUNT(*),
+  case_year,
+  concept_cd, concept_name
+FROM
+  (SELECT extract(YEAR FROM start_date) case_year,
+    concept_cd, concept_name
+  FROM
+    (SELECT to_date(
+      CASE
+        WHEN value IN ('00000000', '99999999', '99990')
+        THEN NULL
+        WHEN LENGTH(trim(value)) = 4
+        THEN value
+          || '0101'
+        WHEN LENGTH(value) = 6
+        THEN value
+          || '01'
+        WHEN SUBSTR(value, 5, 4) = '9999'
+        THEN SUBSTR(value, 1, 4)
+          || '1231'
+        ELSE value
+      END, 'yyyymmdd') AS start_date,
+      sf.concept_cd,
+      sm.name concept_name
+    FROM
+      (SELECT ne."Date of Diagnosis" value ,
+        ne."Primary Site" site ,
+        -- ne."Derived AJCC-7 Stage Grp",
+        ne."Accession Number--Hosp"
+        || '-'
+        || ne."Sequence Number--Hospital" AS encounter_ide
+      FROM naacr.extract ne
+      ) ne
+    JOIN seer_recode_facts sf
+    ON ne.encounter_ide = sf.encounter_ide
+    join seer_site_terms@deid sm on 'SEER_SITE:' || sm.basecode = sf.concept_cd
+    )
+  )
+WHERE case_year IS NOT NULL
+and concept_cd in (/*'SEER_SITE:22030'*/ 'SEER_SITE:26000')
+GROUP BY case_year,
+  concept_cd, concept_name
+-- HAVING COUNT(*) > 100
+ORDER BY 2 DESC,
+  3;
+
+select * from seer_recode_facts;
+select * from seer_site_terms@deid;
+
+
 /* This is the main big flat view. */
 create or replace view tumor_item_value as
 select "Accession Number--Hosp"
