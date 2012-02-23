@@ -13,23 +13,7 @@ by way of seer_recode.py
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
 
-create or replace view seer_recode_facts as
-select MRN
-     , ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide
-     , 'SEER_SITE:' || recode concept_cd, '@' item_name
-     , '@' provider_id
-     , start_date
-     , '@' modifier_cd
-     , 1 instance_num
-     , '@' as valtype_cd
-     , '@' as tval_char
-     , to_number(null) as nval_num
-     , null as valueflag_cd
-     , null as units_cd
-     , start_date as end_date
-     , '@' location_cd
-     , to_date(null) as update_date
-from (
+create or replace view seer_recode_aux as
 select MRN
      , ne."Accession Number--Hosp"
      , ne."Sequence Number--Hospital"
@@ -539,7 +523,7 @@ from
        , ne."Accession Number--Hosp"
        , ne."Sequence Number--Hospital"
        , ne."Primary Site" as site
-       , ne."Morph--Type&Behav ICD-O-3" histology
+       , substr(ne."Morph--Type&Behav ICD-O-3", 1, 4) histology
        , to_date(case length(ne."Date of Diagnosis")
                when 8 then ne."Date of Diagnosis"
                when 6 then ne."Date of Diagnosis" || '01'
@@ -547,9 +531,26 @@ from
                end, 'yyyymmdd') as start_date
   from naacr.extract ne
   where ne."Date of Diagnosis" is not null
-    and ne."Accession Number--Hosp" is not null) ne
-) ne;
+    and ne."Accession Number--Hosp" is not null) ne;
 
+
+create or replace view seer_recode_facts as
+select MRN
+     , ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide
+     , 'SEER_SITE:' || recode concept_cd, '@' item_name
+     , '@' provider_id
+     , start_date
+     , '@' modifier_cd
+     , 1 instance_num
+     , '@' as valtype_cd
+     , '@' as tval_char
+     , to_number(null) as nval_num
+     , null as valueflag_cd
+     , null as units_cd
+     , start_date as end_date
+     , '@' location_cd
+     , to_date(null) as update_date
+from seer_recode_aux ne;
 
 /*
 select count(*), concept_cd
@@ -557,3 +558,56 @@ from seer_recode_facts
 group by concept_cd
 order by 1 desc;
 */
+
+/**
+ * Verify the above algorithm vs. results of John K.'s SAS code.
+select count(*) from naacr.extract;
+select count(*) from seer_recode_facts;
+select count(*) from seer_jk;
+
+select count(distinct mrn)
+from seer_recode_facts
+where concept_cd='SEER_SITE:22030';
+-- 6443 here; 6407 in i2b2. hmm.
+
+
+select jk.*, sf.recode,
+  sf.site,
+  sf.histology
+from
+seer_recode_aux sf
+left join seer_jk jk
+on jk.accno = sf."Accession Number--Hosp"
+  and jk.SeqNoHos = sf."Sequence Number--Hospital"
+  and jk.sitenew = sf.site
+  and jk.histo3 = sf.histology
+where sf.recode != jk.site_recode
+order by jk.site_recode
+;
+ */
+
+
+/* TODO: Handle null histology.
+select case
+ when (site between 'C019' and 'C029')
+  and  not (histology between '9590' and '9989'
+   or histology between '9050' and '9055'
+   or histology = '9140') then '20020'
+   end recode
+   from
+   (select 'C019' site, null histology from dual);
+
+For now, verify that it's in the noise:
+ */
+
+select case when missing_histology / tot > .001 then 1/0
+            else 1 end as few_missing_histologies
+from (
+select (
+select count(*)
+from naacr.extract ne
+ where ne."Morph--Type&Behav ICD-O-3" is null) missing_histology,
+(select count(*)  from naacr.extract ne) tot
+from dual
+) 
+;
