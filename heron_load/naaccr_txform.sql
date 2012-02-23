@@ -298,8 +298,8 @@ left join naacr.t_code nc
  and nc.codenbr = tiv.value
 -- order by to_number(SectionID), 1, 2, 3
 
-where "Accession Number--Hosp"='193800001'
- and "Sequence Number--Hospital" = 1
+where "Accession Number--Hosp"='200000045'
+ and "Sequence Number--Hospital" = '00'
 order by to_number(SectionID), 1, 2, 3;
 */
 
