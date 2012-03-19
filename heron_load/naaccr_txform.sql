@@ -192,6 +192,8 @@ order by 1, 2, 3, 4, 5
 
 But we also see wierdness such as '    2009' and '19719999'; see
 test cases below.
+
+In Date of Last Contact, we've also seen 19919999
 */
 select itemname,  value, to_date(
   case
@@ -221,56 +223,14 @@ select 'almost all 9s' as itemname, '99990' as value from dual
 )
 ;
 
-/* Breakdown by year */
-SELECT COUNT(*),
-  case_year,
-  concept_cd, concept_name
-FROM
-  (SELECT extract(YEAR FROM start_date) case_year,
-    concept_cd, concept_name
-  FROM
-    (SELECT to_date(
-      CASE
-        WHEN value IN ('00000000', '99999999', '99990')
-        THEN NULL
-        WHEN LENGTH(trim(value)) = 4
-        THEN value
-          || '0101'
-        WHEN LENGTH(value) = 6
-        THEN value
-          || '01'
-        WHEN SUBSTR(value, 5, 4) = '9999'
-        THEN SUBSTR(value, 1, 4)
-          || '1231'
-        ELSE value
-      END, 'yyyymmdd') AS start_date,
-      sf.concept_cd,
-      sm.name concept_name
-    FROM
-      (SELECT ne."Date of Diagnosis" value ,
-        ne."Primary Site" site ,
-        -- ne."Derived AJCC-7 Stage Grp",
-        ne."Accession Number--Hosp"
-        || '-'
-        || ne."Sequence Number--Hospital" AS encounter_ide
-      FROM naacr.extract ne
-      ) ne
-    JOIN seer_recode_facts sf
-    ON ne.encounter_ide = sf.encounter_ide
-    join seer_site_terms@deid sm on 'SEER_SITE:' || sm.basecode = sf.concept_cd
-    )
-  )
-WHERE case_year IS NOT NULL
-and concept_cd in (/*'SEER_SITE:22030'*/ 'SEER_SITE:26000')
-GROUP BY case_year,
-  concept_cd, concept_name
--- HAVING COUNT(*) > 100
-ORDER BY 2 DESC,
-  3;
-
-select * from seer_recode_facts;
-select * from seer_site_terms@deid;
-
+/* Hunt down "not a valid month"
+select min(to_date(ne."Date of Last Contact", 'yyyymmdd'))
+from (
+  select * from (
+  select rownum i, "Date of Last Contact", substr("Date of Last Contact", 5, 2) mm
+  from naacr.extract
+  ) where i > 960 and i < 970) ne;
+*/
 
 /* This is the main big flat view. */
 create or replace view tumor_item_value as
@@ -349,8 +309,8 @@ left join naacr.t_code nc
  and nc.codenbr = tiv.value
 -- order by to_number(SectionID), 1, 2, 3
 
-where "Accession Number--Hosp"='193800001'
- and "Sequence Number--Hospital" = 1
+where "Accession Number--Hosp"='200000045'
+ and "Sequence Number--Hospital" = '00'
 order by to_number(SectionID), 1, 2, 3;
 */
 
@@ -400,7 +360,21 @@ select
   av.ItemName,
 -- codedcrp is not unique; causes duplicate key errors in observation_fact
 --  av.codedcrp,
-  case when av.start_date is not null then av.start_date
+  case
+  when av.start_date is not null then av.start_date
+  -- Use Date of Last Contact for Follow-up/Recurrence/Death
+  when av.sectionid = 4
+  then to_date(case length(ne."Date of Last Contact")
+               when 8 then case
+               -- handle 19919999
+                 when substr(ne."Date of Last Contact", 5, 2) = '99'
+                   then substr(ne."Date of Last Contact", 1, 4) || '0101'
+                 else ne."Date of Last Contact"
+               end
+               when 6 then ne."Date of Last Contact" || '01'
+               when 4 then ne."Date of Last Contact" || '0101'
+               end, 'yyyymmdd')
+  -- Use Date of Diagnosis for everything else
   else to_date(case length(ne."Date of Diagnosis")
                when 8 then ne."Date of Diagnosis"
                when 6 then ne."Date of Diagnosis" || '01'
@@ -413,6 +387,7 @@ select tiv."Accession Number--Hosp"
      , tiv.start_date
      , tiv.concept_cd
      , tiv.ItemName
+     , tiv.SectionId
 --     , tiv.codedcrp
 from tumor_item_value tiv
 
@@ -430,7 +405,7 @@ and ne."Accession Number--Hosp" not in (
 ;
 
 -- eyeball it:
--- select * from tumor_reg_facts order by mrn desc, start_date desc, encounter_ide;
+-- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
 
 /* Duplicate keys? */
 select case when count(*) > 0 then 1/0 else 1 end as tumor_fact_keys_unique
