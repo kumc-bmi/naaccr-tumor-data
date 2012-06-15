@@ -1,4 +1,5 @@
 LOAD DATA
+INFILE '/d1/kuh_tumor_registry/naaccr_jun_2012/NAACCR_6.DAT'
 APPEND
 INTO TABLE "NAACR"."EXTRACT" (
 "Record Type" position(1:1) CHAR,
