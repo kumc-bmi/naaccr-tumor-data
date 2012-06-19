@@ -13,13 +13,31 @@ select * from naacr.t_item where 1=0;
 
 alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 
-whenever sqlerror continue; -- in case index is already there
+whenever sqlerror continue;
+--Inside "continue" clause in case index is not there
+drop index patient_id;
+drop index accession;
+whenever sqlerror exit;
+
+/* There are some known duplicates - 3 rows.  The unique constraint on the index
+below should cause sqlldr to dump the duplicate rows into the .bad file 
+(assuming the index was still there durin the staging).  So, at this point,
+we shouldn't have any duplicates.  But if we do, we have the re-creation of the
+index here that will fail if there are duplicates.
+
+As per #1155, we had 30 copies of a subset of the data.  So, also, make sure we 
+have at least as many rows as we do today.
+*/
 create index patient_id on naacr.extract (
   "Patient ID Number");
-  
-create index accession on naacr.extract (
+
+--Will fail if duplicates found
+create unique index accession on naacr.extract (
   "Accession Number--Hosp", "Sequence Number--Hospital");
-whenever sqlerror exit;
+
+-- At least as much data as before (2012.05) - see #1155 comment 17.
+select case when num >= 68437 then 1 else 1/0 end enough_naaccr_records from(
+select count(*) num from naacr.extract);
 
 /* would be unique but for a handful of dups:
 select * from
@@ -323,12 +341,19 @@ select ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital"
        as encounter_ide
      , ne."Patient ID Number" as MRN
 from naacr.extract ne
-where ne."Accession Number--Hosp" is not null
+where ne."Accession Number--Hosp" is not null;
+
+/* below are the known duplicates - we now have the unique index constraing as 
+per #1155 so we shouldn't need this anymore but here for reference
+
+...
 and ne."Accession Number--Hosp" not in (
   '200801856'
 , '199601553'
 , '200200890'
 );
+*/
+
 
 -- select * from tumor_reg_visits;
 -- select count(*) from tumor_reg_visits;
@@ -396,13 +421,16 @@ from tumor_item_value tiv
 and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital"
 where ne."Date of Diagnosis" is not null
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis */
-and ne."Accession Number--Hosp" is not null
+and ne."Accession Number--Hosp" is not null);
+
+/* Known duplicates handled by the unique index now as per #1155
 and ne."Accession Number--Hosp" not in (
   '200801856'
 , '199601553'
 , '200200890'
 ))
 ;
+*/
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
