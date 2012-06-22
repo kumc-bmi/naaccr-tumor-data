@@ -15,8 +15,8 @@ alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 
 whenever sqlerror continue;
 --Inside "continue" clause in case index is not there
-drop index patient_id;
-drop index accession;
+drop index naacr.patient_id_idx;
+drop index naacr.accession_idx;
 whenever sqlerror exit;
 
 /* There are some known duplicates - 3 rows.  The unique constraint on the index
@@ -28,16 +28,13 @@ index here that will fail if there are duplicates.
 As per #1155, we had 30 copies of a subset of the data.  So, also, make sure we 
 have at least as many rows as we do today.
 */
-create index patient_id on naacr.extract (
+create index naacr.patient_id_idx on naacr.extract (
   "Patient ID Number");
 
 --Will fail if duplicates found
-create unique index accession on naacr.extract (
+create unique index naacr.accession_idx on naacr.extract (
   "Accession Number--Hosp", "Sequence Number--Hospital");
 
--- At least as much data as before (2012.05) - see #1155 comment 17.
-select case when num >= 68437 then 1 else 1/0 end enough_naaccr_records from(
-select count(*) num from naacr.extract);
 
 /* would be unique but for a handful of dups:
 select * from
