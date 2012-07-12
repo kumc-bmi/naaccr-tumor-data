@@ -1,5 +1,9 @@
 /** seer_recode -- recode primary site, histology into SEER site summary
 
+Copyright (c) 2012 University of Kansas Medical Center
+part of the HERON* open source codebase; see NOTICE file for license details.
+* http://informatics.kumc.edu/work/wiki/HERON
+
 Largely derived from:
   SEER Site Recode ICD-O-3 (1/27/2003) Definition 
   http://seer.cancer.gov/siterecode/icdo3_d01272003/
