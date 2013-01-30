@@ -7,27 +7,38 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def main(about_items, get_aux, stdout, level=logging.DEBUG):
+def main(about_items, get_aux, stdout, level=logging.INFO):
     logging.basicConfig(level=level)
-    t = normalize(about_items, get_aux)
-    csv.writer(stdout).writerows(t)
+    dd = DataDict(about_items, get_aux)
+    csv.writer(stdout).writerows(dd.normalize())
 
 
-def normalize(about_items, get_aux):
-    items = csv_table(about_items)
-    text_items = [item for item in items
-                  if item['Prompting'] == 'T']
-    value_maps = [(item['NAACCR_Item_No'], item['FieldName'],
-                   csv_table(get_aux(item['PromptingValue'])))
-                  for item in text_items]
-    return [('NAACCR_Item_No', 'FieldName', '@@code', '@@label')] + [
-        (no, name, term[0], term[1])
-        for (no, name, terms) in value_maps
-        for term in terms]
+class DataDict(object):
+    def __init__(self, about_items, get_aux):
+        self.__about_items = about_items
+        self.__get_aux = get_aux
+
+    def normalize(self):
+        items = csv_table(self.__about_items)
+        text_items = [item for item in items
+                      if item['prompting'] == 'T'
+                      and item['promptingvalue']]
+        value_maps = [(item['naaccr_item_no'], item['fieldname'],
+                       self.get_map(item))
+                      for item in text_items]
+        return [('naaccr_item_no', 'fieldname', 'value', 'label')] + [
+            (no, name, term['value'], term['label'])
+            for (no, name, terms) in value_maps
+            for term in terms]
+
+    def get_map(self, item):
+        return csv_table(self.__get_aux(item['promptingvalue']))
 
 
 def csv_table(fp):
-    return list(csv.DictReader(fp))
+    t = list(csv.DictReader(fp))
+    return [dict([(k.lower(), v) for k, v in row.iteritems()])
+            for row in t]
 
 
 if __name__ == '__main__':
