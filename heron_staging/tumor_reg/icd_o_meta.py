@@ -21,14 +21,14 @@ def main(icd_o_2, icd_o_3, engine,
     '''
     logging.basicConfig(level=level)
 
-    morph = csv.reader(icd_o_2.subRdFile(morph_n).inChannel())
-    log.debug(morph.next())
-
     meta = MetaData()
     morph2 = Table(morph2, meta,
                    autoload=True, autoload_with=engine,
                    schema=who_schema)
-    log.debug('%s', morph2.select())
+
+    morph = csv.DictReader(icd_o_2.subRdFile(morph_n).inChannel(),
+                           fieldnames=[c.name for c in morph2.columns])
+    engine.execute(morph2.insert(), list(morph))
 
     raise NotImplementedError
 
