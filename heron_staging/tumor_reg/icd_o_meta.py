@@ -12,50 +12,87 @@ log = logging.getLogger(__name__)
 
 
 def main(icd_o_2, icd_o_3, engine,
-         morph_n='icd-o-3-morph.csv', topo_n='Topoenglish.txt',
-         who_schema='WHO', morph2='MORPH2', topo2='TOPO2',
          level=logging.DEBUG):
-    '''
-    @param morph2: table for loading ICD-O-2 Morphology metadata.
-                   Assumed to exist.
-    '''
     logging.basicConfig(level=level)
 
     meta = MetaData()
-    load_table(morph2, who_schema, icd_o_2, morph_n, meta, engine)
-    load_table(topo2, who_schema, icd_o_2, topo_n, meta, engine,
-               has_header=True)
 
-    raise NotImplementedError
+    f2 = ICDO2MetaFiles(icd_o_2)
+    t2 = NightHeronICDO2(engine, meta)
+    f3 = ICDO3MetaFiles(icd_o_3)
+    t3 = NightHeronICDO3(engine, meta)
 
+    t2.load(t2.morph, f2, f2.morph, has_header=False)
+    t2.load(t2.topo, f2, f2.topo)
 
-def load_table(table_name, schema, src, file_name, meta, engine,
-               has_header=False,
-               sample_size=1000):
-    t = Table(table_name, meta,
-              autoload=True, autoload_with=engine,
-              schema=schema)
-
-    filerd = src.subRdFile(file_name)
-    sample = filerd.inChannel().read(sample_size)
-    s = csv.Sniffer()
-    data = csv.DictReader(filerd.inChannel(),
-                          fieldnames=[c.name for c in t.columns],
-                          dialect=s.sniff(sample))
-    if has_header:
-        data.next()
-
-    engine.execute(t.delete())
-    rows = list(data)
-    engine.execute(t.insert(), rows)
+    t3.load(t3.morph, f3, f3.morph)
 
 
-def kumc_engine(create_engine, db_creds, ssh_port,
-                sid='KUMC'):
+class MetaFiles(object):
+    topo = 'Topoenglish.txt'
+
+    def __init__(self, src):
+        self.__src = src
+
+    def data(self, file_name, has_header, fieldnames,
+             sample_size=1000):
+        filerd = self.__src.subRdFile(file_name)
+        sample = filerd.inChannel().read(sample_size)
+        s = csv.Sniffer()
+        data = csv.DictReader(filerd.inChannel(),
+                              fieldnames=fieldnames,
+                              dialect=s.sniff(sample))
+        if has_header:
+            data.next()
+
+        return list(data)
+
+
+class ICDO2MetaFiles(MetaFiles):
+    morph = 'icd-o-3-morph.csv'
+
+
+class ICDO3MetaFiles(MetaFiles):
+    morph = 'Morphenglish.txt'
+
+
+class NightHeron(object):
+    '''Schema and tables are assumed to exist.'''
+    who_schema = 'WHO'
+    topo = 'TOPO'
+
+    def __init__(self, engine, meta):
+        self.meta = meta
+        self.__engine = engine
+
+    def load(self, table_name, mf, file_name,
+             has_header=True):
+        engine = self.__engine
+        t = Table(table_name, self.meta,
+                  autoload=True, autoload_with=engine,
+                  schema=self.who_schema)
+
+        data = mf.data(file_name, has_header,
+                       [col.name for col in t.columns])
+        log.info('deleting all rows in %s', t.name)
+        engine.execute(t.delete())
+        log.info('inserting %d rows into %s', len(data), t.name)
+        engine.execute(t.insert(), data)
+
+
+class NightHeronICDO2(NightHeron):
+    morph = 'MORPH2'
+
+
+class NightHeronICDO3(NightHeron):
+    morph = 'MORPH3'
+
+
+def kumc_url(db_creds, ssh_port,
+             sid='KUMC'):
     u, pw = db_creds.inChannel().read().split()
-    url = 'oracle://%s:%s@%s:%d/%s' % (
+    return 'oracle://%s:%s@%s:%d/%s' % (
         u, pw, 'localhost', ssh_port, sid)
-    return create_engine(url)
 
 
 if __name__ == '__main__':
@@ -76,8 +113,7 @@ if __name__ == '__main__':
 
         return dict(icd_o_2=rd(icd_o_2_dir),
                     icd_o_3=rd(icd_o_3_dir),
-                    engine=kumc_engine(create_engine,
-                                       rd(db_creds),
-                                       int(ssh_port)))
+                    engine=create_engine(
+                        kumc_url(rd(db_creds), int(ssh_port))))
 
     main(**_initial_caps())
