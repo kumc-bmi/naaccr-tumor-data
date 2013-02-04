@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 def main(icd_o_2, icd_o_3, engine,
          morph_n='icd-o-3-morph.csv', topo_n='Topoenglish.txt',
-         who_schema='WHO', morph2='MORPH2',
+         who_schema='WHO', morph2='MORPH2', topo2='TOPO2',
          level=logging.DEBUG):
     '''
     @param morph2: table for loading ICD-O-2 Morphology metadata.
@@ -22,15 +22,32 @@ def main(icd_o_2, icd_o_3, engine,
     logging.basicConfig(level=level)
 
     meta = MetaData()
-    morph2 = Table(morph2, meta,
-                   autoload=True, autoload_with=engine,
-                   schema=who_schema)
-
-    morph = csv.DictReader(icd_o_2.subRdFile(morph_n).inChannel(),
-                           fieldnames=[c.name for c in morph2.columns])
-    engine.execute(morph2.insert(), list(morph))
+    load_table(morph2, who_schema, icd_o_2, morph_n, meta, engine)
+    load_table(topo2, who_schema, icd_o_2, topo_n, meta, engine,
+               has_header=True)
 
     raise NotImplementedError
+
+
+def load_table(table_name, schema, src, file_name, meta, engine,
+               has_header=False,
+               sample_size=1000):
+    t = Table(table_name, meta,
+              autoload=True, autoload_with=engine,
+              schema=schema)
+
+    filerd = src.subRdFile(file_name)
+    sample = filerd.inChannel().read(sample_size)
+    s = csv.Sniffer()
+    data = csv.DictReader(filerd.inChannel(),
+                          fieldnames=[c.name for c in t.columns],
+                          dialect=s.sniff(sample))
+    if has_header:
+        data.next()
+
+    engine.execute(t.delete())
+    rows = list(data)
+    engine.execute(t.insert(), rows)
 
 
 def kumc_engine(create_engine, db_creds, ssh_port,
