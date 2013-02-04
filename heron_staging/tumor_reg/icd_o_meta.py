@@ -88,11 +88,11 @@ class NightHeronICDO3(NightHeron):
     morph = 'MORPH3'
 
 
-def kumc_url(db_creds, ssh_port,
+def kumc_url(db_creds, host, ssh_port,
              sid='KUMC'):
     u, pw = db_creds.inChannel().read().split()
     return 'oracle://%s:%s@%s:%d/%s' % (
-        u, pw, 'localhost', ssh_port, sid)
+        u, pw, host, ssh_port, sid)
 
 
 if __name__ == '__main__':
@@ -109,11 +109,11 @@ if __name__ == '__main__':
                                       os.path, os.listdir,
                                       open_rd_universal)
 
-        icd_o_2_dir, icd_o_3_dir, db_creds, ssh_port = sys.argv[1:5]
+        icd_o_2_dir, icd_o_3_dir, db_creds, host, ssh_port, sid = sys.argv[1:7]
 
         return dict(icd_o_2=rd(icd_o_2_dir),
                     icd_o_3=rd(icd_o_3_dir),
                     engine=create_engine(
-                        kumc_url(rd(db_creds), int(ssh_port))))
+                        kumc_url(rd(db_creds), host, int(ssh_port), sid)))
 
     main(**_initial_caps())
