@@ -10,8 +10,8 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
 select "Accession Number--Hosp" from naacr.extract_eav where 1=0;
--- check for deid link and curated data
-select name from seer_site_terms@deid where 1=0;
+-- check for curated data
+select name from seer_site_terms where 1=0;
 
 -- check for metadata tables
 select * from naacr.t_item where 1=0;
