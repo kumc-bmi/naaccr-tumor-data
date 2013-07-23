@@ -57,7 +57,30 @@ class ICDO3MetaFiles(MetaFiles):
 
 
 class NightHeron(object):
-    '''Schema and tables are assumed to exist.'''
+    '''Schema and tables are assumed to exist:
+
+    CREATE TABLE "WHO"."MORPH2"
+    (
+      "CODE"  VARCHAR2(20 BYTE) NOT NULL ENABLE,
+      "LABEL" VARCHAR2(120 BYTE),
+      "NOTES" VARCHAR2(120 BYTE),
+      CONSTRAINT "MORPH2_PK" PRIMARY KEY ("CODE")
+    );
+
+    CREATE TABLE "WHO"."MORPH3"
+    (
+      "CODE"  VARCHAR2(20 BYTE) NOT NULL ENABLE,
+      "LABEL" VARCHAR2(120 BYTE),
+      "NOTES" VARCHAR2(120 BYTE)
+    );
+
+    CREATE TABLE "WHO"."TOPO"
+    (
+      "KODE"  VARCHAR2(20 BYTE) NOT NULL ENABLE,
+      "LVL"   VARCHAR2(20 BYTE) NOT NULL ENABLE,
+      "TITLE" VARCHAR2(80 BYTE)
+    );
+    '''
     who_schema = 'WHO'
     topo = 'TOPO'
 
