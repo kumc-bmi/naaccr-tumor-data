@@ -26,7 +26,7 @@ naaccr12_1.mdb:
 	$(TIDY) -q -i -n -ascii -asxml $< > $@
 
 ,seer_site_recode.html:
-	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_d01272003/'
+	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.html'
 
 
 
