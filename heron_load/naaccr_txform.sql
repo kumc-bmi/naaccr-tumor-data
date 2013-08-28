@@ -205,10 +205,10 @@ order by 1, 2, 3, 4, 5
  p. 97:
  "Below are the common formats to handle the situation where only
   certain components of date are known.
-  YYYYMMDD – when complete date is known and valid
-  YYYYMM – when year and month are known and valid, and day is unknown
-  YYYY – when year is known and valid, and month and day are unknown
-  Blank – when no known date applies"
+  YYYYMMDD - when complete date is known and valid
+  YYYYMM - when year and month are known and valid, and day is unknown
+  YYYY - when year is known and valid, and month and day are unknown
+  Blank - when no known date applies"
 
 But we also see wierdness such as '    2009' and '19719999'; see
 test cases below.
