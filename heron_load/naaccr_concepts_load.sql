@@ -21,9 +21,6 @@ select * from naacr.extract where 1=0;
 /* check that transformation views are in place */
 select * from tumor_item_value tiv where 1=0;
 
--- check installation of I2B2METADATA2 static stuff (from Dustin Key)
-select c_basecode from I2B2METADATA2.naaccr_ontology where 1=0;
-
 /* check that metadata_init.sql was run to create the ontology table. */
 select c_name from BlueHeronMetadata.NAACCR_ONTOLOGY where 1=0;
 
@@ -262,23 +259,11 @@ select sectionid, section
 , concept_cd, codenbr, min(codedcrp) as c_name
 from (
 select tiv.*
-     , case when nc.codedcrp is not null then tiv.codenbr || ' ' || nc.codedcrp
-       else ino.c_name end as codedcrp
-/* grumble... Oracle seems buggy w.r.t. ANSI joins over db links
+     , tiv.codenbr || ' ' || nc.codedcrp as codedcrp
 from tumor_reg_codes tiv
 left join naacr.t_code nc
   on nc.itemid = tiv.ItemID
  and nc.codenbr = tiv.codenbr
-left join i2b2metadata2.NAACCR_ONTOLOGY ino
-on ino.c_basecode = tiv.concept_cd
-*/
-from tumor_reg_codes tiv
-   , naacr.t_code nc
-   , i2b2metadata2.NAACCR_ONTOLOGY ino
-where nc.itemid(+) = tiv.ItemID
-  and nc.codenbr(+) = tiv.codenbr
-  and ino.c_basecode(+) = tiv.concept_cd
-)
 group by sectionid, section
 , itemid, itemnbr, itemname
 , concept_cd, codenbr;
