@@ -264,6 +264,7 @@ from tumor_reg_codes tiv
 left join naacr.t_code nc
   on nc.itemid = tiv.ItemID
  and nc.codenbr = tiv.codenbr
+)
 group by sectionid, section
 , itemid, itemnbr, itemname
 , concept_cd, codenbr;
