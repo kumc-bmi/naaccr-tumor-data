@@ -421,8 +421,14 @@ from tumor_item_value tiv
 ) av
  on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
 and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital"
-where ne."Date of Diagnosis" is not null
-/* TODO: figure out what's up with the 42 records with no Date of Diagnosis */
+where (case 
+       when av.start_date is not null then 1
+       when av.sectionid = 4 and ne."Date of Last Contact" is not null then 1
+       when av.sectionid != 4 and ne."Date of Diagnosis" is not null then 1
+       else 0
+       end) = 1
+/* TODO: figure out what's up with the 42 records with no Date of Diagnosis
+and the ones with no date of last contact */
 and ne."Accession Number--Hosp" is not null);
 
 /* Known duplicates handled by the unique index now as per #1155
