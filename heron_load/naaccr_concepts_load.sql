@@ -22,7 +22,7 @@ select * from naacr.extract where 1=0;
 select * from tumor_item_value tiv where 1=0;
 
 /* check that metadata_init.sql was run to create the ontology table. */
-select c_name from BlueHeronMetadata.NAACCR_ONTOLOGY where 1=0;
+select c_name from BlueHeronMetadata.NAACCR_ONTOLOGY@deid where 1=0;
 
 -- check that WHO materials are staged
 select * from who.topo where 1=0;
@@ -272,9 +272,9 @@ group by sectionid, section
 
 -- select count(*) from tumor_reg_concepts;
 
-delete from BlueHeronMetadata.NAACCR_ONTOLOGY;
+delete from BlueHeronMetadata.NAACCR_ONTOLOGY@deid;
 
-insert into BlueHeronMetadata.NAACCR_ONTOLOGY (
+insert into BlueHeronMetadata.NAACCR_ONTOLOGY@deid (
   c_hlevel, c_fullname, c_name, c_basecode, c_dimcode, c_visualattributes,
   c_synonym_cd, c_facttablecolumn, c_tablename, c_columnname, c_columndatatype,
   c_operator, m_applied_path,
@@ -382,14 +382,14 @@ select 3 + hlevel as c_hlevel
      , case when basecode is null then null
        else 'SEER_SITE:' || basecode end as concept_cd
      , visualattributes as c_visualattributes
-from seer_site_terms
+from seer_site_terms@deid
 ) terms
 , (select 'naaccr\' as path
      , 'NAACCR' as concept_name
      from dual) naaccr_folder
 , (select 0 c_hlevel, '\i2b2\' c_fullname from dual) i2b2_root
-, BlueHeronMetadata.normal_concept norm
-, (select * from BlueHeronData.source_master
+, BlueHeronMetadata.normal_concept@deid norm
+, (select * from BlueHeronData.source_master@deid
    where source_cd like 'tumor_registry@%') tumor_reg_source;
 
 
@@ -397,7 +397,7 @@ from seer_site_terms
 select case when count(*) = 3 then 1 else 1/0 end naaccr_morph_bugs_fixed
 from (
 select distinct c_basecode
-from BlueHeronMetadata.NAACCR_ONTOLOGY
+from BlueHeronMetadata.NAACCR_ONTOLOGY@deid
 where c_basecode in ('NAACCR|521:97323', 'NAACCR|521:80413',
                      'NAACCR|521:98353')
 );
