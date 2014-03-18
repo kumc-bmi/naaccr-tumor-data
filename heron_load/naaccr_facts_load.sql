@@ -4,6 +4,8 @@ Copyright (c) 2013 University of Kansas Medical Center
 part of the HERON* open source codebase; see NOTICE file for license details.
 * http://informatics.kumc.edu/work/wiki/HERON
 
+patterned after epic_facts_load.sql
+
  * ack: "Key, Dustin" <key.d@ghc.org>
  * Thu, 18 Aug 2011 16:16:31 -0700
  *
@@ -134,8 +136,13 @@ insert into NightHeronData.encounter_mapping
   where up.upload_id = :upload_id);
 
 
+truncate table observation_fact_upload;
+whenever sqlerror continue;
+alter table observation_fact_upload
+  disable constraint observation_fact_pk;
+whenever sqlerror exit;
 
-insert into NightHerondata.observation_fact(
+insert into observation_fact_upload (
   patient_num, encounter_num,
   concept_cd,
   provider_id,
@@ -185,41 +192,22 @@ join NIGHTHERONDATA.encounter_mapping em
 commit;
 
 
-/* TODO: make some test data */
 
-/* clean up from buggy load.
-set timing on;
-
-  CREATE INDEX NIGHTHERONDATA.observation_fact_upload_id
-        ON NIGHTHERONDATA.observation_fact (upload_id);
-
-  drop index NIGHTHERONDATA.encounter_mapping_upload_id;
-  
-  CREATE INDEX NIGHTHERONDATA.encounter_mapping_upload_id
-        ON NIGHTHERONDATA.encounter_mapping (upload_id);
-  -- Elapsed: 00:00:23.840
-
-select count(*)
-from NIGHTHERONDATA.encounter_mapping
-where upload_id in (12, 13, 14, 15);
+/* For this upload of data, check primary key constraints. */
+alter table observation_fact_upload
+  enable constraint observation_fact_pk
+  /* TODO: CODE REVIEW: exceptions into ...exceptions ? */
+  ;
 
 
-delete
-from NIGHTHERONDATA.encounter_mapping
-where upload_id in (12, 13, 14, 15);
--- 64,697 rows deleted.
--- Elapsed: 00:00:00.804
+/** Summary stats.
 
-delete
-from NIGHTHERONDATA.observation_fact
-where upload_id=31;
-
-drop INDEX NIGHTHERONDATA.observation_fact_upload_id;
-
- */
-
--- summary stats
+Report how many rows are dropped when joining on patient_ide and encounter_id.
+Subsumes check for null :part (#789).
+*/
 update NightHeronData.upload_status
-  set loaded_record = 0 /* TODO */
-    , no_of_record = (select count(*) from NightHerondata.observation_fact)
+  set loaded_record = (select count(*) from observation_fact_upload)
+    , no_of_record = (select count(*) from tumor_reg_facts)
+                      +
+                     (select count(*) from seer_recode_facts)
   where upload_id = :upload_id;
