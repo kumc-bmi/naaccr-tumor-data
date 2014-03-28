@@ -443,14 +443,6 @@ and ne."Accession Number--Hosp" not in (
 -- eyeball it:
 -- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
 
-/* Duplicate keys? */
-select case when count(*) > 0 then 1/0 else 1 end as tumor_fact_keys_unique
-from (
-select count(*), ENCOUNTER_ide, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD
-from tumor_reg_facts f
-group by ENCOUNTER_ide, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD
-having count(*) > 1
-order by 1 desc);
 
 /*ugh: multiple codedcrp s:
 select tiv."Accession Number--Hosp"
