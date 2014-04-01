@@ -196,7 +196,7 @@ commit;
 /* For this upload of data, check primary key constraints. */
 alter table observation_fact_upload
   enable constraint observation_fact_pk
-  /* TODO: CODE REVIEW: exceptions into ...exceptions ? */
+  /* TODO: log errors ... ? #2117 */
   ;
 
 
