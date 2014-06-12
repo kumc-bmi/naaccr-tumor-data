@@ -16,6 +16,13 @@ import os
 from lxml import etree
 
 
+def main():
+    all_files = os.listdir(CS.xml_format)
+    names = xml_items(all_files)
+    print 'XML format files:', len(names)
+    xstuff(names)
+
+
 class CS(object):
     '''
     reference:
@@ -53,7 +60,5 @@ def xstuff(names):
         break
 
 
-all_files = os.listdir(CS.xml_format)
-names = xml_items(all_files)
-print 'XML format files:', len(names)
-xstuff(names)
+if __name__ == '__main__':
+    main()
