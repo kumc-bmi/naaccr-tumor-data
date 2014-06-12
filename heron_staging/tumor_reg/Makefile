@@ -29,6 +29,16 @@ naaccr12_1.mdb:
 	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.html'
 
 
+CSTABLES=3_CSTables(HTMLandXML)
+csterms: $(CSTABLES)
+	find "3_CS Tables (HTML and XML)/XML Format/" -type f -print0 | \
+		xargs -0 perl -i.bak -pe 's,\\,/,g'
+
+$(CSTABLES): $(CSTABLES).zip
+	unzip -q -o "$(CSTABLES).zip"
+
+$(CSTABLES).zip:
+	$(CURL) --output "$@" 'https://cancerstaging.org/cstage/software/Documents/3_CSTables(HTMLandXML).zip'
 
 
 # Tested with the following:
