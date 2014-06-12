@@ -47,13 +47,33 @@ def xstuff(xml_dir, targets):
     parser = etree.XMLParser(load_dtd=True)
     parser.resolvers.add(LAResolver(xml_dir))
     for f in targets:
+        if not f.path.endswith('Breast.xml'):  #@@
+            continue
         log.debug("document: %s", f)
-        text_stream = f.inChannel()
-        tree = etree.parse(text_stream, parser)
+        tree = etree.parse(f.inChannel(), parser)
         root = tree.getroot()
-        log.debug('%s %s %s', f, root.tag, root.attrib)
+        log.debug("root tag: %s", root.tag)
+        title = root.xpath('schemahead/title')[0]
+        maintitle = title.xpath('maintitle/text()')
+        sitesummary = title.xpath('sitesummary/text()')
+        log.debug('title: %s summary: %s',
+                  maintitle, sitesummary)
+
+        for table in root.xpath('cstable'):
+            tablename = table.xpath('tablename')[0]
+            tabletitle = tablename.xpath('tabletitle/text()')
+            tablesubtitle = tablename.xpath('tablesubtitle//text()')
+            log.debug('tabletitle: %s tablesubtitle: %s',
+                      tabletitle, tablesubtitle)
+
+            for row in table.xpath('row'):
+                code = row.xpath('code/text()')[0]
+                descrip = row.xpath('descrip/text()')[0]
+                log.debug('code: %s descrip: %s',
+                          code, descrip)
+
+
         log.debug('%s', etree.tostring(root, pretty_print=True))
-        break
 
 
 class LAResolver(etree.Resolver):
