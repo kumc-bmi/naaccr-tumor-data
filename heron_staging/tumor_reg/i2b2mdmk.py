@@ -5,7 +5,7 @@ see dmtoterms.rst for design notes and tests.
 
 __author__ = 'Dan Connolly'
 __contact__ = 'http://informatics.kumc.edu/'
-__copyright__ = 'Copyright (c) 2014 Univeristy of Kansas Medical Center'
+__copyright__ = 'Copyright (c) 2014 University of Kansas Medical Center'
 __license__ = 'MIT'
 __docformat__ = "restructuredtext en"
 
