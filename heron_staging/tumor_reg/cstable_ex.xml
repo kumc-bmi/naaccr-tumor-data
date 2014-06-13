@@ -1,0 +1,106 @@
+<cstgschema csschemaid="Breast" status="DRAFT" revised="06/27/2013" order="5700">
+	<schemahead>
+		<title>
+			<maintitle>Breast</maintitle>
+			<subtitle/>
+			<sitesummary>C50.0-C50.6, C50.8-C50.9</sitesummary>
+		</title>
+		<note>DISCONTINUED SITE-SPECIFIC FACTORS:  SSF17, SSF18, SSF19, SSF20, SSF24</note>
+		<note>C50.0  Nipple</note>
+		<note>C50.1  Central portion of breast</note>
+		<note>C50.2  Upper-inner quadrant of breast</note>
+		<note>C50.3  Lower-inner quadrant of breast</note>
+		<note>C50.4  Upper-outer quadrant of breast</note>
+		<note>C50.5  Lower-outer quadrant of breast</note>
+		<note>C50.6  Axillary Tail of breast</note>
+		<note>C50.8  Overlapping lesion of breast</note>
+		<note>C50.9  Breast, NOS</note>
+		<note>Note:  Laterality must be coded for this site.</note>
+	</schemahead>
+
+<cstable tableid="aab" revised="08/07/2013" pattern="1-1-0" type="desc" role="ROLE_TUMOR_SIZE" usage="ACTIVE" currency="CURRENT" externalrole="INPUT">
+		<tablename>
+			<tabletitle>CS Tumor Size</tabletitle>
+			<tablesubtitle/>
+		</tablename>
+		<note>Note 1:  Code the specific tumor size as documented in the medical record. If the only information regarding tumor size is the physician's statement of the T category, assign code 990 (T1mi), 991 (T1b), 992 (T1 or T1c), or 995 (T2). If the physician's statement of the T category is T1a with no documentation of tumor size, code tumor size as 005. If the physician's statement of the T category is T3 with no documentation of tumor size or a statement specifying only that the tumor size is greater than 5 cm, code tumor size as 051.</note>
+		<note>Note 2:  When coding pathologic size, code the measurement of the invasive component.  For example, if there is a large in situ component (e.g., 4 cm) and a small invasive component, see <a href="Breast_ssf6.html">CS Site-Specific Factor 6 </a>to code more information about the reported tumor size.  If the size of invasive component is not given, code the size of the entire tumor and record what the size value represents in CS Site-Specific Factor 6.  Note that some breast cancers cannot be sized pathologically.</note>
+		<note>Note 3:  Microinvasion is the extension of cancer cells beyond the basement membrane into the adjacent tissues with no focus more than 0.1 cm in greatest dimension.  When there are multiple foci of microinvasion, the size of only the largest focus is used to classify the microinvasion.  (Do not use the sum of all the individual foci.)</note>
+	<tableheader>
+		<headerrow>
+			<indextype>INDEX_STANDARD</indextype>
+			<sorttype>SORT_NOTAPPLICABLE</sorttype>
+			<lookup>
+				<param>TUMORSIZE</param>
+			</lookup>
+			<colhead indexvar="TUMORSIZE" io="lookup"><coltitle>Code</coltitle></colhead>
+			<colhead><coltitle>Description</coltitle></colhead>
+		</headerrow>
+	</tableheader>
+		<row>
+			<code>000</code>
+			<descrip>No mass/tumor found</descrip>
+		</row>
+		<row>
+			<code>001-988</code>
+			<descrip>001 - 988 millimeters (mm)
+(Code exact size in mm)</descrip>
+		</row>
+		<row>
+			<code>989</code>
+			<descrip>989 mm or larger</descrip>
+		</row>
+		<row>
+			<code>990</code>
+			<descrip>Microinvasion
+Microscopic focus or foci only and no size given
+Described as "less than 1 mm"
+
+Stated as T1mi  with no other information on tumor size</descrip>
+		</row>
+		<row>
+			<code>991</code>
+			<descrip>Described as "less than 1 centimeter (cm)"
+
+Stated as T1b  with no other information on tumor size</descrip>
+		</row>
+		<row>
+			<code>992</code>
+			<descrip>Described as "less than 2 cm," or "greater than 1 cm," or "between 1 cm and 2 cm"
+
+Stated as T1 [NOS] or T1c [NOS] with no other information on tumor size</descrip>
+		</row>
+		<row>
+			<code>993</code>
+			<descrip>Described as "less than 3 cm," or "greater than 2 cm," or "between 2 cm and 3 cm"</descrip>
+		</row>
+		<row>
+			<code>994</code>
+			<descrip>Described as "less than 4 cm," or "greater than 3 cm," or "between 3 cm and 4 cm"</descrip>
+		</row>
+		<row>
+			<code>995</code>
+			<descrip>Described as "less than 5 cm," or "greater than 4 cm," or "between 4 cm and 5 cm"
+
+Stated as T2 with no other information on tumor size</descrip>
+		</row>
+		<row>
+			<code>996</code>
+			<descrip>Mammographic/xerographic diagnosis only, no size given; clinically not palpable</descrip>
+		</row>
+		<row>
+			<code>997</code>
+			<descrip>Paget disease of nipple with no demonstrable tumor</descrip>
+		</row>
+		<row>
+			<code>998</code>
+			<descrip>Diffuse</descrip>
+		</row>
+		<row>
+			<code>999</code>
+			<descrip>Unknown; size not stated
+Size of tumor cannot be assessed
+Not documented in patient record</descrip>
+		</row>
+</cstable>
+</cstgschema>
