@@ -102,5 +102,11 @@ Stated as T2 with no other information on tumor size</descrip>
 Size of tumor cannot be assessed
 Not documented in patient record</descrip>
 		</row>
+
+
+		<row>
+			<code>123</code>
+		</row>
+
 </cstable>
 </cstgschema>

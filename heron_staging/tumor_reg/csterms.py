@@ -96,11 +96,15 @@ def doc_terms(doc_elt):
         yield '@@TABLE THINGY'
 
         for row in table.xpath('row'):
-            code = row.xpath('code/text()')[0]
-            descrip = row.xpath('descrip/text()')[0]
+            code = maybeNode(row.xpath('code/text()'))
+            descrip = maybeNode(row.xpath('descrip/text()'))
             log.debug('code: %s descrip: %s',
                       code, descrip)
             yield '@@ROW THINGY'
+
+
+def maybeNode(nodes):
+    return nodes[0] if len(nodes) > 0 else None
 
 
 class LAResolver(etree.Resolver):
