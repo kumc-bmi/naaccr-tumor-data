@@ -1,5 +1,6 @@
 r'''Make i2b2 metadata terms
 
+
 see dmtoterms.rst for design notes and tests.
 '''
 
@@ -13,6 +14,8 @@ __docformat__ = "restructuredtext en"
 from collections import namedtuple
 
 
+# Columns are taken from DDL for Table I2B2
+# in create_oracle_i2b2metadata_tables.sql
 Term = namedtuple('Term',
                   ['c_hlevel',
                    'c_fullname', 'c_basecode', 'c_name',
@@ -39,7 +42,40 @@ class I2B2MetaData(object):
              c_tablename='concept_dimension',
              c_facttablecolumn='concept_cd',
              max_tooltip_len=850, encoding='utf-8'):
-        '''
+        r'''Make metadata for an i2b2 term.
+
+        :param pfx: Part of the fullname that doesn't contribute to the c_hlevel
+        :param parts: normal parts of the c_fullname (to be joined by \)
+        :param name: visible label for the term
+
+        Remaining parameters have sensible defaults:
+
+        >>> t1 = I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name='Collaborative Staging Terms')
+        >>> t1
+        ... # doctest: +NORMALIZE_WHITESPACE
+        Term(c_hlevel=2,
+             c_fullname='\\i2b2\\Cancer Cases\\CS Terms\\',
+              c_basecode=None, c_name='Collaborative Staging Terms',
+               c_visualattributes='CAE',
+                m_applied_path='@',
+                 c_tooltip='Collaborative Staging Terms',
+                  c_synonym_cd='N',
+                   update_date=None,
+                    sourcesystem_cd=None,
+                     c_metadataxml='',
+                      c_dimcode='\\i2b2\\Cancer Cases\\CS Terms\\',
+                       c_operator='like', c_columndatatype='@',
+                        c_columnname='concept_path',
+                         c_tablename='concept_dimension',
+                          c_facttablecolumn='concept_cd')
+
+        The `c_hlevel` is taken from the length of `parts`:
+        >>> print I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name='name').c_hlevel
+        2
+
+        The prefix and parts get combined into `c_fullname`:
+        >>> print I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name='name').c_fullname
+        \i2b2\Cancer Cases\CS Terms\
 
         Where there is no tooltip, copy the name into the tooltip
         field so the web client doesn't show null:
