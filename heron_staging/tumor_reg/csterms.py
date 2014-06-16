@@ -15,7 +15,7 @@ import logging
 from lxml import etree
 
 from lafile import osRd
-
+from i2b2mdmk import I2B2MetaData
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +25,8 @@ def main(rd):
     for doc in each_document(xml_dir):
         terms = list(doc_terms(doc))
         log.debug('@@terms doc: %s %d', doc, len(terms))
+        for t in terms:
+            log.debug('term: %s', t)
 
 
 class CS(object):
@@ -93,14 +95,17 @@ def doc_terms(doc_elt):
         log.debug('tabletitle: %s tablesubtitle: %s',
                   tabletitle, tablesubtitle)
 
-        yield '@@TABLE THINGY'
+        if len(tablesubtitle) == 0:
+            continue
+
+        yield I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name=tablesubtitle[0])
 
         for row in table.xpath('row'):
             code = maybeNode(row.xpath('code/text()'))
             descrip = maybeNode(row.xpath('descrip/text()'))
             log.debug('code: %s descrip: %s',
                       code, descrip)
-            yield '@@ROW THINGY'
+            yield I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name=descrip)
 
 
 def maybeNode(nodes):
