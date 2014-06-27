@@ -58,11 +58,6 @@ def each_document(xml_dir):
     parser.resolvers.add(LAResolver(xml_dir))
 
     for f in targets:
-
-        # For now, let's just parse one file.
-        if not f.path.endswith('Breast.xml'):  #@@
-            continue
-
         log.debug("document: %s", f)
         doc = etree.parse(f.inChannel(), parser)
         yield doc.getroot()
@@ -104,9 +99,9 @@ def doc_terms(doc_elt):
     maintitle, sitesummary, tables = doc_info(doc_elt)
     log.debug('title: %s summary: %s',
               maintitle, sitesummary)
-    parts = ['Cancer Cases', 'CS Terms', maintitle]
+    parts = ['Cancer Cases', 'CS Terms', sitesummary or maintitle]
     yield I2B2MetaData.term(pfx=['', 'i2b2'],
-                            parts=parts,
+                            parts=parts, viz='FAE',
                             name=maintitle)
 
     for table in tables:
@@ -128,7 +123,7 @@ def doc_info(doc_elt):
     title = doc_elt.xpath('schemahead/title')[0]
     tables = doc_elt.xpath('cstable')
     return (title.xpath('maintitle/text()')[0],
-            title.xpath('sitesummary/text()')[0],
+            maybeNode(title.xpath('sitesummary/text()')),
             tables)
 
 
@@ -142,7 +137,7 @@ def table_term(table, parts):
 
     parts = parts + [segment]
     return (I2B2MetaData.term(pfx=['', 'i2b2'],
-                              parts=parts,
+                              parts=parts, viz='FAE',
                               name=(subtitle + title)[0]),
             parts,
             table.xpath('row'))
@@ -157,7 +152,7 @@ def row_term(row, parts):
         return None
 
     return I2B2MetaData.term(pfx=['', 'i2b2'],
-                             parts=parts + [code],
+                             parts=parts + [code], viz='LAE',
                              name=descrip)
 
 
@@ -173,7 +168,7 @@ class LAResolver(etree.Resolver):
 
 
 if __name__ == '__main__':
-    def _configure_logging(level=logging.DEBUG):
+    def _configure_logging(level=logging.INFO):
         logging.basicConfig(level=level)
 
     def _trusted_main():
