@@ -79,24 +79,45 @@ def doc_terms(doc_elt):
 
     >>> doc = etree.fromstring(text)
     >>> terms = list(doc_terms(doc))
-    >>> terms[:2]
-    ['@@TABLE THINGY', '@@ROW THINGY']
+    >>> for t in terms:
+    ...     print t.c_fullname
+    \i2b2\Cancer Cases\CS Terms\Breast\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\000\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\001-988\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\989\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\990\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\991\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\992\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\993\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\994\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\995\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\996\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\997\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\998\
+    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\999\
 
     '''
     log.debug("root tag: %s", doc_elt.tag)
     log.debug('document: %s', etree.tostring(doc_elt, pretty_print=True))
 
-    title, maintitle, sitesummary, tables = doc_info(doc_elt)
+    maintitle, sitesummary, tables = doc_info(doc_elt)
     log.debug('title: %s summary: %s',
               maintitle, sitesummary)
+    parts = ['Cancer Cases', 'CS Terms', maintitle]
+    yield I2B2MetaData.term(pfx=['', 'i2b2'],
+                            parts=parts,
+                            name=maintitle)
 
     for table in tables:
-        tt, rows = table_term(table, maintitle)
+        tt, sub_parts, rows = table_term(table, parts)
         if tt:
             yield tt
 
         for row in rows:
-            yield row_term(row)
+            rt = row_term(row, sub_parts)
+            if rt:
+                yield rt
 
 
 def maybeNode(nodes):
@@ -105,33 +126,38 @@ def maybeNode(nodes):
 
 def doc_info(doc_elt):
     title = doc_elt.xpath('schemahead/title')[0]
+    tables = doc_elt.xpath('cstable')
+    return (title.xpath('maintitle/text()')[0],
+            title.xpath('sitesummary/text()')[0],
+            tables)
 
-    return (title,
-            title.xpath('maintitle/text()'),
-            title.xpath('sitesummary/text()'),
-            doc_elt.xpath('cstable'))
 
-
-def table_term(table, maintitle):
+def table_term(table, parts):
+    segment = '%s_%s' % (table.attrib['role'], table.attrib['tableid'])
     name = table.xpath('tablename')[0]
     title = name.xpath('tabletitle/text()')
     subtitle = name.xpath('tablesubtitle//text()')
     log.debug('tabletitle: %s tablesubtitle: %s',
               title, subtitle)
 
-    return ((I2B2MetaData.term(pfx=['', 'i2b2'],
-                               parts=['Cancer Cases', 'CS Terms'],
-                               name=subtitle[0]), table.xpath('row'))
-            if subtitle else (None, []))
+    parts = parts + [segment]
+    return (I2B2MetaData.term(pfx=['', 'i2b2'],
+                              parts=parts,
+                              name=(subtitle + title)[0]),
+            parts,
+            table.xpath('row'))
 
 
-def row_term(row):
+def row_term(row, parts):
     code = maybeNode(row.xpath('code/text()'))
     descrip = maybeNode(row.xpath('descrip/text()'))
     log.debug('code: %s descrip: %s',
               code, descrip)
+    if not (code and descrip):
+        return None
+
     return I2B2MetaData.term(pfx=['', 'i2b2'],
-                             parts=['Cancer Cases', 'CS Terms'],
+                             parts=parts + [code],
                              name=descrip)
 
 
