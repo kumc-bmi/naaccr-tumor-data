@@ -16,7 +16,7 @@ import logging
 from lxml import etree
 
 from lafile import osRd
-from i2b2mdmk import I2B2MetaData
+from i2b2mdmk import I2B2MetaData, Term
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ def main(argv, rd, arg_wr):
     xml_dir = rd / CS.xml_format
 
     sink = csv.writer(arg_wr(out_fn))
+    sink.writerow(Term._fields)
 
     for doc in each_document(xml_dir):
         for t in doc_terms(doc):
