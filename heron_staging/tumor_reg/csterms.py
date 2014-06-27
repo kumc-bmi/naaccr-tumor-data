@@ -9,6 +9,7 @@ first, download and unzip 3_CSTables(HTMLandXML).zip; see Makefile for details.
 
 '''
 
+import csv
 import logging
 
 # on windows, via conda/anaconda
@@ -20,13 +21,16 @@ from i2b2mdmk import I2B2MetaData
 log = logging.getLogger(__name__)
 
 
-def main(rd):
+def main(argv, rd, arg_wr):
+    out_fn = argv[1]
+
     xml_dir = rd / CS.xml_format
+
+    sink = csv.writer(arg_wr(out_fn))
+
     for doc in each_document(xml_dir):
-        terms = list(doc_terms(doc))
-        log.debug('@@terms doc: %s %d', doc, len(terms))
-        for t in terms:
-            log.debug('term: %s', t)
+        for t in doc_terms(doc):
+            sink.writerow(t)
 
 
 class CS(object):
@@ -81,38 +85,53 @@ def doc_terms(doc_elt):
     log.debug("root tag: %s", doc_elt.tag)
     log.debug('document: %s', etree.tostring(doc_elt, pretty_print=True))
 
-    title = doc_elt.xpath('schemahead/title')[0]
-    maintitle = title.xpath('maintitle/text()')
-    sitesummary = title.xpath('sitesummary/text()')
+    title, maintitle, sitesummary, tables = doc_info(doc_elt)
     log.debug('title: %s summary: %s',
               maintitle, sitesummary)
 
-    for table in doc_elt.xpath('cstable'):
-        tablename = table.xpath('tablename')[0]
-        tabletitle = tablename.xpath('tabletitle/text()')
-        tablesubtitle = tablename.xpath('tablesubtitle//text()')
-        log.debug('tabletitle: %s tablesubtitle: %s',
-                  tabletitle, tablesubtitle)
+    for table in tables:
+        tt, rows = table_term(table, maintitle)
+        if tt:
+            yield tt
 
-        if len(tablesubtitle) == 0:
-            continue
-
-        yield I2B2MetaData.term(pfx=['', 'i2b2'],
-                                parts=['Cancer Cases', 'CS Terms'],
-                                name=tablesubtitle[0])
-
-        for row in table.xpath('row'):
-            code = maybeNode(row.xpath('code/text()'))
-            descrip = maybeNode(row.xpath('descrip/text()'))
-            log.debug('code: %s descrip: %s',
-                      code, descrip)
-            yield I2B2MetaData.term(pfx=['', 'i2b2'],
-                                    parts=['Cancer Cases', 'CS Terms'],
-                                    name=descrip)
+        for row in rows:
+            yield row_term(row)
 
 
 def maybeNode(nodes):
     return nodes[0] if len(nodes) > 0 else None
+
+
+def doc_info(doc_elt):
+    title = doc_elt.xpath('schemahead/title')[0]
+
+    return (title,
+            title.xpath('maintitle/text()'),
+            title.xpath('sitesummary/text()'),
+            doc_elt.xpath('cstable'))
+
+
+def table_term(table, maintitle):
+    name = table.xpath('tablename')[0]
+    title = name.xpath('tabletitle/text()')
+    subtitle = name.xpath('tablesubtitle//text()')
+    log.debug('tabletitle: %s tablesubtitle: %s',
+              title, subtitle)
+
+    return ((I2B2MetaData.term(pfx=['', 'i2b2'],
+                               parts=['Cancer Cases', 'CS Terms'],
+                               name=subtitle[0]), table.xpath('row'))
+            if subtitle else (None, []))
+
+
+def row_term(row):
+    code = maybeNode(row.xpath('code/text()'))
+    descrip = maybeNode(row.xpath('descrip/text()'))
+    log.debug('code: %s descrip: %s',
+              code, descrip)
+    return I2B2MetaData.term(pfx=['', 'i2b2'],
+                             parts=['Cancer Cases', 'CS Terms'],
+                             name=descrip)
 
 
 class LAResolver(etree.Resolver):
@@ -131,11 +150,16 @@ if __name__ == '__main__':
         logging.basicConfig(level=level)
 
     def _trusted_main():
+        from sys import argv
         import os
 
         rd = osRd(os.curdir, lambda n: open(n), os.path, os.listdir)
 
-        main(rd)
+        def arg_wr(n):
+            if n not in argv: raise IOError
+            return open(n, 'w')
+
+        main(argv, rd, arg_wr)
 
     _configure_logging()
     _trusted_main()
