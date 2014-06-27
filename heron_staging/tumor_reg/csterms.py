@@ -38,7 +38,7 @@ class CS(object):
     https://cancerstaging.org/cstage/Pages/default.aspx
     '''
 
-    # https://cancerstaging.org/cstage/software/Documents/3_CSTables(HTMLandXML).zip
+    # https://cancerstaging.org/cstage/software/Documents/3_CSTables(HTMLandXML).zip  # noqa
     cs_tables = '3_CSTables(HTMLandXML).zip'
 
     xml_format = '3_CS Tables (HTML and XML)/XML Format/'
@@ -61,7 +61,6 @@ def each_document(xml_dir):
         log.debug("document: %s", f)
         doc = etree.parse(f.inChannel(), parser)
         yield doc.getroot()
-
 
 
 def doc_terms(doc_elt):
@@ -98,14 +97,18 @@ def doc_terms(doc_elt):
         if len(tablesubtitle) == 0:
             continue
 
-        yield I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name=tablesubtitle[0])
+        yield I2B2MetaData.term(pfx=['', 'i2b2'],
+                                parts=['Cancer Cases', 'CS Terms'],
+                                name=tablesubtitle[0])
 
         for row in table.xpath('row'):
             code = maybeNode(row.xpath('code/text()'))
             descrip = maybeNode(row.xpath('descrip/text()'))
             log.debug('code: %s descrip: %s',
                       code, descrip)
-            yield I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name=descrip)
+            yield I2B2MetaData.term(pfx=['', 'i2b2'],
+                                    parts=['Cancer Cases', 'CS Terms'],
+                                    name=descrip)
 
 
 def maybeNode(nodes):
