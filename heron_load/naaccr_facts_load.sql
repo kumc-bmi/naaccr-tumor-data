@@ -114,13 +114,14 @@ where ne."Accession Number--Hosp" is null;
 
 insert into NightHeronData.encounter_mapping
   (encounter_num, encounter_ide,
-   encounter_ide_status, encounter_ide_source,
+   encounter_ide_status, encounter_ide_source, project_id,
    patient_ide, patient_ide_source,
    import_date, upload_id, download_date, sourcesystem_cd )
 (select NightHeronData.SQ_UP_ENCDIM_ENCOUNTERNUM.nextval as encounter_num
       , tv.encounter_ide
       , 'A' as encounter_ide_status
       , aud.source_cd as encounter_ide_source
+      , '@' as project_id
       , tv.mrn as patient_ide
       , sms_audit_info.source_cd as patient_ide_source
       , sysdate as import_date
