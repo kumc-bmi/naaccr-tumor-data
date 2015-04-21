@@ -179,7 +179,7 @@ join NIGHTHERONDATA.patient_mapping pm
   on pm.patient_ide_source =
   (select source_cd from BlueHeronData.source_master@deid
    where source_cd like 'SMS@%')
-  and ltrim(pm.patient_ide, '0') = ltrim(tf.mrn, '0')
+  and pm.patient_ide = ltrim(tf.mrn, '0')
 join NIGHTHERONDATA.encounter_mapping em
   on em.encounter_ide_source =
   (select source_cd from BlueHeronData.source_master@deid
