@@ -144,7 +144,7 @@ alter table observation_fact_upload
 whenever sqlerror exit;
 
 insert into observation_fact_upload (
-  patient_num, encounter_num,
+  patient_num, encounter_num, encounter_ide,
   concept_cd,
   provider_id,
   start_date,
@@ -159,7 +159,7 @@ insert into observation_fact_upload (
   location_cd,
   update_date,
   import_date, upload_id, download_date, sourcesystem_cd)
-select patient_num, encounter_num,
+select patient_num, encounter_num, tf.encounter_ide,
   tf.concept_cd,
   tf.provider_id,
   tf.start_date,
