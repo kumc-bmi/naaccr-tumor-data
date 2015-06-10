@@ -144,7 +144,7 @@ alter table observation_fact_upload
 whenever sqlerror exit;
 
 insert into observation_fact_upload (
-  patient_num, encounter_num, encounter_ide,
+  patient_num, encounter_num, sub_encounter,
   concept_cd,
   provider_id,
   start_date,
