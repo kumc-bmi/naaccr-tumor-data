@@ -253,12 +253,24 @@ from (
 */
 
 /* This is the main big flat view. */
+     -- TODO: for long lists of numeric codes, find metadata
+     -- and chunking strategy
+     -- TODO: consider normalizing complication 1, complication 2, ...
 create or replace view tumor_item_value as
 select "Accession Number--Hosp"
      , "Sequence Number--Hospital"
      , ns.sectionid
      , ne.ItemNbr
-     , ne.value
+     , ni.valtype_cd
+     , case
+         when valtype_cd like 'T_' then value
+         when valtype_cd like 'D_' then value
+         else null
+       end tval_char
+     , case
+         when valtype_cd like 'N_' then to_number(ne.value)
+         else null
+       end nval_num
      , case when ni."Format" = 'YYYYMMDD'
        then to_date(case
          when value in ('00000000', '99999999', '99990') then null
@@ -269,20 +281,38 @@ select "Accession Number--Hosp"
          end, 'yyyymmdd')
        else null end
        as start_date
-     , 'NAACCR|' || ne.ItemNbr || ':' || (
-         case when ni."Format" = 'YYYYMMDD' then null
-         else value end) as concept_cd
-     , case when ni."Format" = 'YYYYMMDD' then null
-       else value end as codenbr
+     , 'NAACCR|' || ne.itemnbr || ':' || (
+         case when ni.valtype_cd like '@%' then value
+         else null end) as concept_cd
      , ns.section
      , ni."ItemName" as ItemName
-     , ni."ItemID" as ItemID
-from NAACR.extract_eav ne
-join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-where ne.value is not null
+     , ni."ItemID" as itemid
+from naacr.extract_eav ne
+join (
+select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
+         when ni."ItemName" like 'Reserved%' then null
+         when ni."FieldLength" is null then null
 
-and ni."SectionID" in (
+         when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
+         when ni."ItemName" like '%ICD-O-1' then '@'
+         when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
+         when ni."ItemName" like 'Comorbid/Complication%' then '@'
+
+         when ni."ItemName" = 'Patient ID Number' then 'Ti'
+         when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
+         when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
+         -- TODO: handle YYYYMMDDhhmmss as date?
+         when ni."Format" = 'YYYYMMDD' then 'Di'
+         when ni."ItemName" like 'Text--%' then 'Ti'
+         when ni."ItemName" like 'Age%' then 'Ni'
+         when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
+         when ni."AllowValue" like '10-digit%' and ni."ItemName" not like '%ID' then 'Ni'
+         when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
+
+          -- fields 3 characters or smaller are codes that aren't PHI
+         when to_number("FieldLength") <= 3 then '@'
+          -- In certain sections, fields up to 5 characters are non-PHI codes
+         when to_number("FieldLength") <= 5 and ni."SectionID" in (
   1 -- Cancer Identification
  , 2 -- Demographic
 -- , 3 -- Edit Overrides/Conversion History/System Admin
@@ -303,35 +333,30 @@ and ni."SectionID" in (
 -- , 15 -- Treatment-1st Course
 , 16 -- Treatment-Subsequent & Other
 , 17 -- Pathology
-)
--- TODO: store these in the ID star schema and de-id later.
-and ni."AllowValue" not like 'City name or UNKNOWN'
-and ni."AllowValue" not like 'Reference to EDITS table BPLACE.DBF in Appendix B'
-and ni."AllowValue" not like '5-digit or 9-digit U.S. ZIP codes%'
-and ni."AllowValue" not like 'Census Tract Codes%'
-and ni."AllowValue" not like 'See Appendix A for standard FIPS county codes%'
-and ni."AllowValue" not like 'See Appendix A for county codes for each state.%'
-and ni."AllowValue" not like '10-digit number'
-and ni."ItemName" not like 'Age at Diagnosis'
-and ni."ItemName" not like 'Text--%'
-and ni."ItemName" not like 'Place of Death'
-and ni."ItemName" not like 'Abstracted By'
-and ni."ItemName" not like 'NPI--Archive FIN'
-and ni."ItemName" not like 'NPI--Reporting Facility'
+         ) then '@'
+         when ni."Format" like '%zero filled' then 'Ni'
+         else 'Ti'
+       end valtype_cd
+     , ni.*
+from naacr.t_item ni
+) ni on ne.itemnbr = ni."ItemNbr"
+join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
+where ne.value is not null
+and ni.valtype_cd is not null
 ;
 /* eyeball it:
 
-select tiv.*
-     , nc.codedcrp
- from tumor_item_value tiv
-left join naacr.t_code nc
-  on nc.itemid = tiv.ItemID
- and nc.codenbr = tiv.value
--- order by to_number(SectionID), 1, 2, 3
+select * from tumor_item_value tiv
+where "Accession Number--Hosp" like '%555';
 
-where "Accession Number--Hosp"='200000045'
- and "Sequence Number--Hospital" = '00'
-order by to_number(SectionID), 1, 2, 3;
+How many different concept codes are there, excluding comorbidities?
+
+select distinct(concept_cd) from tumor_item_value tiv
+where valtype_cd not like '_i'
+and concept_cd not like 'NAACCR|31%';
+
+~9000.
+
 */
 
 
@@ -371,9 +396,9 @@ select MRN, encounter_ide
      , start_date
      , '@' modifier_cd
      , 1 instance_num
-     , '@' as valtype_cd
-     , '@' as tval_char
-     , to_number(null) as nval_num
+     , valtype_cd
+     , tval_char
+     , nval_num
      , null as valueflag_cd
      , null as units_cd
      , start_date as end_date
@@ -387,6 +412,7 @@ select
   av.ItemName,
 -- codedcrp is not unique; causes duplicate key errors in observation_fact
 --  av.codedcrp,
+  av.valtype_cd, av.nval_num, av.tval_char,
   case
   when av.start_date is not null then av.start_date
   -- Use Date of Last Contact for Follow-up/Recurrence/Death
@@ -413,6 +439,7 @@ select tiv."Accession Number--Hosp"
      , tiv."Sequence Number--Hospital"
      , tiv.start_date
      , tiv.concept_cd
+     , tiv.valtype_cd, tiv.nval_num, tiv.tval_char
      , tiv.ItemName
      , tiv.SectionId
 --     , tiv.codedcrp
