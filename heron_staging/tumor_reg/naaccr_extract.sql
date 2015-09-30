@@ -1153,6 +1153,20 @@ from "NAACR"."EXTRACT"
 
 union all
 select "Accession Number--Hosp", "Sequence Number--Hospital", 
+550 as ItemNbr,
+'Accession Number--Hosp' as ItemName,
+"Accession Number--Hosp" as value
+from "NAACR"."EXTRACT"
+
+union all
+select "Accession Number--Hosp", "Sequence Number--Hospital", 
+560 as ItemNbr,
+'Sequence Number--Hospital' as ItemName,
+"Sequence Number--Hospital" as value
+from "NAACR"."EXTRACT"
+
+union all
+select "Accession Number--Hosp", "Sequence Number--Hospital", 
 570 as ItemNbr,
 'Abstracted By' as ItemName,
 "Abstracted By" as value
