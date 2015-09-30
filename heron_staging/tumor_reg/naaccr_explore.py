@@ -122,7 +122,7 @@ def grok_item(txt):
 
 def make_ctl(spec, table, schema):
     yield '''LOAD DATA
-APPEND
+TRUNCATE
 INTO TABLE "%s"."%s" (
 ''' % (schema, table)
 
@@ -151,7 +151,7 @@ def eav_view_ddl(spec, table, view, schema):
             continue
         if item.num != 10:
             yield '\nunion all\n'
-        yield 'select "Accession Number--Hosp", "Sequence Number--Hospital",\n'
+        yield 'select "Accession Number--Hosp", "Sequence Number--Hospital", \n'
         yield '%s as ItemNbr,\n' % item.num
         yield '\'%s\' as ItemName,\n' % item.name
         yield '"%s" as value\n' % item.name
