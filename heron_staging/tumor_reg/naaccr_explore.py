@@ -145,8 +145,6 @@ def eav_view_ddl(spec, table, view, schema):
     yield 'create or replace view "%s"."%s" as \n' % (schema, view)
     for item in spec:
         if (item.length < 1 or
-                item.name in ('Accession Number--Hosp',
-                              'Sequence Number--Hospital') or
                 not item.num):
             continue
         if item.num != 10:
