@@ -9,7 +9,7 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 -- test that we're in the KUMC sid with the NAACCR data
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
-select "Accession Number--Hosp" from naacr.extract_eav where 1=0;
+select itemnbr from naacr.extract_eav where 1=0;
 -- check for curated data
 select name from seer_site_terms@deid where 1=0;
 
