@@ -1,45 +1,56 @@
 # see Makefile for usage
 
-import sys
-import csv
 from collections import namedtuple
-from string import strip
+from pprint import pformat
+from sys import stderr
+import csv
 
 Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
 
-def main(argv,
-         spec_text_filename='naaccr12_1.txt',
+def main(access,
          schema='NAACR',
          table='EXTRACT',
-         view='EXTRACT_EAV',
-         ctl='naaccr_extract.ctl',
-         ddl='naaccr_extract.sql'):
-    spec = list(grok_schema(open(spec_text_filename)))
-    write_iter(open(ctl, "w"), make_ctl(spec, table, schema))
-    ddlfp = open(ddl, "w")
-    write_iter(ddlfp, table_ddl(spec, table, schema))
-    ddlfp.write(';\n')
-    write_iter(ddlfp, eav_view_ddl(spec, table, view, schema))
-    ddlfp.write(';\n')
+         view='EXTRACT_EAV'):
+    with access.read_spec() as spec_fp:
+        spec = list(grok_schema(spec_fp))
+    with access.write_ctl() as ctlfp:
+        write_iter(ctlfp, make_ctl(spec, table, schema))
+    with access.write_ddl() as ddlfp:
+        write_iter(ddlfp, table_ddl(spec, table, schema))
+        ddlfp.write(';\n')
+        write_iter(ddlfp, eav_view_ddl(spec, table, view, schema))
+        ddlfp.write(';\n')
 
 
-def explore(record_layout_filename, data_filename):
-    import pprint
-    naaccr_schema = to_schema(open(record_layout_filename))
-    pprint.pprint(naaccr_schema)
+class Access(object):
+    spec_text_filename = 'naaccr12_1.txt'
+    ctl = 'naaccr_extract.ctl'
+    ddl = 'naaccr_extract.sql'
 
-    lines = open(data_filename)
+    def __init__(self, open_any):
+        opener = lambda f, mode: lambda: open_any(f, mode)
+        self.read_spec = opener(self.spec_text_filename, 'r')
+        self.write_ctl = opener(self.ctl, 'w')
+        self.write_ddl = opener(self.ddl, 'w')
+
+
+def explore(record_layout_file, data):
+    with record_layout_file() as fp:
+        naaccr_schema = to_schema(fp)
+    print >>stderr, pformat(naaccr_schema)
+
+    lines = data()
     for line in lines:
         cols = parse_record(line, naaccr_schema)
         record = dict([(k, v)
                        for (k, v) in zip([(i.num, i.name)
                                           for i in naaccr_schema], cols)
                        if v])
-        print
-        print '==============='
-        print
-        pprint.pprint(record)
+        print >>stderr
+        print >>stderr, '==============='
+        print >>stderr
+        print >>stderr, pformat(record)
 
 
 def to_schema(infp):
@@ -172,4 +183,9 @@ def parse_record(line, schema):
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    def _script():
+        from __builtin__ import open as open_any
+
+        main(Access(open_any))
+
+    _script()
