@@ -47,7 +47,7 @@ def to_schema(infp):
     rows.next()  # skip header
     return [Item._make(map(int, [start, end, length or 0,
                                  num.replace(',', '')]) +
-                       map(strip, [name, section, note]))
+                       [txt.strip() for txt in [name, section, note]])
             for (start, end, length, num, name, section, note) in
             [(row[0].split('-') + row[1:]) for row in rows]]
 
