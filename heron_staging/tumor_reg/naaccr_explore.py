@@ -1,9 +1,6 @@
 # see Makefile for usage
 
 from collections import namedtuple
-from pprint import pformat
-from sys import stderr
-import csv
 
 Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
@@ -33,34 +30,6 @@ class Access(object):
         self.read_spec = opener(self.spec_text_filename, 'r')
         self.write_ctl = opener(self.ctl, 'w')
         self.write_ddl = opener(self.ddl, 'w')
-
-
-def explore(record_layout_file, data):
-    with record_layout_file() as fp:
-        naaccr_schema = to_schema(fp)
-    print >>stderr, pformat(naaccr_schema)
-
-    lines = data()
-    for line in lines:
-        cols = parse_record(line, naaccr_schema)
-        record = dict([(k, v)
-                       for (k, v) in zip([(i.num, i.name)
-                                          for i in naaccr_schema], cols)
-                       if v])
-        print >>stderr
-        print >>stderr, '==============='
-        print >>stderr
-        print >>stderr, pformat(record)
-
-
-def to_schema(infp):
-    rows = csv.reader(infp)
-    rows.next()  # skip header
-    return [Item._make(map(int, [start, end, length or 0,
-                                 num.replace(',', '')]) +
-                       [txt.strip() for txt in [name, section, note]])
-            for (start, end, length, num, name, section, note) in
-            [(row[0].split('-') + row[1:]) for row in rows]]
 
 
 def grok_schema(infp):
