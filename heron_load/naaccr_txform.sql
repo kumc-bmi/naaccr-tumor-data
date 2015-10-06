@@ -22,37 +22,17 @@ whenever sqlerror continue;
 --Inside "continue" clause in case index is not there
 drop index naacr.patient_id_idx;
 drop index naacr.accession_idx;
+
+alter table naacr.extract add (case_index integer);  -- in case old naaccr_extract.sql was used
+
 whenever sqlerror exit;
 
-/* There are some known duplicates - 3 rows.  The unique constraint on the index
-below should cause sqlldr to dump the duplicate rows into the .bad file 
-(assuming the index was still there durin the staging).  So, at this point,
-we shouldn't have any duplicates.  But if we do, we have the re-creation of the
-index here that will fail if there are duplicates.
-
-As per #1155, we had 30 copies of a subset of the data.  So, also, make sure we 
-have at least as many rows as we do today.
-*/
 create index naacr.patient_id_idx on naacr.extract (
   "Patient ID Number");
 
---Will fail if duplicates found
-create unique index naacr.accession_idx on naacr.extract (
-  "Accession Number--Hosp", "Sequence Number--Hospital");
+create unique index naacr.case_idx on naacr.extract (
+  case_index);
 
-
-/* would be unique but for a handful of dups:
-select * from
-(
-select count(*), "Accession Number--Hosp", "Sequence Number--Hospital"
-from naacr.extract
-group by "Accession Number--Hosp", "Sequence Number--Hospital"
-having count(*) > 1
-) dups
-join naacr.extract ne
-  on ne."Accession Number--Hosp" = dups."Accession Number--Hosp"
- and ne."Sequence Number--Hospital" = dups."Sequence Number--Hospital";
-*/
 
 /* Item names are unique, right? */
 select case when count(*) = 0 then 1 else 0 end as test_item_name_uniqueness
@@ -166,8 +146,7 @@ from (
      -- and chunking strategy
      -- TODO: consider normalizing complication 1, complication 2, ...
 create or replace view tumor_item_value as
-select "Accession Number--Hosp"
-     , "Sequence Number--Hospital"
+select case_index
      , ns.sectionid
      , ne.ItemNbr
      , ni.valtype_cd
@@ -273,22 +252,12 @@ and concept_cd not like 'NAACCR|31%';
  * i2b2 style visit info
  */
 create or replace view tumor_reg_visits as
-select ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital"
+select ne.case_index
        as encounter_ide
      , ne."Patient ID Number" as MRN
 from naacr.extract ne
 where ne."Accession Number--Hosp" is not null;
 
-/* below are the known duplicates - we now have the unique index constraing as 
-per #1155 so we shouldn't need this anymore but here for reference
-
-...
-and ne."Accession Number--Hosp" not in (
-  '200801856'
-, '199601553'
-, '200200890'
-);
-*/
 
 
 -- select * from tumor_reg_visits;
@@ -316,7 +285,7 @@ select MRN, encounter_ide
 from (
 select
   ne."Patient ID Number" as MRN,
-  ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide,
+  ne.case_index as encounter_ide,
   av.concept_cd,
   av.ItemName,
   av.valtype_cd, av.nval_num, av.tval_char,
@@ -342,8 +311,7 @@ select
                end, 'yyyymmdd') end as start_date
 from naacr.extract ne
 join (
-select tiv."Accession Number--Hosp"
-     , tiv."Sequence Number--Hospital"
+select tiv.case_index
      , tiv.start_date
      , tiv.concept_cd
      , tiv.valtype_cd, tiv.nval_num, tiv.tval_char
@@ -352,8 +320,7 @@ select tiv."Accession Number--Hosp"
 from tumor_item_value tiv
 
 ) av
- on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
-and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital"
+ on ne.case_index = av.case_index
 where (case 
        when av.start_date is not null then 1
        when av.sectionid = 4 and ne."Date of Last Contact" is not null then 1
