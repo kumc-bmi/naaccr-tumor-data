@@ -537,8 +537,7 @@ end
 as recode
 from
  (select ne."Patient ID Number" as MRN
-       , ne."Accession Number--Hosp"
-       , ne."Sequence Number--Hospital"
+       , ne.case_index
        , ne."Primary Site" as site
        , substr(ne."Morph--Type&Behav ICD-O-3", 1, 4) histology
        , to_date(case length(ne."Date of Diagnosis")
