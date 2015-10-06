@@ -115,7 +115,7 @@ INTO TABLE "%s"."%s" (
 
 
 def table_ddl(spec, table, schema):
-    yield 'create table "%s"."%s" (\n' % (schema, table)
+    yield 'create table "%s"."%s" (case_index integer,\n' % (schema, table)
     yield ',\n'.join(['"%s" varchar2(%d)' % (i.name, i.length)
                       for i in spec if i.length])
     yield '\n)\n'
@@ -129,7 +129,7 @@ def eav_view_ddl(spec, table, view, schema):
             continue
         if item.num != 10:
             yield '\nunion all\n'
-        yield 'select "Accession Number--Hosp", "Sequence Number--Hospital", \n'
+        yield 'select case_index, \n'
         yield '%s as ItemNbr,\n' % item.num
         yield '\'%s\' as ItemName,\n' % item.name
         yield '"%s" as value\n' % item.name
