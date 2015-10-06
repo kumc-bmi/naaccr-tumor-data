@@ -21,7 +21,7 @@ alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 whenever sqlerror continue;
 --Inside "continue" clause in case index is not there
 drop index naacr.patient_id_idx;
-drop index naacr.accession_idx;
+drop index naacr.case_idx;
 
 alter table naacr.extract add (case_index integer);  -- in case old naaccr_extract.sql was used
 
