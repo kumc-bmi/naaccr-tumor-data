@@ -108,97 +108,6 @@ Do we want to record these as facts?
  */
 
 
-/* Review sections based on ItemName, CodedCRP
-select ns.sectionid, ns.section
-     , ni."ItemNbr" as ItemNbr, ni."ItemName"
-     , nc.codenbr, nc.codedcrp
-     , ni."AllowValue", ni."Format"
-from naacr.t_item ni
-join NAACR.t_section ns on ns.sectionid = ni."SectionID"
-left join naacr.t_code nc on nc.itemid = ni."ItemID"
-where ni."SectionID" in (
-   -- This list was built a la:
-   -- select ', ' || sectionid || ' -- ' || section
-   -- from naacr.t_section;
-  1 -- Cancer Identification
-, 2 -- Demographic
--- , 3 -- Edit Overrides/Conversion History/System Admin
-, 4 -- Follow-up/Recurrence/Death
--- , 5 -- Hospital-Confidential
-, 6 -- Hospital-Specific
--- , 7 -- Other-Confidential
--- , 8 -- Patient-Confidential
--- , 9 -- Record ID
--- , 10 -- Special Use
-, 11 -- Stage/Prognostic Factors
--- , 12 -- Text-Diagnosis
--- , 13 -- Text-Miscellaneous
--- , 14 -- Text-Treatment
--- , 15 -- Treatment-1st Course
-, 16 -- Treatment-Subsequent & Other
-, 17 -- Pathology
-)
-and length(nc.codenbr) < 8  -- exclude case where description of code is given rather than a code
-and nc.codenbr <> 'Blank'
-order by ns.sectionid, to_number(ni."ItemNbr"), nc.codenbr
-;
-*/
-
-
-/**
- * Review distinct attributes, values; eliminate PHI.
- * TODO: store these in the ID repository and de-id later
- * -- TODO: numeric values for section 11 -- Stage/Prognostic Factors
- * -- Tumor Size: what the heck do the values mean???
- * -- select * from naacr.t_item ni where ni."ItemNbr" = '780';
- * -- Regional Nodes Positive
- *    seems to be a mixture of numeric and coded (90-99) data. ugh.
-
-select distinct ns.SectionID, ns.section, to_number(ne.ItemNbr), ne.ItemName
-     , ne.value, nc.codedcrp
-from NAACR.extract_eav ne
-join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-left join naacr.t_code nc
-  on nc.itemid = ni."ItemID"
- and nc.codenbr = ne.value
-where ne.value is not null
--- and ni."Format" != 'YYYYMMDD'
-and ns.SectionID in (
-  1 -- Cancer Identification
- , 2 -- Demographic
--- , 3 -- Edit Overrides/Conversion History/System Admin
- , 4 -- Follow-up/Recurrence/Death
--- , 5 -- Hospital-Confidential
- , 6 -- Hospital-Specific
--- , 7 -- Other-Confidential
--- , 8 -- Patient-Confidential
--- , 9 -- Record ID
--- , 10 -- Special Use
-  11 -- Stage/Prognostic Factors -- TODO: numeric stuff
--- , 12 -- Text-Diagnosis
--- , 13 -- Text-Miscellaneous
--- , 14 -- Text-Treatment
--- , 15 -- Treatment-1st Course
-, 16 -- Treatment-Subsequent & Other
-, 17 -- Pathology
-)
--- TODO: store these in the ID repository and de-id later
-and ni."AllowValue" not like 'City name or UNKNOWN'
-and ni."AllowValue" not like 'Reference to EDITS table BPLACE.DBF in Appendix B'
-and ni."AllowValue" not like '5-digit or 9-digit U.S. ZIP codes%'
-and ni."AllowValue" not like 'Census Tract Codes%'
-and ni."AllowValue" not like 'See Appendix A for standard FIPS county codes%'
-and ni."AllowValue" not like 'See Appendix A for county codes for each state.%'
-and ni."ItemName" not like 'Age at Diagnosis'
-and ni."ItemName" not like 'Text--%'
-and ni."ItemName" not like 'Place of Death'
-order by 1, 2, 3, 4, 5
-;
- */
-
-
-
 /*****
  * Date parsing. Ugh.
  
@@ -410,8 +319,6 @@ select
   ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide,
   av.concept_cd,
   av.ItemName,
--- codedcrp is not unique; causes duplicate key errors in observation_fact
---  av.codedcrp,
   av.valtype_cd, av.nval_num, av.tval_char,
   case
   when av.start_date is not null then av.start_date
@@ -442,7 +349,6 @@ select tiv."Accession Number--Hosp"
      , tiv.valtype_cd, tiv.nval_num, tiv.tval_char
      , tiv.ItemName
      , tiv.SectionId
---     , tiv.codedcrp
 from tumor_item_value tiv
 
 ) av
@@ -458,35 +364,10 @@ where (case
 and the ones with no date of last contact */
 and ne."Accession Number--Hosp" is not null);
 
-/* Known duplicates handled by the unique index now as per #1155
-and ne."Accession Number--Hosp" not in (
-  '200801856'
-, '199601553'
-, '200200890'
-))
-;
-*/
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
 
-
-/*ugh: multiple codedcrp s:
-select tiv."Accession Number--Hosp"
-     , tiv."Sequence Number--Hospital"
-     , tiv.start_date
-     , tiv.concept_cd
-     , tiv.ItemName
-     , tiv.codedcrp
-from tumor_item_value tiv
-where tiv."Accession Number--Hosp"='196900417'
-and tiv."Sequence Number--Hospital"='00'
-and tiv.concept_cd='NAACCR|190:6';
-
-Spanish, NOS
-Hispanic, NOS
-Latino, NOS
-*/
 
 /* count facts by scheme
 
