@@ -9,7 +9,7 @@ Item = namedtuple('Item', 'start, end, length, num, name, section, note')
 
 
 def main(access,
-         schema='NAACR',
+         schema='NAACR',  # typo; sigh.
          table='EXTRACT',
          view='EXTRACT_EAV'):
     with access.read_spec() as spec_fp:
