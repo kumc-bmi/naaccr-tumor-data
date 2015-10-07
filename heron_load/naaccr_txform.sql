@@ -151,8 +151,9 @@ select case_index
      , ne.ItemNbr
      , ni.valtype_cd
      , case
-         when valtype_cd like 'T_' then value
-         when valtype_cd like 'D_' then value
+         when valtype_cd like 'T%' then value
+         when valtype_cd like 'D%' then
+           substr(value, 1, 4) || '-' || substr(value, 5, 2) || '-' || substr(value, 7, 2)
          else null
        end tval_char
      , case
@@ -172,8 +173,8 @@ select case_index
      , 'NAACCR|' || ne.itemnbr || ':' || (
          case when ni.valtype_cd like '@%' then value
          else null end) as concept_cd
-     , case when ni."Format" = 'YYYYMMDD' then null
-       else value end as codenbr
+     , case when ni.valtype_cd like '@%' then value
+       else null end as codenbr
      , ns.section
      , ni."ItemName" as ItemName
      , ni."ItemID" as itemid
@@ -192,7 +193,7 @@ select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_dei
          when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
          when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
          -- TODO: handle YYYYMMDDhhmmss as date?
-         when ni."Format" = 'YYYYMMDD' then 'Di'
+         when ni."Format" = 'YYYYMMDD' then 'D'
          when ni."ItemName" like 'Text--%' then 'Ti'
          when ni."ItemName" like 'Age%' then 'Ni'
          when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
