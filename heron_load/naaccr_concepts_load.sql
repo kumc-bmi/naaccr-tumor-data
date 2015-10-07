@@ -357,7 +357,6 @@ select distinct 4 as c_hlevel
        else 'LA'
        end as c_visualattributes
 from tumor_reg_concepts where codenbr is not null
-and itemnbr = 2220 --@@@@@
 
 union all
 
