@@ -284,6 +284,8 @@ select "Accession Number--Hosp"
      , 'NAACCR|' || ne.itemnbr || ':' || (
          case when ni.valtype_cd like '@%' then value
          else null end) as concept_cd
+     , case when ni."Format" = 'YYYYMMDD' then null
+       else value end as codenbr
      , ns.section
      , ni."ItemName" as ItemName
      , ni."ItemID" as itemid
