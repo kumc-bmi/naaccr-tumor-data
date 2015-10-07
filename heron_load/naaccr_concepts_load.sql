@@ -300,12 +300,19 @@ from dual
 
 union all
 /* Section concepts */
-select distinct 2 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\' as path
-     , trim(to_char(sectionid, '09')) || ' ' || section as concept_name
+select 2 as c_hlevel
+     , 'S:' || nts.sectionid || ' ' || section || '\' as path
+     , trim(to_char(nts.sectionid, '09')) || ' ' || section as concept_name
      , null as concept_cd
-     , 'FA' as c_visualattributes
-from tumor_reg_concepts
+     , case
+       when trc.sectionid is null then 'FH'
+       else 'FA'
+       end as c_visualattributes
+from NAACR.t_section nts
+left join (
+  select distinct sectionid
+  from tumor_reg_concepts) trc
+  on trc.sectionid = nts.sectionid
 
 union all
 /* Item concepts */
