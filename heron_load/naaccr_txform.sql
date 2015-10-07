@@ -220,7 +220,7 @@ select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_dei
 -- , 12 -- Text-Diagnosis
 -- , 13 -- Text-Miscellaneous
 -- , 14 -- Text-Treatment
--- , 15 -- Treatment-1st Course
+, 15 -- Treatment-1st Course
 , 16 -- Treatment-Subsequent & Other
 , 17 -- Pathology
          ) then '@'
