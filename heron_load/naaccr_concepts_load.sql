@@ -300,26 +300,43 @@ from dual
 
 union all
 /* Section concepts */
-select distinct 2 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\' as path
-     , trim(to_char(sectionid, '09')) || ' ' || section as concept_name
+select 2 as c_hlevel
+     , 'S:' || nts.sectionid || ' ' || section || '\' as path
+     , trim(to_char(nts.sectionid, '09')) || ' ' || section as concept_name
      , null as concept_cd
-     , 'FA' as c_visualattributes
-from tumor_reg_concepts
+     , case
+       when trc.sectionid is null then 'FH'
+       else 'FA'
+       end as c_visualattributes
+from NAACR.t_section nts
+left join (
+  select distinct sectionid
+  from tumor_reg_concepts) trc
+  on trc.sectionid = nts.sectionid
 
 union all
 /* Item concepts */
-select distinct 3 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\'
-       || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\' as path
-     , trim(to_char(itemnbr, '0999')) || ' ' || itemname as concept_name
-     , 'NAACCR|' || itemnbr || ':' as concept_cd
-     , case when codenbr is null then 'LA' else 'FA' end as c_visualattributes
-from tumor_reg_concepts
-where itemnbr not in (
-                    -- skip Histology since
-                    -- we already have Morph--Type&Behav
+select 3 as c_hlevel
+     , 'S:' || ns.sectionid || ' ' || ns.section || '\'
+       || substr(trim(to_char(ni."ItemNbr", '0999')) || ' ' || ni."ItemName", 1, 40) || '\' as path
+     , trim(to_char(ni."ItemNbr", '0999')) || ' ' || ni."ItemName" as concept_name
+     , 'NAACCR|' || ni."ItemNbr" || ':' as concept_cd
+     , case
+         when ni."ItemNbr" in (
+                    -- hide Histology since
+                    -- we already have Morph--Type/Behav
                     '0420', '0522')
+              or viz1 is null -- hide concepts where we have no data
+              then 'LH'
+         else viz1 || 'A'
+       end c_visualattributes
+from NAACR.t_section ns
+join NAACR.t_item ni on ns.sectionid = to_number(ni."SectionID")
+left join (
+  select distinct itemnbr, itemname,
+    case when codenbr is null then 'L' else 'F' end as viz1
+  from tumor_reg_concepts) trc
+  on ni."ItemNbr" = trc.itemnbr
 
 union all
 /* Code concepts */
@@ -331,12 +348,15 @@ select distinct 4 as c_hlevel
      , case when c_name is not null then c_name
        else codenbr end as concept_name
      , concept_cd
-     , 'LA' as c_visualattributes
-from tumor_reg_concepts where codenbr is not null
-and itemnbr not in ('0400', '0419', '0521',
+     , case
+       when itemnbr in ('0400', '0419', '0521',
                     -- skip Histology since
-                    -- we already have Morph--Type&Behav
+                    -- we already have Morph--Type/Behav
                     '0420', '0522')
+       then 'LH'
+       else 'LA'
+       end as c_visualattributes
+from tumor_reg_concepts where codenbr is not null
 
 union all
 
@@ -352,7 +372,7 @@ select distinct lvl + 1 as c_hlevel
 from icd_o_topo icdo, tumor_reg_concepts
 where itemnbr  = '0400'
 
-/* Morph--Type&Behav concepts */
+/* Morph--Type/Behav concepts */
 union all
 select distinct lvl + 1 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
