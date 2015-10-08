@@ -172,39 +172,55 @@ select * from icd_o_morph order by path;
  */
 
 whenever sqlerror continue;
-drop table tumor_reg_codes;
-whenever sqlerror exit;
-create table tumor_reg_codes as
-select distinct
-  tiv.sectionid, tiv.section
-, tiv.itemid, tiv.itemnbr, tiv.itemname
-, tiv.concept_cd, tiv.codenbr
-from tumor_item_value tiv;
-
--- select * from tumor_reg_codes;
--- select count(*) from tumor_reg_codes;
-
-whenever sqlerror continue;
 drop table tumor_reg_concepts;
 whenever sqlerror exit;
 create table tumor_reg_concepts as
-select sectionid, section
-, itemid, itemnbr, itemname
-, concept_cd, codenbr, min(codedcrp) as c_name
-from (
-select tiv.*
-     , tiv.codenbr || ' ' || nc.codedcrp as codedcrp
-from tumor_reg_codes tiv
-left join naacr.t_code nc
-  on nc.itemid = tiv.ItemID
- and nc.codenbr = tiv.codenbr
-)
-group by sectionid, section
-, itemid, itemnbr, itemname
-, concept_cd, codenbr;
+select coded.sectionid, coded.section, coded.itemnbr, coded.itemname
+     , concept_cd
+     , tc.codenbr, coalesce(label.c_name, tc.codenbr) c_name
+from
+-- For each coded item...
+(
+  select sectionid, section, itemnbr, itemname
+  from tumor_item_type
+  where valtype_cd = '@'
+) coded
+-- ... find all the code values...
+join (
+  -- ... from the data ...
+  select distinct itemnbr, codenbr, concept_cd
+  from tumor_item_value
+  where valtype_cd = '@'
 
+  union
 
+  -- ... as well as those from the data dictionary (t_code) ...
+  select distinct to_number(ti."ItemNbr"), codenbr
+                , 'NAACCR|' || ti."ItemNbr" || ':' || codenbr concept_cd
+  from naacr.t_code tc
+  join naacr.t_item ti on tc.itemid = ti."ItemID"
+  where tc.codedcrp is not null
+  -- exclude description of codes; we just want codes
+  and tc.codenbr not like '% %'
+  and tc.codenbr not like '%<%'
+  and tc.codenbr not in ('..', '*', 'User-defined', 'nn')
+) tc on coded.itemnbr = tc.itemnbr
+-- now get labels where available from t_code
+left join (
+  select ty.itemnbr, tc.codenbr, min(tc.codenbr || ' ' || tc.codedcrp) c_name
+  from naacr.t_code tc
+  join tumor_item_type ty on tc.itemid = ty.itemid
+  group by ty.itemnbr, tc.codenbr
+) label
+  on label.itemnbr = coded.itemnbr
+ and label.codenbr = tc.codenbr
+;
+
+-- eyeball it:
+-- select * from tumor_reg_concepts order by sectionid, itemnbr, codenbr;
 -- select count(*) from tumor_reg_concepts;
+-- 1742 (in test)
+
 
 delete from BlueHeronMetadata.NAACCR_ONTOLOGY@deid;
 
@@ -271,26 +287,27 @@ left join (
     case when codenbr is null then 'L' else 'F' end as viz1
   from tumor_reg_concepts) trc
   on ni."ItemNbr" = trc.itemnbr
+where ni."ItemNbr" not in (400, 419, 521) -- separate code for primary site, Morph.
 
 union all
 /* Code concepts */
 select distinct 4 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
        || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\'
-       || case when c_name is null then codenbr else substr(c_name, 1, 40) end || '\'
+       || substr(c_name, 1, 40) || '\'
        as concept_path
-     , case when c_name is not null then c_name
-       else codenbr end as concept_name
+     , c_name as concept_name
      , concept_cd
      , case
-       when itemnbr in ('0400', '0419', '0521',
-                    -- skip Histology since
+       when itemnbr in (
+                    -- hide Histology since
                     -- we already have Morph--Type/Behav
                     '0420', '0522')
        then 'LH'
        else 'LA'
        end as c_visualattributes
-from tumor_reg_concepts where codenbr is not null
+from tumor_reg_concepts
+where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
 
 union all
 
@@ -317,7 +334,7 @@ select distinct lvl + 1 as c_hlevel
      , substr(tr.concept_cd, 1, length('NAACCR|400:')) || icdo.concept_cd concept_cd
      , icdo.c_visualattributes
 from icd_o_morph icdo, tumor_reg_concepts tr
-where tr.itemnbr in ('0419', '0521')
+where tr.itemnbr in (419, 521)
 
 union all
 /* SEER Site Summary concepts*/
@@ -382,7 +399,7 @@ select 'Cancer Cases' test_domain, 'code_terms_indep_data' test_name
      , sysdate result_date
      , ti."ItemNbr", ti.codenbr, substr(ti."ItemName" || ' / ' || ti.codedcrp, 1, 255)
 from (
-select "ItemNbr", "ItemName", "ReqStatus", codenbr
+select "ItemNbr", "ItemName", "ReqStatus", "AllowValue", codenbr
      , 'NAACCR|' || "ItemNbr" || ':' || codenbr c_basecode, codedcrp
 from naacr.t_code tc
 join naacr.t_item ti on ti."ItemID" = tc.itemid
@@ -393,6 +410,15 @@ left join (-- avoid link/LOB error ORA-22992
   on ont.c_basecode = ti.c_basecode
 where ont.c_basecode is null
 and ti."ReqStatus" != 'Retired'
+
+-- skip numeric values that are actually codes
+and ti."AllowValue" != '10-digit number'
+and ti."AllowValue" not like 'Census Tract Codes%'
+and ti.codenbr not in ('00000000', '88888888', '99999999')
+
+-- comments on/descriptions of codes
+and ti.codenbr not like '<_>%'
+and ti.codenbr not like '% %'
 ;
 
 drop table icd_o_topo;
