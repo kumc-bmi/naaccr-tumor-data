@@ -166,20 +166,54 @@ and label = 'title'
 select * from icd_o_morph order by path;
 */
 
-/* For concept labels, we use
- *   1. CODEDCRP from the NAACCR t_code table, or if that is not available,
- *   3. the raw code number
+/** tumor_reg_codes - one row for each distinct concept_cd in the data
+ *  - NAACCR|III:CCC concept codes: one row per code value per coded item
+ *  - NAACCR|NNN: concept codes: one per non-coded (numeric, date, ...) item
  */
 
+whenever sqlerror continue;
+drop table tumor_reg_codes;
+whenever sqlerror exit;
+create table tumor_reg_codes as
+-- Note: this includes both coded and other (date, numeric) items
+select distinct
+  tiv.sectionid, tiv.section
+, tiv.itemid, tiv.itemnbr, tiv.itemname
+, tiv.concept_cd, tiv.codenbr
+from tumor_item_value tiv;
+
+-- select * from tumor_reg_codes;
+-- select count(*) from tumor_reg_codes;
+
+/** tumor_reg_concepts -- one row per code from data or data dictionary
+ *
+ * A left join from the data dictionary to the data would leave out
+ * codes that appear only in the data.
+ *
+ * A left join from the data to the data dictionary would leave out
+ * codes that appear only in the data dictionary.
+ *
+ * So we take the union of these, left join it with the data dictionary,
+ * and for c_visualattributes, check whether any such data exist.
+ */
 whenever sqlerror continue;
 drop table tumor_reg_concepts;
 whenever sqlerror exit;
 create table tumor_reg_concepts as
 select coded.sectionid, coded.section, coded.itemnbr, coded.itemname
      , concept_cd
+     , case
+       -- concepts where we have data are Active
+       when exists (
+         select 1
+         from tumor_reg_codes trc
+         where trc.itemnbr = coded.itemnbr
+         and trc.codenbr = tc.codenbr) then 'LA'
+       else 'LH'
+       end c_visualattributes
      , tc.codenbr, coalesce(label.c_name, tc.codenbr) c_name
 from
--- For each coded item...
+-- For each *coded* item from the data dictionary...
 (
   select sectionid, section, itemnbr, itemname
   from tumor_item_type
@@ -189,8 +223,8 @@ from
 join (
   -- ... from the data ...
   select distinct itemnbr, codenbr, concept_cd
-  from tumor_item_value
-  where valtype_cd = '@'
+  from tumor_reg_codes
+  where codenbr is not null
 
   union
 
@@ -219,7 +253,7 @@ left join (
 -- eyeball it:
 -- select * from tumor_reg_concepts order by sectionid, itemnbr, codenbr;
 -- select count(*) from tumor_reg_concepts;
--- 1742 (in test)
+-- 1849 (in test)
 
 
 delete from BlueHeronMetadata.NAACCR_ONTOLOGY@deid;
@@ -261,7 +295,7 @@ select 2 as c_hlevel
 from NAACR.t_section nts
 left join (
   select distinct sectionid
-  from tumor_reg_concepts) trc
+  from tumor_reg_codes) trc
   on trc.sectionid = nts.sectionid
 
 union all
@@ -283,9 +317,9 @@ select 3 as c_hlevel
 from NAACR.t_section ns
 join NAACR.t_item ni on ns.sectionid = to_number(ni."SectionID")
 left join (
-  select distinct itemnbr, itemname,
+  select distinct itemnbr,
     case when codenbr is null then 'L' else 'F' end as viz1
-  from tumor_reg_concepts) trc
+  from tumor_reg_codes) trc
   on ni."ItemNbr" = trc.itemnbr
 where ni."ItemNbr" not in (400, 419, 521) -- separate code for primary site, Morph.
 
@@ -304,7 +338,7 @@ select distinct 4 as c_hlevel
                     -- we already have Morph--Type/Behav
                     '0420', '0522')
        then 'LH'
-       else 'LA'
+       else c_visualattributes
        end as c_visualattributes
 from tumor_reg_concepts
 where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
