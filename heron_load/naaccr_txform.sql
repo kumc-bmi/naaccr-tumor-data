@@ -143,8 +143,10 @@ from (
 
 create or replace view tumor_item_type as
 select ns.sectionid
+     , ns.section
      , ni."ItemNbr" ItemNbr
      , ni."Format"
+     , ni."AllowValue"
      , ni.valtype_cd
      , ni."ItemName" as ItemName
      , ni."ItemID" as itemid
