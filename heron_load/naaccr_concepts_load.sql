@@ -422,7 +422,8 @@ select 1370,         'RX Summ--Rad to CNS' from dual union all
 select 1380,         'RX Summ--Surg/Rad Seq' from dual
 
 union all  -- not related to RX, but has the same test structure
-select 0230,         'Age at Diagnosis' from dual
+select 0230,         'Age at Diagnosis' from dual union all
+select 0560,         'Sequence Number-Hospital' from dual
 ) rx
 left join (select c_basecode, c_name, c_fullname
            from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
