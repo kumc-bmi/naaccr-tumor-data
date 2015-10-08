@@ -233,7 +233,6 @@ select * from icd_o_morph order by path;
 
 /* For concept labels, we use
  *   1. CODEDCRP from the NAACCR t_code table, or if that is not available,
- *   2. c_name from Dustin Key's work, or if that is not available,
  *   3. the raw code number
  */
 
