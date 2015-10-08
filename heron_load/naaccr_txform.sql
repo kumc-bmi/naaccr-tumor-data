@@ -300,6 +300,32 @@ and ni."ItemName" not like 'NPI--Archive FIN'
 and ni."ItemName" not like 'NPI--Reporting Facility'
 ;
 
+insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1)
+select 'Cancer Cases' test_domain, 'rx_summary_item_types' test_name
+     , case when ty.itemnbr is null then 0 else 1 end test_value
+     , sq_result_id.nextval result_id
+     , sysdate result_date
+     , rx.itemnbr, rx.itemname
+from
+(
+select 1640 itemnbr, 'RX Summ--Surgery Type' itemname from dual union all
+select 1290,         'RX Summ--Surg Prim Site' from dual union all
+select 1292,         'RX Summ--Scope Reg LN Sur' from dual union all
+select 1294,         'RX Summ--Surg Oth Reg/Dis' from dual union all          
+select 1296,         'RX Summ--Reg LN Examined' from dual union all
+select 1330,         'RX Summ--Reconstruct 1st' from dual union all      
+select 1340,         'Reason for No Surgery' from dual union all 
+select 1360,         'RX Summ--Radiation' from dual union all
+select 1370,         'RX Summ--Rad to CNS' from dual union all
+select 1380,         'RX Summ--Surg/Rad Seq' from dual
+
+union all  -- not related to RX, but has the same test structure
+select 0230,         'Age at Diagnosis' from dual
+) rx
+left join tumor_item_type ty
+  on ty.itemnbr = rx.itemnbr
+;
+
 /* This is the main big flat view. */
 create or replace view tumor_item_value as
 select "Accession Number--Hosp"
