@@ -141,6 +141,69 @@ from (
   ) where i > 960 and i < 970) ne;
 */
 
+create or replace view tumor_item_type as
+select ns.sectionid
+     , ni."ItemNbr" ItemNbr
+     , ni."Format"
+     , ni.valtype_cd
+     , ni."ItemName" as ItemName
+     , ni."ItemID" as itemid
+from (
+select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
+         when ni."ItemName" like 'Reserved%' then null
+         when ni."FieldLength" is null then null
+
+         when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
+         when ni."ItemName" like '%ICD-O-1' then '@'
+         when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
+         when ni."ItemName" like 'Comorbid/Complication%' then '@'
+
+         when ni."ItemName" = 'Patient ID Number' then 'Ti'
+         when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
+         when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
+         -- TODO: handle YYYYMMDDhhmmss as date?
+         when ni."Format" = 'YYYYMMDD' then 'D'
+         when ni."ItemName" like 'Text--%' then 'Ti'
+         when ni."ItemName" like 'Age%' then 'Ni'
+         when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
+         when ni."AllowValue" like '10-digit%' and ni."ItemName" not like '%ID' then 'Ni'
+         when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
+ 
+          -- fields 3 characters or smaller are codes that aren't PHI
+         when to_number("FieldLength") <= 3 then '@'
+          -- In certain sections, fields up to 5 characters are non-PHI codes
+         when to_number("FieldLength") <= 5 and ni."SectionID" in (
+  1 -- Cancer Identification
+ , 2 -- Demographic
+-- , 3 -- Edit Overrides/Conversion History/System Admin
+ , 4 -- Follow-up/Recurrence/Death
+-- , 5 -- Hospital-Confidential
+ , 6 -- Hospital-Specific
+-- , 7 -- Other-Confidential
+-- , 8 -- Patient-Confidential
+-- , 9 -- Record ID
+-- , 10 -- Special Use
+ , 11 -- Stage/Prognostic Factors
+     -- TODO: for long lists of numeric codes, find metadata
+     -- and chunking strategy
+     -- TODO: consider normalizing complication 1, complication 2, ...
+-- , 12 -- Text-Diagnosis
+-- , 13 -- Text-Miscellaneous
+-- , 14 -- Text-Treatment
+, 15 -- Treatment-1st Course
+, 16 -- Treatment-Subsequent & Other
+, 17 -- Pathology
+         ) then '@'
+         when ni."Format" like '%zero filled' then 'Ni'
+         else 'Ti'
+       end valtype_cd
+     , ni.*
+from naacr.t_item ni
+) ni
+join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
+and ni.valtype_cd is not null
+;
+
 /* This is the main big flat view. */
      -- TODO: for long lists of numeric codes, find metadata
      -- and chunking strategy
@@ -176,62 +239,12 @@ select case_index
      , case when ni.valtype_cd like '@%' then value
        else null end as codenbr
      , ns.section
-     , ni."ItemName" as ItemName
-     , ni."ItemID" as itemid
+     , ni.ItemName
+     , ni.itemid
 from naacr.extract_eav ne
-join (
-select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
-         when ni."ItemName" like 'Reserved%' then null
-         when ni."FieldLength" is null then null
-
-         when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
-         when ni."ItemName" like '%ICD-O-1' then '@'
-         when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
-         when ni."ItemName" like 'Comorbid/Complication%' then '@'
-
-         when ni."ItemName" = 'Patient ID Number' then 'Ti'
-         when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
-         when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
-         -- TODO: handle YYYYMMDDhhmmss as date?
-         when ni."Format" = 'YYYYMMDD' then 'D'
-         when ni."ItemName" like 'Text--%' then 'Ti'
-         when ni."ItemName" like 'Age%' then 'Ni'
-         when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
-         when ni."AllowValue" like '10-digit%' and ni."ItemName" not like '%ID' then 'Ni'
-         when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
-
-          -- fields 3 characters or smaller are codes that aren't PHI
-         when to_number("FieldLength") <= 3 then '@'
-          -- In certain sections, fields up to 5 characters are non-PHI codes
-         when to_number("FieldLength") <= 5 and ni."SectionID" in (
-  1 -- Cancer Identification
- , 2 -- Demographic
--- , 3 -- Edit Overrides/Conversion History/System Admin
- , 4 -- Follow-up/Recurrence/Death
--- , 5 -- Hospital-Confidential
- , 6 -- Hospital-Specific
--- , 7 -- Other-Confidential
--- , 8 -- Patient-Confidential
--- , 9 -- Record ID
--- , 10 -- Special Use
- , 11 -- Stage/Prognostic Factors
-     -- TODO: for long lists of numeric codes, find metadata
-     -- and chunking strategy
-     -- TODO: consider normalizing complication 1, complication 2, ...
--- , 12 -- Text-Diagnosis
--- , 13 -- Text-Miscellaneous
--- , 14 -- Text-Treatment
-, 15 -- Treatment-1st Course
-, 16 -- Treatment-Subsequent & Other
-, 17 -- Pathology
-         ) then '@'
-         when ni."Format" like '%zero filled' then 'Ni'
-         else 'Ti'
-       end valtype_cd
-     , ni.*
-from naacr.t_item ni
-) ni on ne.itemnbr = ni."ItemNbr"
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
+join tumor_item_type ni
+  on ne.itemnbr = ni.ItemNbr
+join NAACR.t_section ns on ns.sectionid = to_number(ni.SectionID)
 where ne.value is not null
 and ni.valtype_cd is not null
 ;
