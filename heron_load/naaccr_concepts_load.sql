@@ -402,32 +402,41 @@ where c_basecode in ('NAACCR|521:97323', 'NAACCR|521:80413',
                      'NAACCR|521:98353')
 );
 
-insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1, detail_char_2)
-select 'Cancer Cases' test_domain, 'rx_summary_concepts' test_name
+
+insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1)
+select 'Cancer Cases' test_domain, 'item_terms_indep_data' test_name
      , case when ont.c_basecode is null then 0 else 1 end test_value
      , sq_result_id.nextval result_id
      , sysdate result_date
-     , rx.itemnbr, rx.itemname, ont.c_fullname
-from
-(
-select 1640 itemnbr, 'RX Summ--Surgery Type' itemname from dual union all
-select 1290,         'RX Summ--Surg Prim Site' from dual union all
-select 1292,         'RX Summ--Scope Reg LN Sur' from dual union all
-select 1294,         'RX Summ--Surg Oth Reg/Dis' from dual union all          
-select 1296,         'RX Summ--Reg LN Examined' from dual union all
-select 1330,         'RX Summ--Reconstruct 1st' from dual union all      
-select 1340,         'Reason for No Surgery' from dual union all 
-select 1360,         'RX Summ--Radiation' from dual union all
-select 1370,         'RX Summ--Rad to CNS' from dual union all
-select 1380,         'RX Summ--Surg/Rad Seq' from dual
+     , ti.itemnbr, ti.itemname
+from (
+select "ItemNbr" itemnbr, null codecrp
+     , 'NAACCR|' || "ItemNbr" || ':' c_basecode, "ItemName" itemname
+from naacr.t_item) ti
+left join (-- avoid link/LOB error ORA-22992
+  select c_basecode, c_name
+  from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
+  on ont.c_basecode = ti.c_basecode
+where ont.c_basecode is null
+;
 
-union all  -- not related to RX, but has the same test structure
-select 0230,         'Age at Diagnosis' from dual union all
-select 0560,         'Sequence Number-Hospital' from dual
-) rx
-left join (select c_basecode, c_name, c_fullname
-           from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
-  on ont.c_basecode = 'NAACCR|' || rx.itemnbr || ':'
+insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1, detail_char_2)
+select 'Cancer Cases' test_domain, 'code_terms_indep_data' test_name
+     , case when ont.c_basecode is null then 0 else 1 end test_value
+     , sq_result_id.nextval result_id
+     , sysdate result_date
+     , ti."ItemNbr", ti.codenbr, substr(ti."ItemName" || ' / ' || ti.codedcrp, 1, 255)
+from (
+select "ItemNbr", "ItemName", codenbr
+     , 'NAACCR|' || "ItemNbr" || ':' || codenbr c_basecode, codedcrp
+from naacr.t_code tc
+join naacr.t_item ti on ti."ItemID" = tc.itemid
+) ti
+left join (-- avoid link/LOB error ORA-22992
+  select c_basecode, c_name
+  from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
+  on ont.c_basecode = ti.c_basecode
+where ont.c_basecode is null
 ;
 
 drop table icd_o_topo;
