@@ -1,6 +1,6 @@
 /** naaccr_txform -- transform NAACCR data to fit i2b2 star schema
 
-Copyright (c) 2012 University of Kansas Medical Center
+Copyright (c) 2012-2015 University of Kansas Medical Center
 part of the HERON* open source codebase; see NOTICE file for license details.
 * http://informatics.kumc.edu/work/wiki/HERON
 
