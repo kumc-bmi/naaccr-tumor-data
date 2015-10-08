@@ -430,7 +430,7 @@ select 'Cancer Cases' test_domain, 'item_terms_indep_data' test_name
      , sysdate result_date
      , ti.itemnbr, ti.itemname
 from (
-select "ItemNbr" itemnbr, null codecrp
+select "ItemNbr" itemnbr, null codecrp, "ReqStatus"
      , 'NAACCR|' || "ItemNbr" || ':' c_basecode, "ItemName" itemname
 from naacr.t_item) ti
 left join (-- avoid link/LOB error ORA-22992
@@ -438,6 +438,7 @@ left join (-- avoid link/LOB error ORA-22992
   from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
   on ont.c_basecode = ti.c_basecode
 where ont.c_basecode is null
+and ti."ReqStatus" != 'Retired'
 ;
 
 insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1, detail_char_2)
@@ -447,7 +448,7 @@ select 'Cancer Cases' test_domain, 'code_terms_indep_data' test_name
      , sysdate result_date
      , ti."ItemNbr", ti.codenbr, substr(ti."ItemName" || ' / ' || ti.codedcrp, 1, 255)
 from (
-select "ItemNbr", "ItemName", codenbr
+select "ItemNbr", "ItemName", "ReqStatus", codenbr
      , 'NAACCR|' || "ItemNbr" || ':' || codenbr c_basecode, codedcrp
 from naacr.t_code tc
 join naacr.t_item ti on ti."ItemID" = tc.itemid
@@ -457,6 +458,7 @@ left join (-- avoid link/LOB error ORA-22992
   from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
   on ont.c_basecode = ti.c_basecode
 where ont.c_basecode is null
+and ti."ReqStatus" != 'Retired'
 ;
 
 drop table icd_o_topo;
