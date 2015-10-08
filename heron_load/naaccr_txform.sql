@@ -320,7 +320,8 @@ select 1370,         'RX Summ--Rad to CNS' from dual union all
 select 1380,         'RX Summ--Surg/Rad Seq' from dual
 
 union all  -- not related to RX, but has the same test structure
-select 0230,         'Age at Diagnosis' from dual
+select 0230,         'Age at Diagnosis' from dual union all
+select 0560,         'Sequence Number-Hospital' from dual
 ) rx
 left join tumor_item_type ty
   on ty.itemnbr = rx.itemnbr
