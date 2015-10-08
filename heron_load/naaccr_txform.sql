@@ -252,37 +252,17 @@ from (
   ) where i > 960 and i < 970) ne;
 */
 
-/* This is the main big flat view. */
-create or replace view tumor_item_value as
-select "Accession Number--Hosp"
-     , "Sequence Number--Hospital"
-     , ns.sectionid
-     , ne.ItemNbr
-     , ne.value
-     , case when ni."Format" = 'YYYYMMDD'
-       then to_date(case
-         when value in ('00000000', '99999999', '99990') then null
-         when length(trim(value)) = 4 then value || '0101'
-         when length(value) = 6 then value || '01'
-         when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
-         else value
-         end, 'yyyymmdd')
-       else null end
-       as start_date
-     , 'NAACCR|' || ne.ItemNbr || ':' || (
-         case when ni."Format" = 'YYYYMMDD' then null
-         else value end) as concept_cd
-     , case when ni."Format" = 'YYYYMMDD' then null
-       else value end as codenbr
-     , ns.section
-     , ni."ItemName" as ItemName
-     , ni."ItemID" as ItemID
-from NAACR.extract_eav ne
-join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
+create or replace view tumor_item_type as
+select ns.sectionid
+     , ni."ItemNbr" itemnbr
+     , ni."Format"
+     , '@' valtype_cd
+     , ni."ItemName"
+     , ni."ItemID"
+from naacr.t_item ni
 join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-where ne.value is not null
 
-and ni."SectionID" in (
+where ni."SectionID" in (
   1 -- Cancer Identification
  , 2 -- Demographic
 -- , 3 -- Edit Overrides/Conversion History/System Admin
@@ -318,6 +298,37 @@ and ni."ItemName" not like 'Place of Death'
 and ni."ItemName" not like 'Abstracted By'
 and ni."ItemName" not like 'NPI--Archive FIN'
 and ni."ItemName" not like 'NPI--Reporting Facility'
+;
+
+/* This is the main big flat view. */
+create or replace view tumor_item_value as
+select "Accession Number--Hosp"
+     , "Sequence Number--Hospital"
+     , ni.sectionid
+     , ni.valtype_cd
+     , ne.ItemNbr
+     , ne.value
+     , case when ni."Format" = 'YYYYMMDD'
+       then to_date(case
+         when value in ('00000000', '99999999', '99990') then null
+         when length(trim(value)) = 4 then value || '0101'
+         when length(value) = 6 then value || '01'
+         when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
+         else value
+         end, 'yyyymmdd')
+       else null end
+       as start_date
+     , 'NAACCR|' || ne.ItemNbr || ':' || (
+         case when ni."Format" = 'YYYYMMDD' then null
+         else value end) as concept_cd
+     , case when ni."Format" = 'YYYYMMDD' then null
+       else value end as codenbr
+     , ni.sectionid section
+     , ni."ItemName" as ItemName
+     , ni."ItemID" as ItemID
+from NAACR.extract_eav ne
+join tumor_item_type ni on ne.ItemNbr = ni.ItemNbr
+where ne.value is not null
 ;
 /* eyeball it:
 
@@ -371,7 +382,7 @@ select MRN, encounter_ide
      , start_date
      , '@' modifier_cd
      , 1 instance_num
-     , '@' as valtype_cd
+     , valtype_cd
      , '@' as tval_char
      , to_number(null) as nval_num
      , null as valueflag_cd
@@ -385,6 +396,7 @@ select
   ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide,
   av.concept_cd,
   av.ItemName,
+  av.valtype_cd,
 -- codedcrp is not unique; causes duplicate key errors in observation_fact
 --  av.codedcrp,
   case
@@ -415,6 +427,7 @@ select tiv."Accession Number--Hosp"
      , tiv.concept_cd
      , tiv.ItemName
      , tiv.SectionId
+     , tiv.valtype_cd
 --     , tiv.codedcrp
 from tumor_item_value tiv
 
