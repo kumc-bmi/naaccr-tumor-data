@@ -90,7 +90,11 @@ Do we want to record these as facts?
 
 /*****
  * Date parsing. Ugh.
- 
+
+Please excuse the copy-and-paste coding here; a p-sql function would
+probably let us factor out the redundancy but we haven't crossed into
+that territory yet.
+
  p. 97:
  "Below are the common formats to handle the situation where only
   certain components of date are known.
@@ -104,15 +108,19 @@ test cases below.
 
 In Date of Last Contact, we've also seen 19919999
 */
-select itemname,  value, to_date(
-  case
-  when value in ('00000000', '99999999', '99990') then null
-  when length(trim(value)) = 4 then value || '0101'
-  when length(value) = 6 then value || '01'
-  when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
-  else value
-  end,
-  'yyyymmdd') as start_date
+select itemname,  value
+     , case
+       when value in ('00000000', '99999999', '99990')
+       then null
+       when regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+       then to_date(value, 'YYYYMMDD')
+       when regexp_like(value, '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+       then to_date(value, 'MMDDYYYY')
+       when regexp_like(value, '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+       then to_date(value, 'YYYYMM')
+       when regexp_like(value, '^[1-2][0-9]{3}$')
+       then to_date(value, 'YYYY')
+       end start_date
 from (
 select 'normal' as itemname, '19700101' as value from dual
 union all
@@ -129,6 +137,8 @@ union all
 select 'all 0s' as itemname, '00000000' as value from dual
 union all
 select 'almost all 9s' as itemname, '99990' as value from dual
+union all
+select 'inscruitable', '12001024' from dual
 )
 ;
 
@@ -244,7 +254,9 @@ select case_index
      , ni.valtype_cd
      , case
          when valtype_cd like 'T%' then value
-         when valtype_cd like 'D%' then
+         when valtype_cd like 'D%'
+          and regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then
            substr(value, 1, 4) || '-' || substr(value, 5, 2) || '-' || substr(value, 7, 2)
          else null
        end tval_char
@@ -252,14 +264,19 @@ select case_index
          when valtype_cd like 'N_' then to_number(ne.value)
          else null
        end nval_num
-     , case when ni."Format" = 'YYYYMMDD'
-       then to_date(case
-         when value in ('00000000', '99999999', '99990') then null
-         when length(trim(value)) = 4 then value || '0101'
-         when length(value) = 6 then value || '01'
-         when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
-         else value
-         end, 'yyyymmdd')
+     , case when valtype_cd like 'D%' then
+        case
+         when value in ('00000000', '99999999', '99990')
+         then null
+         when regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then to_date(value, 'YYYYMMDD')
+         when regexp_like(value, '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+         then to_date(value, 'MMDDYYYY')
+         when regexp_like(value, '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+         then to_date(value, 'YYYYMM')
+         when regexp_like(value, '^[1-2][0-9]{3}$')
+         then to_date(value, 'YYYY')
+         end
        else null end
        as start_date
      , 'NAACCR|' || ne.itemnbr || ':' || (
@@ -338,22 +355,34 @@ select
   when av.start_date is not null then av.start_date
   -- Use Date of Last Contact for Follow-up/Recurrence/Death
   when av.sectionid = 4
-  then to_date(case length(ne."Date of Last Contact")
-               when 8 then case
-               -- handle 19919999
-                 when substr(ne."Date of Last Contact", 5, 2) = '99'
-                   then substr(ne."Date of Last Contact", 1, 4) || '0101'
-                 else ne."Date of Last Contact"
-               end
-               when 6 then ne."Date of Last Contact" || '01'
-               when 4 then ne."Date of Last Contact" || '0101'
-               end, 'yyyymmdd')
+  then
+        case
+         when ne."Date of Last Contact" in ('00000000', '99999999', '99990')
+         then null
+         when regexp_like(ne."Date of Last Contact", '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then to_date(ne."Date of Last Contact", 'YYYYMMDD')
+         when regexp_like(ne."Date of Last Contact", '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+         then to_date(ne."Date of Last Contact", 'MMDDYYYY')
+         when regexp_like(ne."Date of Last Contact", '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+         then to_date(ne."Date of Last Contact", 'YYYYMM')
+         when regexp_like(ne."Date of Last Contact", '^[1-2][0-9]{3}$')
+         then to_date(ne."Date of Last Contact", 'YYYY')
+         end
   -- Use Date of Diagnosis for everything else
-  else to_date(case length(ne."Date of Diagnosis")
-               when 8 then ne."Date of Diagnosis"
-               when 6 then ne."Date of Diagnosis" || '01'
-               when 4 then ne."Date of Diagnosis" || '0101'
-               end, 'yyyymmdd') end as start_date
+  else
+        case
+         when ne."Date of Diagnosis" in ('00000000', '99999999', '99990')
+         then null
+         when regexp_like(ne."Date of Diagnosis", '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then to_date(ne."Date of Diagnosis", 'YYYYMMDD')
+         when regexp_like(ne."Date of Diagnosis", '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+         then to_date(ne."Date of Diagnosis", 'MMDDYYYY')
+         when regexp_like(ne."Date of Diagnosis", '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+         then to_date(ne."Date of Diagnosis", 'YYYYMM')
+         when regexp_like(ne."Date of Diagnosis", '^[1-2][0-9]{3}$')
+         then to_date(ne."Date of Diagnosis", 'YYYY')
+        end
+  end as start_date
 from naacr.extract ne
 join (
 select tiv.case_index
@@ -375,7 +404,6 @@ where (case
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis
 and the ones with no date of last contact */
 and ne."Accession Number--Hosp" is not null);
-
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
