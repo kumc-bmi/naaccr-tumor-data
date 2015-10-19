@@ -395,15 +395,10 @@ from tumor_item_value tiv
 
 ) av
  on ne.case_index = av.case_index
-where (case 
-       when av.start_date is not null then 1
-       when av.sectionid = 4 and ne."Date of Last Contact" is not null then 1
-       when av.sectionid != 4 and ne."Date of Diagnosis" is not null then 1
-       else 0
-       end) = 1
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis
 and the ones with no date of last contact */
-and ne."Accession Number--Hosp" is not null);
+and ne."Accession Number--Hosp" is not null)
+where start_date is not null;
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
