@@ -321,7 +321,6 @@ left join (
     case when codenbr is null then 'L' else 'F' end as viz1
   from tumor_reg_codes) trc
   on ni."ItemNbr" = trc.itemnbr
-where ni."ItemNbr" not in (400, 419, 521) -- separate code for primary site, Morph.
 
 union all
 /* Code concepts */
