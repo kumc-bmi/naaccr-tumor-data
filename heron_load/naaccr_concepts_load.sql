@@ -354,7 +354,7 @@ select distinct lvl + 1 as c_hlevel
      , 'NAACCR|400:' || icdo.concept_cd concept_cd
      , icdo.c_visualattributes
 from icd_o_topo icdo, tumor_reg_concepts
-where itemnbr  = '0400'
+where itemnbr  = 400
 
 /* Morph--Type/Behav concepts */
 union all
@@ -398,12 +398,12 @@ from seer_site_terms@deid
 
 
 /* Regression tests for earlier bugs. */
-select case when count(*) = 3 then 1 else 1/0 end naaccr_morph_bugs_fixed
+select case when count(*) = 4 then 1 else 1/0 end naaccr_morph_bugs_fixed
 from (
 select distinct c_basecode
 from BlueHeronMetadata.NAACCR_ONTOLOGY@deid
 where c_basecode in ('NAACCR|521:97323', 'NAACCR|521:80413',
-                     'NAACCR|521:98353')
+                     'NAACCR|521:98353', 'NAACCR|400:C619')
 );
 
 
