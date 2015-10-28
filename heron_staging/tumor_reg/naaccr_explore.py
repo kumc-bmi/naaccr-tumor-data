@@ -131,7 +131,7 @@ def table_ddl(spec, table, schema):
 
 
 def eav_view_ddl(spec, table, view, schema):
-    yield 'create or replace view "%s"."%s" as \n' % (schema, view)
+    yield 'create materialized view "%s"."%s" as \n' % (schema, view)
     for item in spec:
         if (item.length < 1 or
                 not item.num):
