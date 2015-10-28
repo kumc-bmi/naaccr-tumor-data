@@ -1,5 +1,14 @@
 # see Makefile for usage
 
+# Note: After loading the NAACCR file with sqlldr,
+#       set case_index as follows:
+#
+# CREATE SEQUENCE naacr.sq_case_index
+#   START WITH 1  INCREMENT BY 1  CACHE 100;
+#
+# update NAACR.EXTRACT
+# set case_index = naacr.sq_case_index.nextval;
+
 from collections import namedtuple
 
 Item = namedtuple('Item', 'start, end, length, num, name, section, note')
