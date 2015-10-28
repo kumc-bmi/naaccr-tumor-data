@@ -535,7 +535,7 @@ create table "NAACR"."EXTRACT" (case_index integer,
 "Reserved 14" varchar2(2000)
 )
 ;
-create or replace view "NAACR"."EXTRACT_EAV" as 
+create materialized view "NAACR"."EXTRACT_EAV" as 
 select case_index, 
 10 as ItemNbr,
 'Record Type' as ItemName,
