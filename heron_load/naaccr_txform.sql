@@ -166,6 +166,7 @@ select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_dei
          when ni."FieldLength" is null then null
 
          when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
+         when ni."ItemName" like '%Tumor Size%' then 'N'
          when ni."ItemName" like '%ICD-O-1' then '@'
          when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
          when ni."ItemName" like 'Comorbid/Complication%' then '@'
