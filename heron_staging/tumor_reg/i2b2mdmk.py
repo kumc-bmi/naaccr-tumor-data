@@ -4,14 +4,13 @@ r'''Make i2b2 metadata terms
 see dmtoterms.rst for design notes and tests.
 '''
 
+from collections import namedtuple
+
 __author__ = 'Dan Connolly'
 __contact__ = 'http://informatics.kumc.edu/'
 __copyright__ = 'Copyright (c) 2014 University of Kansas Medical Center'
 __license__ = 'MIT'
 __docformat__ = "restructuredtext en"
-
-
-from collections import namedtuple
 
 
 # Columns are taken from DDL for Table I2B2
@@ -44,13 +43,16 @@ class I2B2MetaData(object):
              max_tooltip_len=850, encoding='utf-8'):
         r'''Make metadata for an i2b2 term.
 
-        :param pfx: Part of the fullname that doesn't contribute to the c_hlevel
+        :param pfx: Part of the fullname that doesn't contribute to
+                    the c_hlevel
         :param parts: normal parts of the c_fullname (to be joined by \)
         :param name: visible label for the term
 
         Remaining parameters have sensible defaults:
 
-        >>> t1 = I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name='Collaborative Staging Terms')
+        >>> t1 = I2B2MetaData.term(
+        ...     pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'],
+        ...     name='Collaborative Staging Terms')
         >>> t1
         ... # doctest: +NORMALIZE_WHITESPACE
         Term(c_hlevel=2,
@@ -70,11 +72,15 @@ class I2B2MetaData(object):
                           c_facttablecolumn='concept_cd')
 
         The `c_hlevel` is taken from the length of `parts`:
-        >>> print I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name='name').c_hlevel
+        >>> print I2B2MetaData.term(
+        ...     pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'],
+        ...      name='name').c_hlevel
         2
 
         The prefix and parts get combined into `c_fullname`:
-        >>> print I2B2MetaData.term(pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'], name='name').c_fullname
+        >>> print I2B2MetaData.term(
+        ...     pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'],
+        ...     name='name').c_fullname
         \i2b2\Cancer Cases\CS Terms\
 
         Where there is no tooltip, copy the name into the tooltip
