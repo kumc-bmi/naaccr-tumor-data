@@ -161,7 +161,7 @@ class LAResolver(etree.Resolver):
     '''
     def __init__(self, rd):
         def resolve(url, name, context):
-            #log.debug('resolving: %s', url)
+            # log.debug('resolving: %s', url)
             return self.resolve_file(rd.subRdFile(url).inChannel(), context)
 
         self.resolve = resolve
@@ -178,7 +178,8 @@ if __name__ == '__main__':
         rd = osRd(os.curdir, lambda n: open(n), os.path, os.listdir)
 
         def arg_wr(n):
-            if n not in argv: raise IOError
+            if n not in argv:
+                raise IOError
             return open(n, 'w')
 
         main(argv, rd, arg_wr)
