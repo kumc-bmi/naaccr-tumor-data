@@ -3195,5 +3195,4 @@ select case_index,
 2210 as ItemNbr,
 'Reserved 14' as ItemName,
 "Reserved 14" as value
-from "NAACR"."EXTRACT"
-;
+from "NAACR"."EXTRACT";
