@@ -48,71 +48,6 @@ select count(to_number(ne."Patient ID Number"))
   from NAACR.EXTRACT ne;
 -- 65584, so yes.
 
--- How many of them match MRNs from our patient mapping?
-select count(*)
-from naacr.extract ne
-join NIGHTHERONDATA.patient_mapping pm
-  on pm.patient_ide_source =
-  (select source_cd from sms_audit_info)
-  and pm.patient_ide = ne."Patient ID Number";
--- 0. oops.
-
--- how long are MRNs in our patient_mapping?
-select min(length(pm.patient_ide)),
-  max(length(pm.patient_ide))
-from NIGHTHERONDATA.patient_mapping pm
-where pm.patient_ide_source =
-  (select source_cd from sms_audit_info);
--- 6 to 7 chars (bytes? never mind...)
-
--- How long are Patient ID Numbers?
-select min(length(ne."Patient ID Number")),
-  max(length(ne."Patient ID Number"))
-from naacr.extract ne;
--- 8. hmm.
-
--- How many of them match after we drop the 1st digit?
-select numerator, denominator, round(numerator/denominator*100, 2) as density
-from (
-  select count(*) as numerator
-  from naacr.extract ne
-  join NIGHTHERONDATA.patient_mapping pm
-    on pm.patient_ide_source =
-       (select source_cd from sms_audit_info)
-   and pm.patient_ide = substr(ne."Patient ID Number", 2)) matches,
-  (select count(*) as denominator from naacr.extract ne) 
-;
--- 65183 out of 65584; i.e. 99.39% 
-
-
--- How many match if we convert digit-strings to numbers?
-select count(*)
-from naacr.extract ne
-join NIGHTHERONDATA.patient_mapping pm
-  on pm.patient_ide_source =
-  (select source_cd from sms_audit_info)
-  and to_number(pm.patient_ide) = to_number(ne."Patient ID Number");
--- ORA-01722: invalid number. Bad data somewhere; so we can't tell.
--- FWIW, the NAACCR Patient IDs all convert to_number just fine.
--- The problem is in the Epic/SMS data.
-
--- What can we use as a primary key?
-select count(*) from (
-select distinct ne."Accession Number--Hosp", ne."Sequence Number--Hospital"
-from naacr.extract ne);
--- 65581. almost; all but 4.
-
--- which 4?
-select count(*), ne."Accession Number--Hosp", ne."Sequence Number--Hospital"
-from naacr.extract ne
-group by ne."Accession Number--Hosp", ne."Sequence Number--Hospital"
-having count(*) > 1;
-
--- are there any nulls?
-select count(*)
-from naacr.extract ne
-where ne."Accession Number--Hosp" is null;
--- 2
 */
 
 
@@ -231,16 +166,16 @@ and label = 'title'
 select * from icd_o_morph order by path;
 */
 
-/* For concept labels, we use
- *   1. CODEDCRP from the NAACCR t_code table, or if that is not available,
- *   2. c_name from Dustin Key's work, or if that is not available,
- *   3. the raw code number
+/** tumor_reg_codes - one row for each distinct concept_cd in the data
+ *  - NAACCR|III:CCC concept codes: one row per code value per coded item
+ *  - NAACCR|NNN: concept codes: one per non-coded (numeric, date, ...) item
  */
 
 whenever sqlerror continue;
 drop table tumor_reg_codes;
 whenever sqlerror exit;
 create table tumor_reg_codes as
+-- Note: this includes both coded and other (date, numeric) items
 select distinct
   tiv.sectionid, tiv.section
 , tiv.itemid, tiv.itemnbr, tiv.itemname
@@ -250,27 +185,76 @@ from tumor_item_value tiv;
 -- select * from tumor_reg_codes;
 -- select count(*) from tumor_reg_codes;
 
+/** tumor_reg_concepts -- one row per code from data or data dictionary
+ *
+ * A left join from the data dictionary to the data would leave out
+ * codes that appear only in the data.
+ *
+ * A left join from the data to the data dictionary would leave out
+ * codes that appear only in the data dictionary.
+ *
+ * So we take the union of these, left join it with the data dictionary,
+ * and for c_visualattributes, check whether any such data exist.
+ */
 whenever sqlerror continue;
 drop table tumor_reg_concepts;
 whenever sqlerror exit;
 create table tumor_reg_concepts as
-select sectionid, section
-, itemid, itemnbr, itemname
-, concept_cd, codenbr, min(codedcrp) as c_name
-from (
-select tiv.*
-     , tiv.codenbr || ' ' || nc.codedcrp as codedcrp
-from tumor_reg_codes tiv
-left join naacr.t_code nc
-  on nc.itemid = tiv.ItemID
- and nc.codenbr = tiv.codenbr
-)
-group by sectionid, section
-, itemid, itemnbr, itemname
-, concept_cd, codenbr;
+select coded.sectionid, coded.section, coded.itemnbr, coded.itemname
+     , concept_cd
+     , case
+       -- concepts where we have data are Active
+       when exists (
+         select 1
+         from tumor_reg_codes trc
+         where trc.itemnbr = coded.itemnbr
+         and trc.codenbr = tc.codenbr) then 'LA'
+       else 'LH'
+       end c_visualattributes
+     , tc.codenbr, coalesce(label.c_name, tc.codenbr) c_name
+from
+-- For each *coded* item from the data dictionary...
+(
+  select sectionid, section, itemnbr, itemname
+  from tumor_item_type
+  where valtype_cd = '@'
+) coded
+-- ... find all the code values...
+join (
+  -- ... from the data ...
+  select distinct itemnbr, codenbr, concept_cd
+  from tumor_reg_codes
+  where codenbr is not null
 
+  union
 
+  -- ... as well as those from the data dictionary (t_code) ...
+  select distinct to_number(ti."ItemNbr"), codenbr
+                , 'NAACCR|' || ti."ItemNbr" || ':' || codenbr concept_cd
+  from naacr.t_code tc
+  join naacr.t_item ti on tc.itemid = ti."ItemID"
+  where tc.codedcrp is not null
+  -- exclude description of codes; we just want codes
+  and tc.codenbr not like '% %'
+  and tc.codenbr not like '%<%'
+  and tc.codenbr not in ('..', '*', 'User-defined', 'nn')
+) tc on coded.itemnbr = tc.itemnbr
+-- now get labels where available from t_code
+left join (
+  select ty.itemnbr, tc.codenbr, min(tc.codenbr || ' ' || tc.codedcrp) c_name
+  from naacr.t_code tc
+  join tumor_item_type ty on tc.itemid = ty.itemid
+  group by ty.itemnbr, tc.codenbr
+) label
+  on label.itemnbr = coded.itemnbr
+ and label.codenbr = tc.codenbr
+;
+
+-- eyeball it:
+-- select * from tumor_reg_concepts order by sectionid, itemnbr, codenbr;
 -- select count(*) from tumor_reg_concepts;
+-- 1849 (in test)
+
 
 delete from BlueHeronMetadata.NAACCR_ONTOLOGY@deid;
 
@@ -300,43 +284,63 @@ from dual
 
 union all
 /* Section concepts */
-select distinct 2 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\' as path
-     , trim(to_char(sectionid, '09')) || ' ' || section as concept_name
+select 2 as c_hlevel
+     , 'S:' || nts.sectionid || ' ' || section || '\' as path
+     , trim(to_char(nts.sectionid, '09')) || ' ' || section as concept_name
      , null as concept_cd
-     , 'FA' as c_visualattributes
-from tumor_reg_concepts
+     , case
+       when trc.sectionid is null then 'FH'
+       else 'FA'
+       end as c_visualattributes
+from NAACR.t_section nts
+left join (
+  select distinct sectionid
+  from tumor_reg_codes) trc
+  on trc.sectionid = nts.sectionid
 
 union all
 /* Item concepts */
-select distinct 3 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\'
-       || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\' as path
-     , trim(to_char(itemnbr, '0999')) || ' ' || itemname as concept_name
-     , 'NAACCR|' || itemnbr || ':' as concept_cd
-     , case when codenbr is null then 'LA' else 'FA' end as c_visualattributes
-from tumor_reg_concepts
-where itemnbr not in (
-                    -- skip Histology since
-                    -- we already have Morph--Type&Behav
+select 3 as c_hlevel
+     , 'S:' || ns.sectionid || ' ' || ns.section || '\'
+       || substr(trim(to_char(ni."ItemNbr", '0999')) || ' ' || ni."ItemName", 1, 40) || '\' as path
+     , trim(to_char(ni."ItemNbr", '0999')) || ' ' || ni."ItemName" as concept_name
+     , 'NAACCR|' || ni."ItemNbr" || ':' as concept_cd
+     , case
+         when ni."ItemNbr" in (
+                    -- hide Histology since
+                    -- we already have Morph--Type/Behav
                     '0420', '0522')
+              or viz1 is null -- hide concepts where we have no data
+              then 'LH'
+         else viz1 || 'A'
+       end c_visualattributes
+from NAACR.t_section ns
+join NAACR.t_item ni on ns.sectionid = to_number(ni."SectionID")
+left join (
+  select distinct itemnbr,
+    case when codenbr is null then 'L' else 'F' end as viz1
+  from tumor_reg_codes) trc
+  on ni."ItemNbr" = trc.itemnbr
 
 union all
 /* Code concepts */
 select distinct 4 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
        || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\'
-       || case when c_name is null then codenbr else substr(c_name, 1, 40) end || '\'
+       || substr(c_name, 1, 40) || '\'
        as concept_path
-     , case when c_name is not null then c_name
-       else codenbr end as concept_name
+     , c_name as concept_name
      , concept_cd
-     , 'LA' as c_visualattributes
-from tumor_reg_concepts where codenbr is not null
-and itemnbr not in ('0400', '0419', '0521',
-                    -- skip Histology since
-                    -- we already have Morph--Type&Behav
+     , case
+       when itemnbr in (
+                    -- hide Histology since
+                    -- we already have Morph--Type/Behav
                     '0420', '0522')
+       then 'LH'
+       else c_visualattributes
+       end as c_visualattributes
+from tumor_reg_concepts
+where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
 
 union all
 
@@ -350,9 +354,9 @@ select distinct lvl + 1 as c_hlevel
      , 'NAACCR|400:' || icdo.concept_cd concept_cd
      , icdo.c_visualattributes
 from icd_o_topo icdo, tumor_reg_concepts
-where itemnbr  = '0400'
+where itemnbr  = 400
 
-/* Morph--Type&Behav concepts */
+/* Morph--Type/Behav concepts */
 union all
 select distinct lvl + 1 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
@@ -363,7 +367,7 @@ select distinct lvl + 1 as c_hlevel
      , substr(tr.concept_cd, 1, length('NAACCR|400:')) || icdo.concept_cd concept_cd
      , icdo.c_visualattributes
 from icd_o_morph icdo, tumor_reg_concepts tr
-where tr.itemnbr in ('0419', '0521')
+where tr.itemnbr in (419, 521)
 
 union all
 /* SEER Site Summary concepts*/
@@ -394,13 +398,61 @@ from seer_site_terms@deid
 
 
 /* Regression tests for earlier bugs. */
-select case when count(*) = 3 then 1 else 1/0 end naaccr_morph_bugs_fixed
+select case when count(*) = 4 then 1 else 1/0 end naaccr_morph_bugs_fixed
 from (
 select distinct c_basecode
 from BlueHeronMetadata.NAACCR_ONTOLOGY@deid
 where c_basecode in ('NAACCR|521:97323', 'NAACCR|521:80413',
-                     'NAACCR|521:98353')
+                     'NAACCR|521:98353', 'NAACCR|400:C619')
 );
+
+
+insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1)
+select 'Cancer Cases' test_domain, 'item_terms_indep_data' test_name
+     , case when ont.c_basecode is null then 0 else 1 end test_value
+     , sq_result_id.nextval result_id
+     , sysdate result_date
+     , ti.itemnbr, ti.itemname
+from (
+select "ItemNbr" itemnbr, null codecrp, "ReqStatus"
+     , 'NAACCR|' || "ItemNbr" || ':' c_basecode, "ItemName" itemname
+from naacr.t_item) ti
+left join (-- avoid link/LOB error ORA-22992
+  select c_basecode, c_name
+  from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
+  on ont.c_basecode = ti.c_basecode
+where ont.c_basecode is null
+and ti."ReqStatus" != 'Retired'
+;
+
+insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1, detail_char_2)
+select 'Cancer Cases' test_domain, 'code_terms_indep_data' test_name
+     , case when ont.c_basecode is null then 0 else 1 end test_value
+     , sq_result_id.nextval result_id
+     , sysdate result_date
+     , ti."ItemNbr", ti.codenbr, substr(ti."ItemName" || ' / ' || ti.codedcrp, 1, 255)
+from (
+select "ItemNbr", "ItemName", "ReqStatus", "AllowValue", codenbr
+     , 'NAACCR|' || "ItemNbr" || ':' || codenbr c_basecode, codedcrp
+from naacr.t_code tc
+join naacr.t_item ti on ti."ItemID" = tc.itemid
+) ti
+left join (-- avoid link/LOB error ORA-22992
+  select c_basecode, c_name
+  from BlueHeronMetadata.NAACCR_ONTOLOGY@deid) ont
+  on ont.c_basecode = ti.c_basecode
+where ont.c_basecode is null
+and ti."ReqStatus" != 'Retired'
+
+-- skip numeric values that are actually codes
+and ti."AllowValue" != '10-digit number'
+and ti."AllowValue" not like 'Census Tract Codes%'
+and ti.codenbr not in ('00000000', '88888888', '99999999')
+
+-- comments on/descriptions of codes
+and ti.codenbr not like '<_>%'
+and ti.codenbr not like '% %'
+;
 
 drop table icd_o_topo;
 drop table icd_o_morph;

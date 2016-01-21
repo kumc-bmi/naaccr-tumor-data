@@ -114,13 +114,14 @@ where ne."Accession Number--Hosp" is null;
 
 insert into NightHeronData.encounter_mapping
   (encounter_num, encounter_ide,
-   encounter_ide_status, encounter_ide_source,
+   encounter_ide_status, encounter_ide_source, project_id,
    patient_ide, patient_ide_source,
    import_date, upload_id, download_date, sourcesystem_cd )
 (select NightHeronData.SQ_UP_ENCDIM_ENCOUNTERNUM.nextval as encounter_num
       , tv.encounter_ide
       , 'A' as encounter_ide_status
       , aud.source_cd as encounter_ide_source
+      , '@' as project_id
       , tv.mrn as patient_ide
       , sms_audit_info.source_cd as patient_ide_source
       , sysdate as import_date
@@ -143,7 +144,7 @@ alter table observation_fact_upload
 whenever sqlerror exit;
 
 insert into observation_fact_upload (
-  patient_num, encounter_num,
+  patient_num, encounter_num, sub_encounter,
   concept_cd,
   provider_id,
   start_date,
@@ -158,7 +159,7 @@ insert into observation_fact_upload (
   location_cd,
   update_date,
   import_date, upload_id, download_date, sourcesystem_cd)
-select patient_num, encounter_num,
+select patient_num, encounter_num, tf.encounter_ide,
   tf.concept_cd,
   tf.provider_id,
   tf.start_date,
@@ -178,7 +179,7 @@ join NIGHTHERONDATA.patient_mapping pm
   on pm.patient_ide_source =
   (select source_cd from BlueHeronData.source_master@deid
    where source_cd like 'SMS@%')
-  and ltrim(pm.patient_ide, '0') = ltrim(tf.mrn, '0')
+  and pm.patient_ide = ltrim(tf.mrn, '0')
 join NIGHTHERONDATA.encounter_mapping em
   on em.encounter_ide_source =
   (select source_cd from BlueHeronData.source_master@deid
