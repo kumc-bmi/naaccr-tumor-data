@@ -1,5 +1,4 @@
-'''ccterms -- make i2b2 terms from Collaborative Staging tables
-especially ER/PR status for breast cancer.
+'''ccterms -- make i2b2 terms for Collaborative Staging site-specific factors
 
 Usage::
 
@@ -29,7 +28,8 @@ def main(argv, rd, arg_wr):
     sink = csv.writer(arg_wr(out_fn))
     sink.writerow(Term._fields)
 
-    for doc in each_document(xml_dir):
+    for path, doc in each_document(xml_dir):
+        log.debug('path: %s', path)
         for t in doc_terms(doc):
             sink.writerow(t)
 
@@ -50,6 +50,8 @@ class CS(object):
 
 
 def each_document(xml_dir):
+    '''Generate a parsed XML document for each .xml file in a directory.
+    '''
     targets = [target for target in xml_dir.subRdFiles()
                if target.path.endswith('.xml')]
     log.info('XML format files: %d', len(targets))
@@ -58,9 +60,9 @@ def each_document(xml_dir):
     parser.resolvers.add(LAResolver(xml_dir))
 
     for f in targets:
-        log.debug("document: %s", f)
+        # log.debug("document: %s", f)
         doc = etree.parse(f.inChannel(), parser)
-        yield doc.getroot()
+        yield str(f), doc.getroot()
 
 
 def doc_terms(doc_elt):
@@ -94,11 +96,11 @@ def doc_terms(doc_elt):
 
     '''
     log.debug("root tag: %s", doc_elt.tag)
-    log.debug('document: %s', etree.tostring(doc_elt, pretty_print=True))
+    # log.debug('document: %s', etree.tostring(doc_elt, pretty_print=True))
 
-    maintitle, sitesummary, tables = doc_info(doc_elt)
-    log.debug('title: %s summary: %s',
-              maintitle, sitesummary)
+    maintitle, subtitle, sitesummary, tables = doc_info(doc_elt)
+    log.debug('title: %s subtitle: %s summary: %s',
+              maintitle, subtitle, sitesummary)
     parts = ['Cancer Cases', 'CS Terms', maintitle or sitesummary]
     yield I2B2MetaData.term(pfx=['', 'i2b2'],
                             parts=parts, viz='FAE',
@@ -106,6 +108,9 @@ def doc_terms(doc_elt):
 
     for table in tables:
         tt, sub_parts, rows = table_term(table, parts)
+        if not sub_parts[-1].startswith('CS Site-Specific Factor'):
+            continue
+
         if tt:
             yield tt
 
@@ -121,21 +126,23 @@ def maybeNode(nodes):
 
 def doc_info(doc_elt):
     title = doc_elt.xpath('schemahead/title')[0]
+    subtitle = maybeNode(doc_elt.xpath('schemahead/subtitle/text()'))
     tables = doc_elt.xpath('cstable')
     return (title.xpath('maintitle/text()')[0],
+            subtitle,
             maybeNode(title.xpath('sitesummary/text()')),
             tables)
 
 
 def table_term(table, parts):
-    segment = '%s_%s' % (table.attrib['role'], table.attrib['tableid'])
+    # segment = '%s_%s' % (table.attrib['role'], table.attrib['tableid'])
     name = table.xpath('tablename')[0]
     title = name.xpath('tabletitle/text()')
     subtitle = name.xpath('tablesubtitle//text()')
     log.debug('tabletitle: %s tablesubtitle: %s',
               title, subtitle)
 
-    parts = parts + [segment]
+    parts = parts + [' '.join(title)]
     return (I2B2MetaData.term(pfx=['', 'i2b2'],
                               parts=parts, viz='FAE',
                               name=(subtitle + title)[0]),
@@ -146,8 +153,7 @@ def table_term(table, parts):
 def row_term(row, parts):
     code = maybeNode(row.xpath('code/text()'))
     descrip = maybeNode(row.xpath('descrip/text()'))
-    log.debug('code: %s descrip: %s',
-              code, descrip)
+    # log.debug('code: %s descrip: %s', code, descrip)
     if not (code and descrip):
         return None
 
