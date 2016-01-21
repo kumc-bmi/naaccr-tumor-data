@@ -64,7 +64,7 @@ def each_document(xml_dir):
 
 
 def doc_terms(doc_elt):
-    '''Extract i2b2 terms from CS Tables XML document.
+    r'''Extract i2b2 terms from CS Tables XML document.
 
     :param doc_elt: root element of XML document from CS Tables
     :return: generator of terms in doc
@@ -99,7 +99,7 @@ def doc_terms(doc_elt):
     maintitle, sitesummary, tables = doc_info(doc_elt)
     log.debug('title: %s summary: %s',
               maintitle, sitesummary)
-    parts = ['Cancer Cases', 'CS Terms', sitesummary or maintitle]
+    parts = ['Cancer Cases', 'CS Terms', maintitle or sitesummary]
     yield I2B2MetaData.term(pfx=['', 'i2b2'],
                             parts=parts, viz='FAE',
                             name=maintitle)
