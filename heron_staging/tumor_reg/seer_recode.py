@@ -17,8 +17,8 @@ def main(argv):
 
     terms, rules = seer_parse(open(pgfn))
 
-    open(rulesfn, 'w').write('case\n' + '\n'.join(rules)
-                             + "\n/* Invalid */ else '99999'\nend")
+    open(rulesfn, 'w').write('case\n' + '\n'.join(rules) +
+                             "\n/* Invalid */ else '99999'\nend")
     write_csv(open(termfn, 'w'), Term, terms)
 
 
@@ -53,8 +53,8 @@ def seer_parse(fp):
             log.debug('term: %s', (recode, label, parents))
             terms.append(
                 Term(hlevel=len(parents),
-                     path='\\'.join([seg[:20] for i, seg in parents]
-                                    + [label[:20]]),
+                     path='\\'.join([seg[:20] for i, seg in parents] +
+                                    [label[:20]]),
                      name=label,
                      basecode=recode,
                      visualattributes='LA' if recode else 'FA'))
@@ -126,8 +126,8 @@ def t(elt):
 
 
 def mk_rule(sites, histologies, site_col='site', hist_col='histology'):
-    return '\n  and '.join(mk_clause(ranges(sites), site_col)
-                           + mk_clause(ranges(histologies), hist_col))
+    return '\n  and '.join(mk_clause(ranges(sites), site_col) +
+                           mk_clause(ranges(histologies), hist_col))
 
 
 def mk_clause(eb, col):
@@ -137,14 +137,13 @@ def mk_clause(eb, col):
     ground = [(("%s between '%s' and '%s'" % (col, lo, hi))
                if hi else
                "%s = '%s'" % (col, lo))
-               for lo, hi in bounds]
-    return [((' not ' if excl else '')
-             + '('
-             + '\n   or '.join(ground)
-             + ')')]
-                
+              for lo, hi in bounds]
+    return [((' not ' if excl else '') +
+             '(' +
+             '\n   or '.join(ground) +
+             ')')]
 
-    
+
 def ranges(txt, sometimes=True):
     '''
     >>> ranges('')
