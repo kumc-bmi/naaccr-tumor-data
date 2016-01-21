@@ -262,7 +262,7 @@ select case_index
          else null
        end tval_char
      , case
-         when valtype_cd like 'N_' then to_number(ne.value)
+         when valtype_cd like 'N%' then to_number(ne.value)
          else null
        end nval_num
      , case when valtype_cd like 'D%' then
