@@ -11,15 +11,16 @@ from lxml import etree
 log = logging.getLogger(__name__)
 
 
-def main(argv):
-    logging.basicConfig(level=logging.INFO)
-    pgfn, termfn, rulesfn = argv[1:4]
+def main(arg_rd, arg_wr):
+    with arg_rd(1) as page:
+        terms, rules = seer_parse(page)
 
-    terms, rules = seer_parse(open(pgfn))
+    with arg_wr(2) as terms:
+        write_csv(terms, Term, terms)
 
-    open(rulesfn, 'w').write('case\n' + '\n'.join(rules) +
-                             "\n/* Invalid */ else '99999'\nend")
-    write_csv(open(termfn, 'w'), Term, terms)
+    with arg_wr(3) as rules:
+        rules.write('case\n' + '\n'.join(rules) +
+                    "\n/* Invalid */ else '99999'\nend")
 
 
 Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
@@ -212,5 +213,16 @@ TEST_ROW_LIP = '''
 
 
 if __name__ == '__main__':
-    import sys
-    main(sys.argv)
+    def _script():
+        from sys import argv
+
+        logging.basicConfig(level=logging.INFO)
+
+        def arg_rd(ix):
+            return open(argv[ix])
+
+        def arg_wr(ix):
+            return open(argv[ix], 'w')
+
+        main(arg_rd, arg_wr)
+    _script()
