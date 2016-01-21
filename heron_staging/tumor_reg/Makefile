@@ -4,8 +4,10 @@ PERL=perl
 PS2PDF=pdf2ps
 PS2ASCII=ps2ascii
 TIDY=tidy
+PYTHON=python
 
 naaccr_extract.sql naaccr_extract.ctl: naaccr_explore.py naaccr12_1.txt
+	$(PYTHON) naaccr_explore.py
 
 naaccr12_1.txt: naaccr12_1.ps
 	$(PS2ASCII) <naaccr12_1.ps >$@
@@ -28,6 +30,8 @@ naaccr12_1.mdb:
 ,seer_site_recode.html:
 	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.html'
 
+clean:
+	rm -f ,* naaccr_extract.sql naaccr_extract.ctl naaccr12_1.txt
 
 CSTABLES=3_CSTables(HTMLandXML)
 csterms: $(CSTABLES)
@@ -59,4 +63,4 @@ $(CSTABLES).zip:
 # Homepage: http://curl.haxx.se
 
 install-dependencies-ubuntu:
-	sudo apt-get install perl-base ghostscript 
+	sudo apt-get install perl-base ghostscript

@@ -19,8 +19,7 @@ select "Accession Number--Hosp" from naacr.extract where 1=0;
 
 create or replace view seer_recode_aux as
 select MRN
-     , ne."Accession Number--Hosp"
-     , ne."Sequence Number--Hospital"
+     , ne.case_index
      , start_date
      , ne.site, ne.histology,
 case
@@ -538,8 +537,7 @@ end
 as recode
 from
  (select ne."Patient ID Number" as MRN
-       , ne."Accession Number--Hosp"
-       , ne."Sequence Number--Hospital"
+       , ne.case_index
        , ne."Primary Site" as site
        , substr(ne."Morph--Type&Behav ICD-O-3", 1, 4) histology
        , to_date(case length(ne."Date of Diagnosis")
@@ -554,7 +552,7 @@ from
 
 create or replace view seer_recode_facts as
 select MRN
-     , ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide
+     , ne.case_index as encounter_ide
      , 'SEER_SITE:' || recode concept_cd, '@' item_name
      , '@' provider_id
      , start_date

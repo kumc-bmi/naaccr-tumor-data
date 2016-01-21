@@ -1,6 +1,6 @@
 /** naaccr_txform -- transform NAACCR data to fit i2b2 star schema
 
-Copyright (c) 2012 University of Kansas Medical Center
+Copyright (c) 2012-2015 University of Kansas Medical Center
 part of the HERON* open source codebase; see NOTICE file for license details.
 * http://informatics.kumc.edu/work/wiki/HERON
 
@@ -9,7 +9,7 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 -- test that we're in the KUMC sid with the NAACCR data
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
-select "Accession Number--Hosp" from naacr.extract_eav where 1=0;
+select itemnbr from naacr.extract_eav where 1=0;
 -- check for curated data
 select name from seer_site_terms@deid where 1=0;
 
@@ -21,38 +21,18 @@ alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 whenever sqlerror continue;
 --Inside "continue" clause in case index is not there
 drop index naacr.patient_id_idx;
-drop index naacr.accession_idx;
+drop index naacr.case_idx;
+
+alter table naacr.extract add (case_index integer);  -- in case old naaccr_extract.sql was used
+
 whenever sqlerror exit;
 
-/* There are some known duplicates - 3 rows.  The unique constraint on the index
-below should cause sqlldr to dump the duplicate rows into the .bad file 
-(assuming the index was still there durin the staging).  So, at this point,
-we shouldn't have any duplicates.  But if we do, we have the re-creation of the
-index here that will fail if there are duplicates.
-
-As per #1155, we had 30 copies of a subset of the data.  So, also, make sure we 
-have at least as many rows as we do today.
-*/
 create index naacr.patient_id_idx on naacr.extract (
   "Patient ID Number");
 
---Will fail if duplicates found
-create unique index naacr.accession_idx on naacr.extract (
-  "Accession Number--Hosp", "Sequence Number--Hospital");
+create unique index naacr.case_idx on naacr.extract (
+  case_index);
 
-
-/* would be unique but for a handful of dups:
-select * from
-(
-select count(*), "Accession Number--Hosp", "Sequence Number--Hospital"
-from naacr.extract
-group by "Accession Number--Hosp", "Sequence Number--Hospital"
-having count(*) > 1
-) dups
-join naacr.extract ne
-  on ne."Accession Number--Hosp" = dups."Accession Number--Hosp"
- and ne."Sequence Number--Hospital" = dups."Sequence Number--Hospital";
-*/
 
 /* Item names are unique, right? */
 select case when count(*) = 0 then 1 else 0 end as test_item_name_uniqueness
@@ -108,100 +88,13 @@ Do we want to record these as facts?
  */
 
 
-/* Review sections based on ItemName, CodedCRP
-select ns.sectionid, ns.section
-     , ni."ItemNbr" as ItemNbr, ni."ItemName"
-     , nc.codenbr, nc.codedcrp
-     , ni."AllowValue", ni."Format"
-from naacr.t_item ni
-join NAACR.t_section ns on ns.sectionid = ni."SectionID"
-left join naacr.t_code nc on nc.itemid = ni."ItemID"
-where ni."SectionID" in (
-   -- This list was built a la:
-   -- select ', ' || sectionid || ' -- ' || section
-   -- from naacr.t_section;
-  1 -- Cancer Identification
-, 2 -- Demographic
--- , 3 -- Edit Overrides/Conversion History/System Admin
-, 4 -- Follow-up/Recurrence/Death
--- , 5 -- Hospital-Confidential
-, 6 -- Hospital-Specific
--- , 7 -- Other-Confidential
--- , 8 -- Patient-Confidential
--- , 9 -- Record ID
--- , 10 -- Special Use
-, 11 -- Stage/Prognostic Factors
--- , 12 -- Text-Diagnosis
--- , 13 -- Text-Miscellaneous
--- , 14 -- Text-Treatment
--- , 15 -- Treatment-1st Course
-, 16 -- Treatment-Subsequent & Other
-, 17 -- Pathology
-)
-and length(nc.codenbr) < 8  -- exclude case where description of code is given rather than a code
-and nc.codenbr <> 'Blank'
-order by ns.sectionid, to_number(ni."ItemNbr"), nc.codenbr
-;
-*/
-
-
-/**
- * Review distinct attributes, values; eliminate PHI.
- * TODO: store these in the ID repository and de-id later
- * -- TODO: numeric values for section 11 -- Stage/Prognostic Factors
- * -- Tumor Size: what the heck do the values mean???
- * -- select * from naacr.t_item ni where ni."ItemNbr" = '780';
- * -- Regional Nodes Positive
- *    seems to be a mixture of numeric and coded (90-99) data. ugh.
-
-select distinct ns.SectionID, ns.section, to_number(ne.ItemNbr), ne.ItemName
-     , ne.value, nc.codedcrp
-from NAACR.extract_eav ne
-join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-left join naacr.t_code nc
-  on nc.itemid = ni."ItemID"
- and nc.codenbr = ne.value
-where ne.value is not null
--- and ni."Format" != 'YYYYMMDD'
-and ns.SectionID in (
-  1 -- Cancer Identification
- , 2 -- Demographic
--- , 3 -- Edit Overrides/Conversion History/System Admin
- , 4 -- Follow-up/Recurrence/Death
--- , 5 -- Hospital-Confidential
- , 6 -- Hospital-Specific
--- , 7 -- Other-Confidential
--- , 8 -- Patient-Confidential
--- , 9 -- Record ID
--- , 10 -- Special Use
-  11 -- Stage/Prognostic Factors -- TODO: numeric stuff
--- , 12 -- Text-Diagnosis
--- , 13 -- Text-Miscellaneous
--- , 14 -- Text-Treatment
--- , 15 -- Treatment-1st Course
-, 16 -- Treatment-Subsequent & Other
-, 17 -- Pathology
-)
--- TODO: store these in the ID repository and de-id later
-and ni."AllowValue" not like 'City name or UNKNOWN'
-and ni."AllowValue" not like 'Reference to EDITS table BPLACE.DBF in Appendix B'
-and ni."AllowValue" not like '5-digit or 9-digit U.S. ZIP codes%'
-and ni."AllowValue" not like 'Census Tract Codes%'
-and ni."AllowValue" not like 'See Appendix A for standard FIPS county codes%'
-and ni."AllowValue" not like 'See Appendix A for county codes for each state.%'
-and ni."ItemName" not like 'Age at Diagnosis'
-and ni."ItemName" not like 'Text--%'
-and ni."ItemName" not like 'Place of Death'
-order by 1, 2, 3, 4, 5
-;
- */
-
-
-
 /*****
  * Date parsing. Ugh.
- 
+
+Please excuse the copy-and-paste coding here; a p-sql function would
+probably let us factor out the redundancy but we haven't crossed into
+that territory yet.
+
  p. 97:
  "Below are the common formats to handle the situation where only
   certain components of date are known.
@@ -215,15 +108,19 @@ test cases below.
 
 In Date of Last Contact, we've also seen 19919999
 */
-select itemname,  value, to_date(
-  case
-  when value in ('00000000', '99999999', '99990') then null
-  when length(trim(value)) = 4 then value || '0101'
-  when length(value) = 6 then value || '01'
-  when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
-  else value
-  end,
-  'yyyymmdd') as start_date
+select itemname,  value
+     , case
+       when value in ('00000000', '99999999', '99990')
+       then null
+       when regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+       then to_date(value, 'YYYYMMDD')
+       when regexp_like(value, '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+       then to_date(value, 'MMDDYYYY')
+       when regexp_like(value, '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+       then to_date(value, 'YYYYMM')
+       when regexp_like(value, '^[1-2][0-9]{3}$')
+       then to_date(value, 'YYYY')
+       end start_date
 from (
 select 'normal' as itemname, '19700101' as value from dual
 union all
@@ -240,6 +137,8 @@ union all
 select 'all 0s' as itemname, '00000000' as value from dual
 union all
 select 'almost all 9s' as itemname, '99990' as value from dual
+union all
+select 'inscruitable', '12001024' from dual
 )
 ;
 
@@ -252,37 +151,41 @@ from (
   ) where i > 960 and i < 970) ne;
 */
 
-/* This is the main big flat view. */
-create or replace view tumor_item_value as
-select "Accession Number--Hosp"
-     , "Sequence Number--Hospital"
-     , ns.sectionid
-     , ne.ItemNbr
-     , ne.value
-     , case when ni."Format" = 'YYYYMMDD'
-       then to_date(case
-         when value in ('00000000', '99999999', '99990') then null
-         when length(trim(value)) = 4 then value || '0101'
-         when length(value) = 6 then value || '01'
-         when substr(value, 5, 4) = '9999' then substr(value, 1, 4) || '1231'
-         else value
-         end, 'yyyymmdd')
-       else null end
-       as start_date
-     , 'NAACCR|' || ne.ItemNbr || ':' || (
-         case when ni."Format" = 'YYYYMMDD' then null
-         else value end) as concept_cd
-     , case when ni."Format" = 'YYYYMMDD' then null
-       else value end as codenbr
+create or replace view tumor_item_type as
+select ns.sectionid
      , ns.section
+     , ni."ItemNbr" ItemNbr
+     , ni."Format"
+     , ni."AllowValue"
+     , ni.valtype_cd
      , ni."ItemName" as ItemName
-     , ni."ItemID" as ItemID
-from NAACR.extract_eav ne
-join naacr.t_item ni on ne.ItemNbr = ni."ItemNbr"
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-where ne.value is not null
+     , ni."ItemID" as itemid
+from (
+select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
+         when ni."ItemName" like 'Reserved%' then null
+         when ni."FieldLength" is null then null
 
-and ni."SectionID" in (
+         when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
+         when ni."ItemName" like '%Tumor Size%' then 'N'
+         when ni."ItemName" like '%ICD-O-1' then '@'
+         when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
+         when ni."ItemName" like 'Comorbid/Complication%' then '@'
+
+         when ni."ItemName" = 'Patient ID Number' then 'Ti'
+         when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
+         when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
+         -- TODO: handle YYYYMMDDhhmmss as date?
+         when ni."Format" = 'YYYYMMDD' then 'D'
+         when ni."ItemName" like 'Text--%' then 'Ti'
+         when ni."ItemName" like 'Age%' then 'Ni'
+         when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
+         when ni."AllowValue" like '10-digit%' and ni."ItemName" not like '%ID' then 'Ni'
+         when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
+ 
+          -- fields 3 characters or smaller are codes that aren't PHI
+         when to_number("FieldLength") <= 3 then '@'
+          -- In certain sections, fields up to 5 characters are non-PHI codes
+         when to_number("FieldLength") <= 5 and ni."SectionID" in (
   1 -- Cancer Identification
  , 2 -- Demographic
 -- , 3 -- Edit Overrides/Conversion History/System Admin
@@ -300,38 +203,111 @@ and ni."SectionID" in (
 -- , 12 -- Text-Diagnosis
 -- , 13 -- Text-Miscellaneous
 -- , 14 -- Text-Treatment
--- , 15 -- Treatment-1st Course
+, 15 -- Treatment-1st Course
 , 16 -- Treatment-Subsequent & Other
 , 17 -- Pathology
-)
--- TODO: store these in the ID star schema and de-id later.
-and ni."AllowValue" not like 'City name or UNKNOWN'
-and ni."AllowValue" not like 'Reference to EDITS table BPLACE.DBF in Appendix B'
-and ni."AllowValue" not like '5-digit or 9-digit U.S. ZIP codes%'
-and ni."AllowValue" not like 'Census Tract Codes%'
-and ni."AllowValue" not like 'See Appendix A for standard FIPS county codes%'
-and ni."AllowValue" not like 'See Appendix A for county codes for each state.%'
-and ni."AllowValue" not like '10-digit number'
-and ni."ItemName" not like 'Age at Diagnosis'
-and ni."ItemName" not like 'Text--%'
-and ni."ItemName" not like 'Place of Death'
-and ni."ItemName" not like 'Abstracted By'
-and ni."ItemName" not like 'NPI--Archive FIN'
-and ni."ItemName" not like 'NPI--Reporting Facility'
+         ) then '@'
+         when ni."Format" like '%zero filled' then 'Ni'
+         else 'Ti'
+       end valtype_cd
+     , ni.*
+from naacr.t_item ni
+) ni
+join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
+and ni.valtype_cd is not null
+;
+
+insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1)
+select 'Cancer Cases' test_domain, 'rx_summary_item_types' test_name
+     , case when ty.itemnbr is null then 0 else 1 end test_value
+     , sq_result_id.nextval result_id
+     , sysdate result_date
+     , rx.itemnbr, rx.itemname
+from
+(
+select 1640 itemnbr, 'RX Summ--Surgery Type' itemname from dual union all
+select 1290,         'RX Summ--Surg Prim Site' from dual union all
+select 1292,         'RX Summ--Scope Reg LN Sur' from dual union all
+select 1294,         'RX Summ--Surg Oth Reg/Dis' from dual union all          
+select 1296,         'RX Summ--Reg LN Examined' from dual union all
+select 1330,         'RX Summ--Reconstruct 1st' from dual union all      
+select 1340,         'Reason for No Surgery' from dual union all 
+select 1360,         'RX Summ--Radiation' from dual union all
+select 1370,         'RX Summ--Rad to CNS' from dual union all
+select 1380,         'RX Summ--Surg/Rad Seq' from dual
+
+union all  -- not related to RX, but has the same test structure
+select 0230,         'Age at Diagnosis' from dual union all
+select 0560,         'Sequence Number-Hospital' from dual
+) rx
+left join tumor_item_type ty
+  on ty.itemnbr = rx.itemnbr
+;
+
+/* This is the main big flat view. */
+     -- TODO: for long lists of numeric codes, find metadata
+     -- and chunking strategy
+     -- TODO: consider normalizing complication 1, complication 2, ...
+create or replace view tumor_item_value as
+select case_index
+     , ns.sectionid
+     , ne.ItemNbr
+     , ni.valtype_cd
+     , case
+         when valtype_cd like 'T%' then value
+         when valtype_cd like 'D%'
+          and regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then
+           substr(value, 1, 4) || '-' || substr(value, 5, 2) || '-' || substr(value, 7, 2)
+         else null
+       end tval_char
+     , case
+         when valtype_cd like 'N_' then to_number(ne.value)
+         else null
+       end nval_num
+     , case when valtype_cd like 'D%' then
+        case
+         when value in ('00000000', '99999999', '99990')
+         then null
+         when regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then to_date(value, 'YYYYMMDD')
+         when regexp_like(value, '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+         then to_date(value, 'MMDDYYYY')
+         when regexp_like(value, '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+         then to_date(value, 'YYYYMM')
+         when regexp_like(value, '^[1-2][0-9]{3}$')
+         then to_date(value, 'YYYY')
+         end
+       else null end
+       as start_date
+     , 'NAACCR|' || ne.itemnbr || ':' || (
+         case when ni.valtype_cd like '@%' then value
+         else null end) as concept_cd
+     , case when ni.valtype_cd like '@%' then value
+       else null end as codenbr
+     , ns.section
+     , ni.ItemName
+     , ni.itemid
+from naacr.extract_eav ne
+join tumor_item_type ni
+  on ne.itemnbr = ni.ItemNbr
+join NAACR.t_section ns on ns.sectionid = to_number(ni.SectionID)
+where ne.value is not null
+and ni.valtype_cd is not null
 ;
 /* eyeball it:
 
-select tiv.*
-     , nc.codedcrp
- from tumor_item_value tiv
-left join naacr.t_code nc
-  on nc.itemid = tiv.ItemID
- and nc.codenbr = tiv.value
--- order by to_number(SectionID), 1, 2, 3
+select * from tumor_item_value tiv
+where "Accession Number--Hosp" like '%555';
 
-where "Accession Number--Hosp"='200000045'
- and "Sequence Number--Hospital" = '00'
-order by to_number(SectionID), 1, 2, 3;
+How many different concept codes are there, excluding comorbidities?
+
+select distinct(concept_cd) from tumor_item_value tiv
+where valtype_cd not like '_i'
+and concept_cd not like 'NAACCR|31%';
+
+~9000.
+
 */
 
 
@@ -339,22 +315,12 @@ order by to_number(SectionID), 1, 2, 3;
  * i2b2 style visit info
  */
 create or replace view tumor_reg_visits as
-select ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital"
+select ne.case_index
        as encounter_ide
      , ne."Patient ID Number" as MRN
 from naacr.extract ne
 where ne."Accession Number--Hosp" is not null;
 
-/* below are the known duplicates - we now have the unique index constraing as 
-per #1155 so we shouldn't need this anymore but here for reference
-
-...
-and ne."Accession Number--Hosp" not in (
-  '200801856'
-, '199601553'
-, '200200890'
-);
-*/
 
 
 -- select * from tumor_reg_visits;
@@ -371,9 +337,9 @@ select MRN, encounter_ide
      , start_date
      , '@' modifier_cd
      , 1 instance_num
-     , '@' as valtype_cd
-     , '@' as tval_char
-     , to_number(null) as nval_num
+     , valtype_cd
+     , tval_char
+     , nval_num
      , null as valueflag_cd
      , null as units_cd
      , start_date as end_date
@@ -382,84 +348,62 @@ select MRN, encounter_ide
 from (
 select
   ne."Patient ID Number" as MRN,
-  ne."Accession Number--Hosp" || '-' || ne."Sequence Number--Hospital" as encounter_ide,
+  ne.case_index as encounter_ide,
   av.concept_cd,
   av.ItemName,
--- codedcrp is not unique; causes duplicate key errors in observation_fact
---  av.codedcrp,
+  av.valtype_cd, av.nval_num, av.tval_char,
   case
   when av.start_date is not null then av.start_date
   -- Use Date of Last Contact for Follow-up/Recurrence/Death
   when av.sectionid = 4
-  then to_date(case length(ne."Date of Last Contact")
-               when 8 then case
-               -- handle 19919999
-                 when substr(ne."Date of Last Contact", 5, 2) = '99'
-                   then substr(ne."Date of Last Contact", 1, 4) || '0101'
-                 else ne."Date of Last Contact"
-               end
-               when 6 then ne."Date of Last Contact" || '01'
-               when 4 then ne."Date of Last Contact" || '0101'
-               end, 'yyyymmdd')
+  then
+        case
+         when ne."Date of Last Contact" in ('00000000', '99999999', '99990')
+         then null
+         when regexp_like(ne."Date of Last Contact", '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then to_date(ne."Date of Last Contact", 'YYYYMMDD')
+         when regexp_like(ne."Date of Last Contact", '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+         then to_date(ne."Date of Last Contact", 'MMDDYYYY')
+         when regexp_like(ne."Date of Last Contact", '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+         then to_date(ne."Date of Last Contact", 'YYYYMM')
+         when regexp_like(ne."Date of Last Contact", '^[1-2][0-9]{3}$')
+         then to_date(ne."Date of Last Contact", 'YYYY')
+         end
   -- Use Date of Diagnosis for everything else
-  else to_date(case length(ne."Date of Diagnosis")
-               when 8 then ne."Date of Diagnosis"
-               when 6 then ne."Date of Diagnosis" || '01'
-               when 4 then ne."Date of Diagnosis" || '0101'
-               end, 'yyyymmdd') end as start_date
+  else
+        case
+         when ne."Date of Diagnosis" in ('00000000', '99999999', '99990')
+         then null
+         when regexp_like(ne."Date of Diagnosis", '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
+         then to_date(ne."Date of Diagnosis", 'YYYYMMDD')
+         when regexp_like(ne."Date of Diagnosis", '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
+         then to_date(ne."Date of Diagnosis", 'MMDDYYYY')
+         when regexp_like(ne."Date of Diagnosis", '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
+         then to_date(ne."Date of Diagnosis", 'YYYYMM')
+         when regexp_like(ne."Date of Diagnosis", '^[1-2][0-9]{3}$')
+         then to_date(ne."Date of Diagnosis", 'YYYY')
+        end
+  end as start_date
 from naacr.extract ne
 join (
-select tiv."Accession Number--Hosp"
-     , tiv."Sequence Number--Hospital"
+select tiv.case_index
      , tiv.start_date
      , tiv.concept_cd
+     , tiv.valtype_cd, tiv.nval_num, tiv.tval_char
      , tiv.ItemName
      , tiv.SectionId
---     , tiv.codedcrp
 from tumor_item_value tiv
 
 ) av
- on ne."Accession Number--Hosp" = av."Accession Number--Hosp"
-and ne."Sequence Number--Hospital" = av."Sequence Number--Hospital"
-where (case 
-       when av.start_date is not null then 1
-       when av.sectionid = 4 and ne."Date of Last Contact" is not null then 1
-       when av.sectionid != 4 and ne."Date of Diagnosis" is not null then 1
-       else 0
-       end) = 1
+ on ne.case_index = av.case_index
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis
 and the ones with no date of last contact */
-and ne."Accession Number--Hosp" is not null);
-
-/* Known duplicates handled by the unique index now as per #1155
-and ne."Accession Number--Hosp" not in (
-  '200801856'
-, '199601553'
-, '200200890'
-))
-;
-*/
+and ne."Accession Number--Hosp" is not null)
+where start_date is not null;
 
 -- eyeball it:
 -- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
 
-
-/*ugh: multiple codedcrp s:
-select tiv."Accession Number--Hosp"
-     , tiv."Sequence Number--Hospital"
-     , tiv.start_date
-     , tiv.concept_cd
-     , tiv.ItemName
-     , tiv.codedcrp
-from tumor_item_value tiv
-where tiv."Accession Number--Hosp"='196900417'
-and tiv."Sequence Number--Hospital"='00'
-and tiv.concept_cd='NAACCR|190:6';
-
-Spanish, NOS
-Hispanic, NOS
-Latino, NOS
-*/
 
 /* count facts by scheme
 

@@ -1,6 +1,6 @@
 LOAD DATA
 TRUNCATE
-INTO TABLE "NAACR"."EXTRACT" (
+INTO TABLE "NAACR"."EXTRACT_INCR" (
 "Record Type" position(1:1) CHAR,
 "Registry Type" position(2:2) CHAR,
 "FIN Coding System" position(3:3) CHAR,
