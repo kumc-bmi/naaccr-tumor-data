@@ -39,15 +39,16 @@ Now we can get i2b2 style terms for site-specific factors of lung::
     ...     print t.c_basecode, t.c_name.split('\n')[0]
     ...     print t.c_fullname
     None Breast
-    \i2b2\Cancer Cases\CS Terms\Breast\
+    \i2b2\naaccr\Seer Site\Breast\
     None Estrogen Receptor (ER) Assay
-    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\
+    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\
     CS26000|1:000 OBSOLETE DATA CONVERTED V0203
-    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\000\
+    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\000\
     CS26000|1:010 Positive/elevated
-    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\010\
+    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\010\
     CS26000|1:020 Negative/normal; within normal limits
-    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\020\
+    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\020\
+
 
 '''
 
@@ -88,8 +89,13 @@ class SeerSiteTerm(I2B2MetaData):
     @classmethod
     def from_site(cls, s, rules,
                   pfx=['', 'i2b2'],
-                  folder=['Cancer Cases', 'CS Terms']):
-        parts = folder + [s.maintitle or s.sitesummary]
+                  folder=['naaccr', 'Seer Site']):
+        recode = s.recode(rules)
+        # This could be computed just once rather than once per site.
+        paths = dict((recode, path)
+                     for (_level, path, recode)
+                     in seer_recode.Rule.site_group_paths(rules))
+        parts = folder + paths[recode]
         yield cls.term(pfx=pfx,
                        parts=parts, viz='FAE',
                        name=s.maintitle)
@@ -103,7 +109,7 @@ class SeerSiteTerm(I2B2MetaData):
 
             for v in vbl.values:
                 yield ValueTerm.from_value(
-                    v, vparts, s.recode(rules), factor)
+                    v, vparts, recode, factor)
 
 
 class VariableTerm(I2B2MetaData):
