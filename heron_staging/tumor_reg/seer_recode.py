@@ -6,10 +6,9 @@ The National Cancer Institutute provides the `Site Recode ICD-O-3/WHO
 Site Group;ICD-O-3 Site;ICD-O-3 Histology (Type);Recode
 Digestive System; ; ; ;
     Stomach;C160-C169;excluding 9050-9055, 9140, 9590-9992;21020;
-    Colon and Rectum; ; ; ;
-        Colon excluding Rectum; ; ; ;
     Liver and Intrahepatic Bile Duct; ; ; ;
         Liver;C220;excluding 9050-9055, 9140, 9590-9992;21071;
+Breast;C500-C509;excluding 9050-9055, 9140, 9590-9992;26000;
 Brain and Other Nervous System; ; ;  ;
     Brain;C710-C719;excluding 9050-9055, 9140, 9530-9539, 9590-9992;31010;
     Cranial Nerves Other ...;C710-C719;9530-9539;31040 ;
@@ -62,7 +61,7 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
 
     >>> r = Rule.from_lines(test_lines)
     >>> len(r)
-    11
+    10
 
     The table has four columns::
 
