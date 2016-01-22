@@ -1,13 +1,57 @@
-'''ccterms -- make i2b2 terms for Collaborative Staging site-specific factors
+r'''ccterms -- make i2b2 terms for Collaborative Staging site-specific factors
 
 Usage::
 
-first, download and unzip 3_CSTables(HTMLandXML).zip; see Makefile for details.
+  python csterms.py ,seer_site_recode.txt ss_terms_out.csv
 
-???@@TODO
+
+The American Joint Committee on Cancer (AJCC) maintains overall
+management of the Collaborative Staging System and publishes a `schema
+for browsing`__ as well as a `zip file with data in XML`__.
+
+__ https://cancerstaging.org/cstage/schema/Pages/version0205.aspx
+__ https://cancerstaging.org/cstage/software/Documents/3_CSTables(HTMLandXML).zip  # noqa
+
+
+For example, `Breast.xml` begins with the following markup::
+
+    >>> from pkg_resources import resource_string
+    >>> text = resource_string(__name__, 'cstable_ex.xml')
+    >>> text.split('\n', 1)[0]
+    ... # doctest: +ELLIPSIS
+    '<cstgschema csschemaid="Breast" status="DRAFT" revised="06/27/2013" ...
+
+For our purposes, we just need a few parts of the document::
+
+    >>> lung = Site.from_doc(etree.fromstring(text))
+    >>> lung.maintitle, lung.sitesummary
+    ('Breast', 'C50.0-C50.6, C50.8-C50.9')
+
+To build basecodes, we need the SEER Site Recode rules::
+
+    >>> seer_rules = seer_recode.Rule.from_lines(seer_recode.test_lines)
+
+Now we can get i2b2 style terms for site-specific factors of lung::
+
+    >>> lung_terms = SeerSiteTerm.from_site(lung, seer_rules)
+    >>> from itertools import islice
+    >>> for t in islice(lung_terms, 5):
+    ...     print t.c_basecode, t.c_name.split('\n')[0]
+    ...     print t.c_fullname
+    None Breast
+    \i2b2\Cancer Cases\CS Terms\Breast\
+    None Estrogen Receptor (ER) Assay
+    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\
+    CS26000|1:000 OBSOLETE DATA CONVERTED V0203
+    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\000\
+    CS26000|1:010 Positive/elevated
+    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\010\
+    CS26000|1:020 Negative/normal; within normal limits
+    \i2b2\Cancer Cases\CS Terms\Breast\CS Site-Specific Factor 1\020\
 
 '''
 
+from collections import namedtuple
 import csv
 import logging
 
@@ -16,150 +60,157 @@ from lxml import etree
 
 from lafile import osRd
 from i2b2mdmk import I2B2MetaData, Term
+import seer_recode
 
 log = logging.getLogger(__name__)
 
 
 def main(argv, rd, arg_wr):
-    out_fn = argv[1]
+    seer_fn, out_fn = argv[1:3]
 
-    xml_dir = rd / CS.xml_format
+    with (rd / seer_fn).inChannel() as seer_file:
+        seer_rules = seer_recode.Rule.from_lines(seer_file)
 
-    sink = csv.writer(arg_wr(out_fn))
-    sink.writerow(Term._fields)
+    cs = CS(rd)
+    terms = (t
+             for s in cs.each_site()
+             for t in SeerSiteTerm.from_site(s, seer_rules))
 
-    for path, doc in each_document(xml_dir):
-        log.debug('path: %s', path)
-        for t in doc_terms(doc):
+    with arg_wr(out_fn) as out:
+        sink = csv.writer(out)
+        sink.writerow(Term._fields)
+
+        for t in terms:
             sink.writerow(t)
 
 
+class SeerSiteTerm(I2B2MetaData):
+    @classmethod
+    def from_site(cls, s, rules,
+                  pfx=['', 'i2b2'],
+                  folder=['Cancer Cases', 'CS Terms']):
+        parts = folder + [s.maintitle or s.sitesummary]
+        yield cls.term(pfx=pfx,
+                       parts=parts, viz='FAE',
+                       name=s.maintitle)
+
+        for vbl in s.variables:
+            factor = vbl.factor()
+            if not factor:
+                continue
+            vparts = parts + [vbl.title]
+            yield VariableTerm.from_variable(vbl, parts)
+
+            for v in vbl.values:
+                yield ValueTerm.from_value(
+                    v, vparts, s.recode(rules), factor)
+
+
+class VariableTerm(I2B2MetaData):
+    @classmethod
+    def from_variable(cls, vbl, parts,
+                      pfx=['', 'i2b2']):
+        vparts = parts + [vbl.title]
+        return cls.term(pfx=pfx,
+                        parts=vparts, viz='FAE',
+                        name=vbl.subtitle or vbl.title)
+
+
+class ValueTerm(I2B2MetaData):
+    @classmethod
+    def from_value(cls, v, parts, recode, factor,
+                   pfx=['', 'i2b2']):
+        return I2B2MetaData.term(
+            pfx=pfx,
+            code='CS%s|%s:%s' % (recode, factor, v.code),
+            parts=parts + [v.code], viz='LAE',
+            name=v.descrip)
+
+
 class CS(object):
-    '''
-    reference:
-
-    Collaborative Stage Version 02.05
-    (c) Copyright 2014 American Joint Committee on Cancer.
-    https://cancerstaging.org/cstage/Pages/default.aspx
-    '''
-
-    # https://cancerstaging.org/cstage/software/Documents/3_CSTables(HTMLandXML).zip  # noqa
     cs_tables = '3_CSTables(HTMLandXML).zip'
 
     xml_format = '3_CS Tables (HTML and XML)/XML Format/'
 
+    def __init__(self, rd):
+        self._xml_dir = (rd / self.xml_format)
 
-def each_document(xml_dir):
-    '''Generate a parsed XML document for each .xml file in a directory.
-    '''
-    targets = [target for target in xml_dir.subRdFiles()
-               if target.path.endswith('.xml')]
-    log.info('XML format files: %d', len(targets))
+    def each_doc(self):
+        '''Generate a parsed XML document for each .xml file in the schema.
+        '''
+        targets = [target for target in self._xml_dir.subRdFiles()
+                   if target.path.endswith('.xml')]
+        log.info('XML format files: %d', len(targets))
 
-    parser = etree.XMLParser(load_dtd=True)
-    parser.resolvers.add(LAResolver(xml_dir))
+        parser = etree.XMLParser(load_dtd=True)
+        parser.resolvers.add(LAResolver(self._xml_dir))
 
-    for f in targets:
-        # log.debug("document: %s", f)
-        doc = etree.parse(f.inChannel(), parser)
-        yield str(f), doc.getroot()
+        for f in targets:
+            log.info('file: %s', f.path.split('/')[-1])
+            doc = etree.parse(f.inChannel(), parser)
+            yield doc.getroot()
+
+    def each_site(self):
+        for doc_elt in self.each_doc():
+            yield Site.from_doc(doc_elt)
 
 
-def doc_terms(doc_elt):
-    r'''Extract i2b2 terms from CS Tables XML document.
+class Site(namedtuple('Site', 'maintitle subtitle sitesummary variables')):
+    @classmethod
+    def from_doc(cls, doc_elt):
+        title = doc_elt.xpath('schemahead/title')[0]
+        subtitle = maybeNode(doc_elt.xpath('schemahead/subtitle/text()'))
+        tables = doc_elt.xpath('cstable')
+        return cls(title.xpath('maintitle/text()')[0],
+                   subtitle,
+                   maybeNode(title.xpath('sitesummary/text()')),
+                   (Variable.from_table(t) for t in tables))
 
-    :param doc_elt: root element of XML document from CS Tables
-    :return: generator of terms in doc
+    def recode(self, rules):
+        if not self.sitesummary:
+            return None
 
-    >>> from pkg_resources import resource_string
-    >>> text = resource_string(__name__, 'cstable_ex.xml')
+        # C50.0-C50.6, C50.8-C50.9 => C500
+        needle = self.sitesummary[:5].replace('.', '')
+        try:
+            return (rule.recode
+                    for rule in rules
+                    if rule.site.startswith(needle)).next()
+        except StopIteration:
+            return None
 
-    >>> doc = etree.fromstring(text)
-    >>> terms = list(doc_terms(doc))
-    >>> for t in terms:
-    ...     print t.c_fullname
-    \i2b2\Cancer Cases\CS Terms\Breast\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\000\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\001-988\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\989\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\990\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\991\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\992\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\993\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\994\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\995\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\996\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\997\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\998\
-    \i2b2\Cancer Cases\CS Terms\Breast\ROLE_TUMOR_SIZE_aab\999\
 
-    '''
-    log.debug("root tag: %s", doc_elt.tag)
-    # log.debug('document: %s', etree.tostring(doc_elt, pretty_print=True))
+class Variable(namedtuple('Variable', 'name title subtitle values')):
+    @classmethod
+    def from_table(cls, table):
+        name = table.xpath('tablename')[0]
+        title = name.xpath('tabletitle/text()')
+        subtitle = name.xpath('tablesubtitle//text()')
+        log.debug('tabletitle: %s tablesubtitle: %s',
+                  title, subtitle)
 
-    maintitle, subtitle, sitesummary, tables = doc_info(doc_elt)
-    log.debug('title: %s subtitle: %s summary: %s',
-              maintitle, subtitle, sitesummary)
-    parts = ['Cancer Cases', 'CS Terms', maintitle or sitesummary]
-    yield I2B2MetaData.term(pfx=['', 'i2b2'],
-                            parts=parts, viz='FAE',
-                            name=maintitle)
+        return cls(name, ' '.join(title), ' '.join(subtitle),
+                   (v
+                    for r in table.xpath('row')
+                    for v in Value.from_row(r)))
 
-    for table in tables:
-        tt, sub_parts, rows = table_term(table, parts)
-        if not sub_parts[-1].startswith('CS Site-Specific Factor'):
-            continue
+    def factor(self, pfx='CS Site-Specific Factor'):
+        return self.title.startswith(pfx) and int(self.title[len(pfx):])
 
-        if tt:
-            yield tt
 
-        for row in rows:
-            rt = row_term(row, sub_parts)
-            if rt:
-                yield rt
+class Value(namedtuple('Code', 'code, descrip')):
+    @classmethod
+    def from_row(cls, row):
+        '''Maybe generate a value from a row.
+        '''
+        code = maybeNode(row.xpath('code/text()'))
+        descrip = maybeNode(row.xpath('descrip/text()'))
+        if code and descrip:
+            yield cls(code, descrip)
 
 
 def maybeNode(nodes):
     return nodes[0] if len(nodes) > 0 else None
-
-
-def doc_info(doc_elt):
-    title = doc_elt.xpath('schemahead/title')[0]
-    subtitle = maybeNode(doc_elt.xpath('schemahead/subtitle/text()'))
-    tables = doc_elt.xpath('cstable')
-    return (title.xpath('maintitle/text()')[0],
-            subtitle,
-            maybeNode(title.xpath('sitesummary/text()')),
-            tables)
-
-
-def table_term(table, parts):
-    # segment = '%s_%s' % (table.attrib['role'], table.attrib['tableid'])
-    name = table.xpath('tablename')[0]
-    title = name.xpath('tabletitle/text()')
-    subtitle = name.xpath('tablesubtitle//text()')
-    log.debug('tabletitle: %s tablesubtitle: %s',
-              title, subtitle)
-
-    parts = parts + [' '.join(title)]
-    return (I2B2MetaData.term(pfx=['', 'i2b2'],
-                              parts=parts, viz='FAE',
-                              name=(subtitle + title)[0]),
-            parts,
-            table.xpath('row'))
-
-
-def row_term(row, parts):
-    code = maybeNode(row.xpath('code/text()'))
-    descrip = maybeNode(row.xpath('descrip/text()'))
-    # log.debug('code: %s descrip: %s', code, descrip)
-    if not (code and descrip):
-        return None
-
-    return I2B2MetaData.term(pfx=['', 'i2b2'],
-                             parts=parts + [code], viz='LAE',
-                             name=descrip)
 
 
 class LAResolver(etree.Resolver):
