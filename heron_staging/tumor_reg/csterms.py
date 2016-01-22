@@ -36,19 +36,18 @@ Now we can get i2b2 style terms for site-specific factors of lung::
     >>> lung_terms = SeerSiteTerm.from_site(lung, seer_rules)
     >>> from itertools import islice
     >>> for t in islice(lung_terms, 5):
-    ...     print t.c_basecode, t.c_name.split('\n')[0]
+    ...     print t.c_basecode, t.c_name
     ...     print t.c_fullname
-    None Breast
-    \i2b2\naaccr\Seer Site\Breast\
-    None Estrogen Receptor (ER) Assay
-    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\
-    CS26000|1:000 OBSOLETE DATA CONVERTED V0203
-    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\000\
-    CS26000|1:010 Positive/elevated
-    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\010\
-    CS26000|1:020 Negative/normal; within normal limits
-    \i2b2\naaccr\Seer Site\Breast\CS Site-Specific Factor 1\020\
-
+    SEER_SITE:26000 Breast
+    \i2b2\naaccr\SEER Site\Breast\
+    None 01: Estrogen Receptor (ER) Assay
+    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\
+    CS26000|1:000 000: OBSOLETE DATA CONVERTED V0203
+    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\000\
+    CS26000|1:010 010: Positive/elevated
+    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\010\
+    CS26000|1:020 020: Negative/normal; within normal limits
+    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\020\
 
 '''
 
@@ -89,7 +88,7 @@ class SeerSiteTerm(I2B2MetaData):
     @classmethod
     def from_site(cls, s, rules,
                   pfx=['', 'i2b2'],
-                  folder=['naaccr', 'Seer Site']):
+                  folder=['naaccr', 'SEER Site']):
         recode = s.recode(rules)
         # This could be computed just once rather than once per site.
         paths = dict((recode, path)
@@ -97,6 +96,7 @@ class SeerSiteTerm(I2B2MetaData):
                      in seer_recode.Rule.site_group_paths(rules))
         parts = folder + paths[recode]
         yield cls.term(pfx=pfx,
+                       code='SEER_SITE:%s' % recode,
                        parts=parts, viz='FAE',
                        name=s.maintitle)
 
@@ -117,9 +117,11 @@ class VariableTerm(I2B2MetaData):
     def from_variable(cls, vbl, parts,
                       pfx=['', 'i2b2']):
         vparts = parts + [vbl.title]
+        factor = vbl.factor()
+        num = '%02d: ' % factor if factor else ''
         return cls.term(pfx=pfx,
                         parts=vparts, viz='FAE',
-                        name=vbl.subtitle or vbl.title)
+                        name=num + (vbl.subtitle or vbl.title))
 
 
 class ValueTerm(I2B2MetaData):
@@ -130,7 +132,7 @@ class ValueTerm(I2B2MetaData):
             pfx=pfx,
             code='CS%s|%s:%s' % (recode, factor, v.code),
             parts=parts + [v.code], viz='LAE',
-            name=v.descrip)
+            name=v.code + ': ' + v.descrip.split('\n')[0])
 
 
 class CS(object):
