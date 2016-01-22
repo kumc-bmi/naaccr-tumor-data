@@ -1,148 +1,181 @@
 '''seer_recode -- parse the SEER Site Recode table
+
+The National Cancer Institutute provides the `Site Recode ICD-O-3/WHO
+2008 Definition`__ in an `ASCII text file`__ in this format:
+
+Site Group;ICD-O-3 Site;ICD-O-3 Histology (Type);Recode
+Digestive System; ; ; ;
+    Stomach;C160-C169;excluding 9050-9055, 9140, 9590-9992;21020;
+    Colon and Rectum; ; ; ;
+        Colon excluding Rectum; ; ; ;
+    Liver and Intrahepatic Bile Duct; ; ; ;
+        Liver;C220;excluding 9050-9055, 9140, 9590-9992;21071;
+Brain and Other Nervous System; ; ;  ;
+    Brain;C710-C719;excluding 9050-9055, 9140, 9530-9539, 9590-9992;31010;
+    Cranial Nerves Other ...;C710-C719;9530-9539;31040 ;
+    Cranial Nerves Other ...;C700-C709, C720-C729;excluding 9050-... ;31040 ;
+Invalid;Site or histology code not within valid range ...;;99999;
+
+From this, we extract
+  1. A table of paths and such for building i2b2 terms
+  2. A SQL expression for computing the recode based on
+     primary site and histology.
+
+Usage:
+
+  python seer_recode.py index.txt seer_recode_terms.csv seer_recode.sql
+
+__ http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.html
+__ http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
+
 '''
 
 import logging
 from collections import namedtuple
-import itertools
+from itertools import dropwhile, takewhile
 import csv
-
-from lxml import etree
 
 log = logging.getLogger(__name__)
 
 
 def main(arg_rd, arg_wr):
     with arg_rd(1) as page:
-        terms, rules = seer_parse(page)
+        rules = Rule.from_lines(page)
 
-    with arg_wr(2) as terms:
-        write_csv(terms, Term, terms)
+    with arg_wr(2) as termf:
+        write_csv(termf, Term, Rule.as_terms(rules))
 
-    with arg_wr(3) as rules:
-        rules.write('case\n' + '\n'.join(rules) +
+    with arg_wr(3) as rulef:
+        rulef.write('case\n' + '\n'.join(
+            rule.as_sql() for rule in rules
+            if rule.recode and rule.site_group != 'Invalid') +
                     "\n/* Invalid */ else '99999'\nend")
 
 
+test_lines = __doc__.split('\n\n')[2].split('\n')
+
+
+class Rule(namedtuple('Rule', 'site_group site histology recode')):
+    r'''Each Rule is taken from a row in the recode definition table.
+
+    We skip the header when reading the lines:
+
+    >>> r = Rule.from_lines(test_lines)
+    >>> len(r)
+    11
+
+    The table has four columns::
+
+    >>> r[1]
+    ... # doctest: +NORMALIZE_WHITESPACE
+    Rule(site_group='    Stomach',
+         site='C160-C169',
+         histology='excluding 9050-9055, 9140, 9590-9992',
+         recode='21020')
+
+    We can extract the paths implied by indentation::
+
+    >>> g = Rule.site_group_paths(r)
+    >>> list(g)
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [(1, ['Digestive System'], None),
+     (2, ['Digestive System', 'Stomach'], '21020'),
+    ...
+     (1, ['Invalid'], '99999')]
+
+    We can render them as i2b2-style terms::
+
+    >>> terms = list(Rule.as_terms(r))
+    >>> terms
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [Term(hlevel=0, path='Digestive System', name='Digestive System',
+          basecode=None, visualattributes='FA'),
+     Term(hlevel=1, path='Digestive System\\Stomach', name='Stomach',
+          basecode='21020', visualattributes='LA'),
+    ...
+     Term(hlevel=0, path='Invalid', name='Invalid', basecode='99999',
+          visualattributes='LA')]
+
+    Or as SQL case clauses::
+
+    >>> print r[1].as_sql(),
+    /* Stomach */ when (site between 'C160' and 'C169')
+      and  not (histology between '9050' and '9055'
+       or histology = '9140'
+       or histology between '9590' and '9992') then '21020'
+    '''
+
+    @classmethod
+    def from_lines(cls, lines):
+        # drop title, heading
+        lines = dropwhile(lambda l: l.startswith('Site '), iter(lines))
+        # skip stuff at the bottom
+        lines = takewhile(lambda l: len(l.split(';')) == 5, lines)
+
+        return list(
+            # clean up trailing whitespace in label, recode
+            cls(label.rstrip(), site, hist, recode.strip() or None)
+            for line in lines
+            for (label, site, hist, recode, _) in [line.split(';')])
+
+    @classmethod
+    def site_group_paths(cls, records):
+        '''Generate hierarchy based on indentation
+        '''
+        path = []
+        for label, _site, _exc, recode in records:
+            indent = (ix for ix in range(len(label))
+                      if label[ix] != ' ').next()
+            label = label[indent:]
+            path = [(i, txt) for (i, txt) in path
+                    if i < indent] + [(indent, label)]
+            yield len(path), [seg for (_, seg) in path], recode
+
+    @classmethod
+    def as_terms(cls, rules):
+        '''Generate i2b2-like terms from seer recode rules.
+
+        Some rules reduce to duplicate terms; be sure to skip them:
+
+        >>> r = Rule.from_lines(test_lines)
+        >>> terms = list(Rule.as_terms(r))
+        >>> [t.name for t in terms if t.basecode == '31040']
+        ['Cranial Nerves Other ...']
+
+        '''
+        paths = Rule.site_group_paths(rules)
+        terms = (Term(hlevel=level - 1,
+                      path='\\'.join(part[:20] for part in parts),
+                      name=parts[-1],
+                      basecode=recode,
+                      visualattributes='LA' if recode else 'FA')
+                 for level, parts, recode in paths)
+
+        skip_dups = reduce(lambda acc, p: acc if p in acc else acc + [p],
+                           terms, [])
+        return skip_dups
+
+    def as_sql(self, site_col='site', hist_col='histology'):
+        def mk_clause(eb, col):
+            excl, bounds = eb
+            if not bounds:
+                return []
+            ground = [(("%s between '%s' and '%s'" % (col, lo, hi))
+                       if hi else
+                       "%s = '%s'" % (col, lo))
+                      for lo, hi in bounds]
+            return [((' not ' if excl else '') +
+                     '(' +
+                     '\n   or '.join(ground) +
+                     ')')]
+
+        clause = '\n  and '.join(mk_clause(ranges(self.site), site_col) +
+                                 mk_clause(ranges(self.histology), hist_col))
+        return "/* %s */ when %s then '%s'\n" % (
+            self.site_group.strip(), clause, self.recode)
+
+
 Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
-
-
-def seer_parse(fp):
-    doc = etree.HTML(fp.read())
-    tbl1 = doc.xpath('.//table')[0]
-
-    terms = []
-    parents = []
-    prev_label = None
-
-    rules = []
-    hist_span = 0
-    icdo3histology = None
-    recode_span = 0
-    recode = None
-
-    for site_row in tbl1:
-        icdo3site, icdo3histology, recode, hist_span, recode_span = grok_row(
-            site_row, icdo3histology, recode, hist_span, recode_span)
-        indent, label = build_site_tree(site_row, prev_label, parents)
-        if recode and label != 'Invalid':
-            rules.append("/* %s */ when %s then '%s'\n" % (
-                label,
-                mk_rule(icdo3site, icdo3histology),
-                recode))
-
-        if label:
-            log.debug('term: %s', (recode, label, parents))
-            terms.append(
-                Term(hlevel=len(parents),
-                     path='\\'.join([seg[:20] for i, seg in parents] +
-                                    [label[:20]]),
-                     name=label,
-                     basecode=recode,
-                     visualattributes='LA' if recode else 'FA'))
-
-        prev_label = label
-
-    return terms, rules
-
-
-def build_site_tree(site_row, prev_label, parents):
-    '''
-    >>> build_site_tree(etree.fromstring(TEST_ROW_LIP), None, [])
-    ... #doctest: +NORMALIZE_WHITESPACE
-    (23, 'Lip')
-    '''
-    tds = site_row.xpath('td[@headers="site"]')
-    if tds:
-        site_td = tds[0]
-    else:
-        return None, None
-
-    indent_txt = site_td.xpath('table/tr/td')[0].text
-    indent = len(indent_txt) if indent_txt else 0
-    label = t(site_td.xpath('table/tr/td')[1])
-
-    while parents and indent < parents[-1][0]:
-        parents.pop()
-    if indent > (parents[-1][0] if parents else 0):
-        parents.append((indent, prev_label))
-
-    return indent, label or prev_label
-
-
-def grok_row(site_row, icdo3histology, recode, hist_span, recode_span):
-    '''
-    >>> grok_row(etree.fromstring(TEST_ROW_LIP), 'h1', 'r1', 1, 1)
-    ... #doctest: +NORMALIZE_WHITESPACE
-    ('C000-C009', 'excluding 9590-9989, and sometimes 9050-9055, 9140',
-     '20010', 10, 1)
-    '''
-    if not site_row.xpath('td[@headers]'):
-        log.debug('not a recode row: %s', etree.tostring(site_row))
-        return None, None, None, None, None
-
-    def td(n):
-        tds = [td for td in site_row if n in td.attrib['headers']]
-        return tds[0] if tds else None
-
-    def spanning(span, txt, n):
-        if span > 1:
-            span -= 1
-        else:
-            n_td = td(n)
-            txt = t(n_td)
-            if n_td is not None:
-                span = int(n_td.attrib.get('rowspan', '1'))
-        return span, txt
-
-    hist_span, icdo3histology = spanning(hist_span,
-                                         icdo3histology, 'icdo3histology')
-    recode_span, recode = spanning(recode_span,
-                                   recode, 'recode')
-
-    return (t(td('icdo3site')), icdo3histology, recode, hist_span, recode_span)
-
-
-def t(elt):
-    return ' '.join(elt.text.split()) if elt is not None else None
-
-
-def mk_rule(sites, histologies, site_col='site', hist_col='histology'):
-    return '\n  and '.join(mk_clause(ranges(sites), site_col) +
-                           mk_clause(ranges(histologies), hist_col))
-
-
-def mk_clause(eb, col):
-    excl, bounds = eb
-    if not bounds:
-        return []
-    ground = [(("%s between '%s' and '%s'" % (col, lo, hi))
-               if hi else
-               "%s = '%s'" % (col, lo))
-              for lo, hi in bounds]
-    return [((' not ' if excl else '') +
-             '(' +
-             '\n   or '.join(ground) +
-             ')')]
 
 
 def ranges(txt, sometimes=True):
@@ -175,41 +208,11 @@ def ranges(txt, sometimes=True):
              [t.split('-') if '-' in t else [t, None] for t in hilos if t]])
 
 
-def flatten(lists):
-    return list(itertools.chain(lists))
-
-
 def write_csv(fp, klass, items):
     fields = klass._fields
     o = csv.DictWriter(fp, fields, lineterminator='\n')
     o.writerow(dict(zip(fields, fields)))
     o.writerows([item._asdict() for item in items])
-
-
-TEST_ROW_LIP = '''
-          <tr>
-            <td headers='site' id="h2" valign="baseline">
-              <table border='0' cellpadding='0' cellspacing='0'>
-                <tr>
-                  <td valign="baseline">
-                  &#160;&#160;&#160;&#160;</td>
-
-                  <td valign="baseline">Lip</td>
-                </tr>
-              </table>
-            </td>
-
-            <td headers="icdo3site h2" valign="baseline">
-            C000-C009</td>
-
-            <td headers="icdo3histology h2" valign="baseline"
-            rowspan="10">excluding 9590-9989, and sometimes
-            9050-9055, 9140<a href='#_+'><span class=
-            'recodefootnote'>+</span></a></td>
-
-            <td headers="recode h2" valign="baseline">20010</td>
-          </tr>
-'''
 
 
 if __name__ == '__main__':
