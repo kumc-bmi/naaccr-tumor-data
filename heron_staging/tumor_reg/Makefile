@@ -3,8 +3,9 @@ CURL=curl
 PERL=perl
 PS2PDF=pdf2ps
 PS2ASCII=ps2ascii
-TIDY=tidy
 PYTHON=python
+
+## NAACCR table
 
 naaccr_extract.sql naaccr_extract.ctl: naaccr_explore.py naaccr12_1.txt
 	$(PYTHON) naaccr_explore.py
@@ -15,7 +16,8 @@ naaccr12_1.txt: naaccr12_1.ps
 naaccr12_1.ps: Vol\ II\ Version\ 12.1\ with\ cover.pdf
 	$(PS2PDF) Vol\ II\ Version\ 12.1\ with\ cover.pdf $@
 
-Vol\ II\ Version\ 12.1\ with\ cover.pdf:
+NAACCR_SPEC=Vol\ II\ Version\ 12.1\ with\ cover.pdf
+$(NAACCR_SPEC):
 	$(CURL) --output "$@" 'http://www.naaccr.org/LinkClick.aspx?fileticket=LJJNRVo4lT4%3d&tabid=133&mid=473'
 
 
@@ -24,14 +26,17 @@ naaccr12_1.mdb:
 	$(CURL) --output $@ 'http://www.naaccr.org/LinkClick.aspx?fileticket=h6_MTYvGFLU%3d&tabid=133&mid=473'
 
 
-,seer_site_recode_t.html: ,seer_site_recode.html
-	$(TIDY) -q -i -n -ascii -asxml $< > $@
+## SEER Recode
 
-,seer_site_recode.html:
-	$(CURL) --output "$@" 'http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.html'
+seer-recode: seer_recode_terms.csv seer_recode.sql
 
-clean:
-	rm -f ,* naaccr_extract.sql naaccr_extract.ctl naaccr12_1.txt
+seer_recode_terms.csv seer_recode.sql: seer_recode.py ,seer_site_recode.txt
+	$(PYTHON) seer_recode.py ,seer_site_recode.txt seer_recode_terms.csv seer_recode.sql
+
+,seer_site_recode.txt:
+	$(CURL) --output "$@" http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
+
+## CS Site-Specific Factors
 
 CSTABLES=3_CSTables(HTMLandXML)
 csterms: $(CSTABLES)
@@ -43,6 +48,20 @@ $(CSTABLES): $(CSTABLES).zip
 
 $(CSTABLES).zip:
 	$(CURL) --output "$@" 'https://cancerstaging.org/cstage/software/Documents/3_CSTables(HTMLandXML).zip'
+
+
+clean:
+	rm -rf \
+	    naaccr12_1.txt naaccr12_1.ps \
+            seer_recode_terms.csv seer_recode.sql
+
+distclean:
+	rm -rf \
+            naaccr_extract.sql naaccr_extract.ctl naaccr12_1.txt
+
+clear-cache:
+	rm -rf ,* \
+            $(CSTABLES) $(CSTABLES).zip $(NAACCR_SPEC)
 
 
 # Tested with the following:
