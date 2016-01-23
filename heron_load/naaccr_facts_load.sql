@@ -174,7 +174,9 @@ select patient_num, encounter_num, tf.encounter_ide,
   sysdate, up.upload_id, :download_date, up.source_cd
 from (select * from tumor_reg_facts
       union all
-      select * from seer_recode_facts) tf
+      select * from seer_recode_facts
+      union all
+      select * from cs_site_factor_facts) tf
 join NIGHTHERONDATA.patient_mapping pm
   on pm.patient_ide_source =
   (select source_cd from BlueHeronData.source_master@deid
