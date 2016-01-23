@@ -568,6 +568,31 @@ select MRN
      , to_date(null) as update_date
 from seer_recode_aux ne;
 
+
+create or replace view cs_site_factor_facts as
+select sra.mrn
+     , sra.case_index
+     , 'CS' || sra.recode || '|' ||
+       substr(ssf.itemname, length('CS Site-Specific Factor 1')) ||
+       ':' || ssf.codenbr concept_cd, '@' item_name
+     , '@' provider_id
+     , sra.start_date
+     , '@' modifier_cd  -- hmm... modifier for synthesized info?
+     , 1 instance_num
+     , '@' valtype_cd
+     , null tval_char
+     , to_number(null) nval_num
+     , null as valueflag_cd
+     , null as units_cd
+     , sra.start_date as end_date
+     , '@' location_cd
+     , to_date(null) as update_date
+from tumor_item_value ssf
+join seer_recode_aux sra on sra.case_index = ssf.case_index
+where itemnbr between 2861 and 2930
+;
+
+
 /*
 select count(*), concept_cd
 from seer_recode_facts
