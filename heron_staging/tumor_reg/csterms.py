@@ -39,15 +39,15 @@ Now we can get i2b2 style terms for site-specific factors of lung::
     ...     print t.c_basecode, t.c_name
     ...     print t.c_fullname
     SEER_SITE:26000 Breast
-    \i2b2\naaccr\SEER Site\Breast\
+    \i2b2\naaccr\csterms\Breast\
     None 01: Estrogen Receptor (ER) Assay
-    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\
+    \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 1\
     CS26000|1:000 000: OBSOLETE DATA CONVERTED V0203
-    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\000\
+    \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 1\000\
     CS26000|1:010 010: Positive/elevated
-    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\010\
+    \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 1\010\
     CS26000|1:020 020: Negative/normal; within normal limits
-    \i2b2\naaccr\SEER Site\Breast\CS Site-Specific Factor 1\020\
+    \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 1\020\
 
 '''
 
@@ -80,23 +80,26 @@ def main(argv, rd, arg_wr):
         sink = csv.writer(out)
         sink.writerow(Term._fields)
 
+        for t in SeerSiteTerm.hierarchy(seer_rules):
+            sink.writerow(t)
+
         for t in terms:
             sink.writerow(t)
 
 
 class SeerSiteTerm(I2B2MetaData):
+    pfx = ['', 'i2b2']
+    folder = ['naaccr', 'csterms']
+
     @classmethod
-    def from_site(cls, s, rules,
-                  pfx=['', 'i2b2'],
-                  folder=['naaccr', 'SEER Site']):
+    def from_site(cls, s, rules):
         recode = s.recode(rules)
         # This could be computed just once rather than once per site.
         paths = dict((recode, path)
                      for (_level, path, recode)
                      in seer_recode.Rule.site_group_paths(rules))
-        parts = folder + paths[recode]
-        yield cls.term(pfx=pfx,
-                       code='SEER_SITE:%s' % recode,
+        parts = cls.folder + paths[recode]
+        yield cls.term(pfx=cls.pfx,
                        parts=parts, viz='FAE',
                        name=s.maintitle)
 
@@ -111,25 +114,40 @@ class SeerSiteTerm(I2B2MetaData):
                 yield ValueTerm.from_value(
                     v, vparts, recode, factor)
 
+    @classmethod
+    def hierarchy(cls, rules,
+                  name='Cancer Staging: Site-Specific Factors'):
+        # Top
+        yield cls.term(pfx=cls.pfx,
+                       parts=cls.folder,
+                       name=name)
+
+        mix = zip(seer_recode.Rule.site_group_paths(rules), rules)
+
+        # Interior nodes
+        for ((_level, path, recode), r) in mix:
+            if not recode:
+                yield cls.term(pfx=cls.pfx,
+                               parts=cls.folder + path,
+                               name=r.site_group)
+
 
 class VariableTerm(I2B2MetaData):
     @classmethod
-    def from_variable(cls, vbl, parts,
-                      pfx=['', 'i2b2']):
+    def from_variable(cls, vbl, parts):
         vparts = parts + [vbl.title]
         factor = vbl.factor()
         num = '%02d: ' % factor if factor else ''
-        return cls.term(pfx=pfx,
+        return cls.term(pfx=SeerSiteTerm.pfx,
                         parts=vparts, viz='FAE',
                         name=num + (vbl.subtitle or vbl.title))
 
 
 class ValueTerm(I2B2MetaData):
     @classmethod
-    def from_value(cls, v, parts, recode, factor,
-                   pfx=['', 'i2b2']):
+    def from_value(cls, v, parts, recode, factor):
         return I2B2MetaData.term(
-            pfx=pfx,
+            pfx=SeerSiteTerm.pfx,
             code='CS%s|%s:%s' % (recode, factor, v.code),
             parts=parts + [v.code], viz='LAE',
             name=v.code + ': ' + v.descrip.split('\n')[0])
