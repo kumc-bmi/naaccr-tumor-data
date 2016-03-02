@@ -2,13 +2,13 @@ r'''ccterms -- make i2b2 terms for Collaborative Staging site-specific factors
 
 Usage:
   csterms.py [options] terms
-  csterms.py [options] explore
+  csterms.py [options] sql
 
 Options:
  -m DIR --metadata=DIR  metadata directory
                         [default: 3_CS Tables (HTML and XML)/XML Format/]
  -o F --out=FILE        where to write terms [default: cs-terms.csv]
-
+ -s F --sql=FILE        where to write SQL [default: csschema.sql]
 
 .. note: This line separates usage doc above from design/test notes below.
 
@@ -82,10 +82,7 @@ def main(access, rd):
 
     cs = CS(rd / opts['--metadata'])
 
-    if opts['explore']:
-        explore(cs)
-
-    elif opts['terms']:
+    if opts['terms']:
         with opt_wr('--out') as out:
             sink = csv.writer(out)
             sink.writerow(Term._fields)
@@ -96,23 +93,20 @@ def main(access, rd):
 
                 for t in SchemaTerm.site_factor_terms(site):
                     sink.writerow(t)
-
-
-def explore(cs):
-    site_codes = [str(d1) + str(d2)
-                 for d1 in range(10)
-                 for d2 in range(10)]
-
-    for site in cs.each_site():
-        factors = [vbl for vbl in site.variables
-                   if vbl.factor_num()]
-        if not factors:
-            continue
-        if not site.sitesummary:
-            import pdb; pdb.set_trace()
-        f = lambda nn: CS.site_filter(site.sitesummary, nn)
-        for matched in filter(f, site_codes):
-            print site.maintitle, site.sitesummary, matched
+    elif opts['sql']:
+        with opt_wr('--sql') as out:
+            for site in cs.each_site():
+                parsed = Site.schema_constraint(site.notes)
+                oops = [note for (oops, note) in parsed if oops is None]
+                if oops:
+                    from pprint import pprint
+                    pprint(site.maintitle)
+                    pprint(oops)
+                    import pdb; pdb.set_trace()
+                out.write('/* {title}\n{notes} */\n {parsed}\n\n'.format(
+                    title=site.maintitle,
+                    notes='\n'.join(site.notes),
+                    parsed=parsed))
 
 
 class SchemaTerm(I2B2MetaData):
@@ -179,6 +173,7 @@ class VariableTerm(I2B2MetaData):
         num = '%02d: ' % factor if factor else ''
         return cls.term(pfx=SchemaTerm.pfx,
                         parts=vparts, viz='FAE',
+                        tooltip=units.replace('\n', ' ') if units else None,
                         name=num + (vbl.subtitle or vbl.title))
 
 
@@ -224,39 +219,6 @@ class CS(object):
         for doc_elt in self.each_doc():
             yield Site.from_doc(doc_elt)
 
-    @classmethod
-    def site_filter(self, sitesummary, site):
-        '''
-        >>> CS.site_filter('C24.0 Extrahepatic bile duct', '22')
-        False
-        >>> CS.site_filter('C24.0 Extrahepatic bile duct', '24')
-        True
-        '''
-        txt = sitesummary
-
-        while txt:
-            lohi = re.match(r'^C(\d\d)\.\d-C(\d\d)\.\d(, )?', txt)
-            if lohi:
-                lo, hi = lohi.group(1), lohi.group(2)
-                if not lo <= site <= hi:
-                    return False
-                txt = txt[len(lohi.group(0)):]
-                continue
-            konst = re.match(r'^C(\d\d)\.\d(, )?', txt)
-            if konst:
-                x = konst.group(1)
-                if not x <= site <= x:
-                    return False
-                txt = txt[len(konst.group(0)):]
-                continue
-            words = re.match(r'^[a-zA-Z ]+', txt)
-            if words:
-                txt = txt[len(words.group(0)):]
-                continue
-            else:
-                import pdb; pdb.set_trace()
-        return True
-
 
 class Site(namedtuple('Site',
                       ['csschemaid', 'maintitle', 'subtitle',
@@ -279,19 +241,89 @@ class Site(namedtuple('Site',
     23 Multigene Signature Results
     24 Paget Disease
 
+    >>> Site.schema_constraint(breast.notes)
+    ... # doctest: +NORMALIZE_WHITESPACE
+    [('disc', ['SSF17', 'SSF18', 'SSF19', 'SSF20', 'SSF24']),
+     ('site', ('50.0', None)), ('site', ('50.1', None)),
+     ('site', ('50.2', None)), ('site', ('50.3', None)),
+     ('site', ('50.4', None)), ('site', ('50.5', None)),
+     ('site', ('50.6', None)), ('site', ('50.8', None)),
+     ('site', ('50.9', None)),
+     ('note', 'Laterality must be coded for this site.')]
+
+    >>> Site.schema_constraint(['M-8720-8790'])
+    [('M', ('-8720-8790', None))]
+    >>> Site.schema_constraint([
+    ...     'M-9590-9699,9702-9729 (EXCEPT C44.1, C69.0, C69.5-C69.6)'])
+    [('M', ('-9590-9699,9702-9729 ', 'C44.1, C69.0, C69.5-C69.6'))]
+
+    >>> Site.schema_constraint([
+    ...     '9731 Plasmacytoma, NOS (except C441, C690, C695-C696)',
+    ...     '9740     Mast cell sarcoma'])
+    ... # doctest: +NORMALIZE_WHITESPACE
+    [('histology', ('9731', None, 'C441, C690, C695-C696')),
+     ('histology', ('9740', None, None))]
+
+    >>> Site.schema_constraint([
+    ...     'C21.0 Anus, NOS (excluding skin of anus C44.5)',
+    ...     'C16.1 Fundus of stomach, proximal 5 centimeters (cm) only',
+    ...     'C17.3  Meckel diverticulum (site of neoplasm)'])
+    ... # doctest: +NORMALIZE_WHITESPACE
+    [('site', ('21.0', 'C44.5')),
+     ('site', ('16.1', None)),
+     ('site', ('17.3', None))]
+
     '''
     @classmethod
     def from_doc(cls, doc_elt):
         title = doc_elt.xpath('schemahead/title')[0]
         subtitle = maybeNode(doc_elt.xpath('schemahead/subtitle/text()'))
         tables = doc_elt.xpath('cstable')
-        notes = doc_elt.xpath('schemahead/note/text()')
+        notes = doc_elt.xpath('schemahead/note')
         return cls(doc_elt.xpath('@csschemaid')[0],
                    title.xpath('maintitle/text()')[0],
                    subtitle,
                    maybeNode(title.xpath('sitesummary/text()')),
                    (Variable.from_table(t) for t in tables),
-                   notes)
+                   [''.join(note.xpath('.//text()')) for note in notes])
+
+    @classmethod
+    def schema_constraint(self, notes):
+        '''Interpret site notes as SQL constraint
+        '''
+        pat = re.compile(
+            r'''^(C(?P<site>\d\d\.\d) # C50.1  Central portion ...
+                  (?:[^\(]+|\([^C]+\))*  # words or (cm)
+                  (\([^C]+(?P<excl_site>C[^\)]+)?\))?$)
+               |((?P<hist_lo>\d{4}) [^\(]+
+                 (\([^C]+(?P<except_site>C[^)]+)\))?$)
+               |(M(?P<M>(-|\d{4}|,|\ )+) [^\(]*
+                 (\((EXCEPT)?[^C]+(?P<M_no_C>C[^)]+)\))?\s*$)
+               |(DISCONTINUED\ SITE-SPECIFIC\ FACTORS:\s*(?P<disc>.*))
+               |(Note(?:\s*\d+)?:\s+(?P<note>.*))
+            ''', re.VERBOSE)
+
+        parsed = [
+            ('site', (m.group('site'), m.group('excl_site')))
+            if m and m.group('site') else
+
+            ('histology', (m.group('hist_lo'), None,
+                           m.group('except_site')))
+            if m and m.group('hist_lo') else
+            ('M', (m.group('M'), m.group('M_no_C')))
+            if m and m.group('M') else
+
+            ('disc', m.group('disc').split(', '))
+            if m and m.group('disc') else
+
+            ('note', m.group('note'))
+            if m and m.group('note')
+
+            else (None, note)
+
+            for note in notes
+            for m in [re.match(pat, note)]]
+        return parsed
 
     def special_notes(self):
         return [note
