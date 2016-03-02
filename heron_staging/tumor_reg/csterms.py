@@ -96,17 +96,10 @@ def main(access, rd):
     elif opts['sql']:
         with opt_wr('--sql') as out:
             for site in cs.each_site():
-                parsed = Site.schema_constraint(site.notes)
-                oops = [note for (oops, note) in parsed if oops is None]
-                if oops:
-                    from pprint import pprint
-                    pprint(site.maintitle)
-                    pprint(oops)
-                    import pdb; pdb.set_trace()
-                out.write('/* {title}\n{notes} */\n {parsed}\n\n'.format(
-                    title=site.maintitle,
-                    notes='\n'.join(site.notes),
-                    parsed=parsed))
+                comment, case = Site.schema_constraint(site)
+                out.write('/* {comment} */\n {case}\n\n'.format(
+                    comment=comment,
+                    case=case))
 
 
 class SchemaTerm(I2B2MetaData):
@@ -241,7 +234,9 @@ class Site(namedtuple('Site',
     23 Multigene Signature Results
     24 Paget Disease
 
-    >>> Site.schema_constraint(breast.notes)
+    @@> print Site.schema_constraint(breast)
+
+    >>> Site._parse_notes(breast.notes)
     ... # doctest: +NORMALIZE_WHITESPACE
     [('disc', ['SSF17', 'SSF18', 'SSF19', 'SSF20', 'SSF24']),
      ('site', ('50.0', None)), ('site', ('50.1', None)),
@@ -251,20 +246,20 @@ class Site(namedtuple('Site',
      ('site', ('50.9', None)),
      ('note', 'Laterality must be coded for this site.')]
 
-    >>> Site.schema_constraint(['M-8720-8790'])
+    >>> Site._parse_notes(['M-8720-8790'])
     [('M', ('-8720-8790', None))]
-    >>> Site.schema_constraint([
+    >>> Site._parse_notes([
     ...     'M-9590-9699,9702-9729 (EXCEPT C44.1, C69.0, C69.5-C69.6)'])
     [('M', ('-9590-9699,9702-9729 ', 'C44.1, C69.0, C69.5-C69.6'))]
 
-    >>> Site.schema_constraint([
+    >>> Site._parse_notes([
     ...     '9731 Plasmacytoma, NOS (except C441, C690, C695-C696)',
     ...     '9740     Mast cell sarcoma'])
     ... # doctest: +NORMALIZE_WHITESPACE
     [('histology', ('9731', None, 'C441, C690, C695-C696')),
      ('histology', ('9740', None, None))]
 
-    >>> Site.schema_constraint([
+    >>> Site._parse_notes([
     ...     'C21.0 Anus, NOS (excluding skin of anus C44.5)',
     ...     'C16.1 Fundus of stomach, proximal 5 centimeters (cm) only',
     ...     'C17.3  Meckel diverticulum (site of neoplasm)'])
@@ -288,7 +283,27 @@ class Site(namedtuple('Site',
                    [''.join(note.xpath('.//text()')) for note in notes])
 
     @classmethod
-    def schema_constraint(self, notes):
+    def schema_constraint(cls, site):
+        comment = '{title}\n{sitesummary}\n{notes}'.format(
+            title=site.maintitle,
+            sitesummary=site.sitesummary,
+            notes='\n'.join(site.notes))
+        if '*/' in comment:
+            raise ValueError(site.notes)
+
+        clauses = cls._parse_notes(site.notes)
+        tags = set(tag for (tag, detail) in clauses)
+        if not tags <= set(['disc', 'note', 'site', 'M']):
+            raise NotImplementedError(tags)
+
+        case = "when {test}\n  then '{id}'".format(
+            test=_sql_and(_site_check(clauses), _hist_check(clauses)),
+            id=site.csschemaid)
+
+        return comment, case
+
+    @classmethod
+    def _parse_notes(cls, notes):
         '''Interpret site notes as SQL constraint
         '''
         pat = re.compile(
@@ -349,6 +364,85 @@ class Site(namedtuple('Site',
     @classmethod
     def _test_doc(cls):
         return etree.fromstring(cls._test_markup())
+
+
+def _site_check(items,
+                col='primary_site'):
+    '''
+    >>> breast = Site.from_doc(Site._test_doc())
+    >>> print _site_check(Site._parse_notes(breast.notes))
+    ... # doctest: +NORMALIZE_WHITESPACE
+    primary_site in ('500', '501', '502', '503', '504', '505',
+                     '506', '508', '509')
+    '''
+    nodot = lambda s: s.replace('.', '').replace('C', '') if s else s
+    tagged = lambda tag: filter(lambda i: i[0] == tag, items)
+    site_items = tagged('site')
+    yes = [nodot(val) for (tag, (val, excl)) in site_items]
+    no = [nodot(excl) for (tag, (val, excl)) in site_items if excl]
+    negate = lambda expr: '(not %s)' % expr
+
+    return _sql_and(_sql_enum(col, yes),
+                    negate(_sql_enum(col, no)) if no else '')
+
+
+def _hist_check(items,
+                col='histology',
+                site_col='primary_site'):
+    '''
+    >>> _hist_check([('M', ('-8720-8790', None))])
+    "(histology between '8720' and '8790')"
+
+    >>> print _hist_check([('M', ('-8000-8152,8247,8248,8250-8934', None))])
+    (histology between '8000' and '8152'
+      or histology = '8247'
+      or histology = '8248'
+      or histology between '8250' and '8934')
+    '''
+    tagged = lambda tag: filter(lambda i: i[0] == tag, items)
+    skip_neg = lambda s: s[1:] if s.startswith('-') else s
+
+    def item_expr(expr):
+        r = _sql_ranges(col,
+                        [(lo, hi)
+                         for lo_hi
+                         in skip_neg(expr).replace(' ', '').split(',')
+                         for (lo, hi) in [(lo_hi.split('-') + [None])[:2]]])
+        return r
+
+    hist_ranges = reduce(_sql_and,
+                         [item_expr(expr)
+                          for (_tag, (expr, _excl)) in tagged('M')], '')
+    no_sites = [excl for (_tag, (_expr, excl)) in tagged('M')
+                if excl]
+    site_excl = '(not %s)' % _sql_enum(no_sites) if no_sites else ''
+    return _sql_and(hist_ranges, site_excl)
+
+
+def _sql_and(a, b):
+    return ('({a} and {b})'.format(a=a, b=b) if (a and b)
+            else b if b
+            else a)
+
+
+def _sql_enum(col, values):
+    return ('{col} in ({vals})'.format(
+        col=col,
+        vals=', '.join("'%s'" % val for val in values)))
+
+
+def _sql_ranges(col, ranges):
+    assert ranges
+    sql_range = lambda col, lo, hi: (
+        "{col} = '{lo}'".format(
+            col=col, lo=lo) if hi is None else
+        "{col} between '{lo}' and '{hi}'".format(
+            col=col, lo=lo, hi=hi))
+
+    parens = lambda expr: '(%s)' % expr
+    return parens('\n  or '.join(
+        sql_range(col, lo, hi)
+        for (lo, hi) in ranges))
 
 
 class Variable(namedtuple('Variable', 'title subtitle values')):
