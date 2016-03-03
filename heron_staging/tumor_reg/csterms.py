@@ -68,22 +68,22 @@ We can render these site-specific factors as an i2b2 ontology::
     5 CS|Breast|1:010 010: Positive/elevated
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 1\010\
     ...
-    4 _ 01: Estrogen Receptor (ER) Assay
+    4 CS|Breast|1: 01: Estrogen Receptor (ER) Assay
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 1\
     ...
-    4 _ 02: Progesterone Receptor (PR) Assay
+    4 CS|Breast|2: 02: Progesterone Receptor (PR) Assay
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 2\
     5 CS|Breast|3:000 000: All ipsilateral axillary nodes examined negative
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 3\000\
     5 CS|Breast|3:090 090: 90 or more nodes positive
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 3\090\
     ...
-    4 _ 03: Number of Positive Ipsilateral Level I-II Axillary Lymph Nodes
+    4 CS|Breast|3: 03: Number of Positive Ipsilateral Level I-II Axillary Lymph Nodes
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 3\
     ...
     5 CS|Breast|24:999 999: Unknown or no information
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 24\999\
-    4 _ 24: Paget Disease
+    4 CS|Breast|24: 24: Paget Disease
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 24\
 
 
@@ -202,7 +202,8 @@ class SchemaTerm(I2B2MetaData):
                 yield ValueTerm.from_value(
                     val, vparts, site.csschemaid, factor.factor_num())
 
-            yield VariableTerm.from_variable(factor, site_folder, units)
+            yield VariableTerm.from_variable(
+                factor, site_folder, site.csschemaid, units)
 
     @classmethod
     def root(cls,
@@ -217,7 +218,7 @@ class VariableTerm(I2B2MetaData):
     '''i2b2 term for a nominal variable
     '''
     @classmethod
-    def from_variable(cls, vbl, parts, units=None):
+    def from_variable(cls, vbl, parts, csschemaid, units=None):
         '''Build an i2b2 term from a :class:`Variable`.
 
         @type vbl: Variable
@@ -232,6 +233,7 @@ class VariableTerm(I2B2MetaData):
         return cls.term(pfx=SchemaTerm.pfx,
                         parts=vparts, viz='FAE',
                         tooltip=units.replace('\n', ' ') if units else None,
+                        code='CS|%s|%s:' % (csschemaid, factor),
                         name=num + (vbl.subtitle or vbl.title))
 
 
