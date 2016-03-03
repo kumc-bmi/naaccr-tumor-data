@@ -22,7 +22,8 @@ Term = namedtuple('Term',
                    'm_applied_path', 'c_tooltip',
                    'c_synonym_cd',
                    'update_date', 'sourcesystem_cd',
-                   'c_metadataxml',
+                   # Loading CLOBS from CSV doesn't seem to work.
+                   # 'c_metadataxml',
                    'c_dimcode', 'c_operator', 'c_columndatatype',
                    'c_columnname', 'c_tablename', 'c_facttablecolumn'])
 
@@ -60,16 +61,15 @@ class I2B2MetaData(object):
               c_basecode=None, c_name='Collaborative Staging Terms',
                c_visualattributes='CAE',
                 m_applied_path='@',
-                 c_tooltip='Collaborative Staging Terms',
+                 c_tooltip='',
                   c_synonym_cd='N',
                    update_date=None,
                     sourcesystem_cd=None,
-                     c_metadataxml='',
-                      c_dimcode='\\i2b2\\Cancer Cases\\CS Terms\\',
-                       c_operator='like', c_columndatatype='@',
-                        c_columnname='concept_path',
-                         c_tablename='concept_dimension',
-                          c_facttablecolumn='concept_cd')
+                     c_dimcode='\\i2b2\\Cancer Cases\\CS Terms\\',
+                      c_operator='like', c_columndatatype='@',
+                       c_columnname='concept_path',
+                        c_tablename='concept_dimension',
+                         c_facttablecolumn='concept_cd')
 
         The `c_hlevel` is taken from the length of `parts`:
         >>> print I2B2MetaData.term(
@@ -82,12 +82,6 @@ class I2B2MetaData(object):
         ...     pfx=['', 'i2b2'], parts=['Cancer Cases', 'CS Terms'],
         ...     name='name').c_fullname
         \i2b2\Cancer Cases\CS Terms\
-
-        Where there is no tooltip, copy the name into the tooltip
-        field so the web client doesn't show null:
-
-        >>> I2B2MetaData.term(['ROOT'], ['T'], 'name').c_tooltip
-        'name'
 
         If there's a double quote in the tooltip, the web client
         gets confused and doesn't display the tooltip.
@@ -113,7 +107,6 @@ class I2B2MetaData(object):
             m_path, tooltip_q,
             c_synonym_cd,
             update_date, sourcesystem_cd,
-            c_metadataxml or '',
             path, c_operator, c_columndatatype, c_columnname,
             c_tablename, c_facttablecolumn)
 
