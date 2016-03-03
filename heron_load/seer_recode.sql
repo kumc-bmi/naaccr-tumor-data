@@ -570,6 +570,11 @@ from seer_recode_aux ne;
 
 
 create or replace view cs_site_factor_facts as
+with ssf_item as (
+  select min(itemnbr) lo, max(itemnbr) hi
+  from tumor_item_type
+  where itemname like 'CS Site-Specific Factor%'
+)
 select sra.mrn
      , sra.case_index
      , 'CS' || sra.recode || '|' ||
@@ -589,7 +594,7 @@ select sra.mrn
      , to_date(null) as update_date
 from tumor_item_value ssf
 join seer_recode_aux sra on sra.case_index = ssf.case_index
-where itemnbr between 2861 and 2930
+join ssf_item on itemnbr between ssf_item.lo and ssf_item.hi
 ;
 
 
