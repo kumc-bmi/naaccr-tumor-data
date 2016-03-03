@@ -1,14 +1,21 @@
-r'''ccterms -- make i2b2 terms for Collaborative Staging site-specific factors
+r'''csterms -- i2b2 ontology for Collaborative Staging site-specific factors
 
 Usage:
   csterms.py [options] terms
   csterms.py [options] sql
 
 Options:
- -m DIR --metadata=DIR  metadata directory
+ terms                  Write i2b2 metadata terms (less update_date)
+                        for "schema" and site-specific factors
+ -m DIR --metadata=DIR  input metadata directory
                         [default: 3_CS Tables (HTML and XML)/XML Format/]
  -o F --out=FILE        where to write terms [default: cs-terms.csv]
+ sql                    Render schema selection notes as SQL in a view
+                        that combines primary site histology into `csschemaid`
+                        and produce concept codes corresponding to terms.
+ -t F --template=FILE   SQL template [default: csschema_tpl.sql]
  -s F --sql=FILE        where to write SQL [default: csschema.sql]
+ --help                 Show this help and exit.
 
 .. note: This line separates usage doc above from design/test notes below.
 
@@ -58,8 +65,40 @@ Now we can get i2b2 style terms for site-specific factors of breast::
     4 _ 03: Number of Positive Ipsilateral Level I-II Axillary Lymph Nodes
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 3\
     ...
+    5 CS|Breast|24:999 999: Unknown or no information
+    --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 24\999\
     4 _ 24: Paget Disease
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 24\
+
+
+Each XML document has a list of notes for determining when it applies;
+we can render these as SQL expressions:
+
+    >>> breast.csschemaid
+    'Breast'
+    >>> for txt in breast.notes:
+    ...     print txt
+    DISCONTINUED SITE-SPECIFIC FACTORS:  SSF17, SSF18, SSF19, SSF20, SSF24
+    C50.0  Nipple
+    C50.1  Central portion of breast
+    C50.2  Upper-inner quadrant of breast
+    C50.3  Lower-inner quadrant of breast
+    C50.4  Upper-outer quadrant of breast
+    C50.5  Lower-outer quadrant of breast
+    C50.6  Axillary Tail of breast
+    C50.8  Overlapping lesion of breast
+    C50.9  Breast, NOS
+    Note:  Laterality must be coded for this site.
+
+    >>> _comment, case, problems = Site.schema_constraint(breast)
+    >>> problems is None
+    True
+    >>> print case
+    ... # doctest: +NORMALIZE_WHITESPACE
+    when primary_site in ('C500', 'C501', 'C502', 'C503', 'C504', 'C505',
+                          'C506', 'C508', 'C509')
+      then 'Breast'
+
 '''
 
 from collections import namedtuple
@@ -93,8 +132,14 @@ def main(access, rd):
 
                 for t in SchemaTerm.site_factor_terms(site):
                     sink.writerow(t)
+
     elif opts['sql']:
+        with (rd / opts['--template']).inChannel() as tpl:
+            top, bottom = tpl.read().split('&&CASES')
+
         with opt_wr('--sql') as out:
+            out.write(top)
+
             for site in cs.each_site():
                 comment, case, problems = Site.schema_constraint(site)
                 if problems:
@@ -104,6 +149,8 @@ def main(access, rd):
                     comment=comment,
                     case=('/* SKIPPED {id} */'.format(id=site.csschemaid)
                           if problems else case)))
+
+            out.write(bottom)
 
 
 class SchemaTerm(I2B2MetaData):
@@ -238,21 +285,14 @@ class Site(namedtuple('Site',
     23 Multigene Signature Results
     24 Paget Disease
 
-    >>> _comment, case, problems = Site.schema_constraint(breast)
-    >>> print case
-    ... # doctest: +NORMALIZE_WHITESPACE
-    when primary_site in ('500', '501', '502', '503', '504', '505',
-                          '506', '508', '509')
-      then 'Breast'
-
     >>> Site._parse_notes(breast.notes)
     ... # doctest: +NORMALIZE_WHITESPACE
     [('disc', ['SSF17', 'SSF18', 'SSF19', 'SSF20', 'SSF24']),
-     ('site', ('500', None)), ('site', ('501', None)),
-     ('site', ('502', None)), ('site', ('503', None)),
-     ('site', ('504', None)), ('site', ('505', None)),
-     ('site', ('506', None)), ('site', ('508', None)),
-     ('site', ('509', None)),
+     ('site', ('C500', None)), ('site', ('C501', None)),
+     ('site', ('C502', None)), ('site', ('C503', None)),
+     ('site', ('C504', None)), ('site', ('C505', None)),
+     ('site', ('C506', None)), ('site', ('C508', None)),
+     ('site', ('C509', None)),
      ('note', 'Laterality must be coded for this site.')]
 
     >>> Site._parse_notes([
@@ -260,13 +300,13 @@ class Site(namedtuple('Site',
     ...     'M-9590-9699,9702-9729 (EXCEPT C44.1, C69.0, C69.5-C69.6)'])
     ... # doctest: +NORMALIZE_WHITESPACE
     [('M', ('8720-8790', None)),
-     ('M', ('9590-9699,9702-9729', '441,690,695-696'))]
+     ('M', ('9590-9699,9702-9729', 'C441,C690,C695-C696'))]
 
     >>> Site._parse_notes([
     ...     '9731 Plasmacytoma, NOS (except C441, C690, C695-C696)',
     ...     '9740     Mast cell sarcoma'])
     ... # doctest: +NORMALIZE_WHITESPACE
-    [('histology', ('9731', '441,690,695-696')),
+    [('histology', ('9731', 'C441,C690,C695-C696')),
      ('histology', ('9740', None))]
 
     >>> Site._parse_notes([
@@ -274,9 +314,9 @@ class Site(namedtuple('Site',
     ...     'C16.1 Fundus of stomach, proximal 5 centimeters (cm) only',
     ...     'C17.3  Meckel diverticulum (site of neoplasm)'])
     ... # doctest: +NORMALIZE_WHITESPACE
-    [('site', ('210', '445')),
-     ('site', ('161', None)),
-     ('site', ('173', None))]
+    [('site', ('C210', 'C445')),
+     ('site', ('C161', None)),
+     ('site', ('C173', None))]
 
     '''
     @classmethod
@@ -319,7 +359,7 @@ class Site(namedtuple('Site',
         '''Interpret site notes as SQL constraint
         '''
         pat = re.compile(
-            r'''^(C(?P<site>\d\d\.\d) # C50.1  Central portion ...
+            r'''^((?P<site>C\d\d\.\d) # C50.1  Central portion ...
                   (?:[^\(]+|\([^C]+\))*  # words or (cm)
                   (\([^C]+(?P<excl_site>C[^\)]+)?\))?$)
                |((?P<hist_lo>\d{4}) [^\(]+
@@ -330,7 +370,7 @@ class Site(namedtuple('Site',
                |(Note(?:\s*\d+)?:\s+(?P<note>.*))
             ''', re.VERBOSE)
 
-        nodot = lambda s: (s.replace('.', '').replace('C', '').replace(' ', '')
+        nodot = lambda s: (s.replace('.', '').replace(' ', '')
                            if s else s)
 
         parsed = [
@@ -383,12 +423,17 @@ class Site(namedtuple('Site',
 
 def _site_check(items,
                 col='primary_site'):
-    '''
+    '''Render primary site constraint.
+
     >>> breast = Site.from_doc(Site._test_doc())
     >>> print _site_check(Site._parse_notes(breast.notes))
     ... # doctest: +NORMALIZE_WHITESPACE
-    primary_site in ('500', '501', '502', '503', '504', '505',
-                     '506', '508', '509')
+    primary_site in ('C500', 'C501', 'C502', 'C503', 'C504', 'C505',
+                     'C506', 'C508', 'C509')
+
+    >>> print _site_check([('M', ('8720-8790', None))])
+    None
+
     '''
     tagged = lambda tag: filter(lambda i: i[0] == tag, items)
     site_items = tagged('site')
@@ -396,14 +441,15 @@ def _site_check(items,
     no = [excl for (tag, (val, excl)) in site_items if excl]
     negate = lambda expr: '(not %s)' % expr
 
-    return _sql_and([_sql_enum(col, yes)] +
+    return _sql_and(([_sql_enum(col, yes)] if yes else []) +
                     ([negate(_sql_enum(col, no))] if no else []))
 
 
 def _hist_check(items,
                 col='histology',
                 site_col='primary_site'):
-    '''
+    '''Render constraint from histology items.
+
     >>> print _hist_check([('histology', ('9731', '441,690,695-696'))])
     (histology = '9731' and (not (primary_site = '441'
       or primary_site = '690'
@@ -423,7 +469,8 @@ def _hist_check(items,
 def _morph_check(items,
                 col='histology',
                 site_col='primary_site'):
-    '''
+    '''Render constraint from M- items.
+
     >>> _morph_check([('M', ('8720-8790', None))])
     "histology between '8720' and '8790'"
 
