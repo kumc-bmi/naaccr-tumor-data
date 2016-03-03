@@ -104,7 +104,7 @@ class I2B2MetaData(object):
         hlevel, path = len(parts), '\\'.join(pfx + parts + [''])
         m_path = '\\'.join(applies_to + ['%']) if applies_to else '@'
 
-        tooltip_enc = (tooltip or name)[:max_tooltip_len].encode(encoding)
+        tooltip_enc = (tooltip or '')[:max_tooltip_len].encode(encoding)
         tooltip_q = tooltip_enc.replace('"', "'")
 
         return Term(
