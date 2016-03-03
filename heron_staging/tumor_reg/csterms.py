@@ -19,6 +19,7 @@ Options:
 
 .. note: This line separates usage doc above from design/test notes below.
 
+
 The American Joint Committee on Cancer (AJCC) maintains overall
 management of the Collaborative Staging System and publishes a `schema
 for browsing`__ as well as a `zip file with data in XML`__.
@@ -34,14 +35,29 @@ For example, `Breast.xml` begins with the following markup::
     ... # doctest: +ELLIPSIS
     '<cstgschema csschemaid="Breast" status="DRAFT" revised="06/27/2013" ...
 
-For our purposes, we just need a few parts of the document::
+Each document specifies a "schema", which has an id and a title:
 
     >>> breast = Site.from_doc(etree.fromstring(text))
-    >>> breast.csschemaid, breast.maintitle, breast.sitesummary
-    ('Breast', 'Breast', 'C50.0-C50.6, C50.8-C50.9')
+    >>> breast.csschemaid, breast.maintitle
+    ('Breast', 'Breast')
 
-Now we can get i2b2 style terms for site-specific factors of breast::
+Each schema specifies its site-specific factors:
 
+    >>> for ix, factor in enumerate(breast.each_site_specific_factor()):
+    ...     print ix + 1, factor.subtitle
+    ... # doctest: +ELLIPSIS
+    1 Estrogen Receptor (ER) Assay
+    2 Progesterone Receptor (PR) Assay
+    3 Number of Positive Ipsilateral Level I-II Axillary Lymph Nodes
+    4 Immunohistochemistry (IHC) of Regional Lymph Nodes
+    ...
+    22 Multigene Signature Method
+    23 Multigene Signature Results
+    24 Paget Disease
+
+We can render these site-specific factors as an i2b2 ontology::
+
+    >>> breast = Site.from_doc(etree.fromstring(text))  # restart generators
     >>> breast_terms = SchemaTerm.site_factor_terms(breast)
     >>> for t in breast_terms:
     ...     print t.c_hlevel, t.c_basecode or '_', t.c_name
@@ -71,11 +87,9 @@ Now we can get i2b2 style terms for site-specific factors of breast::
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 24\
 
 
-Each XML document has a list of notes for determining when it applies;
+Each schema has a list of notes for determining when it applies;
 we can render these as SQL expressions:
 
-    >>> breast.csschemaid
-    'Breast'
     >>> for txt in breast.notes:
     ...     print txt
     DISCONTINUED SITE-SPECIFIC FACTORS:  SSF17, SSF18, SSF19, SSF20, SSF24
@@ -90,9 +104,7 @@ we can render these as SQL expressions:
     C50.9  Breast, NOS
     Note:  Laterality must be coded for this site.
 
-    >>> _comment, case, problems = Site.schema_constraint(breast)
-    >>> problems is None
-    True
+    >>> _comment, case, _problems = Site.schema_constraint(breast)
     >>> print case
     ... # doctest: +NORMALIZE_WHITESPACE
     when primary_site in ('C500', 'C501', 'C502', 'C503', 'C504', 'C505',
@@ -169,9 +181,11 @@ class SchemaTerm(I2B2MetaData):
 
     @classmethod
     def from_site(cls, site):
+        _comment, _case, problems = Site.schema_constraint(site)
+        oops = 'NOT SUPPORTED: ' if problems else ''
         return cls.term(pfx=cls.pfx,
                         parts=cls.folder + [site.csschemaid], viz='FAE',
-                        name=site.maintitle)
+                        name=oops + site.maintitle)
 
     @classmethod
     def site_factor_terms(cls, site):
@@ -271,19 +285,8 @@ class Site(namedtuple('Site',
 
     >>> breast = Site.from_doc(Site._test_doc())
 
-    Site-specific factors:
-
-    >>> for ix, factor in enumerate(breast.each_site_specific_factor()):
-    ...     print ix + 1, factor.subtitle
-    ... # doctest: +ELLIPSIS
-    1 Estrogen Receptor (ER) Assay
-    2 Progesterone Receptor (PR) Assay
-    3 Number of Positive Ipsilateral Level I-II Axillary Lymph Nodes
-    4 Immunohistochemistry (IHC) of Regional Lymph Nodes
-    ...
-    22 Multigene Signature Method
-    23 Multigene Signature Results
-    24 Paget Disease
+    The `_parse_notes()` function is an intermediate step in
+    generating the SQL site_constraint.
 
     >>> Site._parse_notes(breast.notes)
     ... # doctest: +NORMALIZE_WHITESPACE
@@ -394,16 +397,6 @@ class Site(namedtuple('Site',
             for note in notes
             for m in [re.match(pat, note)]]
         return parsed
-
-    def special_notes(self):
-        return [note
-                for note in self.notes
-                if not (
-                        # C50.9  Breast, NOS
-                        re.match(r'^C\d\d\.\d +\S', note) or
-                        # 9732 Multiple myeloma
-                        re.match(r'^\d\d\d\d +\S', note) or
-                        note.startswith('DISCONTINUED '))]
 
     def each_site_specific_factor(self):
         for vbl in self.variables:
