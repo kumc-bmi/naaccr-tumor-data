@@ -96,10 +96,14 @@ def main(access, rd):
     elif opts['sql']:
         with opt_wr('--sql') as out:
             for site in cs.each_site():
-                comment, case = Site.schema_constraint(site)
+                comment, case, problems = Site.schema_constraint(site)
+                if problems:
+                    log.warn('skipping {site}: {qty} problems'.format(
+                        site=site.maintitle, qty=len(problems)))
                 out.write('/* {comment} */\n {case}\n\n'.format(
                     comment=comment,
-                    case=case))
+                    case=('/* SKIPPED {id} */'.format(id=site.csschemaid)
+                          if problems else case)))
 
 
 class SchemaTerm(I2B2MetaData):
@@ -234,39 +238,45 @@ class Site(namedtuple('Site',
     23 Multigene Signature Results
     24 Paget Disease
 
-    @@> print Site.schema_constraint(breast)
+    >>> _comment, case, problems = Site.schema_constraint(breast)
+    >>> print case
+    ... # doctest: +NORMALIZE_WHITESPACE
+    when primary_site in ('500', '501', '502', '503', '504', '505',
+                          '506', '508', '509')
+      then 'Breast'
 
     >>> Site._parse_notes(breast.notes)
     ... # doctest: +NORMALIZE_WHITESPACE
     [('disc', ['SSF17', 'SSF18', 'SSF19', 'SSF20', 'SSF24']),
-     ('site', ('50.0', None)), ('site', ('50.1', None)),
-     ('site', ('50.2', None)), ('site', ('50.3', None)),
-     ('site', ('50.4', None)), ('site', ('50.5', None)),
-     ('site', ('50.6', None)), ('site', ('50.8', None)),
-     ('site', ('50.9', None)),
+     ('site', ('500', None)), ('site', ('501', None)),
+     ('site', ('502', None)), ('site', ('503', None)),
+     ('site', ('504', None)), ('site', ('505', None)),
+     ('site', ('506', None)), ('site', ('508', None)),
+     ('site', ('509', None)),
      ('note', 'Laterality must be coded for this site.')]
 
-    >>> Site._parse_notes(['M-8720-8790'])
-    [('M', ('-8720-8790', None))]
     >>> Site._parse_notes([
+    ...     'M-8720-8790',
     ...     'M-9590-9699,9702-9729 (EXCEPT C44.1, C69.0, C69.5-C69.6)'])
-    [('M', ('-9590-9699,9702-9729 ', 'C44.1, C69.0, C69.5-C69.6'))]
+    ... # doctest: +NORMALIZE_WHITESPACE
+    [('M', ('8720-8790', None)),
+     ('M', ('9590-9699,9702-9729', '441,690,695-696'))]
 
     >>> Site._parse_notes([
     ...     '9731 Plasmacytoma, NOS (except C441, C690, C695-C696)',
     ...     '9740     Mast cell sarcoma'])
     ... # doctest: +NORMALIZE_WHITESPACE
-    [('histology', ('9731', None, 'C441, C690, C695-C696')),
-     ('histology', ('9740', None, None))]
+    [('histology', ('9731', '441,690,695-696')),
+     ('histology', ('9740', None))]
 
     >>> Site._parse_notes([
     ...     'C21.0 Anus, NOS (excluding skin of anus C44.5)',
     ...     'C16.1 Fundus of stomach, proximal 5 centimeters (cm) only',
     ...     'C17.3  Meckel diverticulum (site of neoplasm)'])
     ... # doctest: +NORMALIZE_WHITESPACE
-    [('site', ('21.0', 'C44.5')),
-     ('site', ('16.1', None)),
-     ('site', ('17.3', None))]
+    [('site', ('210', '445')),
+     ('site', ('161', None)),
+     ('site', ('173', None))]
 
     '''
     @classmethod
@@ -292,15 +302,17 @@ class Site(namedtuple('Site',
             raise ValueError(site.notes)
 
         clauses = cls._parse_notes(site.notes)
-        tags = set(tag for (tag, detail) in clauses)
-        if not tags <= set(['disc', 'note', 'site', 'M']):
-            raise NotImplementedError(tags)
+        problems = [note for (tag, note) in clauses if not tag]
+        if problems:
+            return comment, None, problems
 
         case = "when {test}\n  then '{id}'".format(
-            test=_sql_and(_site_check(clauses), _hist_check(clauses)),
+            test=_sql_and([_site_check(clauses),
+                           _morph_check(clauses),
+                           _hist_check(clauses)]),
             id=site.csschemaid)
 
-        return comment, case
+        return comment, case, None
 
     @classmethod
     def _parse_notes(cls, notes):
@@ -312,20 +324,23 @@ class Site(namedtuple('Site',
                   (\([^C]+(?P<excl_site>C[^\)]+)?\))?$)
                |((?P<hist_lo>\d{4}) [^\(]+
                  (\([^C]+(?P<except_site>C[^)]+)\))?$)
-               |(M(?P<M>(-|\d{4}|,|\ )+) [^\(]*
+               |(M-(?P<M>(-|\d{4}|,|\ )+) [^\(]*
                  (\((EXCEPT)?[^C]+(?P<M_no_C>C[^)]+)\))?\s*$)
                |(DISCONTINUED\ SITE-SPECIFIC\ FACTORS:\s*(?P<disc>.*))
                |(Note(?:\s*\d+)?:\s+(?P<note>.*))
             ''', re.VERBOSE)
 
+        nodot = lambda s: (s.replace('.', '').replace('C', '').replace(' ', '')
+                           if s else s)
+
         parsed = [
-            ('site', (m.group('site'), m.group('excl_site')))
+            ('site', (nodot(m.group('site')), nodot(m.group('excl_site'))))
             if m and m.group('site') else
 
-            ('histology', (m.group('hist_lo'), None,
-                           m.group('except_site')))
+            ('histology', (m.group('hist_lo'),
+                           nodot(m.group('except_site'))))
             if m and m.group('hist_lo') else
-            ('M', (m.group('M'), m.group('M_no_C')))
+            ('M', (m.group('M').replace(' ', ''), nodot(m.group('M_no_C'))))
             if m and m.group('M') else
 
             ('disc', m.group('disc').split(', '))
@@ -375,54 +390,98 @@ def _site_check(items,
     primary_site in ('500', '501', '502', '503', '504', '505',
                      '506', '508', '509')
     '''
-    nodot = lambda s: s.replace('.', '').replace('C', '') if s else s
     tagged = lambda tag: filter(lambda i: i[0] == tag, items)
     site_items = tagged('site')
-    yes = [nodot(val) for (tag, (val, excl)) in site_items]
-    no = [nodot(excl) for (tag, (val, excl)) in site_items if excl]
+    yes = [val for (tag, (val, excl)) in site_items]
+    no = [excl for (tag, (val, excl)) in site_items if excl]
     negate = lambda expr: '(not %s)' % expr
 
-    return _sql_and(_sql_enum(col, yes),
-                    negate(_sql_enum(col, no)) if no else '')
+    return _sql_and([_sql_enum(col, yes)] +
+                    ([negate(_sql_enum(col, no))] if no else []))
 
 
 def _hist_check(items,
                 col='histology',
                 site_col='primary_site'):
     '''
-    >>> _hist_check([('M', ('-8720-8790', None))])
-    "(histology between '8720' and '8790')"
+    >>> print _hist_check([('histology', ('9731', '441,690,695-696'))])
+    (histology = '9731' and (not (primary_site = '441'
+      or primary_site = '690'
+      or primary_site between '695' and '696')))
+    '''
+    tagged = lambda tag: filter(lambda i: i[0] == tag, items)
 
-    >>> print _hist_check([('M', ('-8000-8152,8247,8248,8250-8934', None))])
+    negate = lambda expr: '(not %s)' % expr
+    clauses = [_sql_and(["{col} = '{hist}'".format(col=col, hist=hist)] +
+                        ([negate(_item_expr(site_excl, site_col))]
+                         if site_excl else []))
+               for (_tag, (hist, site_excl)) in tagged('histology')]
+
+    return _sql_or(clauses)
+
+
+def _morph_check(items,
+                col='histology',
+                site_col='primary_site'):
+    '''
+    >>> _morph_check([('M', ('8720-8790', None))])
+    "histology between '8720' and '8790'"
+
+    >>> print _morph_check([('M', ('8000-8152,8247,8248,8250-8934', None))])
     (histology between '8000' and '8152'
       or histology = '8247'
       or histology = '8248'
       or histology between '8250' and '8934')
+
+    >>> print _morph_check([('M', ('9590-9699,9738', '441,690,695-696')),
+    ...                     ('M', ('9811-9818', '421,424,441,690,695-696'))])
+    (((histology between '9590' and '9699'
+      or histology = '9738') and (not (primary_site = '441'
+      or primary_site = '690'
+      or primary_site between '695' and '696')))
+      or (histology between '9811' and '9818' and (not (primary_site = '421'
+      or primary_site = '424'
+      or primary_site = '441'
+      or primary_site = '690'
+      or primary_site between '695' and '696'))))
+
     '''
     tagged = lambda tag: filter(lambda i: i[0] == tag, items)
-    skip_neg = lambda s: s[1:] if s.startswith('-') else s
-
-    def item_expr(expr):
-        r = _sql_ranges(col,
-                        [(lo, hi)
-                         for lo_hi
-                         in skip_neg(expr).replace(' ', '').split(',')
-                         for (lo, hi) in [(lo_hi.split('-') + [None])[:2]]])
-        return r
-
-    hist_ranges = reduce(_sql_and,
-                         [item_expr(expr)
-                          for (_tag, (expr, _excl)) in tagged('M')], '')
-    no_sites = [excl for (_tag, (_expr, excl)) in tagged('M')
-                if excl]
-    site_excl = '(not %s)' % _sql_enum(no_sites) if no_sites else ''
-    return _sql_and(hist_ranges, site_excl)
+    negate = lambda expr: '(not %s)' % expr
+    clauses = [_sql_and([_item_expr(expr, col)] +
+                        ([negate(_item_expr(excl, site_col))] if excl else []))
+               for (_tag, (expr, excl)) in tagged('M')]
+    return _sql_or(clauses) if clauses else None
 
 
-def _sql_and(a, b):
-    return ('({a} and {b})'.format(a=a, b=b) if (a and b)
-            else b if b
-            else a)
+def _item_expr(expr, col):
+    '''
+    >>> print _item_expr('441,690,695-696', 'c1')
+    (c1 = '441'
+      or c1 = '690'
+      or c1 between '695' and '696')
+    '''
+    r = _sql_ranges(col,
+                    [(lo, hi)
+                     for lo_hi in expr.split(',')
+                     for (lo, hi) in [(lo_hi.split('-') + [None])[:2]]])
+    return r
+
+
+def _sql_and(conjuncts):
+    flat = [c for c in conjuncts if c is not None]
+    parens = lambda expr: '(%s)' % expr
+    return (None if not flat else
+            flat[0] if len(flat) == 1 else
+            parens(' and '.join(flat)))
+
+
+def _sql_or(clauses):
+    flat = [c for c in clauses if c is not None]
+    parens = lambda expr: '(%s)' % expr
+    return (None if not flat else
+            flat[0] if len(flat) == 1 else
+            parens('\n  or '.join(flat)))
 
 
 def _sql_enum(col, values):
@@ -439,10 +498,8 @@ def _sql_ranges(col, ranges):
         "{col} between '{lo}' and '{hi}'".format(
             col=col, lo=lo, hi=hi))
 
-    parens = lambda expr: '(%s)' % expr
-    return parens('\n  or '.join(
-        sql_range(col, lo, hi)
-        for (lo, hi) in ranges))
+    return _sql_or([sql_range(col, lo, hi)
+                    for (lo, hi) in ranges])
 
 
 class Variable(namedtuple('Variable', 'title subtitle values')):
