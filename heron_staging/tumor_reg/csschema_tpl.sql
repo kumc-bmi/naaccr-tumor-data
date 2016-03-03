@@ -65,7 +65,7 @@ select cs.mrn
      , cs.start_date
      , '@' modifier_cd  -- hmm... modifier for synthesized info?
      , 1 instance_num
-     , '@' valtype_cd
+     , '@' valtype_cd   -- TODO: numeric values, e.g. for Breast SSF3 Number of ... Nodes
      , null tval_char
      , to_number(null) nval_num
      , null as valueflag_cd
