@@ -20,8 +20,6 @@ by way of csterms.py
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
 
-set define off;
-
 
 create or replace view tumor_cs_schema as
   select MRN
@@ -2004,7 +2002,7 @@ select cs.mrn
      , cs.start_date
      , '@' modifier_cd  -- hmm... modifier for synthesized info?
      , 1 instance_num
-     , '@' valtype_cd
+     , '@' valtype_cd   -- TODO: numeric values, e.g. for Breast SSF3 Number of ... Nodes
      , null tval_char
      , to_number(null) nval_num
      , null as valueflag_cd
