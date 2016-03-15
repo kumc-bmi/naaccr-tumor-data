@@ -20,8 +20,6 @@ by way of csterms.py
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
 
-set define off;
-
 
 create or replace view tumor_cs_schema as
   select MRN
