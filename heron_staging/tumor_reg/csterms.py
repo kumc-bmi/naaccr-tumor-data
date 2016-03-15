@@ -86,6 +86,25 @@ We can render these site-specific factors as an i2b2 ontology::
     4 CS|Breast|24: 24: Paget Disease
     --- \i2b2\naaccr\csterms\Breast\CS Site-Specific Factor 24\
 
+Note that in some cases, the 3 digit values are not enumerated codes
+but numeric values::
+
+    >>> breast = Site.from_doc(etree.fromstring(text))  # restart generators
+    >>> for ix, factor in enumerate(breast.each_site_specific_factor()):
+    ...     for val in factor.values:
+    ...         if '-' in val.code and 'OBSOLETE' not in val.descrip:
+    ...           print ix + 1, factor.subtitle
+    ...           print val.code, "/", val.descrip.split('\n')[0]
+    3 Number of Positive Ipsilateral Level I-II Axillary Lymph Nodes
+    001-089 / 1 - 89 nodes positive 
+    10 HER2: Fluorescence In Situ Hybridization (FISH) Lab Value
+    100-979 / Ratio of 1.00 - 9.79 
+    12 HER2: Chromogenic In Situ Hybridization (CISH) Lab Value
+    100-979 / Mean of 1.00 - 9.79
+    23 Multigene Signature Results
+    000-100 / Score of 000 - 100
+
+TODO: c_metadataxml for numeric values.
 
 Each schema has a list of notes for determining when it applies;
 we can render these as SQL expressions:
