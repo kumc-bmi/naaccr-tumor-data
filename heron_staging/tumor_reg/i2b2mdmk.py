@@ -1,7 +1,8 @@
 r'''Make i2b2 metadata terms
 
+see also dmtoterms.rst in `pcornet-dm`__ for design notes and tests.
 
-see dmtoterms.rst for design notes and tests.
+__ https://bitbucket.org/gpcnetwork/pcornet-dm
 '''
 
 from collections import namedtuple
