@@ -1,23 +1,23 @@
 #!/bin/bash
-
-rm -f ./*.log ./*.bad
+set -e
 
 # SC2164 Use cd ... || exit in case cd fails.
 # -- http://www.shellcheck.net/
 cd "/d1/naaccr/$yyyy_mm_naaccr" || exit
 
 # Take note of the number of records in the new incremental update file.
-record_count=$(wc -l "${naaccr_data}.DAT" |cut -d' ' -f1)
+record_count=$(wc -l "${naaccr_data}" |cut -d' ' -f1)
 echo records in the incremental update: "$record_count"
 
 # Count rows in the extract table, then create the incremental update table if needed.
 sqlplus NAACR/${staging_account_password}@${staging_sid} <<EOF
 
 set echo on;
+whenever sqlerror exit failure
 
 select 'The extract table contains ' || count(*) || ' rows before update.' msg from NAACR.EXTRACT;
 
-whenever sqlerror continue
+whenever sqlerror continue;
 
 create table naacr.EXTRACT_INCR as select * from naacr.EXTRACT where 1=0;
 
@@ -28,7 +28,7 @@ sqlldr NAACR/${staging_account_password}@${staging_sid} \
   control="${WORKSPACE}/heron_staging/tumor_reg/naaccr_extract.ctl" direct=true rows=10000 \
   log="${naaccr_data}.log" \
   bad="${naaccr_data}.bad" \
-  data="${naaccr_data}.DAT"
+  data="${naaccr_data}"
 
 cp "${naaccr_data}.log" "${WORKSPACE}"
 
