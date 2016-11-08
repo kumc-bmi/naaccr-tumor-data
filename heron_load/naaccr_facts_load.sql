@@ -129,9 +129,9 @@ insert into NightHeronData.encounter_mapping
       , :download_date
       , up.source_cd
   from tumor_reg_visits tv
-     , (select * from BlueHeronData.source_master@deid
+     , (select * from NightHeronData.source_master
         where source_cd like 'tumor_registry@%') aud
-     , (select * from BlueHeronData.source_master@deid
+     , (select * from NightHeronData.source_master
         where source_cd like 'SMS@%') sms_audit_info
      , NightHeronData.upload_status up
   where up.upload_id = :upload_id);
@@ -179,12 +179,12 @@ from (select * from tumor_reg_facts
       select * from cs_site_factor_facts) tf
 join NIGHTHERONDATA.patient_mapping pm
   on pm.patient_ide_source =
-  (select source_cd from BlueHeronData.source_master@deid
+  (select source_cd from NightHeronData.source_master
    where source_cd like 'SMS@%')
   and pm.patient_ide = ltrim(tf.mrn, '0')
 join NIGHTHERONDATA.encounter_mapping em
   on em.encounter_ide_source =
-  (select source_cd from BlueHeronData.source_master@deid
+  (select source_cd from NightHeronData.source_master
    where source_cd like 'tumor_registry@%')
  and em.encounter_ide = tf.encounter_ide
  , NightHeronData.upload_status up
