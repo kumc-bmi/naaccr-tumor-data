@@ -393,7 +393,7 @@ from seer_site_terms@deid
      from dual) naaccr_folder
 , (select 0 c_hlevel, '\i2b2\' c_fullname from dual) i2b2_root
 , BlueHeronMetadata.normal_concept@deid norm
-, (select * from BlueHeronData.source_master@deid
+, (select * from NightHeronData.source_master
    where source_cd like 'tumor_registry@%') tumor_reg_source;
 
 
