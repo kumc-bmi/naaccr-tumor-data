@@ -277,7 +277,7 @@ from
 (
 select 1 as c_hlevel
      , '' as path
-     , 'Cancer Cases' as concept_name
+     , 'Cancer Cases (NAACCR Hierarchy)' as concept_name
      , null as concept_cd
      , 'FA' as c_visualattributes
 from dual
