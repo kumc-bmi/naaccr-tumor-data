@@ -1,4 +1,6 @@
-create materialized view "NAACR"."EXTRACT_EAV" as 
+-- set define off
+
+create view "NAACR"."EXTRACT_EAV_VIEW" as 
 select case_index, 
 10 as ItemNbr,
 'Record Type' as ItemName,
