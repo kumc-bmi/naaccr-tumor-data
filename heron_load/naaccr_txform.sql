@@ -265,21 +265,12 @@ select case_index
          when valtype_cd like 'N%' then to_number(ne.value)
          else null
        end nval_num
-     , case when valtype_cd like 'D%' then
-        case
-         when value in ('00000000', '99999999', '99990')
-         then null
-         when regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
-         then to_date(value, 'YYYYMMDD')
-         when regexp_like(value, '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
-         then to_date(value, 'MMDDYYYY')
-         when regexp_like(value, '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
-         then to_date(value, 'YYYYMM')
-         when regexp_like(value, '^[1-2][0-9]{3}$')
-         then to_date(value, 'YYYY')
-         end
-       else null end
-       as start_date
+     , case when valtype_cd like 'D%' 
+            then coalesce( to_date_noex(value, 'YYYYMMDD')
+                         , to_date_noex(value, 'MMDDYYYY')
+                         , to_date_noex(value, 'YYYYMM')
+                         , to_date_noex(value, 'YYYY'))
+            else null end as start_date
      , 'NAACCR|' || ne.itemnbr || ':' || (
          case when ni.valtype_cd like '@%' then value
          else null end) as concept_cd
