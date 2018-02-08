@@ -347,33 +347,15 @@ select
   when av.start_date is not null then av.start_date
   -- Use Date of Last Contact for Follow-up/Recurrence/Death
   when av.sectionid = 4
-  then
-        case
-         when ne."Date of Last Contact" in ('00000000', '99999999', '99990')
-         then null
-         when regexp_like(ne."Date of Last Contact", '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
-         then to_date(ne."Date of Last Contact", 'YYYYMMDD')
-         when regexp_like(ne."Date of Last Contact", '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
-         then to_date(ne."Date of Last Contact", 'MMDDYYYY')
-         when regexp_like(ne."Date of Last Contact", '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
-         then to_date(ne."Date of Last Contact", 'YYYYMM')
-         when regexp_like(ne."Date of Last Contact", '^[1-2][0-9]{3}$')
-         then to_date(ne."Date of Last Contact", 'YYYY')
-         end
+  then coalesce( to_date_noex(ne."Date of Last Contact", 'YYYYMMDD')
+               , to_date_noex(ne."Date of Last Contact", 'MMDDYYYY')
+               , to_date_noex(ne."Date of Last Contact", 'YYYYMM')
+               , to_date_noex(ne."Date of Last Contact", 'YYYY'))
   -- Use Date of Diagnosis for everything else
-  else
-        case
-         when ne."Date of Diagnosis" in ('00000000', '99999999', '99990')
-         then null
-         when regexp_like(ne."Date of Diagnosis", '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
-         then to_date(ne."Date of Diagnosis", 'YYYYMMDD')
-         when regexp_like(ne."Date of Diagnosis", '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
-         then to_date(ne."Date of Diagnosis", 'MMDDYYYY')
-         when regexp_like(ne."Date of Diagnosis", '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
-         then to_date(ne."Date of Diagnosis", 'YYYYMM')
-         when regexp_like(ne."Date of Diagnosis", '^[1-2][0-9]{3}$')
-         then to_date(ne."Date of Diagnosis", 'YYYY')
-        end
+  else coalesce( to_date_noex(ne."Date of Diagnosis", 'YYYYMMDD')
+               , to_date_noex(ne."Date of Diagnosis", 'MMDDYYYY')
+               , to_date_noex(ne."Date of Diagnosis", 'YYYYMM')
+               , to_date_noex(ne."Date of Diagnosis", 'YYYY'))
   end as start_date
 from naacr.extract ne
 join (
