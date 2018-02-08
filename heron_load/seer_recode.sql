@@ -540,14 +540,14 @@ from
        , ne.case_index
        , ne."Primary Site" as site
        , substr(ne."Morph--Type&Behav ICD-O-3", 1, 4) histology
-       , to_date(case length(ne."Date of Diagnosis")
-               when 8 then ne."Date of Diagnosis"
-               when 6 then ne."Date of Diagnosis" || '01'
-               when 4 then ne."Date of Diagnosis" || '0101'
-               end, 'yyyymmdd') as start_date
+       , coalesce( to_date_noex(ne."Date of Diagnosis", 'YYYYMMDD')
+                 , to_date_noex(ne."Date of Diagnosis", 'MMDDYYYY')
+                 , to_date_noex(ne."Date of Diagnosis", 'YYYYMM')
+                 , to_date_noex(ne."Date of Diagnosis", 'YYYY')) as start_date
   from naacr.extract ne
   where ne."Date of Diagnosis" is not null
-    and ne."Accession Number--Hosp" is not null) ne;
+    and ne."Accession Number--Hosp" is not null) ne
+where start_date is not null;
 
 
 create or replace view seer_recode_facts as
