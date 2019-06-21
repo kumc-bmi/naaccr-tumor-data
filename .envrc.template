@@ -1,0 +1,8 @@
+export SPARK_HOME=/opt/spark-2.2.1-bin-hadoop2.7
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export PYSPARK_DRIVER_PYTHON=jupyter
+export PYSPARK_DRIVER_PYTHON_OPTS=notebook
+
+layout python3
+
+
