@@ -23,7 +23,10 @@ def main(argv, cwd):
     out = cwd / out
     if not out.exists():
         out.mkdir()
-    v18.fields(cwd / data).to_csv((out / 'fields.csv').open('w'))
+
+    fields = v18.fields(cwd / data)
+    print(fields.head())
+    fields.to_csv((out / 'fields.csv').open('w'))
     v18.valuesets(cwd / data).to_csv((out / 'valuesets.csv').open('w'))
 
 
@@ -64,6 +67,8 @@ class RecordFormat(object):
             # TODO: 'UNIT_OF_MEASURE': '',
             # TODO: 'FIELD_DEFINITION': 'TODO',
         })
+        fields['item'] = self.info.index
+        fields = fields[~fields.FIELD_NAME.str.startswith('RESERVED')]
         fields['FIELD_ORDER'] = range(1, len(fields) + 1)
         fields = fields.set_index(['TABLE_NAME', 'FIELD_NAME'])\
                        .sort_values('FIELD_ORDER')
@@ -72,7 +77,6 @@ class RecordFormat(object):
         fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
         desc = vals.VALUESET_ITEM_DESCRIPTOR.apply(';'.join)
         fields['VALUESET_DESCRIPTOR'] = desc
-        print(fields.columns)
         return fields
 
     def valuesets(self, data_raw):
@@ -87,7 +91,7 @@ class RecordFormat(object):
             if 'code' not in codes.columns or 'label' not in codes.columns:
                 raise ValueError((info, codes.columns))
             codes['TABLE_NAME'] = self.table_name
-            codes['FIELD_NAME'] = info.stem
+            codes['FIELD_NAME'] = upper_snake_case(info.stem)
             codes['VALUESET_ITEM'] = codes.code
             codes['VALUESET_ITEM_DESCRIPTOR'] = codes.code + '=' + codes.label
             found.append(codes)
