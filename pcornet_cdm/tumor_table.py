@@ -19,7 +19,7 @@ import pandas as pd
 def main(argv, cwd):
     [data, out] = argv[1:3]
 
-    v18 = RecordFormat(cwd / data)
+    v18 = DataDictionary(cwd / data)
     out = cwd / out
     if not out.exists():
         out.mkdir()
@@ -30,7 +30,7 @@ def main(argv, cwd):
     v18.valuesets(cwd / data).to_csv((out / 'valuesets.csv').open('w'))
 
 
-class RecordFormat(object):
+class DataDictionary(object):
     def __init__(self, data_raw,
                  version=18):
         self.items = pd.read_csv(
