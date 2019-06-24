@@ -4,9 +4,11 @@ Usage:
 
 To write fields, valuesets in CSV:
 
-  python tumor_table.py data-raw out/
+  python tumor_table.py data-raw ch10.csv out/
 
 Where data-raw is from https://github.com/WerthPADOH/naaccr
+and ch10 is from running naaccr_dd_scrape.py on
+<http://datadictionary.naaccr.org/?c=10>.
 
 """
 
@@ -17,14 +19,15 @@ import pandas as pd
 
 
 def main(argv, cwd):
-    [data, out] = argv[1:3]
+    [data, ch10, out] = argv[1:4]
 
     v18 = DataDictionary(cwd / data)
     out = cwd / out
     if not out.exists():
         out.mkdir()
 
-    fields = v18.fields(cwd / data)
+    ch10 = pd.read_csv((cwd / ch10).open())
+    fields = v18.fields(cwd / data, ch10)
     print(fields.head())
     fields.to_csv((out / 'fields.csv').open('w'))
     v18.valuesets(cwd / data).to_csv((out / 'valuesets.csv').open('w'))
@@ -56,7 +59,7 @@ class DataDictionary(object):
     # TODO: RELATIONAL: table_name, relation, integrity details, order
     # TODO: constraints
 
-    def fields(self, data_raw):
+    def fields(self, data_raw, ch10):
         fields = pd.DataFrame({
             'TABLE_NAME': self.table_name,
             'FIELD_NAME': self.info.name.apply(upper_snake_case),
@@ -65,11 +68,16 @@ class DataDictionary(object):
             # TODO: 'DATA_FORMAT': self.field_info.type,
             # TODO: 'REPLICATED_FIELD': 'NO',
             # TODO: 'UNIT_OF_MEASURE': '',
-            # TODO: 'FIELD_DEFINITION': 'TODO',
         })
         fields['item'] = self.info.index
         fields = fields[~fields.FIELD_NAME.str.startswith('RESERVED')]
         fields['FIELD_ORDER'] = range(1, len(fields) + 1)
+
+        fields = fields.set_index('item')
+        ch10 = ch10.set_index('item')
+        fields['FIELD_DEFINITION'] = ch10.description
+        fields = fields.reset_index()
+
         fields = fields.set_index(['TABLE_NAME', 'FIELD_NAME'])\
                        .sort_values('FIELD_ORDER')
         vals = self.valuesets(data_raw).reset_index()
@@ -77,7 +85,8 @@ class DataDictionary(object):
         fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
         desc = vals.VALUESET_ITEM_DESCRIPTOR.apply(';'.join)
         fields['VALUESET_DESCRIPTOR'] = desc
-        return fields
+        return fields[['VALUESET', 'VALUESET_DESCRIPTOR',
+                       'FIELD_DEFINITION', 'FIELD_ORDER']]
 
     def valuesets(self, data_raw):
         found = []
