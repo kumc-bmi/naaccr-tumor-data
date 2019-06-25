@@ -30,13 +30,12 @@ URL = 'http://datadictionary.naaccr.org/'
 def main(argv, stderr, cwd, urlopener):
     cache = WebCache(URL, urlopener, cwd)
 
-    dest = cwd / 'record_layout.csv'
-    items = RecordLayout.scrape(cache / '?c=7', dest)
-    log.info('%s: %d items', dest, len(items))
-
-    dest = cwd / 'descriptions.csv'
-    items = ItemDescription.scrape(cache / '?c=10', dest)
-    log.info('%s: %d items', dest, len(items))
+    for cls in [
+            RecordLayout,
+            ItemDescription,
+    ]:
+        cls.scrape(cache / ('?c=%d' % cls.chapter),
+                   cwd / cls.filename)
 
 
 class WebCache(object):
@@ -62,15 +61,16 @@ class WebCache(object):
         return self.joinpath(there)
 
 
-def csv_export(dest, cols, rows,
-               gen=False):
+def csv_export(dest, cols, rows):
+    qty = 0
     with dest.open('w') as fp:
         data = csv.writer(fp)
         data.writerow(cols)
         for row in rows:
             data.writerow(row)
-            if gen:
-                yield row
+            qty += 1
+
+    return qty
 
 
 class RecordLayout(namedtuple(
@@ -82,15 +82,14 @@ class RecordLayout(namedtuple(
          'item', 'name', 'xmlId', 'parentTag',
          'section', 'note'])):
 
+    chapter = 7
+    filename = 'record_layout.csv'
+
     @classmethod
     def scrape(cls, src, dest):
         toSave = cls.scrapeDoc(Builder.doc(src.open()))
-        saved = csv_export(dest, cls._fields, toSave,
-                           gen=True)
-        items = {}
-        for item in saved:
-            items[item.item] = item
-        return items
+        saved = csv_export(dest, cls._fields, toSave)
+        log.info('%s: %d items', dest, saved)
 
     @classmethod
     def scrapeDoc(cls, doc):
@@ -108,15 +107,14 @@ class RecordLayout(namedtuple(
 class ItemDescription(namedtuple(
         'ItemDescription', ['item', 'xmlId', 'parentTag', 'description'])):
 
+    chapter = 10
+    filename = 'descriptions.csv'
+
     @classmethod
     def scrape(cls, src, dest):
         toSave = cls.scrapeDoc(Builder.doc(src.open()))
-        saved = csv_export(dest, cls._fields, toSave,
-                           gen=True)
-        items = {}
-        for item in saved:
-            items[item.item] = item
-        return items
+        saved = csv_export(dest, cls._fields, toSave)
+        log.info('%s: %d items', dest, saved)
 
     @classmethod
     def scrapeDoc(cls, doc):
