@@ -2,8 +2,11 @@
 
 Usage:
 
-  $ pcornet_cdm/naaccr_dd_scrape.py naaccr-ch10.html out/
-  item descriptions found: 890
+  $ scrape.py
+  INFO:no store at ?c=7; fetching: http://datadictionary.naaccr.org/?c=7
+  INFO:record_layout.csv: 802 items
+  INFO:no store at ?c=10; fetching: http://datadictionary.naaccr.org/?c=10
+  INFO:descriptions.csv: 890 items
 
 Chapter VII: Record Layout Table (Column # Order)
 http://datadictionary.naaccr.org/?c=7
@@ -14,18 +17,49 @@ http://datadictionary.naaccr.org/?c=10
 
 from collections import namedtuple
 from html.parser import HTMLParser
+from urllib.parse import urljoin
 from xml.etree import ElementTree as ET
 import csv
+import logging
+
+log = logging.getLogger(__name__)
+
+URL = 'http://datadictionary.naaccr.org/'
 
 
-def main(argv, stderr, cwd):
-    [ch7, ch10, out] = argv[1:4]
+def main(argv, stderr, cwd, urlopener):
+    cache = WebCache(URL, urlopener, cwd)
 
-    items = RecordLayout.scrape(cwd / ch7, cwd / out / 'record_layout.csv')
-    stderr.write('record layouts found: %d\n' % len(items))
+    dest = cwd / 'record_layout.csv'
+    items = RecordLayout.scrape(cache / '?c=7', dest)
+    log.info('%s: %d items', dest, len(items))
 
-    items = ItemDescription.scrape(cwd / ch10, cwd / out / 'descriptions.csv')
-    stderr.write('item descriptions found: %d\n' % len(items))
+    dest = cwd / 'descriptions.csv'
+    items = ItemDescription.scrape(cache / '?c=10', dest)
+    log.info('%s: %d items', dest, len(items))
+
+
+class WebCache(object):
+    def __init__(self, addr, urlopener, store):
+        def joinpath(ref):
+            there = urljoin(addr, ref)
+            return WebCache(there, urlopener, store / ref)
+
+        self.joinpath = joinpath
+
+        def open(mode='r'):
+            if not mode.startswith('r'):
+                raise IOError(mode)
+            if not store.exists():
+                log.info('no store at %s; fetching: %s', store, addr)
+                content = urlopener.open(addr).read()
+                store.open('wb').write(content)
+            return store.open(mode=mode)
+
+        self.open = open
+
+    def __truediv__(self, there):
+        return self.joinpath(there)
 
 
 def csv_export(dest, cols, rows,
@@ -167,7 +201,11 @@ if __name__ == '__main__':
     def _script():
         from pathlib import Path
         from sys import argv, stderr
+        from urllib.request import build_opener
 
-        main(argv[:], stderr, Path('.'))
+        logging.basicConfig(
+            level=logging.DEBUG if '--verbose' in argv
+            else logging.INFO)
+        main(argv[:], stderr, Path('.'), build_opener())
 
     _script()
