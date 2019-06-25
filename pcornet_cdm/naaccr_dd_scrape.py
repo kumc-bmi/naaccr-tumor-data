@@ -2,7 +2,7 @@
 
 Usage:
 
-  $ pcornet_cdm/naaccr_dd_scrape.py naaccr-ch10.html ch10.csv
+  $ pcornet_cdm/naaccr_dd_scrape.py naaccr-ch10.html out/
   item descriptions found: 890
 
 Chapter VII: Record Layout Table (Column # Order)
@@ -19,15 +19,12 @@ import csv
 
 
 def main(argv, stderr, cwd):
-    [ch10, out] = argv[1:4]
+    [ch7, ch10, out] = argv[1:4]
 
-    ch10doc = Builder.doc((cwd / ch10).open())
-    items = {}
-    ea = csv_export(cwd / out, ItemDescription._fields,
-                    ItemDescription.scrape(ch10doc),
-                    gen=True)
-    for item in ea:
-        items[item.item] = item
+    items = RecordLayout.scrape(cwd / ch7, cwd / out / 'record_layout.csv')
+    stderr.write('record layouts found: %d\n' % len(items))
+
+    items = ItemDescription.scrape(cwd / ch10, cwd / out / 'descriptions.csv')
     stderr.write('item descriptions found: %d\n' % len(items))
 
 
@@ -42,11 +39,53 @@ def csv_export(dest, cols, rows,
                 yield row
 
 
+class RecordLayout(namedtuple(
+        'RecordLayout',
+        # Column #	Length	Item #	Item Name
+        #   XML NAACCR ID	PARENT XML ELEMENT
+        #   Section	Note
+        ['start', 'end', 'length',
+         'item', 'name', 'xmlId', 'parentTag',
+         'section', 'note'])):
+
+    @classmethod
+    def scrape(cls, src, dest):
+        toSave = cls.scrapeDoc(Builder.doc(src.open()))
+        saved = csv_export(dest, cls._fields, toSave,
+                           gen=True)
+        items = {}
+        for item in saved:
+            items[item.item] = item
+        return items
+
+    @classmethod
+    def scrapeDoc(cls, doc):
+        trs = doc.findall('body/form/div[@id="Panel2"]/table/tbody/tr')
+        for tr in trs:
+            tds = tr.findall('td')
+            if len(tds) + 1 != len(cls._fields):
+                # print(tds)
+                continue
+            fields = [_text(td) for td in tds]
+            fields[:1] = fields[0].replace(' ', '').split('-')
+            yield cls(*fields)
+
+
 class ItemDescription(namedtuple(
         'ItemDescription', ['item', 'xmlId', 'parentTag', 'description'])):
 
     @classmethod
-    def scrape(cls, doc):
+    def scrape(cls, src, dest):
+        toSave = cls.scrapeDoc(Builder.doc(src.open()))
+        saved = csv_export(dest, cls._fields, toSave,
+                           gen=True)
+        items = {}
+        for item in saved:
+            items[item.item] = item
+        return items
+
+    @classmethod
+    def scrapeDoc(cls, doc):
         item = xmlId = parentTag = description = None
 
         for section in doc.findall('body/form/div[@id="Panel2"]/*'):
