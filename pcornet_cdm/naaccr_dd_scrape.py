@@ -1,41 +1,59 @@
-import csv
-from xml.etree import ElementTree as ET
+"""naaccr_dd_scrape: scrape from HTML format NAACCR data dictionary
+
+Usage:
+
+  $ pcornet_cdm/naaccr_dd_scrape.py naaccr-ch10.html ch10.csv
+  item descriptions found: 890
+
+Chapter VII: Record Layout Table (Column # Order)
+http://datadictionary.naaccr.org/?c=7
+
+Chapter X: Data Dictionary
+http://datadictionary.naaccr.org/?c=10
+"""
+
+from collections import namedtuple
 from html.parser import HTMLParser
+from xml.etree import ElementTree as ET
+import csv
 
 
 def main(argv, stderr, cwd):
-    [page, out] = argv[1:3]
-    doc = RefDoc.structure((cwd / page).open())
+    [ch10, out] = argv[1:4]
 
+    ch10doc = Builder.doc((cwd / ch10).open())
     items = {}
-    with (cwd / out).open('w') as fp:
+    ea = csv_export(cwd / out, ItemDescription._fields,
+                    ItemDescription.scrape(ch10doc),
+                    gen=True)
+    for item in ea:
+        items[item.item] = item
+    stderr.write('item descriptions found: %d\n' % len(items))
+
+
+def csv_export(dest, cols, rows,
+               gen=False):
+    with dest.open('w') as fp:
         data = csv.writer(fp)
-        data.writerow(RefDoc.columns)
-        for item in RefDoc.items(doc):
-            data.writerow(item)
-            items[item[0]] = item
-    stderr.write('items found: %d\n' % len(items))
+        data.writerow(cols)
+        for row in rows:
+            data.writerow(row)
+            if gen:
+                yield row
 
 
-class RefDoc(object):
-
-    columns = 'item xmlId parentTag description'.split()
-
-    @classmethod
-    def structure(cls, fp):
-        b = Builder()
-        b.feed(fp.read())
-        return b.root
+class ItemDescription(namedtuple(
+        'ItemDescription', ['item', 'xmlId', 'parentTag', 'description'])):
 
     @classmethod
-    def items(cls, doc):
+    def scrape(cls, doc):
         item = xmlId = parentTag = description = None
 
         for section in doc.findall('body/form/div[@id="Panel2"]/*'):
             if section.tag == 'table' and section.find(
                     'tr[@class="tableColTitle"]'):
                 if item:
-                    yield (item, xmlId, parentTag, description)
+                    yield cls(item, xmlId, parentTag, description)
                     item = xmlId = parentTag = description = None
                 detail = section.find('tr[@class="tableColData"]')
                 item = _text(detail.find('td'))
@@ -52,7 +70,7 @@ class RefDoc(object):
                 pass
 
         if item:
-            yield (item, xmlId, parentTag, description)
+            yield cls(item, xmlId, parentTag, description)
 
 
 def _text(elt):
@@ -66,6 +84,12 @@ class Builder(HTMLParser):
         self._stack = []
         self._texting = None
         self._tailing = None
+
+    @classmethod
+    def doc(cls, fp):
+        b = cls()
+        b.feed(fp.read())
+        return b.root
 
     def handle_starttag(self, tag, attrs):
         if self._stack:
