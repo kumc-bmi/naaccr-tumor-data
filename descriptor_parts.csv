@@ -1,0 +1,35 @@
+input,target,output,value
+format,"[Rr]ight[ -]justifi?ed(?:, | and )?",alignment,right
+format,"[Ll]eft[ -]justifi?ed(?:, | and |\. ?)?",alignment,left
+format,zero[ -]filled,padding,0
+format,blank filled(?:\.)?,padding, 
+format,space filled,padding, 
+format,"starting with a character, there will be a presumed decimal point.*",pattern,"^[A-Z][0-9]{2,}$"
+format,"4 digits .for ICD-7, 8, 9.; for ICD-10, +upper case letter followed by 3 digits or upper case letter followed by 2 digits plus blank",pattern,"[0-9]{4}|[A-Z]{2,3}"
+format,YYYYMMDDhhmmss,pattern,(?:19|20)[0-9]{2}[01][0-9][0-3][0-9][0-1][0-9][0-5][0-9][0-5][0-9]
+format,YYYYMMDD,pattern,(?:19|20)[0-9]{2}[01][0-9][0-3][0-9]
+format,Free text,pattern,.*
+format,"Numeric plus special characters ""&"" and ""dash"" \(""-""\)",pattern,[0-9&\-]+
+format,Numeric and special characters,pattern,.*
+format,"Mixed case letters, special characters only as allowed by USPS, embedded spaces allowed(?:, )?",pattern,.*
+format,Numbers or upper case letters. No special characters or embedded spaces allowed. ,pattern,[0-9A-Z]+
+format,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. ",pattern,[A-Za-z0-9 \./\-#]
+format,"Mixed case(?:, )",pattern,[A-Za-z \'\-]+
+format,Truncate name if nore than 40 characters long. ?,,
+format,this field may be updated if the name changes.,,
+format,"C followed by 3 digits, no special characters, no embedded blanks",pattern,C[0-9]{3}
+format,"Upper[ -]case,? alphanumeric(?:,|\.)?\s*",pattern,[A-Z0-9]+
+format,Convert AJCC Roman numerals to Arabic numerals.\s*,,
+format,"alphanumeric, no embedded blanks",pattern,[A-Za-z0-9]+
+format,[Aa]lphanumeric,pattern,[A-Za-z0-9 ]+
+format,Upper case,pattern,[A-Z]+
+values,1400-1999,pattern,1[0-9]{3}
+values,8000-9970,pattern,[8-9][0-9]{3}
+format,"Four digits, first digit equals 1. ?",pattern,1[0-9]{3}
+format,Reference ICD-O-1 for valid entries,,
+format,10-digit number,pattern,[0-9]{10}
+format,"9 digits, no dashes",pattern,[0-9]{9}
+format,6-digit number,pattern,[0-9]{6}
+format,No special characters,pattern,[A-Za-z][0-9]
+values,City name or UNKNOWN,sentinel,UNKNOWN
+format,"See EDITS table STATE.DBF in Appendix B; CD, US, XX, YY, ZZ",,
