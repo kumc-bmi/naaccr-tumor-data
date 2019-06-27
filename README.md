@@ -8,11 +8,17 @@
 
 ## Related Work
 
+  - Thornton ML, (ed). [Standards for Cancer Registries Volume II: Data
+    Standards and Data Dictionary][dno], Record Layout Version 18, 21st
+    ed. Springfield, Ill.: North American Association of Central
+    Cancer Registries, February 2018, (Revised Mar. 2018, Apr. 2018,
+    May 2018, Jun. 2018, Aug. 2018, Sept. 2018, Oct. 2018).
  - [naaccr-xml][ims] - NAACCR XML reader in Java by IMS for SEER
  - [naaccr][PADOH] - NAACCR reader in R by N. Werth of PA Detp. of Health
  - [NAACCR_ETL][gpc] - GPC NAACCR ETL work
  - [bc_qa][] - multi-site project with REDCap Data Dictionary
 
+[dno]: http://datadictionary.naaccr.org/
 [ims]: https://github.com/imsweb/naaccr-xml
 [PADOH]: https://github.com/WerthPADOH/naaccr
 [gpc]: https://informatics.gpcnetwork.org/trac/Project/wiki/NAACCR_ETL
