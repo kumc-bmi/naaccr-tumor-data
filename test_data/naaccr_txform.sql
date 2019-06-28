@@ -140,8 +140,6 @@ select 'almost all 9s' as itemname, '99990' as value from dual
 union all
 select 'inscruitable', '12001024' from dual
 )
-;
-
 /* Hunt down "not a valid month"
 select min(to_date(ne."Date of Last Contact", 'yyyymmdd'))
 from (
@@ -150,6 +148,7 @@ from (
   from naacr.extract
   ) where i > 960 and i < 970) ne;
 */
+;
 
 create or replace view tumor_item_type as
 create table t_item as
