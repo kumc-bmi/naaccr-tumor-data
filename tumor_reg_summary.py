@@ -20,9 +20,17 @@ from contextlib import contextmanager
 from itertools import islice
 from pathlib import Path as Path_T  # use type only, per ocap discipline
 from sys import stderr  # ocap exception for logging
-from typing import Any, Callable, Iterable, Iterator, List, NamedTuple
+from typing import (
+    Any,
+    Callable, Iterable, Iterator,
+    List, NamedTuple, Tuple,
+    TextIO,
+    cast,
+)
 import csv
 import sqlite3
+
+Chunk = List[Tuple[int, str]]
 
 
 def main(argv: List[str], cwd: Path_T,
@@ -31,7 +39,7 @@ def main(argv: List[str], cwd: Path_T,
 
     db = connect(str(dbfn))
     tr = Registry.make(db, cwd / layout)
-    tr.load_file(cwd / naaccr_file)
+    tr.load_eav(cwd / naaccr_file)
 
 
 def _log(*args: Any) -> None:
@@ -70,35 +78,69 @@ class Registry(object):
 
     @classmethod
     def make(cls, conn: sqlite3.Connection, layout: Path_T,
+             max_length: int = 10,
              table_name: str = 'tumors') -> 'Registry':
-        items = list(cls.load_layout(layout.open()))
+        eav_ddl = '''
+        create table {0}_eav (tumorid int, item int, value text)
+        '''.format(table_name)
+        conn.cursor().execute(eav_ddl)
+        _log('created {0}'.format(table_name))
+        items = [it for it in cls.load_layout(layout.open())
+                 if it.length <= max_length]
         ddl = cls.create_ddl(table_name, items)
         conn.cursor().execute(ddl)
         _log('created: {0} with {1} columns'.format(table_name, len(items)))
         return cls(conn, items)
 
-    def load_file(self, tumors: Path_T,
-                  chunk_size: int = 4096) -> int:
+    def load_eav(self, tumors: Path_T) -> int:
+        insert_stmt = '''
+        insert into {table}_eav (tumorid, item, value) values (?, ?, ?)
+        '''.format(table=self.table_name)
+        qty = 0
+        with txn(self.__conn) as work:
+            for lines in self._file_chunks(tumors):
+                records = [
+                    (ix, it.item, chars)
+                    for ix, line in lines
+                    for it in self.layout
+                    for chars in [line[it.start - 1:it.end].strip()]
+                    if chars
+                ]
+                work.executemany(insert_stmt, records)
+                qty += len(records)
+                last_tumorid, _ = lines[-1]
+                _log('tumor {id}: records inserted += {n} = {qty}'.format(
+                    id=last_tumorid, n=len(records), qty=qty))
+
+        return qty
+
+    def load_file(self, tumors: Path_T) -> int:
         insert_stmt = self.insert_dml()
 
         qty = 0
-        with tumors.open() as fp:
-            with txn(self.__conn) as work:
-                while True:
-                    lines = list(islice(fp, chunk_size))
-                    if not lines:
-                        break
-                    records = [
-                        tuple([line[it.start - 1:it.end]
-                               for it in self.layout])
-                        for line in lines
-                    ]
-                    work.executemany(insert_stmt, records)
-                    qty += len(records)
-                    _log('records inserted += {n} = {qty}'.format(
-                        n=len(records), qty=qty))
+        with txn(self.__conn) as work:
+            for lines in self._file_chunks(tumors):
+                records = [
+                    tuple([line[it.start - 1:it.end]
+                           for it in self.layout])
+                    for ix, line in lines
+                ]
+                work.executemany(insert_stmt, records)
+                qty += len(records)
+                _log('records inserted += {n} = {qty}'.format(
+                    n=len(records), qty=qty))
 
         return qty
+
+    def _file_chunks(self, tumors: Path_T,
+                     chunk_size: int = 4096) -> Iterable[Chunk]:
+        with cast(TextIO, tumors.open(mode='r')) as fp:  # typeshed/issues/2911
+            lines = enumerate(fp)
+            while True:
+                chunk = list(islice(lines, chunk_size))
+                if not chunk:
+                    break
+                yield chunk
 
     @classmethod
     def load_layout(cls, lines: Iterator[str]) -> Iterator[Item]:
