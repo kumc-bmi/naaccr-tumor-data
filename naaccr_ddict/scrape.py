@@ -21,6 +21,7 @@ from urllib.parse import urljoin
 from xml.etree import ElementTree as ET
 import csv
 import logging
+import re
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ URL = 'http://datadictionary.naaccr.org/'
 def main(argv, stderr, cwd, urlopener):
     cache = WebCache(URL, urlopener, cwd)
 
+    ddl = []
     for cls in [
             RecordLayout,
             DataDescriptor,
@@ -37,6 +39,10 @@ def main(argv, stderr, cwd, urlopener):
     ]:
         cls.scrape(cache / ('?c=%d' % cls.chapter),
                    cwd / cls.filename)
+        ddl.append(cls.create_ddl())
+
+    with (cwd / 'schema.sql').open('w') as fp:
+        fp.write('\n'.join(s + ';\n' for s in ddl))
 
 
 class WebCache(object):
@@ -81,16 +87,48 @@ class PageData(object):
         saved = csv_export(dest, cls._fields, toSave)
         log.info('%s: %d items', dest, saved)
 
+    int_fields = []
+
+    @classmethod
+    def create_ddl(cls):
+        cols = [(f, 'int' if f in cls.int_fields else 'text')
+                for f in cls._fields]
+        coldefs = ['  %s %s' % (n, ty)
+                   for n, ty in cols]
+        return 'create table {name} (\n{coldefs}\n)'.format(
+            name=snake_case(cls.__name__),
+            coldefs=',\n'.join(coldefs),
+        )
+
+
+def snake_case(n):
+    """
+    >>> snake_case(DataDescriptor.__name__)
+    'data_descriptor'
+    """
+    return (n[:1] + re.sub('([A-Z])', r'_\1', n[1:])).lower()
+
 
 class DataDescriptor(PageData, namedtuple(
         'DataDescriptor',
         # Item #	Item Name
         # Format	Allowable Values
         # Length	Note
-        ['item', 'name', 'format', 'values', 'length', 'note'])):
-
+        ['item', 'name', 'format', 'allow_value', 'length', 'note'])):
+    """
+    >>> print(DataDescriptor.create_ddl())
+    create table data_descriptor (
+      item int,
+      name text,
+      format text,
+      values text,
+      length int,
+      note text
+    )
+    """
     chapter = 9
     filename = 'data_descriptor.csv'
+    int_fields = ['item', 'length']
 
     @classmethod
     def scrapeDoc(cls, doc):
@@ -133,7 +171,7 @@ class ItemDescription(PageData, namedtuple(
         'ItemDescription', ['item', 'xmlId', 'parentTag', 'description'])):
 
     chapter = 10
-    filename = 'descriptions.csv'
+    filename = 'item_description.csv'
 
     @classmethod
     def scrapeDoc(cls, doc):
