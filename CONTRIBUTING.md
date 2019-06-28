@@ -1,3 +1,37 @@
+luigi tasks
+  - staging
+    - staging validation
+      - stats; e.g. ~50% male/female, x% breast cancer, x cases/year, ...
+        - charts?
+
+
+### ISSUE: Platform
+
+  - HERON ETL platform is Jenkins + python2 + paver + Oracle SQL with
+    some pandas and some spark; migrating
+    - from paver to luigi
+    - from python2 to python3 (with mypy)
+      - Spark, pandas are among [projects that
+        pledge to drop Python 2 support in or before
+        2020](https://python3statement.org/)
+    - from Oracle SQL to... postgres? to data-lake?
+      - from sqlplus to sqlcl
+      - sql loader isn't essential at O(100K) records
+    - from Java 8 to Java 11
+  - Docker? for integration testing?
+    - stand-alone i2b2 web client, middle tier?
+    - stand-alone DB?
+
+### ISSUE: DB Interop
+
+  - Apache Spark runs on the JVM, the i2b2 platform
+
+  - [OHSDSI SQLRender](https://ohdsi.github.io/SqlRender/) is a nifty
+    approach: based on a CSV file of rules.
+
+
+## Exploratory Notebook
+
 Currently we're using pyspark and jupyter notebook to explore the
 design space.
 
