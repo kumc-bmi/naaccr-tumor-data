@@ -9,7 +9,7 @@ or
 or
   python csvdb.py --queryz zip_file_name sql_query
 
-Design note: this is a single-file script with no dependencies outside the python 2.7 stdlib.
+Design note: this is a single-file script with no dependencies outside the python stdlib.
 
 '''
 import csv
@@ -33,7 +33,8 @@ def main(argv, stdout, stderr, cwd, basename, connect):
     csv_storage = cwd / csv_dir_name
     db = connect(RAM) if flag == '--queryz' else connect(cwd / db_filename)
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG if '--verbose' in argv
+                        else logging.INFO)
     if flag == '--dump':
         dump_db(db, csv_storage)
     elif flag == '--load':
@@ -46,7 +47,7 @@ def main(argv, stdout, stderr, cwd, basename, connect):
         query = db_filename
         run_query(db, query, stdout)
     else:
-        print >>stderr, __doc__
+        print(__doc__, file=stderr)
         raise SystemExit(1)
 
 
@@ -66,10 +67,10 @@ def run_query(db, query, out):
     fmt = '  '.join('{{{ix}:{w}}}'.format(w=w, ix=ix)
                     for (ix, (_, w)) in enumerate(widths))
     fmt_record = lambda row: fmt.format(*row)
-    print >>out, fmt_record(header)
-    print >>out, fmt_record(sep)
+    print(fmt_record(header), file=out)
+    print(fmt_record(sep), file=out)
     for row in rows:
-        print >>out, fmt_record(row)
+        print(fmt_record(row), file=out)
 
 
 def loadz_db(db, csv_storage, csv_dir_name):
@@ -91,17 +92,12 @@ def load_db(dest, src, setup=None):
     def get_rows(table):
         data = src / (table.lower() + '.csv')
         if data.exists():
-            rows = from_utf8(csv.reader(data.open(mode='rb')))
+            rows = csv.reader(data.open())
             return next(rows), rows
         else:
             log.debug('skipping %: no data file', table)
             return [], []
     load_tables(dest, get_rows, setup)
-
-
-def from_utf8(rows):
-    for row in rows:
-        yield [s.decode('utf-8') for s in row]
 
 
 def load_tables(dest, get_rows, setup):
@@ -113,10 +109,11 @@ def load_tables(dest, get_rows, setup):
     '''
     for script in setup:
         log.info('running setup script: %s', script)
-        dest.executescript(script.open(mode='rb').read())
+        dest.executescript(script.open(mode='r').read())
 
     for table in db_tables(dest):
         header, rows = get_rows(table)
+        log.debug('calling load_table(%s)', table)
         load_table(dest, table, header, rows)
 
 
@@ -144,6 +141,7 @@ def load_table(dest, table, header, rows,
     :type batch_size: int
     :type rows: iter[list[str]]
     '''
+    log.debug('loading %s', table)
     work = dest.cursor()
     stmt = """
       insert into {table} ({header})
@@ -215,7 +213,7 @@ class Path(object):
     def __str__(self):
         return self._path
 
-    def __div__(self, there):
+    def __truediv__(self, there):
         '''
         :param str there:
         :rtype: Path
