@@ -152,6 +152,19 @@ from (
 */
 
 create or replace view tumor_item_type as
+create table t_item as
+select dd.item as ItemNbr
+     , dd.name as ItemName
+     , dd.Format
+     , dd.allow_value as AllowValue
+     , dd.length as FieldLength
+     , s.sectionid as SectionID
+from ddict.data_descriptor dd
+join ddict.record_layout rl on rl.item = dd.item
+join section s on s.section = rl.section
+;
+
+
 select ns.sectionid
      , ns.section
      , ni."ItemNbr" ItemNbr
