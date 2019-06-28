@@ -31,7 +31,7 @@ URL = 'http://datadictionary.naaccr.org/'
 def main(argv, stderr, cwd, urlopener):
     cache = WebCache(URL, urlopener, cwd)
 
-    ddl = []
+    ddl = [Section.create_ddl()]
     for cls in [
             RecordLayout,
             DataDescriptor,
@@ -202,6 +202,11 @@ class ItemDescription(PageData, namedtuple(
 
         if item:
             yield cls(item, xmlId, parentTag, description)
+
+class Section(PageData, namedtuple(
+        'Section', ['sectionid', 'section'])):
+    filename = 'section.csv'
+    int_fields = ['sectionid']
 
 
 def _text(elt):
