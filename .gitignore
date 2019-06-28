@@ -1,5 +1,10 @@
+naaccr_ddict/?c=*
 *~
 .ipynb_checkpoints
+*.db
 derby.log
 metastore_db
 .direnv
+vendor/
+__pycache__
+.mypy_cache/
