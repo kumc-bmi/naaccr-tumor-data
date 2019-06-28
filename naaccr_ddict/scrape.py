@@ -158,6 +158,7 @@ class RecordLayout(PageData, namedtuple(
 
     chapter = 7
     filename = 'record_layout.csv'
+    int_fields = ['start', 'end', 'length', 'item']
 
     @classmethod
     def scrapeDoc(cls, doc):
