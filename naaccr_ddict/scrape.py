@@ -87,6 +87,14 @@ class PageData(object):
         saved = csv_export(dest, cls._fields, toSave)
         log.info('%s: %d items', dest, saved)
 
+    @classmethod
+    def _table_rows(cls, doc,
+                    tpath='body/form/div[@id="Panel2"]/table'):
+        trs = doc.findall(tpath + '/tbody/tr')
+        for tr in trs:
+            tds = tr.findall('td')
+            yield [_text(td) for td in tds]
+
     int_fields = []
 
     @classmethod
@@ -132,13 +140,10 @@ class DataDescriptor(PageData, namedtuple(
 
     @classmethod
     def scrapeDoc(cls, doc):
-        trs = doc.findall('body/form/div[@id="Panel2"]/table/tbody/tr')
-        for tr in trs:
-            tds = tr.findall('td')
-            if len(tds) != len(cls._fields):
+        for fields in cls._table_rows(doc):
+            if len(fields) != len(cls._fields):
                 # print(tds)
                 continue
-            fields = [_text(td) for td in tds]
             yield cls(*fields)
 
 
@@ -156,13 +161,10 @@ class RecordLayout(PageData, namedtuple(
 
     @classmethod
     def scrapeDoc(cls, doc):
-        trs = doc.findall('body/form/div[@id="Panel2"]/table/tbody/tr')
-        for tr in trs:
-            tds = tr.findall('td')
-            if len(tds) + 1 != len(cls._fields):
+        for fields in cls._table_rows(doc):
+            if len(fields) + 1 != len(cls._fields):
                 # print(tds)
                 continue
-            fields = [_text(td) for td in tds]
             fields[:1] = fields[0].replace(' ', '').split('-')
             yield cls(*fields)
 
