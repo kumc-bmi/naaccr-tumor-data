@@ -1,6 +1,16 @@
 Currently we're using pyspark and jupyter notebook to explore the
 design space.
 
+
+## QA with doctest and mypy
+
+```
+export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
+  python -m doctest tumor_reg_summary.py && \
+  mypy --strict tumor_reg_summary.py && \
+  python tumor_reg_summary.py naaccr_ddict/record_layout.csv tr1.db NCDB_Export.txt
+```
+
 ## pyspark
 
 As noted in [a tutorial][tut1]:

@@ -150,7 +150,6 @@ from (
 */
 ;
 
-create or replace view tumor_item_type as
 create table t_item as
 select dd.item as ItemNbr
      , dd.name as ItemName
@@ -164,6 +163,7 @@ join section s on s.section = rl.section
 ;
 
 
+create table tumor_item_type as
 select ns.sectionid
      , ns.section
      , ni."ItemNbr" ItemNbr
@@ -171,7 +171,6 @@ select ns.sectionid
      , ni."AllowValue"
      , ni.valtype_cd
      , ni."ItemName" as ItemName
-     , ni."ItemID" as itemid
 from (
 select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
          when ni."ItemName" like 'Reserved%' then null
@@ -195,9 +194,9 @@ select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_dei
          when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
  
           -- fields 3 characters or smaller are codes that aren't PHI
-         when to_number("FieldLength") <= 3 then '@'
+         when "FieldLength" <= 3 then '@'
           -- In certain sections, fields up to 5 characters are non-PHI codes
-         when to_number("FieldLength") <= 5 and ni."SectionID" in (
+         when "FieldLength" <= 5 and ni."SectionID" in (
   1 -- Cancer Identification
  , 2 -- Demographic
 -- , 3 -- Edit Overrides/Conversion History/System Admin
@@ -223,9 +222,9 @@ select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_dei
          else 'Ti'
        end valtype_cd
      , ni.*
-from naacr.t_item ni
+from t_item ni
 ) ni
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
+join section ns on ns.sectionid = ni."SectionID"
 and ni.valtype_cd is not null
 ;
 
@@ -290,11 +289,10 @@ select case_index
        else null end as codenbr
      , ns.section
      , ni.ItemName
-     , ni.itemid
 from naacr.extract_eav ne
 join tumor_item_type ni
   on ne.itemnbr = ni.ItemNbr
-join NAACR.t_section ns on ns.sectionid = to_number(ni.SectionID)
+join NAACR.t_section ns on ns.sectionid = ni.SectionID
 where ne.value is not null
 and ni.valtype_cd is not null
 ;

@@ -9,14 +9,13 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 -- Check that NAACCR data dictionary and data is available.
 select sectionid from naacr.t_section where 1=0;
 select "ItemNbr" from naacr.t_item where 1=0;
-select case_index, itemnbr from naacr.extract_eav where 1=0;  -- Note case_index introduced by HERON ETL.
+select tumorid, item from tumors_eav where 1=0;
 
 -- Check that tumor_item_type from naaccr_txform.sql is available (esp. for valtype_cd)
 select valtype_cd from tumor_item_type where 1=0;
 
 
-drop materialized view data_agg_naaccr;
-create materialized view data_agg_naaccr as
+create table data_agg_naaccr as
 with
 -- count data points by item (variable)
 by_item as (
@@ -24,7 +23,7 @@ by_item as (
   from
   (
     select eav.itemnbr, count(*) tot
-    from naacr.extract_eav eav
+    from tumors_eav eav
     group by eav.itemnbr
   ) agg
   join tumor_item_type ty on ty.itemnbr = agg.itemnbr
@@ -33,7 +32,7 @@ by_item as (
 -- break down nominals by value
 by_val as (
   select by_item.itemnbr, eav.value, count(*) freq
-  from naacr.extract_eav eav
+  from tumors_eav eav
   join by_item on eav.itemnbr = by_item.itemnbr
   where by_item.valtype_cd = '@'
   group by by_item.itemnbr, eav.value
@@ -41,12 +40,9 @@ by_val as (
 ,
 -- parse dates
 event as (
-  select case_index, eav.itemnbr
-       , coalesce( to_date_noex(value, 'YYYYMMDD')
-                         , to_date_noex(value, 'MMDDYYYY')
-                         , to_date_noex(value, 'YYYYMM')
-, to_date_noex(value, 'YYYY')) t
-  from naacr.extract_eav eav
+  select tumorid as case_index, eav.itemnbr
+       , date(substr(value, 1, 4) || '-' || substr(value, 5, 2) || '-' || substr(value, 7, 2)) as t
+  from tumors_eav eav
   join tumor_item_type by_item on eav.itemnbr = by_item.itemnbr
   where by_item.valtype_cd = 'D'
 )
@@ -66,10 +62,10 @@ e0 as (
 ,
 -- normalize other events to the reference event
 e2 as (
-  select e0.itemnbr, sysdate - e0.t mag
+  select e0.itemnbr, julianday(current_date) - julianday(e0.t) mag
   from e0
   union all
-  select e.itemnbr, e.t - e0.t mag
+  select e.itemnbr, julianday(e.t) - julianday(e0.t) mag
   from event e
   join e0
     on e0.case_index = e.case_index
@@ -85,8 +81,8 @@ stats as (
 
 -- For nominal data, save the probability of each value
 select by_val.itemnbr, '@' valtype_cd
-     , to_number(null) mean, to_number(null) sd
-     , by_val.value, by_val.freq / by_item.tot * 100 pct, by_item.tot
+     , null mean, null sd
+     , by_val.value, by_val.freq * 1.0 / by_item.tot * 100 pct, by_item.tot
 from by_val join by_item on by_item.itemnbr = by_val.itemnbr
 
 union all
@@ -101,7 +97,7 @@ join by_item on stats.itemnbr = by_item.itemnbr
 
 select * from data_agg_naaccr;
 
-create or replace view data_char_naaccr as
+create view data_char_naaccr as
 select ty.sectionid, ty.section, ty.itemnbr, ty.ItemName itemname, ty.valtype_cd
      , tot qty, round(mean / 365.25, 2) mean_yr, round(sd / 365.25, 2) sd_yr
               , mean                           , sd
