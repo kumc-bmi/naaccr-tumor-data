@@ -129,7 +129,7 @@ class DataDescriptor(PageData, namedtuple(
       item int,
       name text,
       format text,
-      values text,
+      allow_value text,
       length int,
       note text
     )
@@ -202,6 +202,7 @@ class ItemDescription(PageData, namedtuple(
 
         if item:
             yield cls(item, xmlId, parentTag, description)
+
 
 class Section(PageData, namedtuple(
         'Section', ['sectionid', 'section'])):
