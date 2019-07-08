@@ -1,5 +1,42 @@
 """naaccr_dd_scrape: scrape from HTML format NAACCR data dictionary
 
+The relationship between items and sections (among other details) is
+in a chapter on record layout. We scrape the table from this chapter
+to CSV format::
+
+    >>> csv_hd = lambda cls: print(','.join(cls._fields))
+
+    >>> (RecordLayout.chapter, RecordLayout.filename)
+    (7, 'record_layout.csv')
+    >>> csv_hd(RecordLayout)
+    start,end,length,item,name,xmlId,parentTag,section,note
+
+Format and allowed values are in a table in the data descriptor
+chapter::
+
+    >>> (DataDescriptor.chapter, DataDescriptor.filename)
+    (9, 'data_descriptor.csv')
+    >>> csv_hd(DataDescriptor)
+    item,name,format,allow_value,length,note
+
+Item descriptions are in the Data Descriptor chapter (which is not
+organized in a straightforward table)::
+
+    >>> (ItemDescription.chapter, ItemDescription.filename)
+    (10, 'item_description.csv')
+    >>> csv_hd(ItemDescription)
+    item,xmlId,parentTag,description
+
+
+In addition to the CSV headers, we distinguish int from string fields
+in a SQL schema for use with sqlite (see also csvdb.py)::
+
+   >>> print(DataDescriptor.create_ddl())  # doctest: +ELLIPSIS
+   create table data_descriptor (
+     item int,
+     name text,
+     ...
+
 Usage:
 
   $ scrape.py
@@ -8,11 +45,6 @@ Usage:
   INFO:no store at ?c=10; fetching: http://datadictionary.naaccr.org/?c=10
   INFO:descriptions.csv: 890 items
 
-Chapter VII: Record Layout Table (Column # Order)
-http://datadictionary.naaccr.org/?c=7
-
-Chapter X: Data Dictionary
-http://datadictionary.naaccr.org/?c=10
 """
 
 from collections import namedtuple
