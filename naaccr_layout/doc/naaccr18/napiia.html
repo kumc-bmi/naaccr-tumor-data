@@ -1,0 +1,169 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">193</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2009</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">11.3</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">449 - 450</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Patient.raceNapiia<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;Race--NAPIIA
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para mark-changed'>NAPIIA is an acronym for NAACCR Asian and Pacific Islander Identification Algorithm. Race--NAPIIA(derived API) recodes some single-race cases with a Race 1 [160] code of 96 to a more specific Asian race category, based on an algorithm that makes use of the birthplace and name fields (first, last, and maiden names). For single-race cases with a Race 1 code other than 96, it returns the Race 1 code. Multiple-race cases (those with information in Race 2 through Race 5, [161-164]) are handled variously; for greater detail please refer to the technical documentation:
+    <a href="http://www.naaccr.org/LinkClick.aspx?fileticket=3HnBhlmhkBs%3d&amp;tabid=118&amp;mid=458">http://www.naaccr.org/LinkClick.aspx?fileticket=3HnBhlmhkBs%3d&amp;tabid=118&amp;mid=458</a><br/>
+    <br/>
+    In Version 1.1 of the algorithm, birthplace can be used to indirectly assign a specific race to one of eight Asian race groups (Chinese, Japanese, Vietnamese, Korean, Asian Indian, Filipino, Thai, and Cambodian), and names can be used to indirectly assign a specific race to one of seven Asian groups (Chinese, Japanese, Vietnamese, Korean, Asian Indian, Filipino, and Hmong). Subsequent versions of NAPIIA may incorporate Pacific Islanders and may potentially incorporate name lists for Thai, Cambodian, and Laotians.
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>The use of more specific Asian and Pacific Islander codes will enhance surveillance and research activities focused on specific API subgroups.</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>01</td>
+            <td class='code-desc'>White</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>02</td>
+            <td class='code-desc'>Black</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>03</td>
+            <td class='code-desc'>American Indian, Aleutian, or Eskimo (includes all indigenous populations of the Western Hemisphere)</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>04</td>
+            <td class='code-desc'>Chinese</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>05</td>
+            <td class='code-desc'>Japanese</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>06</td>
+            <td class='code-desc'>Filipino</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>07</td>
+            <td class='code-desc'>Hawaiian</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>08</td>
+            <td class='code-desc'>Korean</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'>*</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>10</td>
+            <td class='code-desc'>Vietnamese</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>11</td>
+            <td class='code-desc'>Laotian</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>12</td>
+            <td class='code-desc'>Hmong</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>13</td>
+            <td class='code-desc'>Kampuchean (Cambodian)</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>14</td>
+            <td class='code-desc'>Thai</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>15</td>
+            <td class='code-desc'>Asian Indian or Pakistani, NOS (code 09 prior to Version 12)</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>16</td>
+            <td class='code-desc'> Asian Indian</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>17</td>
+            <td class='code-desc'> Pakistani</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>20</td>
+            <td class='code-desc'>Micronesian, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>21</td>
+            <td class='code-desc'>Chamorro/Chamoru</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>22</td>
+            <td class='code-desc'>Guamanian, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>25</td>
+            <td class='code-desc'>Polynesian, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>26</td>
+            <td class='code-desc'>Tahitian</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>27</td>
+            <td class='code-desc'>Samoan</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>28</td>
+            <td class='code-desc'>Tongan</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>30</td>
+            <td class='code-desc'>Melanesian, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>31</td>
+            <td class='code-desc'>Fiji Islander</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>32</td>
+            <td class='code-desc'>New Guinean</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>96</td>
+            <td class='code-desc'>Other Asian, including Asian, NOS and Oriental, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>97</td>
+            <td class='code-desc'>Pacific Islander, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>98</td>
+            <td class='code-desc'>Other</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>99</td>
+            <td class='code-desc'>Unknown</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Algorithm was not run</td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'>* Code 09 was retired effective with Version 12. See codes 15-17.</div>

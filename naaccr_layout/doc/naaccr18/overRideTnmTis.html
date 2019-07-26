@@ -1,0 +1,56 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1993</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2018</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">18</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2581 - 2581</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.overRideTnmTis<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct.<br/><br/>
+    <div>This over-ride is used with the following edits in the NAACCR Metafile of the EDITS software:</div>
+    <div>
+        <ul>
+            <li>TNM Clin T, N, M, In Situ (CoC)</li>
+            <li>TNM Path T, N, M, In Situ (CoC)</li>
+        </ul>
+        If the patient has a T value indicating in situ/ noninvasive, this edit verifies that the N, M, and stage group reflect in situ/noninvasive disease. However, there are certain circumstances where AJCC does allow a T value indicating in situ/noninvasive and N, M, and/or stage group that indicates invasive disease. An over-ride is required to accommodate these situations.
+    </div>
+    <div>&nbsp;</div>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>This over-ride will allow registrars to enter combination of T, N, and M with a stage group that differs from the combinations documented in the AJCC Staging Manual.</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Reviewed and confirmed as reported</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Not reviewed or reviewed and corrected</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'></td>
+        </tr>
+    </table>
+</div>

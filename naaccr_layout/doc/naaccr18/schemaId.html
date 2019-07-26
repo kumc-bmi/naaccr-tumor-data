@@ -1,0 +1,38 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">3800</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">5</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2018</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">18</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1726 - 1730</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.schemaId<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>The derived values in this data item link Site-Specific Data Items (including grade data items) with the appropriate site/histology grouping and accounts for every combination of primary site and histology. The values for this data item are derived based on primary site, histology, and schema discriminator fields (when required). The derived values link Site-Specific Data Items with the appropriate site/histology grouping.
+    <br/><br/>
+    <div>For example, the Schema ID for an adenocarcinoma of the lung is 00360. This value links the Site-Specific Data Items associated with adenocarcinoma of the lung: Separate Tumor Nodules [3929], Visceral and Parietal Pleural Invasion [3937], and Pleural Effusion [3913]. The Schema ID would also link to the appropriate grade data items an adenocarcinoma of the lung. The AJCC ID [995] code for Lung is 36. The AJCC ID [995] would link to the AJCC TNM Data items (Clin T, Clin N, Etc.) specific to Lung.</div>
+    <div>&nbsp;</div>
+    <div>AJCC ID [995] will not be assigned when a site/histology combination is not eligible for TNM staging.&nbsp;</div>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>The purpose of the derived Schema ID is to link the appropriate Site-Specific Data Items with the patient&#8217;s primary site/histology. This data item is similar to AJCC ID [995], but includes additional site/histologies that may not be eligible for TNM staging using the current AJCC Staging Manual. AJCC ID [995] is left blank if a case is not eligible for TNM Staging using the current AJCC Staging Manual. Separating AJCC ID [995] and the Schema ID allows coding of Site-Specific Data Items for site/histology combinations that are not eligible for an AJCC Stage, but are eligible for Summary Stage.<br/><br/>This data item will also be used to develop edits and could potentially be used for analysis.
+</div>
+<div class='content chap10-para'><strong>Codes: See the&nbsp;<!--[if gte mso 10]>  <![endif]-->NAACCR Site-Specific Data Item webpage for codes.</strong></div>
+<div class='content chap10-para'>Each Site-Specific Data Item (SSDI) applies only to selected primary sites, histologies, and years of diagnosis. Depending on applicability and standard-setter requirements, SSDIs may be left blank.</div>

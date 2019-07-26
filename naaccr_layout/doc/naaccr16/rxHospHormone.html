@@ -1,0 +1,72 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Hormone Therapy at this Facility (CoC)<br/></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">710</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">792 - 793</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Records whether systemic hormonal agents were administered as first-course treatment at this facility or the reason they were not given. Hormone therapy consists of a group of drugs that may affect the long-term control of a cancer&#8217;s growth. It is not usually used as a curative measure.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>Systemic therapy may involve the administration of one or a combination of agents. This data item allows for the evaluation of hormonal agents given as part of the first course of therapy. Furthermore, it is useful to know the reason hormone therapy was not administered when evaluating quality of care for certain tumors.
+    <br/><br/>If central registries wish to study the treatment given at particular facilities, the facility-level treatment fields must be used. The summary treatment fields, conversely, combine information for all reporting facilities that provide first course of treatment for the tumor. Facility-specific fields allow studies of detailed referral patterns and treatment by type of healthcare setting. Knowing what part of the treatment was given at a particular facility also helps resolve consolidation issues.
+</div>
+<div class='content chap10-para'><strong>Codes (Refer to the most recent version of <em>FORDS</em> for additional instructions.) </strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>00</td>
+            <td class='code-desc'>None, hormone therapy was not part of the planned first course of therapy. Diagnosed at autopsy.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>01</td>
+            <td class='code-desc'>Hormone therapy was administered as first course therapy.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>82</td>
+            <td class='code-desc'>Hormone therapy was not recommended/administered because it was contraindicated due to patient risk factors (comorbid conditions, advanced age) or there was progression of disease prior to administration.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>85</td>
+            <td class='code-desc'>Hormone therapy was not administered because the patient died prior to planned or recommended therapy.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>86</td>
+            <td class='code-desc'>Hormone therapy was not administered. It was recommended by the patient's physician, but was not administered as part of first-course therapy. No reason was stated in the patient record.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>87</td>
+            <td class='code-desc'>Hormone therapy was not administered. It was recommended by the patient's physician, but was refused by the patient, or the patient's family member or guardian. The refusal was noted in the patient record.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>88</td>
+            <td class='code-desc'>Hormone therapy was recommended, but it is unknown if it was administered.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>99</td>
+            <td class='code-desc'>It is unknown whether hormone therapy was recommended or administered because it is not stated in the patient record; death certificate-only cases.</td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'>
+    <em>Note</em>: Codes 02-03 entered under the<em> ROADS </em>rules for tumors diagnosed prior to January 1, 2003, should have been converted to the appropriate code in the new field RX SUMM--Transplnt/Endocr [3250] implemented with
+    <em>FORDS</em>. Endocrine surgery and endocrine radiation therapy are no longer coded as Hormone Therapy for tumors diagnosed on or after January 1, 2003.
+</div>

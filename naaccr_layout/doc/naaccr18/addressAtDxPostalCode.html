@@ -1,0 +1,65 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">100</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">9</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">126 - 134</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.addrAtDxPostalCode<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;Zip Code (pre-CoC)
+<br/>&nbsp;&nbsp;&nbsp;Postal Code (CCCR)
+<br/>&nbsp;&nbsp;&nbsp;Postal Code at Diagnosis (CoC)
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para mark-changed'>Identifies the postal code of the patient&#8217;s address at diagnosis. For consolidated records, postal code may be based on reported or corrected residential address information.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>
+    <div> The postal code is part of the patient&#8217;s demographic data and has multiple uses. It can be used to evaluate referral patterns, allows for the analysis of cancer cluster concerns, and supports epidemiological studies that use area-based social measures.</div>
+    <div>&nbsp;</div>
+    <div><strong>Instructions for Coding</strong></div>
+    <div>
+        <ul>
+            <li>This field is intended to store ZIP Code or other postal code for the patient's physical, residential address. The postal code for PO Box mailing address should not be entered into this data item except in the infrequent case when no other address information is available.</li>
+            <li>If the patient has multiple tumors, the postal code at diagnosis may be different for each tumor.</li>
+            <li>Do not update this item if the patient's residential address changes. Store address update information in the affiliated current address data items. Only update based on improved information on the residential address at time of diagnosis. For instance, it is appropriate to correct a ZIP Code during the geocoding or consolidation process.</li>
+            <li>For U.S. residents, use either the 5-digit or the extended 9-digit ZIP code. Blanks follow the 5-digit code if the 4-digit extension is not collected.</li>
+            <li>For Canadian residents, use the 6-character alphanumeric postal code.</li>
+            <li>When available, enter the postal code for other countries for out-of-country addresses.<br/></li>
+        </ul>
+    </div>
+</div>
+<div class='content chap10-para'><strong>Codes (in addition to known US and Canadian or other postal codes) </strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>888888888</td>
+            <td class='code-desc'>Resident of country other than the United States, U.S. possessions or territories, or Canada and the postal code is unknown</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>999999999</td>
+            <td class='code-desc'>Resident of the United States (including its possessions, etc.) and the postal code is unknown</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>999999</td>
+            <td class='code-desc'>Resident of Canada and postal code is unknown</td>
+        </tr>
+    </table>
+</div>

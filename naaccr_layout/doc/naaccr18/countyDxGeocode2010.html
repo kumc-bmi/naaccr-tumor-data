@@ -1,0 +1,68 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">96</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">3</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2016</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">16</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">182 - 184</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.countyAtDxGeocode2010<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para mark-changed'>County at Diagnosis 2010 Code for the county of the patient's residence at the time the tumor was diagnosed is a derived (geocoded) variable based on Census Boundary files from 2010 Decennial Census. This code should be used for county and county-based (such as CHSDA) rates and analysis for all cases diagnosed in 2010-2019.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>Census tracts are areas geographically nested within counties and designated with a 6-digit number code. This 6-digit code is commonly repeated within a state in different counties. Census tract numbers are only unique when paired with the state and the county. Therefore, a tract cannot be accurately identified without knowing the county. Example from Massachusetts: Rural Franklin County contains a tract 040600 with 2010 population 4,612 people. Urban Suffolk County contains a tract 040600 with 2,444 people. The county must be known in order to distinguish between the two tract codes. Because we historically used a single variable for county at diagnosis [90], correct tract codes were frequently paired with the wrong county due to incorrect county assignment during abstracting or a change of county over time. Also, some variables, such as the Census Tr Poverty Indicatr [145] require the use of the decennial Census County codes closest to year of diagnosis and not the decade of year of diagnosis. Using a single county at diagnosis, and using the reported versus geocoded data, may result in erroneous assignment of geographic location as well as invalid links with census data (i.e., population, poverty category, urban/rural designation).
+    <br/><br/>
+    <div><strong>Instructions for Coding</strong></div>
+    <ul>
+        <li>This variable is generated through the process of geocoding either during abstracting or at the central registry level.</li>
+        <li>It is recommended that all cases diagnosed through 2019 should have a geocoded County at Diagnosis 2010.</li>
+        <li>At a minimum, all cases diagnosed through 2006-2019 should have a geocoded County at Diagnosis 2010. Cases diagnosed 2006-2009 must have both County at Diagnosis 2000 and County at Diagnosis 2010 codes for proper assignment of the Census Tract Poverty Indicator [145]. Cases diagnosed 2016-2019 must have both County at Diagnosis 2010 and County at Diagnosis 2020 codes for proper assignment of the Census Tract Poverty Indicator [145].</li>
+        <li>If the patient has multiple tumors, geocoded county may be different for each tumor.</li>
+        <li>Do not update this item if the patient's county of residence changes. Store updated address information in the affiliated current address data items. Only update based on improved information on the residential address at time of diagnosis. For instance, it is appropriate to correct a county during manual geocoding or a consolidation process.</li>
+        <li>PO Box address information should not be used to geocode this data item except in the infrequent case when no other address information is available.</li>
+        <li>Detailed standards have not been set for Canadian provinces/territories. Use code 998 for Canadian residents.</li>
+        <li>Blank "Not geocoded" is allowable for cases diagnosed before 2005 and after 2019. However, it is preferred to have all cases geocoded to a 2010 Census County to allow for both retrospective and cross-sectional analyses.</li>
+    </ul>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para mark-changed'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>001-997</td>
+            <td class='code-desc'>County at diagnosis. Valid FIPS code.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>998</td>
+            <td class='code-desc'>Known town, city, state, or country of residence but county code not known AND a resident outside of the state of reporting institution (must meet all criteria). Use this code for Canadian residents.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>999</td>
+            <td class='code-desc'>County unknown. The county of the patient is unknown, or the patient is not a United States resident. County is not documented in the patient's medical record.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'></td>
+            <td class='code-desc'></td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para mark-changed'>
+    <em>Note</em>: For U.S. residents, historically, standard codes are those of the FIPS publication &#8220;Counties and Equivalent Entities of the United States, Its Possessions, and Associated Areas.&#8221; These FIPS codes (FIPS 6-4) have been replaced by INCITS standard codes; however, there is no impact on this variable as the codes align with the system the Census used for each decennial census and changes will automatically be accounted for during geocoding. County codes issued by the Federal Information Processing Standards (FIPS) publication
+    <em>Counties and Equivalent Entities of the United States, Its Possessions, and Associated Areas</em> is available in Appendix A.
+</div>

@@ -1,0 +1,68 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">89</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">3</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2018</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">18</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">150 - 152</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.countyAtDxAnalysis<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>County at Diagnosis Analysis Code for the county of the patient's residence at the time the tumor was diagnosed is a derived variable to be used for county and county-based (such as CHSDA) rates and analysis for all cases regardless of year of diagnosis.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Historically, we had a single County at DX [90]. However, counties change over time (which impacts our derived variables such as poverty code indicator which don&#8217;t directly align with year of diagnosis), and the county reported by the facility does not always match the geocoded county. In the vast majority of cases where geocoded county and reported county differ, the geocoded county is correct. Including additional geocoded county codes for each census year addresses the accuracy of geocoded fields, however, it is cumbersome to pull data from different variables in order to generate county-level rates. Use of this variable ensures the most accurate and appropriate county data is used for calculating county-level rates.
+    <br/><br/>
+    <div><strong>Instructions for Coding</strong></div>
+    <ul>
+        <li>This variable can be generated using a standard, NAACCR supplied SAS code (or the logic below). At a minimum, this field should be derived prior to release of data for county-level analysis or rates. Ideally, the variable should be updated whenever there is a change to any county field.</li>
+        <li>If the County At DX Reported [90] AND the County At DX Geocoded associated with the year of diagnosis are the same, the County At DX Analysis county can be pulled from either field.</li>
+        <li>If the County At DX Reported [90] is "999" or NULL AND County At DX Geocoded associated with the year of diagnosis is geocoded (Census Tr Cert [#364 for cases diagnosed through 1999, #365 for cases diagnosed 2000-2009, or #367 for cases diagnosed 2010-2019] = is not null and less than 9), pull the County At DX Geocode associated with the year of diagnosis. Cases diagnosed 1990-1999, pull from County At DX Geocode 1990. Cases diagnosed 2000-2009, pull from County At DX Geocode 2000. Cases diagnosed 2010-2019, pull from County At DX Geocode 2000. Cases diagnosed 2020-2029, pull from County At DX Geocode 2020.</li>
+        <li>If the County At DX Geocoded associated with the year of diagnosis does not equal County At DX Reported [90] AND is a high quality geocode (Census Tr Cert [#364 for cases diagnosed through 1999, #365 for cases diagnosed 2000-2009, or #367 for cases diagnosed 2010-2019] = 1), pull the County At DX Geocode associated with the year of diagnosis. Cases diagnosed 1990-1999, pull from County At DX Geocode 1990. Cases diagnosed 2000-2009, pull from County At DX Geocode 2000. Cases diagnosed 2010-2019, pull from County At DX Geocode 2000. Cases diagnosed 2020-2029, pull from County At DX Geocode 2020.</li>
+        <li>If the County At DX Geocoded associated with the year of diagnosis does not equal County At DX Reported [90] AND is based on a PO Box address (Census Tr Cert [#364 for cases diagnosed through 1999, #365 for cases diagnosed 2000-2009, or #367 for cases diagnosed 2010-2019] = 5), the derived county equals the County At DX Reported [90].</li>
+        <li>If the County At DX Geocoded associated with the year of diagnosis is ungeocoded (Census Tr Cert [#364 for cases diagnosed through 1999, #365 for cases diagnosed 2000-2009, or #367 for cases diagnosed 2010-2019] = blank or 9), the derived county equals the County At DX Reported [90].</li>
+        <li>If the County At DX Geocoded associated with the year of diagnosis does not match County At DX Reported [90] AND a geocode is based on residential addresses but geocoded to the centroid of a zip code (Census Tr Cert [#364 for cases diagnosed through 1999, #365 for cases diagnosed 2000-2009, or #367 for cases diagnosed 2010-2019] = 2-4), manual review is required to resolve the discrepancy. Until manual review can be done, use the County At DX Reported [90].</li>
+        <li>If the patient has multiple tumors, the county codes may be different for each tumor.</li>
+        <li>Detailed standards have not been set for Canadian provinces/territories. Use code 998 for Canadian residents.</li>
+    </ul>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>001-997</td>
+            <td class='code-desc'>Valid FIPS code</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>998</td>
+            <td class='code-desc'>Known town, city, state, or country of residence but county code not known AND a resident outside of the state of reporting institution (must meet all criteria). Use for Canadian residents.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>999</td>
+            <td class='code-desc'>The county of the patient is unknown, or the patient is not a United States resident. County is not documented in the patient's medical record.</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'></td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'><em>Note</em>: For U.S. residents, historically, standard codes are those of the FIPS publication
+    <em>Counties and Equivalent Entities of the United States, Its Possessions, and Associated Areas.</em> These FIPS codes (FIPS 6-4) have been replaced by INCITS standard codes; however, there is no impact on this variable as the codes align with the system the Census used for each decennial census and changes will automatically be accounted for during geocoding. County codes issued by the Federal Information Processing Standards (FIPS) publication,
+    <em>Counties and Equivalent Entities of the United States, Its Possessions, and Associated Areas</em> is available in Appendix A.
+</div>

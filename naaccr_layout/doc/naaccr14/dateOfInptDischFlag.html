@@ -1,0 +1,43 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">601</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">773 - 774</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>This flag explains why no appropriate value is in the field, Date of Inpt Disch [600]. This data item was first available in Volume II Version 12.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Before Version 12 (through 2009 diagnosis), date fields included codes that provided information other than dates. As part of an initiative to standardize date fields, new fields were introduced to accommodate non-date information that had previously been transmitted in date fields.</div>
+<div class='content chap10-para'><strong>Codes (See Appendix H for the complete Flavors of Null table, which includes the NAACCR codes, HL7 codes and definitions.) </strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>10</td>
+            <td class='code-desc'>No information whatsoever can be inferred from this exceptional value (e.g, unknown if patient was an inpatient).</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>11</td>
+            <td class='code-desc'>No proper value is applicable in this context (e.g., patient was never an inpatient at the reporting facility).</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>12</td>
+            <td class='code-desc'>A proper value is applicable but not known. This event occurred, but the date is unknown (e.g., the patient was an inpatient but the date is unknown).</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>A valid date value is provided in item Date of Inpt Disch [600], or the date was not expected to have been transmitted.</td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'>Comment: This is part of the initiative of the transformation from the old NAACCR date standards to interoperable dates.</div>

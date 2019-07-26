@@ -1,0 +1,123 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">501</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">564-565</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+This variable codes the earliest source of identifying information. For cases identified by a source other than reporting facilities (such as through death clearance or as a result of an audit), this variable codes the type of source through which the tumor was first identified. This data item cannot be used by itself as a data quality indicator. The timing of the casefinding processes (e.g., death linkage) varies from registry to registry, and the coded value of this variable is a function of that timing.
+
+<br/><br/><b>Rationale</b><br/>
+This data item will help reporting facilities as well as regional and central registries in prioritizing their casefinding activities. It will identify reportable tumors that were first found through death clearance or sources other than traditional reporting facilities. It provides more detail than "Type of Reporting Source."<br/>
+<br/>
+<b>Coding Instructions</b><br/>
+This variable is intended to code the source that first identified the tumor. Determine where the case was first identified and enter the appropriate code. At the regional or central level, if a hospital and a non-hospital source identified the case independently of each other, enter the code for the non-hospital source (i.e., codes 30-95 have priority over codes 10-29). If the case was first identified at a reporting facility (codes 10-29), code the earliest source (based on patient or specimen contact at the facility) of identifying information.<br/>
+<br/>
+If a death certificate, independent pathology laboratory report, consultation-only report from a hospital, or other report was used to identify a case that was then abstracted from a different source, enter the code for the source that first identified the case, not the source from which it was subsequently abstracted. If a regional or central registry identifies a case and asks a reporting facility to abstract it, enter the code that corresponds to the initial source, not the code that corresponds to the eventual reporting facility.
+
+<br/><br/><b>Codes<br/>
+Case first identified at a reporting facility:</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">10</td>
+        <td class="naaccr-codes-cell">Reporting Hospital, NOS</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">20</td>
+        <td class="naaccr-codes-cell">Pathology Department Review (surgical pathology reports, autopsies, or cytology reports)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">21</td>
+        <td class="naaccr-codes-cell">Daily Discharge Review (daily screening of charts of discharged patients in the medical records department)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">22</td>
+        <td class="naaccr-codes-cell">Disease Index Review (review of disease index in the medical records department)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">23</td>
+        <td class="naaccr-codes-cell">Radiation Therapy Department/Center</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">24</td>
+        <td class="naaccr-codes-cell">Laboratory Reports (other than pathology reports, code 20)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">25</td>
+        <td class="naaccr-codes-cell">Outpatient Chemotherapy</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">26</td>
+        <td class="naaccr-codes-cell">Diagnostic Imaging/Radiology (other than radiation therapy, codes 23; includes nuclear medicine)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">27</td>
+        <td class="naaccr-codes-cell">Tumor Board</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">28</td>
+        <td class="naaccr-codes-cell">Hospital Rehabilitation Service or Clinic</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">29</td>
+        <td class="naaccr-codes-cell">Other Hospital Source (including clinic, NOS or outpatient department, NOS)</td>
+    </tr>
+</table>
+<br/><b>Case first identified by source other than a reporting facility covered in the codes above:</b>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">30</td>
+        <td class="naaccr-codes-cell">Physician-Initiated Case</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">40</td>
+        <td class="naaccr-codes-cell">Consultation-only or Pathology-only Report (not abstracted by reporting hospital)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">50</td>
+        <td class="naaccr-codes-cell">Independent (non-hospital) Pathology-Laboratory Report</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">60</td>
+        <td class="naaccr-codes-cell">Nursing Home-Initiated Case</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">70</td>
+        <td class="naaccr-codes-cell">Coroner's Office Records Review</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">75</td>
+        <td class="naaccr-codes-cell">Managed Care Organization (MCO) or Insurance Records</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">80</td>
+        <td class="naaccr-codes-cell">Death Certificate (case identified through death clearance)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">85</td>
+        <td class="naaccr-codes-cell">Out-of-State Case Sharing</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">90</td>
+        <td class="naaccr-codes-cell">Other Non-Reporting Hospital Source</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">95</td>
+        <td class="naaccr-codes-cell">Quality Control Review (case initially identified through quality control activities such as casefinding audit of a regional or central registry)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">99</td>
+        <td class="naaccr-codes-cell">Unknown</td>
+    </tr>
+</table>

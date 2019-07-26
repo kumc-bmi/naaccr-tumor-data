@@ -1,0 +1,57 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Over-ride Summary Stage/TNM-M<br/></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1983</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2001</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">9</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1890 - 1890</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct.
+    <br/><br/>This over-ride is used with the following edits in the NAACCR Metafile of the EDITS software:<br/>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>Summary Stage 1977, TNM-M (NAACCR) <br/>
+        <tab></tab>
+    </tab>
+    &nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>
+        <tab>Summary Stage 2000, TNM-M (NAACCR)</tab>
+    </tab>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error or warning message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.<strong><br/><br/>Over-ride Flag as Used in the EDITS Software Package</strong><br/>The edit Summary Stage 1977, TNM-M (NAACCR) checks the SEER Summary Stage 1977 against the TNM-M and generates a warning if the SEER Summary Stage 1977 is &#8216;distant&#8217; and the TNM-M is &#8216;0&#8217;. (TNM-M is derived from TNM Path M and TNM Clin M, with TNM Path M having precedence.) It also checks if the SEER Summary Stage 1977 is not &#8216;distant&#8217; and the TNM-M is greater than or equal to &#8216;1&#8217; and generates an error or a warning. The edit Summary Stage 2000, TNM-M (NAACCR) checks the SEER Summary Stage 2000 against the TNM-M and generates a warning if the SEER Summary Stage 2000 is &#8216;distant&#8217; and the TNM-M is &#8216;0&#8217;. It also checks if the SEER Summary Stage 2000 is not &#8216;distant&#8217; and the TNM-M is greater than or equal to &#8216;1&#8217; and generates an error or a warning.<strong><br/><br/>Instructions for Coding</strong>
+    <ul>
+        <li>Leave blank if the program does not generate an error message for the edit Summary Stage 1977, TNM-M (NAACCR) or the edit Summary Stage 2000, TNM-M (NAACCR).</li>
+        <li>Leave blank and correct any errors for the case if an item is discovered to be incorrect.</li>
+        <li>Code 1 if the case has been reviewed and it has been verified that both SEER Summary Stage 1977 and TNM-M have been coded correctly or that SEER Summary Stage 2000 and TNM-M have been coded correctly.</li>
+    </ul>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Reviewed and confirmed as reported</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Not reviewed or reviewed and corrected</td>
+        </tr>
+    </table>
+</div>

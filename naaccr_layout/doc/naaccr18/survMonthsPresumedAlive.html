@@ -1,0 +1,44 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1787</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">4</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2015</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">15</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2987 - 2990</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.survMosPresumedAlive<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>
+    <div> Because not all central cancer registries conduct active patient follow-up, it is necessary to have an option for calculating survival times based on the assumption that the registry has ascertained all available deaths (state/province and national), and persons not known to be deceased are presumed to be alive as of the last date for which complete death ascertainment is available. The survival interval in months is calculated using the month, day, and year of the Surv-Date DX Recode [1788] and the month, day, and year of the Surv-Date Presumed Alive [1785]. The survival program is available from your standard setter or NAACCR.</div>
+    <div>&nbsp;</div>
+    <div>Example of a case diagnosed in 2011 and submitted in 2013. <br/>Date of submission: 20131101 <br/>Date of diagnosis: 20110915 <br/>Date of last contact: 20111017
+        <br/>Latest date for complete death ascertainment: 20111231 <br/>Vital status: Alive <br/>Study cutoff date: 20111231
+        <br/>Under the "presumed alive" scenario, 20111231 would be used as the endpoint for the survival calculation. The presumed alive survival time would be 3 months, while the survival time using the date of last contact (assuming active follow-up) would be 1 month.&nbsp;
+    </div>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Accurate survival estimates are crucial for monitoring trends in population-based cancer survival and assessing the effectiveness of healthcare delivery to cancer patients. With the aim of obtaining the most precise estimates of survival, it is necessary to use complete dates (month, day, and year components) in the calculation of the survival interval. The survival interval in months is calculated using complete dates, and the algorithm imputes missing components of dates when they are not available in central registry records.</div>
+<div class='content chap10-para mark-changed'>Additional information about the algorithm and what specific values are assigned in given missing date situations are available here:
+
+
+    <a target="_blank" href=" http://seer.cancer.gov/survivaltime/">http://seer.cancer.gov/survivaltime/</a>.
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>A value of 9999 is for missing and matches the Surv-Flag Presumed Alive [1786] value of 9 or blank. Leading zeros will be used when needed to left fill the field.</div>

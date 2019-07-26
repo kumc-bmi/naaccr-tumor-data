@@ -1,0 +1,38 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1785</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">8</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2015</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">15</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2978 - 2985</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.survDatePresumedAlive<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>The Surv-Date Presumed Alive is the last date for which complete death ascertainment is available from the registry at the time a file is transmitted. Because not all central cancer registries conduct active patient follow-up, it is necessary to have an option for calculating survival times based on the assumption that the registry has ascertained all available deaths (state/province and national), and persons not known to be deceased are presumed to be alive as of the last date for which complete death ascertainment is available. This variable is set in the survival program used to derive the seven survival variables. The survival program is available from your standard setter or NAACCR.
+    <br/><br/>Example 1 <br/>Vital Status: Alive <br/>Date of Last Contact: 20111120 <br/>Study Cut-off Date: 20111231 <br/>Latest date for complete death ascertainment: 20111231
+    <br/>Surv-Date Presumed Alive: 20111231
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>The Surv-Date Presumed Alive is needed to be able to recalculate survival months if a different study cut-off date is used and provides flexibility to recalculate survival without needing to rerun the survival program on the original data.</div>
+<div class='content chap10-para mark-changed'>Additional information about the survival algorithm and what specific values are assigned in given missing date situations are available here:
+
+
+    <a target="_blank" href=" http://seer.cancer.gov/survivaltime/">http://seer.cancer.gov/survivaltime/</a>.
+</div>

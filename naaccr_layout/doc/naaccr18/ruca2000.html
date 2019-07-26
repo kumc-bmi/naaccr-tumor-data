@@ -1,0 +1,55 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">339</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2018</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">18</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">460 - 460</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.ruca2000<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;Rural Urban Commuting Area-Tract-level 2000
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>A measure of how accessible to an urban center a cancer patient's census tract at diagnosis is based on the USDA identification of urban and rural commuting areas. The variable is a binomial-either in an urban commuting area or not. The measure indicates proximity to large urban centers and can be an indicator of access to oncology specialists and cancer treatment facilities. Collecting the variable with each decennial census allows for retrospective and cross-sectional epidemiologic analysis.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Studies have shown that residents of rural areas have lower screening rates, lower rates of follow-up of abnormal screening tests, higher late-stage diagnosis rates, and differences in cancer treatment patterns. Including tract-level indicators of rural-urban residence in the NAACCR data files will facilitate research in rural-urban disparities and allow researchers to control for rural-urban differences in model-based analysis of cancer risks and outcomes. Using these codes allows cancer registries to release the area-based measure instead of more sensitive information such as address or long/lat. The measure has been tested for uniqueness and the categories selected/aggregated so that identification of individual level census tracts is not possible as long as county is not known. Therefore, unless the researcher can scientifically defend the need for county, the county identifier will not be released in the same database.</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Urban commuting area-RUCA codes 1.0, 1.1, 2.0, 2.1, 3.0, 4.1, 5.1, 7.1, 8.1, and 10.1</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>2</td>
+            <td class='code-desc'>Not an urban commuting area-All other RUCA codes except 99</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>9</td>
+            <td class='code-desc'>Unknown or not applicable-census tract not available or RUCA code = 99</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'></td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'>
+    <em>Note</em>: This is a derived variable. Currently, the variable is derived during call for data. However, SAS code to derive the variable at the central registry variable for local use is available on the NAACCR website.
+</div>

@@ -1,0 +1,46 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Site/Histology/Laterality/Sequence Number Interrecord Review (Interrecord Edit 09)</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2010</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1898-1898</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct. <br/>
+<br/>
+This over-ride is used with the following Interrecord Edit from the SEER Program: <br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Verify Same Primary Not Reported Twice for a Person (SEER IR09)<br/>
+<br/>
+Presently, documentation on interrecord edits is not included in the EDITS software.
+
+<br/><br/><b>Rationale</b><br/>
+Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.<br/>
+<br/>
+<b>Over-ride Flag as Used in the EDITS Software Package</b><br/>
+Verify Same Primary Not Reported Twice for a Person (SEER IR09) applies to paired organs and does not allow two cases with the same primary site group, laterality and three digit histology code. This edit verifies that the same primary is not reported twice for a person.<br/>
+<br/>
+<b>Instructions for Coding</b><br/>
+<ul><li>Leave blank if the program does not generate an error message for the edit Verify Same Primary Not Reported Twice for a Person (SEER IR09).</li>
+<li>Code 1 if the case has been reviewed and it has been verified that the patient had multiple primaries of the same histology (3 digit) in the same primary site group.</li></ul>
+
+<br/><br/><b>Codes</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">1</td>
+        <td class="naaccr-codes-cell">Reviewed and confirmed as reported</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">Blank</td>
+        <td class="naaccr-codes-cell">Not reviewed or reviewed and corrected</td>
+    </tr>
+</table>

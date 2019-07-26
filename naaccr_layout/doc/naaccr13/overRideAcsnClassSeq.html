@@ -1,0 +1,55 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Over-ride Accession/Class of Case/Sequence</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1985</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1891-1891</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct. 
+
+<br/><br/>This over-ride is used with the following edit in the NAACCR Metafile of the EDITS software: 
+<tab>Accession Number, Class of Case, Seq Number (CoC). </tab>
+
+<br/><br/><b>Rationale</b><br/>
+Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.
+<br/>
+<br/><b>Over-ride Flag as Used in the EDITS Software Package</b>
+<br/>The edit, Accession Number, Class of Case, Seq Number (CoC), checks the following:
+<br/><ol>
+<li>If the case is the only case or the first of multiple cases diagnosed at the facility (Sequence Number--Hospital = 00, 01, 60, or 61, and Class of Case = 00, 10-14, or 40), then the first 4 characters of the Accession Number--Hosp must equal the year of the Date of 1st Contact.</li>
+<li>If the case is first diagnosed at autopsy (Class of Case = 38) and the case is the only case or the first of multiple cases for a patient (Sequence Number--Hospital = 00, 01, 60, or 61), then the first 4 characters of the Accession Number--Hosp must equal the year of the Date of Last Contact AND must equal the year of the Date of 1st Contact.</li>
+<li>If the case is first diagnosed at autopsy (Class of Case = 38) and the case is not the first case for a patient (Sequence Number--Hospital) greater than 01 or greater than 61), then the year of the Date of 1st Contact must equal the year of Date of Last Contact.</li></ol>There are some exceptions to the above rules. Over-ride Acsn/Class/Seq may be used to override the edit when the circumstances fit the following situation or one similar to it:
+<br/>The case may be the only or the first of multiple malignant cases for a patient (Sequence Number--Hospital = 00 or 01), but there is an earlier benign case (with an earlier year of the Date of 1st Contact) to which the Accession Number--Hosp applies.
+
+<br/><br/><b>Instructions for Coding</b>
+<br/><ol>
+<li>If edit generates an error or warning message, verify that the Accession Number--Hosp, Sequence Number--Hospital, and Class of Case are correct.</li>
+<li>Leave blank if the program does not generate an error message for the edit Accession Number, Class of Case, Seq Number (CoC).</li>
+<li>Leave blank and correct any errors for the case if an item is discovered to be incorrect.</li>
+<li>Code 1 if review of accession number, sequence number and class of case verifies that they have been coded correctly and there is an unusual combination of these data items.</li></ol>
+
+
+  <b>Codes</b>
+<br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">Blank</td>
+        <td class="naaccr-codes-cell">Not reviewed or reviewed and corrected</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">1</td>
+        <td class="naaccr-codes-cell">Reviewed and confirmed as reported</td>
+    </tr>
+</table>
+<br/>

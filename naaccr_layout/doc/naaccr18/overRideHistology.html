@@ -1,0 +1,217 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2040</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2587 - 2587</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.overRideHistology<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;Histology/Behavior Interfield Review (Field Item Edit Morph)
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct.
+    <br/>This over-ride is used with the following edits in the NAACCR Metafile of the EDITS software:<br/> &nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>Diagnostic Confirmation, Behavior ICDO2 (SEER IF31)<br/>
+        <tab></tab>
+    </tab>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>
+        <tab>Diagnostic Confirmation, Behavior ICDO3 (SEER IF31)<br/>
+            <tab></tab>
+        </tab>
+    </tab>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>
+        <tab>
+            <tab>Morph (1973-91) ICD-O-1 (SEER MORPH)<br/>
+                <tab></tab>
+            </tab>
+        </tab>
+    </tab>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>
+        <tab>
+            <tab>
+                <tab>Morphology--Type/Behavior ICDO2 (SEER MORPH)
+                    <tab><br/></tab>
+                </tab>
+            </tab>
+        </tab>
+    </tab>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>
+        <tab>
+            <tab>
+                <tab>
+                    <tab>Morphology--Type/Behavior ICDO3 (SEER MORPH)</tab>
+                </tab>
+            </tab>
+        </tab>
+    </tab>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.<strong><br/>
+    <br/>
+    Over-ride Flags as Used in the EDITS Software Package</strong><br/>
+    Edits of the type Diagnostic Confirmation, Behavior differ in the use of ICD-O-2 or ICD-O-3 and check that, for
+    <em>in situ</em> cases (Behavior = 2), Diagnostic Confirmation specifies microscopic confirmation (1, 2, or 4).<br/>
+    <br/>
+    The distinction between
+    <em>in situ</em> and invasive is very important to a registry, since prognosis is so different. Since the determination that a neoplasm has not invaded surrounding tissues, i.e.,
+    <em>in situ</em>, is made microscopically, cases coded
+    <em>in situ</em> in behavior should have a microscopic confirmation code. However, very rarely, a physician will designate a case noninvasive or <em>in situ</em> without microscopic evidence.<br/>
+    <br/>
+    <tab>If an edit of the type, Diagnostic Confirmation, Behavior, gives an error message or warning, check that Behavior and Diagnostic Confirmation have been coded correctly. Check carefully for any cytologic or histologic evidence that may have been missed in coding.</tab>
+    <br/>
+    <blockquote>
+        <tab></tab>
+    </blockquote>
+    <tab>Edits of the type, Morphology--Type/Behavior, perform the following check: <br/>
+    </tab>
+    <ol>
+        <li>
+            <tab>Codes listed in ICD-O-2 or ICD-O-3 with behavior codes of only 0 or 1 are considered valid, since the behavior matrix of ICD-O-2 and ICD-O-3 allows for the elevation of the behavior of such histologies when the tumor is
+                <em>in situ </em>or malignant. This edit forces review of these rare cases to verify that they are indeed <em>in situ </em>or malignant.<br/>
+                <br/>
+            </tab>
+        </li>
+        <li>
+            <tab>The following histologies are generally not accepted as
+                <em>in situ</em>: ICD-O-2 histologies 8000-8004, 8020, 8021, 8331, 8332, 8800-9054, 9062, 9082, 9083, 9110-9491, 9501-9989, ICD-O-3 histologies 8000-8005, 8020, 8021, 8331, 8332, 8800-9055, 9062, 9082, 9083, 9110-9493, 9501-9989. This edit forces review of these cases.<br/>
+                <br/>
+            </tab>
+        </li>
+        <li>
+            <tab>If a Morphology-Type/Behavior edit produces an error or warning message and the case is one in which the 4-digit morphology code is one that appears in ICD-O-2 or ICD-O-3 only with behavior codes of 0 or 1, or the case is one in which the 4-digit morphology code is not generally accepted with a behavior code of 2, verify the coding of morphology and that the behavior should be coded malignant or
+                <em>in situ</em>. The registrar may need to consult a pathologist or medical advisor in problem cases.<br/>
+                <br/>
+            </tab>
+            <tab>
+                Exceptions:
+            </tab>
+            <br/>
+            <tab>
+                If year of Date of Diagnosis &amp;gt; 2000, then a behavior code of 1 is valid for the following ICD-O-2 histologies and no over-ride flag is needed: 8931, 9393, 9538, 9950, 9960-9962, 9980-9984, and 9989. Similarly, the following ICD-O-3 histologies are valid with a behavior code of 1: 8442, 8451, 8462, 8472, and 8473. If year of Date of Diagnosis &amp;gt; 2003, the following ICD-O-3 benign histologies will pass without review: 8146, 8271, 8861, 8897, 9121, 9122, 9131, 9161, 9350, 9351, 9352, 9360, 9361, 9383, 9384, 9394, 9412, 9413, 9444, 9492, 9493, 9506, 9531, 9532, 9533, 9534, 9537, 9541, 9550, 9562, and 9570.
+            </tab>
+            <br/>
+            <tab></tab>
+            <tab>
+                <br/>
+            </tab>
+        </li>
+        <li>
+            <tab>Grade 5-8 with histologies not in the range of 9590-9948 is impossible.<br/>
+                <br/>
+            </tab>
+        </li>
+        <li>
+            <tab>Some terms in ICD-O-2 and ICD-O-3 carry an implied statement of grade. These histologies must be reported with the correct grade as stated below. An error of this type cannot be over-ridden.<br/>
+                &nbsp; <br/>
+                <tab><strong>ICD-O-2</strong>
+                    <tab><br/>
+                        8020/34 Carcinoma, undifferentiated
+                        <tab><br/>
+                            8021/34 Carcinoma, anaplastic<br/>
+                            <tab>8331/31 Follicular adenocarcinoma, well differentiated
+                                <tab><br/>
+                                    8851/31 Liposarcoma, well differentiated
+                                    <tab><br/>
+                                        9062/34 Seminoma, anaplastic<br/>
+                                        <tab>9082/34 Malignant teratoma, undifferentiated
+                                            <tab><br/>
+                                                9083/32 Malignant teratoma, intermediate type
+                                                <tab><br/>
+                                                    9401/34 Astrocytoma, anaplastic
+                                                    <tab><br/>
+                                                        9451/34 Oligodendroglioma, anaplastic<br/>
+                                                        <tab>9511/31 Retinoblastoma, differentiated
+                                                            <tab><br/>
+                                                                9512/34 Retinoblastoma, undifferentiated<br/>
+                                                                <tab><u><br/>
+                                                                </u><strong>ICD-O-3</strong>
+                                                                    <tab><br/>
+                                                                        8020/34 Carcinoma, undifferentiated
+                                                                        <tab><br/>
+                                                                            8021/34 Carcinoma, anaplastic
+                                                                            <tab><br/>
+                                                                                8331/31 Follicular adenocarcinoma, well differentiated<br/>
+                                                                                <tab>9082/34 Malignant teratoma, undifferentiated
+                                                                                    <tab><br/>
+                                                                                        9083/32 Malignant teratoma, intermediate type
+                                                                                        <tab><br/>
+                                                                                            9401/34 Astrocytoma, anaplastic
+                                                                                            <tab><br/>
+                                                                                                9451/34 Oligodendroglioma, anaplastic
+                                                                                                <tab><br/>
+                                                                                                    9511/31 Retinoblastoma, differentiated
+                                                                                                    <tab><br/>
+                                                                                                        9512/34 Retinoblastoma, undifferentiated
+                                                                                                    </tab>
+                                                                                                </tab>
+                                                                                            </tab>
+                                                                                        </tab>
+                                                                                    </tab>
+                                                                                </tab>
+                                                                            </tab>
+                                                                        </tab>
+                                                                    </tab>
+                                                                </tab>
+                                                            </tab>
+                                                        </tab>
+                                                    </tab>
+                                                </tab>
+                                            </tab>
+                                        </tab>
+                                    </tab>
+                                </tab>
+                            </tab>
+                        </tab>
+                    </tab>
+                </tab>
+            </tab>
+        </li>
+    </ol>
+    <strong>Instructions for Coding<br/>
+    </strong>
+    <ol>
+        <li>Leave blank if the program does not generate an error message for the edits of the types, Diagnostic Confirmation, Behav Code or Morphology--Type/Behavior.</li>
+        <li>Leave blank and correct any errors for the case if an item is discovered to be incorrect.</li>
+        <li>Code 1, 2, or 3 as indicated if review of all items in the error or warning message confirms that all are correct.</li>
+    </ol>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para mark-changed'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Reviewed and confirmed that the pathologist states the primary to be "<i>in situ</i>" or "malignant" although the behavior code of the histology is designated as "benign" or "uncertain" in ICD-O-2 or ICD-O-3
+            </td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>2</td>
+            <td class='code-desc'>Reviewed and confirmed that the behavior code is "<i>in situ,</i>" but the case is not microscopically confirmed</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>3</td>
+            <td class='code-desc'>Reviewed and confirmed that conditions 1 and 2 both apply</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Not reviewed or reviewed and corrected</td>
+        </tr>
+    </table>
+</div>

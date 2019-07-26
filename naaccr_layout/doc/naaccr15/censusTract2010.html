@@ -1,0 +1,46 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">135</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">6</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">428 - 433</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>This field is provided for coding census tract of patient's residence at time of diagnosis. See Census Tract 1970/80/90 [110]; CENSUS TRACT 2000[130]. Codes are those used by the U.S. Census Bureau for the Year 2010 Census. Census tract codes have a 4-digit basic number and also may have a 2-digit suffix. Census tract numbers range from 0001.00 to 9999.98.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Census tract codes allow central registries to calculate incidence rates for geographical areas having population estimates. This field allows a central registry to add Year 2010 Census tracts to tumors diagnosed in previous years, without losing the codes in data items 110 and 130.<br/><br/>The Census Bureau provides population data for census tracts. Those rates can be used for general surveillance or special geographical and socioeconomic analysis.<br/><br/>Because census tracts for particular cases can change between censuses, the central registry may wish to assign an alternate census tract code to its cases. For example, a registry may code its 2005 cases using both the 2000 and 2010 census tract boundaries. The central registry can use this information for different comparisons.
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>Census Tract Code</td>
+            <td class='code-desc'>000100-999998</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>000000</td>
+            <td class='code-desc'>Area not census tracted</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>999999</td>
+            <td class='code-desc'>Area census tracted, but census tract is not available</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Census Tract 2010 not coded</td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'><strong>Clarification of NPCR Required Status</strong>
+    <br/>Information on census tract and census tract certainty is required. Census Tract and Census Tract Certainty should be recorded in the year-appropriate data item fields in order to reflect demographic information at the time of diagnosis. Until the 2010 Census is completed and data are available for geocoding, tumors diagnosed in 2010 or later, should be coded to the 2000 census definitions and recorded in Census Tract 2000 [130] and Census Tr Certainty 2000 [365]. When the 2010 Census data are available for geocoding, tumors diagnosed in 2010 or later must be coded to the 2010 census tract definitions and recorded in Census Tract 2010 [135] and Census Tract Certainty 2010 [367]. For tumors diagnosed between January 1, 2008, and December 31, 2009, use of Census Tract 2010 [135] and Census Track Certainty 2010 [367] is recommended.
+</div>

@@ -1,0 +1,73 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Age/Site/Histology Interfield Review (Interfield Edit 15) (SEER #3)<br/></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1990</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1896 - 1896</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct.
+    <br/>This over-ride is used with the following edits in the NAACCR Metafile of the EDITS software: <br/>
+    <blockquote>
+        <tab>Age, Primary Site, Morphology ICDO2 (SEER IF15)</tab>
+        <br/>
+        <tab>
+            <tab>Age, Primary Site, Morphology ICDO3 (SEER IF15)
+                <tab></tab>
+            </tab>
+        </tab>
+        <br/>
+        <tab>
+            <tab>
+                <tab>Age, Primary Site, Morph ICDO3--Adult (SEER)</tab>
+            </tab>
+        </tab>
+        <br/>
+        <tab>
+            <tab>
+                <tab>
+                    <tab>Age, Primary Site, Morph ICDO3--Pediatric (NPCR)</tab>
+                </tab>
+            </tab>
+        </tab>
+    </blockquote>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.<br/><br/><strong>Over-ride Flag as Used in the EDITS Software Package</strong><br/>Some cancers occur almost exclusively in certain age groups.<br/><br/>Edits of the type Age, Primary Site, Morphology require review if a site/morphology combination occurs in an age group for which it is extremely rare. The edit Age, Primary Site, Morph ICDO3--Adult (SEER) edits cases with an Age at Diagnosis of 15 and older. The edit Age, Primary Site, Morph ICDO3--Pediatric (NPCR) edits cases with an Age at Diagnosis of less than 15. The edits Age, Primary Site, Morphology ICDO2 (SEER IF15) and Age, Primary Site, Morphology ICDO3 (SEER IF15) contain logic for all ages.<strong><br/><br/>Instructions for Coding</strong>
+    <ol>
+        <li>Leave blank if the program does not generate an error message (and if the case was not diagnosed <em>in utero</em>) for the edits of the type Age, Primary Site, Morphology.</li>
+        <li>Correct any errors for the case if an item is discovered to be incorrect. <br/></li>
+        <li>Code 1 or 3 as indicated if review of items in the error or warning message confirms that all are correct.</li>
+    </ol>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Reviewed and confirmed that age/site/histology combination is correct as reported</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>2</td>
+            <td class='code-desc'>Reviewed and confirmed that case was diagnosed <i>in utero</i></td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>3</td>
+            <td class='code-desc'>Reviewed and confirmed that conditions 1 and 2 both apply</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Not reviewed or reviewed and corrected.</td>
+        </tr>
+    </table>
+</div>

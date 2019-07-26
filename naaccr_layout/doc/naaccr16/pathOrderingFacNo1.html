@@ -1,0 +1,37 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">ORC-21 Ordering Facility Name #01311 (HL7)<br/>Path Ordering Facility Number (AHA Number)<br/></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">7190</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">25</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">HL7</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2010</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">12</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">4596 - 4620</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Facility ID number of the facility where the specimen described in the first path report was removed/collected.
+    <br/><br/>Use the National Provider Identifier (NPI) if possible. Otherwise, use a number defined by the American Hospital Association (AHA), or some other standard-setting organization such as the American College of Surgeons (ACoS) or Clinical Laboratory Improvement Amendments (CLIA).
+    <br/><br/>This item accommodates only one path report; if additional path reports were prepared, enter the facility ID number(s) in Path Ordering Fac No 2 through Path Ordering Fac No 5 [7191-7194]. Information in this data item should refer to the path report described in data items 7010, 7090, 7100, 7320, and 7480.
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>
+    <div> The facility where the specimen was obtained is most likely the location of the medical record for the patient as well as any residual tissue.</div>
+    <div>
+        <br/>Cancer registries collect cancer information from various sources including pathology laboratories. Pathology reports of different types may be sent via HL7 messages. Included here are data items coming from such a message to be included in the cancer registry database to aid in consolidating a cancer case when there is information from multiple sources. Traditionally, these data items were not part of the NAACCR Standards Volume II record layout and therefore provide a link to NAACCR Standards Volume V.
+        <a href="http://www.naaccr.org/standardsandregistryoperations/volumev.aspx">http://www.naaccr.org/standardsandregistryoperations/volumev.aspx</a></div>
+</div>

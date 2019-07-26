@@ -1,0 +1,25 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2081</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">10</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1920-1929</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+Cyclic Redundancy Code (CRC) CHECKSUM for the NAACCR record in which it resides. A unique value is calculated for each unique record in a NAACCR file. The value is calculated by applying a CRC algorithm to all data fields of the NAACCR record (excluding the CRC CHECKSUM field). Following a transmission, the CRC CHECKSUM can be recalculated and compared with the transmitted CHECKSUM. Identical values indicate an error-free transmission; differing values indicate an error in transmission.<br/>
+<br/>
+The algorithm recommended by NAACCR is on the NAACCR website at: <a href="http://www.naaccr.org" target="_blank">http://www.naaccr.org</a>. Users must provide recipients of the data with the algorithm used to create the data transmission file. Otherwise, the item should be left blank.
+
+<br/><br/><b>Rationale</b><br/>
+The CHECKSUM can be used to determine if a record-level error occurred during transmission and can also be used to correct any such errors. Record-level CRC CHECKSUMs also allow portions of a NAACCR file to be salvaged in the event of a transmission error.
+

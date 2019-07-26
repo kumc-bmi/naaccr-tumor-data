@@ -1,0 +1,78 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">191</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2005</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">10.2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">448 - 448</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Patient.nhiaDerivedHispOrigin<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>The NAACCR Hispanic Identification Algorithm (NHIA) uses a combination of standard variables to directly or indirectly classify cases as Hispanic for analytic purposes. It is possible to separate Hispanic ancestral subgroups (e.g., Mexican) when indirect assignment results from birthplace information but not from surname match. The algorithm uses the following standard variables: Spanish/Hispanic Origin [190], Name--Last [2230], Name--Maiden [2390], Birthplace [250], Race 1 [160], IHS Link [192], and Sex [220].<br/><br/>Code 7 (Spanish surname only) of the Spanish/Hispanic Origin [190] data item became effective with 1994 diagnoses. It is recommended that NHIA should be run on 1995 and later diagnoses. However, a central registry may run it on their data for prior years. For greater detail, please refer to the technical documentation:
+    <a href="http://www.naaccr.org/LinkClick.aspx?fileticket=6E20OT41TcA%3d&amp;tabid=118&amp;mid=458">http://www.naaccr.org/LinkClick.aspx?fileticket=6E20OT41TcA%3d&amp;tabid=118&amp;mid=458</a>.
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Sometimes despite best efforts to obtain complete information directly from the medical record, information is not available and is reported to the cancer registry as a missing data item. With regard to Hispanic ethnicity, some cancer registries have found it necessary to rely on indirect methods to populate this data element. Registries often have significant numbers or proportions of Hispanic populations in their jurisdiction.</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>0</td>
+            <td class='code-desc'>Non-Hispanic</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Mexican, by birthplace or other specific identifier</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>2</td>
+            <td class='code-desc'>Puerto Rican, by birthplace or other specific identifier</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>3</td>
+            <td class='code-desc'>Cuban, by birthplace or other specific identifier</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>4</td>
+            <td class='code-desc'>South or Central American (except Brazil), by birthplace or other specific identifier</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>5</td>
+            <td class='code-desc'>Other specified Spanish/Hispanic origin (includes European; excludes Dominican Republic), by birthplace or other specific identifier</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>6</td>
+            <td class='code-desc'>Spanish, NOS; Hispanic, NOS; Latino, NOS</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>7</td>
+            <td class='code-desc'>NHIA surname match only</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>8</td>
+            <td class='code-desc'>Dominican Republic</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Algorithm has not been run</td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para'><em>Note:</em> Code 8 was added in Standards Volume II Version 10.2 effective January 2005.</div>

@@ -1,0 +1,87 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Patient Address (Number and Street)-Current (CoC)</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2350</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">60</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">3748-3807</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+The number and street address or the rural mailing address of the patient's current usual residence. This can be used to generate a follow-up inquiry, and must correspond to other fields in the current address. If the patient has multiple tumors, the current address should be the same. Additional address information such as facility, nursing home, or name of apartment complex should be entered in item Addr Current--Supplemental [2335].
+
+<br/><br/>U.S. addresses should conform to the USPS <em>Postal Addressing Standards</em>. These standards are referenced in USPS Pub. 28, July, 2008, <em>Postal Addressing Standards</em>. The current USPS Pub. 28 may be found and downloaded from the following website: <a href="http://pe.usps.gov/cpim/ftp/pubs/Pub28/pub28.pdf">http://pe.usps.gov/cpim/ftp/pubs/Pub28/pub28.pdf</a>.
+
+<br/><br/>Canadian addresses should conform to the <em>Canada Postal Guide</em>, last updated January, 2010. The current Canadian Postal Address standards may be found at the following website: <a href="http://www.canadapost.ca/personal/tools/pg/default-e.asp%20">http://www.canadapost.ca/personal/tools/pg/default-e.asp </a>
+
+<br/><br/><b>Rationale</b><br/>
+"Current address" can be used to measure the regional "cancer burden" (cost, medical care needs), especially in major retirement regions. Sometimes central registries carry out follow-up by contacting the patients via letter or telephone calls to ascertain their vital status. The most current reported address and telephone number are needed. This information also is useful for conducting interview studies.
+
+<br/><br/>Addresses that are formatted to conform to USPS <em>Postal Addressing Standards</em> can be more properly geocoded by GIS software and vendors to the correct census tract. The USPS Standards also address a number of issues that are problematic in producing precise addresses, including the use of punctuation, abbreviations, and proper placement of address elements, such as street direction, apartment and suite numbers, and unusual addressing situations. Spanish-language addresses also are covered by the USPS Standard.
+
+<b><br/><br/>Coding Instructions (summary of USPS guidelines)</b><br/>The address should be fully spelled out with standardized use of abbreviations and punctuation per USPS postal addressing standards (USPS Postal Addressing Standards, Pub. 28, July 2008). Upper case recommended. Mixed case allowed.<br/><br/>
+
+Abbreviations should be limited to those recognized by USPS standard abbreviations, these include but are not limited to (a complete list of recognized street abbreviations is provided in Appendix C of USPS Pub. 28.):<br/><br/>
+
+<table class="naaccr-codes-table naaccr-borders">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">APT</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">apartment</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">N</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">north</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">BLDG</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">building</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">NE</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">northeast</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">FL</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">floor</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">NW</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">northwest</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">STE</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">suite</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">S</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">south</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">UNIT</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">unit</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">SE</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">Southeast</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">RM</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">room</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">SW</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">southwest</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">DEPT</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">department</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">E</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">east</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">&#160;</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">&#160;</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">W</td>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">west</td>
+    </tr>
+</table>
+<br/>Punctuation marks should be avoided, except when punctuation is necessary to convey the meaning. Punctuation normally is limited to periods when the period carries meaning (e.g., 39.2 RD), slashes for fractional addresses (e.g., 101 1/2 MAIN ST), and hyphens when the hyphen carries meaning (e.g., 289-01 MONTGOMERY AVE). Use of the pound sign (#) to designate address units should be avoided whenever possible. The preferred notation is as follows: 102 MAIN ST APT 101. If a pound sign is used, there must be a space between the pound sign and the secondary number (e.g., 425 FLOWER BLVD # 72).
+
+
+<br/>

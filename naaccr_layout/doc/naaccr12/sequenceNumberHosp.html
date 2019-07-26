@@ -1,0 +1,134 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Sequence Number (CoC)</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">560</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">740-741</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+Item indicates the sequence of all malignant and non-malignant neoplasms over the lifetime of the<br/>
+patient. The code may differ from the Sequence Number--Central [380] because the definitions of reportable<br/>
+neoplasms often vary between a hospital and a central registry. The two items also handle some types of tumors differently. Each neoplasm is assigned a different number. Sequence Number 00 indicates that the person has only one malignant neoplasm in his lifetime (regardless of hospital registry reference date). Sequence Number 01 indicates the first of two or more malignant neoplasms, while 02 indicates the second of two or more malignant neoplasms, and so on. Because the time period of Sequence Number is a person's lifetime, reportable neoplasms not included in the hospital registry are also allotted a sequence number. For example, a registry may contain a single record for a patient with a sequence number of 02 because the first reportable neoplasm occurred before the hospital registry's reference date. Similarly, Sequence Number 60 indicates the patient has only one non-malignant neoplasm, and Sequence Number 61 represents the first of multiple non-malignant neoplasms.<br/>
+ <br/>
+Sequence numbers should be reassigned if the facility subsequently learns of an unaccessioned tumor that affects sequencing. Sequence Number-Central [380] does not affect Sequence Number-Hospital. The two notational systems are independent.<br/>
+<br/>
+<b>Timing Rule</b><br/>
+If two or more malignant tumors are diagnosed at the same time, the lowest sequence number will be<br/>
+assigned to the diagnosis with the worst prognosis. Likewise, if two or more non-malignant tumors are<br/>
+diagnosed at the same time, the lowest sequence number is assigned to the diagnosis with the worse<br/>
+prognosis. If no difference in prognosis is evident, the decision is arbitrary.
+
+<br/><br/><b>Codes<br/>
+<i>In situ</i> and Malignant Tumors:</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">00</td>
+        <td class="naaccr-codes-cell">One malignant primary only in the patient's lifetime</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">01</td>
+        <td class="naaccr-codes-cell">First of two or more malignant primaries</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">02</td>
+        <td class="naaccr-codes-cell">Second of two or more malignant primaries</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap" colspan="2">..</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">..</td>
+        <td class="naaccr-codes-cell">(Actual number of this malignant primary)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap" colspan="2">..</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">59</td>
+        <td class="naaccr-codes-cell">Fifty-ninth or higher of fifty-nine or more malignant primaries</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">99</td>
+        <td class="naaccr-codes-cell">Unspecified sequence number of a primary malignant tumor or unknown (When a patient has multiple tumors with unspecified/unknown sequence numbers code 99 should only be used once.)</td>
+    </tr>
+</table>
+<br/><b>Nonmalignant Tumors</b>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">60</td>
+        <td class="naaccr-codes-cell">Only one non-malignant tumor in the patient's lifetime</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">61</td>
+        <td class="naaccr-codes-cell">First of two or more non-malignant tumors</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">62</td>
+        <td class="naaccr-codes-cell">Second of two or more non-malignant tumors</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap" colspan="2">..</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">88</td>
+        <td class="naaccr-codes-cell">Unspecified number of non-malignant tumors (When a patient has multiple unspecified neoplasms in this category code 88 should only be used once.)</td>
+    </tr>
+</table>
+<br/>The table that follows shows which sequence number series to use by type of neoplasm<br/><br/>
+<table class="naaccr-codes-table naaccr-borders">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders"><b>Neoplasm</b></td>
+        <td class="naaccr-codes-cell naaccr-borders"><b>SeqNum--Hospital</b></td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders"><b><i>In situ</i> and Malignant</b></td>
+        <td class="naaccr-codes-cell naaccr-borders"><b>(code range)</b></td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">One <i>in situ</i> (behavior code = 2) or malignant (behavior code =3) primary tumor only in the patient's lifetime</td>
+        <td class="naaccr-codes-cell naaccr-borders">00</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">First of multiple <i>in situ</i> or malignant primary tumors in the patient's lifetime</td>
+        <td class="naaccr-codes-cell naaccr-borders">01</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">Actual sequence of two or more <i>in situ</i> or malignant primary tumors</td>
+        <td class="naaccr-codes-cell naaccr-borders">02 - 59</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">Unspecified malignant sequence number or unknown</td>
+        <td class="naaccr-codes-cell naaccr-borders">99</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders" colspan="2"><b>Non-Malignant</b></td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">One benign (behavior code = 0) or borderline (behavior code = 1) primary tumor only in the patient's lifetime</td>
+        <td class="naaccr-codes-cell naaccr-borders">60</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">First of two or more benign or borderline primary tumors in the patient's lifetime</td>
+        <td class="naaccr-codes-cell naaccr-borders">61</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">Actual sequence of two or more non-malignant primary tumors</td>
+        <td class="naaccr-codes-cell naaccr-borders">62 - 87</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap naaccr-borders">Unspecified non-malignant sequence number or unknown</td>
+        <td class="naaccr-codes-cell naaccr-borders">88</td>
+    </tr>
+</table>
+<br/>*Juvenile astrocytomas should be reported as 9421/3.
+<br/><br/><i>Note:</i> See the section on Sequence Number in CoC (<i>FORDS</i>) manual.

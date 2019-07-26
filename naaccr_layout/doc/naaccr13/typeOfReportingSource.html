@@ -1,0 +1,68 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">500</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">563-563</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+This variable codes the source documents used to abstract the majority of information on the tumor being reported. This may not be the source of original case finding (for example, if a case is identified through a pathology laboratory report review and all source documents used to abstract the case are from the physician's office, code this item 4).
+
+<br/><br/><b>Rationale</b><br/>
+The code in this field can be used to explain why information may be incomplete on a tumor. For example, death certificate only cases have unknown values for many data items, so one may want to exclude them from some analyses. The field also is used to monitor the success of non-hospital case reporting and follow-back mechanisms. All population-based registries should have some death certificate-only cases where no hospital admission was involved, but too high a percentage can imply both shortcomings in case-finding and that follow-back to uncover missed hospital reports was not complete.
+<br/><br/><b>Coding Instructions</b><br/>Code in the following priority order: 1, 2, 8, 4, 3, 5, 6, 7. This is a change to reflect the addition of codes 2 and 8 and to prioritize laboratory reports over nursing home reports. The source facilities included in the previous code 1 (hospital inpatient and outpatient) are split between codes 1, 2, and 8.
+<br/><br/>
+This data item is intended to indicate the completeness of information available to the abstractor. Reports from health plans (e.g., Kaiser, Veterans Administration, military facilities) in which all diagnostic and treatment information is maintained centrally and is available to the abstractor are expected to be at least as complete as reports for hospital inpatients, which is why these sources are grouped with inpatients and given the code with the highest priority.
+
+<br/><br/>Sources coded with '2' usually have complete information on the cancer diagnosis, staging, and treatment.
+<br/><br/>
+Sources coded with '8' would include, but would not be limited to, outpatient surgery and nuclear medicine services. A physician's office that calls itself a surgery center should be coded as a physician's office. Surgery centers are equipped and staffed to perform surgical procedures under general anesthesia. If a physician's office calls itself a surgery center, but cannot perform surgical procedures under general anesthesia, code as a physician office.
+
+<br/><br/><b>
+  Codes
+</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">1</td>
+        <td class="naaccr-codes-cell">Hospital inpatient; Managed health plans with comprehensive, unified medical records</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">2</td>
+        <td class="naaccr-codes-cell">Radiation Treatment Centers or Medical Oncology Centers (hospital-affiliated or independent)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">3</td>
+        <td class="naaccr-codes-cell">Laboratory only (hospital-affiliated or independent)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">4</td>
+        <td class="naaccr-codes-cell">Physician's office/private medical practitioner (LMD)</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">5</td>
+        <td class="naaccr-codes-cell">Nursing/convalescent home/hospice</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">6</td>
+        <td class="naaccr-codes-cell">Autopsy only</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">7</td>
+        <td class="naaccr-codes-cell">Death certificate only</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">8</td>
+        <td class="naaccr-codes-cell">Other hospital outpatient units/surgery centers</td>
+    </tr>
+</table>
+<br/>

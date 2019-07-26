@@ -1,0 +1,44 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">3600</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">AJCC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1157-1157</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+This data item belongs to the Collaborative Stage (CS) Data Collection System which is based on the <i>AJCC Cancer Staging Manual</i>, 6th and 7th editions. This field indicates whether the patient received neoadjuvant therapy (systemic therapy or radiation therapy prior to first course surgical treatment) as part of first course of treatment.
+
+<br/><br/><b>Rationale</b><br/>
+The Collaborative Stage Data Collection System was designed by a joint task force including representatives from SEER, ACoS, CDC, NAACCR, NCRA, CCCR, CPAC, and AJCC, to provide a single uniform set of codes and rules for coding extent of disease (EOD) and stage information to meet the needs of all of the participating standard setters. When CS data items are coded, a computer algorithm provides the derivation of T, N, M, and stage-based on AJCC Cancer Staging Manual 6th &amp; 7th Editions, SEER Summary Stage 1977, and SEER Summary Stage 2000. There are separate derived CS fields in the NAACCR record based on AJCC 6th Edition for 2004+ cases and AJCC 7th Edition for 2010+ cases.
+
+<br/><br/><b>Codes (See the most current version of the <i>Collaborative Stage Data Collection System</i> (<a href="http://cancerstaging.org/cstage/manuals.html" target="_blank">http://cancerstaging.org/cstage/manuals.html</a>), for rules and site-specific codes and coding structures.)</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">0</td>
+        <td class="naaccr-codes-cell">Neoadjuvant therapy was not administered as part of the first course of therapy</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">1</td>
+        <td class="naaccr-codes-cell">Neoadjuvant therapy was administered as part of the first course of therapy</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">9</td>
+        <td class="naaccr-codes-cell">Unknown</td>
+    </tr>
+</table>
+<br/>This data item will record whether neoadjuvant therapy was administered. This will be a derived field based on RX SUMM-SYSTEMIC/SUR SEQ [1639] &amp; RX SUMM-SURG/RAD SEQ [1380].<br/>
+<br/>
+Comments: <br/>
+1.  This data field is used to record that neoadjuvant therapy was administered as part of the first course of treatment<br/>
+2.  This item is derived based on whether systemic therapy and/or radiation therapy was administered prior to surgical treatment<br/>
+3.  If the initial surgical therapy is not performed following the systemic therapy or radiation therapy, then this will be derived as 0, i.e., it is not considered neoadjuvant therapy

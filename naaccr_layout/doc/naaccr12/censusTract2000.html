@@ -1,0 +1,48 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Census Tract--Alternate (pre-2003)</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">130</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">6</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">168-173</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+This field is provided for coding census tract of patient's residence at time of diagnosis. See Census Tract 1970/80/90 [110]. Codes are those used by the U.S. Census Bureau for the Year 2000 Census. Census tract codes have a 4-digit basic number and also may have a 2-digit suffix. Census tract numbers range from 0001.01 to 9999.98. See the Census Bureau's "Area Classifications" at the following website: <a href="http://www.census.gov/prod/cen2000/doc/sf1.pdf" target="_blank">http://www.census.gov/prod/cen2000/doc/sf1.pdf</a> for further details.
+
+<br/><br/><b>Rationale</b><br/>
+Census tract codes allow central registries to calculate incidence rates for geographical areas having population estimates. This field allows a central registry to add Year 2000 Census tracts to tumors diagnosed in previous years, without losing the codes in data item 110.<br/>
+<br/>
+The Census Bureau provides population data for census tracts. Those rates can be used for general surveillance or special geographical and socioeconomic analysis.<br/>
+<br/>
+Because census tracts for particular cases can change between censuses, the central registry may wish to assign an alternate census tract code to its cases. For example, a registry may code its 1985 cases using both the 1980 and 1990 census tract boundaries. The central registry can use this information for different comparisons.
+
+<br/><br/><b>Codes</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">Census Tract Codes</td>
+        <td class="naaccr-codes-cell">000100-999998</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">000000</td>
+        <td class="naaccr-codes-cell">Area not census tracted</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">999999</td>
+        <td class="naaccr-codes-cell">Area census-tracted, but census tract is not available</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">Blank</td>
+        <td class="naaccr-codes-cell">Census Tract 2000 not coded</td>
+    </tr>
+</table>
+<br/><b>Clarification of NPCR Required Status</b><br/>
+Information on census tract, census tract certainty, and census tract coding system is required. Tumors diagnosed in 2003 or later, must be coded to the 2000 census definitions and recorded in Census Tract 2000 [130] and Census Tr Certainty 2000 [365]. Tumors diagnosed in 2002, or before must be coded to the 2000 census tract definitions OR to 1990 definitions OR to both the 2000 and 1990 census tract definitions. Census tract, census tract certainty and census tract coding system should be recorded in the year appropriate data item fields. For tumors diagnosed between January 1, 1998, and December 31, 2002, (inclusive) use of the 2000 cases tract definitions is recommended.

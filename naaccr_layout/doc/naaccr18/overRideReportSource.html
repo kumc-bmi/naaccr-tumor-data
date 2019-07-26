@@ -1,0 +1,60 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2050</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2588 - 2588</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.overRideReportSource<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;Type of Reporting Source/Sequence Number Interfield Review (Interfield Edit 04) (Seer #7)
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para mark-changed'>Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct.
+    <br/><br/>This over-ride is used with the following edits in the NAACCR Metafile of the EDITS software:
+    <tab></tab>
+    <br/>&nbsp;&nbsp; &nbsp;&nbsp; Type of Rep Srce(DC), Seq Num--Cent, ICDO2 (SEER IF04)
+    <tab>
+        <tab><br/></tab>
+    </tab>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>
+        <tab>Type of Rep Srce(DC), Seq Num--Cent, ICDO3 (SEER IF04)</tab>
+    </tab>
+    <p><br/>&nbsp;</p></div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Date Edits and Software Coordination of Standards.<strong><br/><br/>Over-ride Flag as Used in the EDITS Software Package</strong><br/>Edits of the type 'Type of Rep Srce(DC), Seq Num--Cent' checks that if the case is a death-certificate-only case and the histology is not a lymphoma, leukemia, immunoproliferative or myeloproliferative disease (ICD-O-2 or ICD-O-3 histology is less than 9590), then the tumor sequence number must specify one primary only (sequence '00').<strong><br/><br/>Instructions for Coding</strong>
+    <ul>
+        <li>Leave blank if the program does not generate an error message for the report source edit.</li>
+        <li>Code 1 if review of type of reporting source, histologic type and tumor sequence number verified that a second or subsequent primary with a reporting source of death-certificate-only has been reviewed and is indeed an independent primary.</li>
+    </ul>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Not reviewed or reviewed and corrected</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Reviewed and confirmed as reported</td>
+        </tr>
+    </table>
+</div>

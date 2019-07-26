@@ -1,0 +1,50 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1762</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2018</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">18</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2786 - 2786</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Patient.vitalStatusRecode<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>This variables is akin to Vital Status [1760], with the exception that any patient that dies after the follow-up cut-off date is recoded to alive as of the cut-off date. This variable is used as part of the algorithm for calculating the survival time recode variables (NAACCR items 1782-1788) and is used for survival, prevalence, and multiple primary &#8211; standardized incidence ratio analyses in SEER*Stat. This recode is necessary to conduct survival and prevalence analyses outside of SEER*Stat using other statistical software.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>These changes will benefit the cancer surveillance community by facilitating the application of standard methods for survival analysis. Beginning with data collected in the November 2014 call for data, NAACCR has published
+
+
+    <em> Cancer in North America Volume 4: Cancer Survival in the United States and Canada</em>, which provides cancer survival estimates on a wider population than was previously available. However, at present IMS must pre-process the datasets that are included in the NAACCR survival dataset to calculate the four&nbsp; standard data items, SEER Cause Specific COD [1914], SEER Other COD [1915], Record Number Recode [1775], and Vital Status Recode [1762]. For registries that do not submit cause of death information to NAACCR, it is not possible to calculate the 'SEER cause-specific death classification' or 'SEER other cause of death classification' variables. The 4 new data items will assist individual registries in performing survival analyses using their own data.
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>0</td>
+            <td class='code-desc'>Dead as of study cutoff date</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Alive as of study cutoff date</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'></td>
+        </tr>
+    </table>
+</div>

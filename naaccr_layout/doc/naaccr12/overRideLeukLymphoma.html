@@ -1,0 +1,49 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Leukemia or Lymphoma/Diagnostic Confirmation Interfield Review (Interfield Edit 48)</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2070</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1904-1904</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct. <br/>
+<br/>
+This over-ride is used with the following edits in the NAACCR Metafile of the EDITS software:<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Diagnostic Confirmation, Histology ICDO2 (SEER IF48)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;Diagnostic Confirmation, Histology ICDO3 (SEER IF48)
+
+<br/><br/><b>Rationale</b><br/>
+Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.<br/>
+<br/>
+<b>Over-ride Flag as Used in the EDITS Software Package</b><br/>
+Edits of the type Diagnostic Confirmation, Histology differ in use of ICD-O-2 or ICD-O-3 and check the following:<br/>
+<ol><li>Since lymphoma and leukemia are almost exclusively microscopic diagnoses, this edit forces review of any cases of lymphoma that have diagnostic confirmation of direct visualization or clinical, and any leukemia with a diagnostic confirmation of direct visualization.<br/></li>
+<li>If histology = 9590-9717 for ICD-O-2 or 9590-9729 for ICD-O-3 (lymphoma) then Diagnostic Confirmation cannot be 6 (direct visualization) or 8 (clinical).<br/></li>
+<li>If histology = 9720-9941 for ICD-O-2 or 9731-9948 for ICD-O-3 (leukemia and other) then Diagnostic Confirmation cannot be 6 (direct visualization).<br/></li></ol>
+<br/>
+<b>Instructions for Coding</b><br/>
+<ul><li>Leave blank if the program does not generate an error message for the edits of the type Diagnostic Confirmation, Histology.</li>
+<li>Leave blank and correct any errors for the case if an item is discovered to be incorrect.</li>
+<li>If the edit produces an error or warning message, verify that the ICD-O-2 or ICD-O-3 histology and diagnostic confirmation are correctly coded. Remember that positive hematologic findings and bone marrow specimens are included as histologic confirmation (code 1 in Diagnostic Confirmation) for leukemia. Code 1 indicates that a review has taken place and histologic type and diagnostic confirmation are correctly coded.</li></ul>
+
+<br/><br/><b>Codes</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">1</td>
+        <td class="naaccr-codes-cell">Reviewed and confirmed as reported</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">Blank</td>
+        <td class="naaccr-codes-cell">Not reviewed or reviewed and corrected</td>
+    </tr>
+</table>

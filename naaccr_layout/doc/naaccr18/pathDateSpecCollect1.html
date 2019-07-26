@@ -1,0 +1,43 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">7320</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">14</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">HL7</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2010</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">12</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">6200 - 6213</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.pathDateSpecCollect1<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;OBR-7 Observation Date/Time #00241 (HL7)
+<br/>&nbsp;&nbsp;&nbsp;Path--Date Spec Collection
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>
+    <div>Records the date and time the specimen for the report on the cancer &nbsp;was collected, not the date read, interpreted or typed.
+        <div> &nbsp;</div>
+        <div>This is a field to record when specimens are collected; can be used as approximate date of diagnosis in absence of other information. HL7 OBR-7 records the date and time (YYYYMMDDHHMMSS). NAACCR records the date (YYYYMMDD).</div>
+        <div> &nbsp;</div>
+        <div>This data item accommodates only one path report. If additional reports were prepared, enter the date specimen collected in Path Date Spec Collect 2 through Path Date Spec Collect 5 [7321 - 7324]. Information in this data item should refer to the path report described in data items 7010, 7090, 7100, 7190 and 7480.</div>
+    </div>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>Cancer registries collect cancer information from various sources including pathology laboratories. Pathology reports of different types may be sent via HL7 messages. Included here are data items coming from such a message to be included in the cancer registry database to aid in consolidating a cancer case when there is information from multiple sources. Traditionally, these data items were not part of the NAACCR Standards Volume II record layout and therefore provide a link to NAACCR Standards Volume V.
+
+
+    <a href="http://www.naaccr.org/standardsandregistryoperations/volumev.aspx">http://www.naaccr.org/standardsandregistryoperations/volumev.aspx</a></div>

@@ -1,0 +1,62 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1915</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">SEER</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2018</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">18</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2945 - 2945</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.seerOtherCod<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Using the same recoding logic as the &#8216;SEER cause-specific death classification&#8217; variable, the &#8216;SEER other cause of death classification&#8217; variable designates that the person died of causes other than their cancer.
+    <br/><br/>Adapted from
+    <a href="http://seer.cancer.gov/causespecific/">http://seer.cancer.gov/causespecific/</a>:<br/>The 'SEER other cause of death classification' variable is used to obtain the other-cause survival probability for a cohort of patients. It is used when deaths attributed to causes other than cancer are treated as events and deaths from cancer are treated as censored observation. This variable is used in the SEER*Stat left-truncated life table session. -specific survival and crude probability of death using cause of death information.
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>These changes will benefit the cancer surveillance community by facilitating the application of standard methods for survival analysis. Beginning with data collected in the November 2014 call for data, NAACCR has published
+
+
+    <em>Cancer in North America Volume 4: Cancer Survival in the United States and Canada</em>, which provides cancer survival estimates on a wider population than was previously available. However, at present IMS must pre-process the datasets that are included in the NAACCR survival dataset to calculate the four new standard data items, SEER Cause Specific COD [1914], SEER Other COD [1915], Record Number Recode [1775], and Vital Status Recode [1762]. For registries that do not submit cause of death information to NAACCR, it is not possible to calculate the 'SEER cause-specific death classification' or 'SEER other cause of death classification' variables. The 4 new data items will assist individual registries in performing survival analyses using their own data.
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>0</td>
+            <td class='code-desc'>Alive or dead due to cancer</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Dead (attributable to causes other than this cancer diagnosis)</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>8</td>
+            <td class='code-desc'>Missing/Unknown Cause of Death</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>9</td>
+            <td class='code-desc'>Not applicable/not first tumor</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'></td>
+            <td class='code-desc'></td>
+        </tr>
+    </table>
+</div>

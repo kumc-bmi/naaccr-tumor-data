@@ -1,0 +1,73 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">135</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">6</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">NAACCR</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2011</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">12.1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">185 - 190</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.censusTract2010<br/><br/>
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para mark-changed'>Identifies the patient's census tract of residence at the time the tumor was diagnosed. Census Tract 2010 is a derived (geocoded) variables based on the Census Boundary files from 2010. See Census Tract 1970/80/90 [110]; Census Tract 2000 [130]; Census Tract 2020 [125]. Codes are those used by the U.S. Census Bureau for the Year 2010 Census. For consolidated records, the geocoded state should be based on the best address at diagnosis information identified.</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para mark-changed'>Census tract codes allow central registries to calculate incidence rates for geographical areas having population estimates. This field allows a central registry to add Year 2020 Census tracts to tumors diagnosed in previous years, without losing the codes in data items [110], [130] and [135].<br/><br/>The Census Bureau provides population and other demographic data for census tracts. This allows for small area analysis for general surveillance or special geographical and socioeconomic analysis.<br/><strong><br/></strong>
+    <div><strong>Instructions for Coding</strong></div>
+    <div>
+        <ul>
+            <li>This variable is generated through the process of geocoding either during abstracting or at the central registry level.</li>
+            <li>Census tract codes have a 4-digit basic number and also may have a 2-digit suffix. Census tract numbers range from 0001.00 to 9999.98, but the decimal should not be retained in the NAACCR layout.</li>
+            <li>It is recommended that all cases diagnosed through 2019 should have a geocoded Census Tract 2010.</li>
+            <li>At a minimum, all cases diagnosed through 2006-2019 should have a geocoded Census Tract 2010. Cases diagnosed 2006-2009 must have both State at DX Geocode 2000 [82] and State at DX Geocode 2010 [83] codes for proper assignment of the Census Tr Poverty Indicatr [145]. Cases diagnosed 2016-2019 must have both State at DX Geocode 2010 [83] and State at DX Geocode 2020 [84] codes for proper assignment of the Census Tr Poverty Indicatr [145].</li>
+            <li>If the patient has multiple tumors, geocoded state at diagnosis may be different for each tumor.</li>
+            <li>Do not update this item if the patient's tract of residence changes. Store updated address information in the affiliated current address data items. Only update based on improved information on the residential address at time of diagnosis. For instance, it is appropriate to correct a tract during manual geocoding or a consolidation process.</li>
+            <li>PO Box address information should not be used to geocode this data item except in the infrequent case when no other address information is available.</li>
+            <li>Blank &#8220;Not geocoded&#8221; is allowable for cases diagnosed before 2005 and after 2019. However, it is preferred to have all cases geocoded to a 2010 Census Tract to allow for both retrospective and cross-sectional analyses.<br/>
+            </li>
+        </ul>
+    </div>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para mark-changed'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>000100-999998</td>
+            <td class='code-desc'>Valid FIPS code</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>000000</td>
+            <td class='code-desc'>Area not census tracted</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>999999</td>
+            <td class='code-desc'>Area census tracted, but census tract is not available</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Census Tract 2010 not coded</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'></td>
+            <td class='code-desc'></td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para mark-changed'>
+    <em>Note</em>: For U.S. residents, historically, standard codes are those of the FIPS publication "Counties and Equivalent Entities of the United States, Its Possessions, and Associated Areas." These FIPS codes (FIPS 6-4) have been replaced by INCITS standard codes; however, there is no impact on this variable as the codes align with the system the Census used for each decennial census and changes will automatically be accounted for during geocoding. County codes issued by the Federal Information Processing Standards (FIPS) publication Counties and Equivalent Entities of the United States, Its Possessions, and Associated Areas is available in Appendix A.
+</div>

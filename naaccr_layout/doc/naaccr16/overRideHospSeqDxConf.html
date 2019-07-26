@@ -1,0 +1,63 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Implemented Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Year</th>
+        <th class="naaccr-summary-header naaccr-borders">Retired Version</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders">Over-ride Hospital Sequence/Diagnostic Confirmation<br/></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1986</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2001</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">9</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1892 - 1892</td>
+    </tr>
+</table>
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para'>Some computer edits identify errors. Others indicate possible errors that require manual review for resolution. To eliminate the need to review the same cases repeatedly, over-ride flags have been developed to indicate that data in a record (or records) have been reviewed and, while unusual, are correct.
+    <br/><br/>This over-ride is used with the following edit in the NAACCR Metafile of the EDITS software:<br/>&nbsp;&nbsp; &nbsp;&nbsp;
+    <tab>Diagnostic Confirm, Seq Num--Hosp (CoC)</tab>
+</div>
+<div class='content chap10-para-head'><strong><strong>Rationale</strong></strong></div>
+<div class='content chap10-para'>Some edits check for code combinations that are possible, but quite rare. If the code combination generates an error message and review of the case indicates that the codes are correct for the case, then the over-ride flag is used to skip the edit in the future. See Chapter IV, Recommended Data Edits and Software Coordination of Standards.<strong><br/><br/>Over-ride Flag as Used in the EDITS Software Package</strong><br/>The edit, Diagnostic Confirm, Seq Num--Hosp (CoC), does the following:<br/>
+    <ol>
+        <li>If any case is one of multiple primaries and is not microscopically confirmed or lacks a positive lab test/marker study, i.e., Diagnostic Confirmation &amp;gt; 5 and Sequence Number--Hospital &amp;gt; 00 (more than one primary), review is required.
+            <br/></li>
+        <li>If Primary Site specifies an ill-defined or unknown primary (C760-C768, C809), no further checking is done.</li>
+        <li>If Sequence Number--Hospital is in the range of 60-88, this edit is skipped.</li>
+    </ol>
+    <p>It is important to verify that the non-microscopically confirmed case is indeed a separate primary from any others that may have been reported. This edit forces review of multiple primary cancers when one of the primaries is coded to a site other than ill-defined or unknown and is not microscopically confirmed or confirmed by a positive lab test/marker study.</p>
+    <ol>
+        <li>If the suspect case is confirmed accurate as coded and if the number of primaries is correct, set the Over-ride HospSeq/DxConf to 1. Do not set the over-ride flag on the patient's other primary cancers.</li>
+        <li>If it turns out that the non-microscopically confirmed cancer is considered a manifestation of one of the patient's other cancers, delete the non-microscopically confirmed case. Check the sequence numbers of remaining cases, correcting them if necessary. Also check for other data items on the remaining cases that may need to be changed as a result of the corrections, such as stage and treatment.</li>
+    </ol>
+    <p><strong>Instructions for Coding</strong></p>
+    <ul>
+        <li>Leave blank if the program does not generate an error message for the edit Diagnostic Confirm, Seq Num--Hosp (CoC).</li>
+        <li>Leave blank and correct any errors for the case if an item is discovered to be incorrect.</li>
+        <li>Code 1 if review of all items in the error or warning message confirms that all are correct.</li>
+    </ul>
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr'>1</td>
+            <td class='code-desc'>Reviewed and confirmed as reported</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>Blank</td>
+            <td class='code-desc'>Not reviewed or reviewed and corrected</td>
+        </tr>
+    </table>
+</div>

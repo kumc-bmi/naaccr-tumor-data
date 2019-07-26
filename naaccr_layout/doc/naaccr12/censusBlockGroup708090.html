@@ -1,0 +1,43 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Alternate Name</th>
+        <th class="naaccr-summary-header naaccr-borders">Item#</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">368</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">1</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">Census</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">165-165</td>
+    </tr>
+</table>
+
+<br/><b>Description</b><br/>
+This field is provided for coding the block group of patient's residence at time of diagnosis, as defined by the 1970, 1980, or 1990 Census.
+
+<br/><br/><b>Rationale</b><br/>
+A block group is a subdivision of a census tract or block numbering area (BNA). Not all of the United States was described by a census block group or BNA prior to the 2000 Census, but for areas assigned to block groups or BNAs, the Census Bureau published detailed population and socioeconomic data. Block groups thus offer a high level of specificity for geographical and socioeconomic analyses, where available.<br/>
+<br/>
+A block group has no meaning in the absence of a census tract. Refer to Census Tr Cert 1970/80/90 [364] to ascertain the basis of assignment of CensusBlockGroup 70/80/90. Refer to Census Cod Sys 1970/80/90 [120] to ascertain the decade of reference.
+
+<br/><br/><b>Codes</b><br/>
+<table class="naaccr-codes-table">
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">0</td>
+        <td class="naaccr-codes-cell">Census block group assignment was attempted, but the value could not be determined</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">1-9</td>
+        <td class="naaccr-codes-cell">Census block group values as defined by the Census Bureau</td>
+    </tr>
+    <tr>
+        <td class="naaccr-codes-cell naaccr-codes-padding naaccr-codes-nowrap">Blank</td>
+        <td class="naaccr-codes-cell">CensusBlockGroup 70/80/90 not coded</td>
+    </tr>
+</table>
+<br/><br/><i>Note:</i> The values 1 through 9 are nominal, with no hierarchy of values. This number determines the first digit of all the blocks which comprise the block group; for instance, census block group 3 would contain blocks numbered 3000 to 3999
+<br/><br/><b>Comment</b><br/>
+Numerous registries find the distinction between "attempted, could not be determined" (zero) and "not coded" (blank) to be useful for geocoding planning purposes.

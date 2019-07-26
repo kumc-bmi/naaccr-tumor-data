@@ -1,0 +1,163 @@
+<table class="naaccr-summary-table naaccr-borders">
+    <tr>
+        <th class="naaccr-summary-header naaccr-borders">Item #</th>
+        <th class="naaccr-summary-header naaccr-borders">Length</th>
+        <th class="naaccr-summary-header naaccr-borders">Source of Standard</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Implemented</th>
+        <th class="naaccr-summary-header naaccr-borders">Year Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Version Retired</th>
+        <th class="naaccr-summary-header naaccr-borders">Column #</th>
+    </tr>
+    <tr>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">560</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">2</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">CoC</td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered"></td>
+        <td class="naaccr-summary-cell naaccr-borders naaccr-summary-centered">754 - 755</td>
+    </tr>
+</table>
+
+<br/><strong>NAACCR XML</strong>: Tumor.sequenceNumberHospital<br/><br/>
+<strong>Alternate Names</strong>
+<br/>&nbsp;&nbsp;&nbsp;Sequence Number (CoC)
+
+
+<div class='content chap10-para-head'><strong><strong>Description</strong></strong></div>
+<div class='content chap10-para mark-changed'>Item indicates the sequence of all malignant and non-malignant neoplasms over the lifetime of the patient. The code may differ from the Sequence Number--Central [380] because the definitions of reportable neoplasms often vary between a hospital and a central registry. The two items also handle some types of tumors differently. Each neoplasm is assigned a different number. Sequence Number 00 indicates that the person has only one malignant neoplasm in his lifetime (regardless of hospital registry reference date). Sequence Number 01 indicates the first of two or more malignant neoplasms, while 02 indicates the second of two or more malignant neoplasms, and so on. Because the time period of Sequence Number is a person&#8217;s lifetime, reportable neoplasms not included in the hospital registry are also allotted a sequence number. For example, a registry may contain a single record for a patient with a sequence number of 02 because the first reportable neoplasm occurred before the hospital registry&#8217;s reference date. Similarly, Sequence Number 60 indicates the patient has only one non-malignant neoplasm, and Sequence Number 61 represents the first of multiple non-malignant neoplasms.
+    <br/><br/>Sequence numbers should be reassigned if the facility subsequently learns of an unaccessioned tumor that affects sequencing. Sequence Number-Central [380] does not affect Sequence Number-Hospital. The two notational systems are independent.<strong><br/><br/>Timing Rule</strong><br/>If two or more malignant tumors are diagnosed at the same time, the lowest sequence number will be assigned to the diagnosis with the worst prognosis. Likewise, if two or more non-malignant tumors are diagnosed at the same time, the lowest sequence number is assigned to the diagnosis with the worse prognosis. If no difference in prognosis is evident, the decision is arbitrary.
+</div>
+<div class='content chap10-para'><strong>Codes</strong></div>
+<div class='content chap10-para'>
+    <table>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'>...</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>00</td>
+            <td class='code-desc'>One malignant primary only in the patient's lifetime</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>01</td>
+            <td class='code-desc'>First of two or more malignant primaries</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>02</td>
+            <td class='code-desc'>Second of two or more malignant primaries</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>..</td>
+            <td class='code-desc'>(Actual number of this malignant primary)</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>59</td>
+            <td class='code-desc'>Fifty-ninth or higher of fifty-nine or more malignant primaries</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>99</td>
+            <td class='code-desc'>Unspecified sequence number of a primary malignant tumor or unknown. When a patient has multiple tumors with unspecified/unknown sequence numbers code 99 should only be used once.)</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'>...</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>60</td>
+            <td class='code-desc'>Only one non-malignant tumor in the patient's lifetime</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>61</td>
+            <td class='code-desc'>First of two or more non-malignant tumors</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>62</td>
+            <td class='code-desc'>Second of two or more non-malignant tumors</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr' colspan='2'>...</td>
+        </tr>
+        <tr class='code-row'>
+            <td class='code-nbr'>88</td>
+            <td class='code-desc'>Unspecified number of non-malignant tumors (When a patient has multiple unspecified neoplasms in this category code 88 should only be used once.)</td>
+        </tr>
+    </table>
+</div>
+<div class='content chap10-para mark-changed'><p><strong>
+    <span style="font-size:11.0pt;font-family:&quot;Times New Roman&quot;,&quot;serif&quot;;">The table that follows shows which sequence number series to use by type of neoplasm</span> </strong>
+    <em>.</em></p>
+    <p></p>
+    <table class="naaccr - borders" style="border-collapse: collapse; border: medium none;" width="500" cellspacing="0" cellpadding="0" bordercolor="" border="1">
+        <tbody>
+        <tr>
+            <td class="naaccr - borders" style="width: 375.1pt; border: 1pt solid windowtext; padding: 0in 5.75pt;" height="" width="450" valign="top"><span style="font-size: 11pt;">          </span>
+                <p style="margin-left: 0in; text-indent: 0in;"><strong style="font-size: 11pt;">Neoplasm</strong></p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border:solid windowtext 1.0pt;   border-left:none;padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;"><strong>SeqNum-Hospital</strong></p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;"><strong> <em>In situ</em>/Malignant</strong></p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;"><strong>(code range)</strong></p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width: 375.1pt; border-right: 1pt solid windowtext; border-width: medium 1pt 1pt; border-style: none solid solid; border-color: -moz-use-text-color windowtext windowtext; -moz-border-top-colors: none; -moz-border-right-colors: none; -moz-border-bottom-colors: none; -moz-border-left-colors: none; -moz-border-image: none; padding: 0in 5.75pt;" width="500" valign="top">
+                <p style="margin-left: 0in; text-indent: 0in;">One <em>in situ </em>(behavior code = 2) or malignant (behavior code =3) primary tumor only in the patient&#8217;s lifetime</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">00</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">First of multiple <em>in situ</em> or malignant primary tumors in the patient&#8217;s lifetime</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">01</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">Actual sequence of two or more <em>in situ </em>or malignant primary tumors</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">02 -- 59</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">Unspecified malignant sequence number or unknown</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">99</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;"><strong>Non-Malignant</strong></p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;"> &nbsp;</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">One benign (behavior code = 0) or borderline (behavior code = 1) primary tumor only in the patient&#8217;s lifetime</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">60</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">First of two or more benign or borderline primary tumors in the patient&#8217;s lifetime</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">61</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">Actual sequence of two or more non-malignant primary tumors</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;   padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">62 -- 87</p></td>
+        </tr>
+        <tr>
+            <td class="naaccr - borders" style="width:375.1pt;border:solid windowtext 1.0pt;   border-top:none;padding:   0in 5.75pt 0in 5.75pt" width="500" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">Unspecified non-malignant sequence number or unknown</p></td>
+            <td class="naaccr - borders" style="width:124.2pt;border-top:none;border-left:   none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;padding:0in 5.75pt 0in 5.75pt" width="166" valign="top">
+                <p style="margin-left:0in;text-indent:0in;">88</p></td>
+        </tr>
+        </tbody>
+    </table>
+    <em> <br/> </em> <span style="font-size:11.0pt;font-family:&quot;Times New Roman&quot;,&quot;serif&quot;;">*Juvenile astrocytomas should be reported as 9421/3.</span> <em> <br/>
+        <br/>Note:</em> See the section on Sequence Number in CoC (<em>STORE</em>) manual.
+</div>
