@@ -1,11 +1,16 @@
 .mode csv
 .header on
 
-select lr.loinc_number, rc.code_system, rc.code_value, l.component
-from LOINC_RELATED_CODE_LK lr
+select rc.code_system, rc.code_value
+     , l.loinc_num, l.component, l.DisplayName
+     , l.property, l.time_aspct, l.system, l.scale_typ, l.method_typ
+     , l.AnswerListId, l.answer_list_type
+     , l.example_units, l.unitsandrange
+     , l.long_common_name, l.DefinitionDescription
+from loinc_related_code_lk lr
 join related_code rc
-  on LR.RELATEDCODEID = RC.ID
+  on lr.relatedcodeid = rc.id
 join loinc l
-  on L.LOINC_NUM = LR.LOINC_NUMBER
-where LR.SOURCE = 'NAACCR'
+  on l.loinc_num = lr.loinc_number
+where lr.source = 'NAACCR'
 order by 0 + rc.code_value;

@@ -6,11 +6,18 @@ MDB_SCHEMA=mdb-schema
 # from sqlite3 (debian / ubuntu package)
 SQLITE=sqlite3
 
+all: loinc_naaccr.csv loinc_naaccr_answer.csv
+
 loinc_naaccr.csv: crosswalk.sql relma.db
 	$(SQLITE) relma.db <crosswalk.sql >$@
 
+loinc_naaccr_answer.csv: answers.sql relma.db
+	$(SQLITE) relma.db <answers.sql >$@
+
 relma.db: schema.sql load_tables.sql \
-		LOINC.csv LOINC_RELATED_CODE_LK.csv RELATED_CODE.csv
+		LOINC.csv LOINC_RELATED_CODE_LK.csv RELATED_CODE.csv \
+		ANSWER.csv ANSWER_STRING.csv LoincAnswerListLinks.csv
+	rm -f relma.db
 	$(SQLITE) $@ <schema.sql
 	$(SQLITE) $@ <load_tables.sql
 
@@ -26,7 +33,16 @@ LOINC_RELATED_CODE_LK.csv: $(RELMA_DB)
 RELATED_CODE.csv: $(RELMA_DB)
 	$(MDB_EXPORT) $< RELATED_CODE >$@
 
+ANSWER.csv: $(RELMA_DB)
+	$(MDB_EXPORT) $< ANSWER >$@
+
+ANSWER_STRING.csv: $(RELMA_DB)
+	$(MDB_EXPORT) $< ANSWER_STRING >$@
+
+LoincAnswerListLinks.csv: $(RELMA_DB)
+	$(MDB_EXPORT) $< LoincAnswerListLinks >$@
+
 clean:
-	rm -f relma.db schema.sql *~ LOINC*.csv RELATED*.csv loinc_naaccr.csv
+	rm -f relma.db schema.sql *~ [A-Z]*.csv loinc_naaccr.csv
 
 
