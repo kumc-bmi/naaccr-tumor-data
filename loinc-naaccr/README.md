@@ -1,3 +1,6 @@
+These NAACCR details are derived from LOINC / RELMA.
+Note the [LOINC and RELMA License](https://loinc.org/license/).
+
 It works something like this:
 
 ```
