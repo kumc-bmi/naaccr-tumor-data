@@ -12,6 +12,7 @@
  * from tumors;
  */
 import java.io.StringWriter
+import java.sql.SQLXML
 import java.util.logging.Logger
 
 import groovy.sql.Sql
@@ -34,7 +35,8 @@ import com.imsweb.naaccrxml.entity.NaaccrData
 class Loader {
     static String oraDriver = 'oracle.jdbc.OracleDriver'
     static String oraUrl = 'jdbc:oracle:thin:@localhost:1521:'
-    static int batch_size = 1000
+    static int xml_batch_size = 100  // patients per record
+    static int sql_batch_size = 50   // records per batch insert
     static Logger logger = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME)
 
     static void main(String[] args) {
@@ -43,6 +45,8 @@ class Loader {
         String username = System.getenv('LOGNAME')
         String password = System.getenv("${username}_${database}".toUpperCase())
         String db_url = oraUrl + database
+
+        xmlLinkage.each { java.lang.System.setProperty(it.name, it.value) }
 
         Sql.withInstance(db_url, username, password, oraDriver) { Sql sql ->
             sql.eachRow('select * from global_name') { GroovyResultSet row ->
@@ -63,38 +67,81 @@ class Loader {
     }
 
     int load(Reader flatReader) {
-        int line = 0
+        int patQty = 0
         Patient p1
 
+        logger.info("deleting from tumors...")
         sql.execute 'delete from tumors' // ISSUE: purge?
         sql.execute 'commit'
 
-        sql.withBatch(batch_size,
-                      'insert into tumors (line, tumor) values(?, ?)') {
+        def patReader = new PatientFlatReader(flatReader)
+        NaaccrData naaccrData = patReader.getRootData()
+        def dest = new Dest(sql, naaccrData, 0)
+
+        sql.withBatch(sql_batch_size,
+                      'insert into tumors (record_num, patients) values(?, ?)') {
             PS stmt ->
-            def patReader = new PatientFlatReader(flatReader)
-            NaaccrData naaccrData = patReader.getRootData()
+
             while ((p1 = patReader.readPatient()) != null) {
-                def xmlVal = sql.connection.createSQLXML()
-                xmlVal.setString(patientXML(p1, naaccrData))
-                line += 1
-                stmt.addBatch(line, xmlVal)
-                if (line % batch_size == 0) {
-                    logger.info("${line} lines inserted (queued)...")
+                patQty += 1
+                if (dest.addPatient(stmt, p1, patQty)) {
+                    dest = new Dest(sql, naaccrData, dest.recordQty)
                 }
             }
+            dest.flush(stmt)
         }
-        return line - 1
+        return patQty
     }
 
-    /**
-     * serailize Patient as XML format String.
-     */
-    static String patientXML(Patient p1, NaaccrData naaccrData) {
-        def buf = new StringWriter()
-        def writer = new PatientXmlWriter(buf, naaccrData)
-        writer.writePatient(p1)
-        writer.close()
-        buf.toString()
+    class Dest {
+        public final SQLXML xmlVal
+        public final Writer stream
+        public final PatientXmlWriter writer
+
+        private int pending = 0
+        int recordQty
+
+        Dest(Sql sql, NaaccrData naaccrData, int qty) {
+            xmlVal = sql.connection.createSQLXML()
+            stream = xmlVal.setCharacterStream()
+            writer = new PatientXmlWriter(stream, naaccrData)
+            recordQty = qty
+        }
+
+        boolean addPatient(PS stmt, Patient p1, int patQty) {
+            writer.writePatient(p1)
+            pending += 1
+            if (pending >= xml_batch_size) {
+                if (patQty % (sql_batch_size * xml_batch_size) == 0) {
+                    logger.info("${patQty} patients inserted (queued)...")
+                }
+                return flush(stmt)
+            }
+            return false
+        }
+
+        boolean flush(PS stmt) {
+            if (pending == 0) {
+                return false
+            }
+            writer.close()
+            stream.close()
+            stmt.addBatch([recordQty, xmlVal])
+            recordQty += 1
+            xmlVal.free()
+            pending = 0
+            true
+        }
+    }
+
+    // help createSQLXML find XML parser
+    // https://stackoverflow.com/a/12150962
+    static List<Map<String, String>> xmlLinkage = [
+        "javax.xml.parsers.DocumentBuilderFactory=com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl",
+        "javax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl",
+        "javax.xml.transform.TransformerFactory=com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl"
+    ].collect {
+        String[] nv = it.split("=")
+        ["name": nv[0], "value": nv[1]] as Map<String, String>
     }
 }
