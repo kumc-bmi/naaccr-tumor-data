@@ -4,6 +4,7 @@ but at runtime, luigi actually picks an int value. So the type
 of a class variable set to an IntParam should be int.
 """
 from typing import Any, Callable, TypeVar, cast
+from pathlib import Path as Path_T
 
 import luigi
 
@@ -19,7 +20,19 @@ def _valueOf(example: _T, cls: Callable[..., _U]) -> Callable[..., _T]:
     return getValue
 
 
+class PathParameter(luigi.Parameter):
+    @classmethod
+    def parse(self, x):
+        from pathlib import Path  # ISSUE: ambient
+        return Path(x)
+
+    @classmethod
+    def serialize(self, x):
+        return str(x)
+
+
 StrParam = _valueOf('s', luigi.Parameter)
 IntParam = _valueOf(0, luigi.IntParameter)
 BoolParam = _valueOf(True, luigi.BoolParameter)
 DictParam = _valueOf({'k': 'v'}, luigi.DictParameter)
+PathParam = _valueOf(Path_T('.'), PathParameter)
