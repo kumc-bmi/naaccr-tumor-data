@@ -100,6 +100,14 @@ class JDBCTableTarget(luigi.Target):
 
 
 class NAACCR_Ontology1(SparkJDBCTask):
+    design_id = pv.StrParam(
+        default='upper',
+        description='''
+        mnemonic for latest visible change to output.
+        Changing this causes task_id to change, which
+        ensures the ontology gets rebuilt if necessary.
+        '''.strip(),
+    )
     naaccr_version = pv.IntParam(default=18)
     naaccr_ch10_bytes = pv.IntParam(default=3078052, description='''
       Content-Length of http://datadictionary.naaccr.org/default.aspx?c=10
@@ -128,4 +136,5 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
         ont = NAACCR_I2B2.ont_view_in(spark, self.naaccr_ddict.resolve(),
                                       self.scripts)
-        self.jdbc_access(ont.write, self.table_name, mode='overwrite')
+        ont_upper = ont.toDF(*[n.upper() for n in ont.columns])
+        self.jdbc_access(ont_upper.write, self.table_name, mode='overwrite')
