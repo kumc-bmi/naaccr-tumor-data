@@ -65,9 +65,9 @@ testing has been with spark 2.2.1.
 [dl]: https://spark.apache.org/downloads.html
 
 
-### Python dependencies
+### Python dependencies (WIP)
 
-See `requirements.txt`.
+ISSUE: migrating from `requirements.txt` to `environment.yml`.
 
 Extra dev requirement: `pip install flake8`.
 **ISSUE**: migrate to **pipenv** and `Pipfile`?
