@@ -1,5 +1,8 @@
-These NAACCR details are derived from LOINC / RELMA.
-Note the [LOINC and RELMA License](https://loinc.org/license/).
+These NAACCR details are derived from LOINC / RELMA, with permission
+(See LOINC_NOTICE for license details).
+
+**Note Well**: This mapping is quite dated. It's based on NAACCR v11
+and v12, whereas the current version as of this writing is NAACCR v18.
 
 It works something like this:
 
