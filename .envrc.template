@@ -1,8 +1,20 @@
+# See Bootstrap section of CONTRIBUTING.md for usage.
+
 export SPARK_HOME=/opt/spark-2.2.1-bin-hadoop2.7
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 export PYSPARK_DRIVER_PYTHON=jupyter
 export PYSPARK_DRIVER_PYTHON_OPTS=notebook
 
-layout python3
+# Help pyspark find JDBC driver.
+# https://stackoverflow.com/a/30983983
+ojdbc=$HOME/Downloads/ojdbc8.jar
+export PYSPARK_SUBMIT_ARGS="--driver-class-path $ojdbc --jars $ojdbc"
+
+# Luigi expects modules to be installed; help it find sources.
+# ISSUE: use `pip install -e` instead?
+export PYTHONPATH=$HOME/projects/naaccr-tumor-data
+
+layout anaconda py3tr
+
 
 
