@@ -44,7 +44,7 @@ class NAACCR_I2B2(object):
     script = res.read_text(heron_load, 'naaccr_concepts_load.sql')
 
     @classmethod
-    def ont_view_in(cls, spark, ddict: Path_T, scripts: Path_T):
+    def ont_view_in(cls, spark, ddict: Path_T):
         DataDictionary.make_in(spark, ddict)
         for view in cls.view_names:
             create_object(view, cls.script, spark)
