@@ -82,6 +82,76 @@ export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
 
 ---
 
+### Python coding style
+
+  - We follow python community norms: PEP8; use flake8 to check.
+    - **ISSUE**: explain how to check; establish Jenkins ci.
+  - The first line of a module or function docstring should be a short description
+    - if it is blank, either the item is in an early stage of
+      development or the name and doctests are supposed to make the purpose
+      obvious.
+
+  - *NOTE*: with static type annotations, the 79 character line
+            length limit is awkward; in GROUSE we used 99 in `setup.cfg`.
+
+---
+
+## OCap discipline
+
+For **robust composition** and **cooperation without vulnerability**,
+we use [object capability (ocap) discipline][ocap]:
+
+  - **Memory safety and encapsulation**
+    - There is no way to get a reference to an object except by
+      creating one or being given one at creation or via a message; no
+      casting integers to pointers, for example.
+    - From outside an object, there is no way to access the internal
+      state of the object without the object's consent (where consent
+      is expressed by responding to messages).
+
+  - **Primitive effects only via references**
+    - The only way an object can affect the world outside itself is
+      via references to other objects. All primitives for interacting
+      with the external world are embodied by primitive objects and
+      **anything globally accessible is immutable data**. There must
+      be no `open(filename)` function in the global namespace, nor may
+      such a function be imported.
+
+[ocap]: http://erights.org/elib/capability/ode/ode-capabilities.html
+
+OCap discipline is consistent with the "don't call us, we'll call you"
+style that facilitates unit testing with mocks.
+
+---
+
+### OCap discipline in python
+
+  - **Memory safety and encapsulation**
+      - Python is memory-safe.
+      - Python doesn't enforce encapsulation; it's a coding convention.
+        - vs. python community norm: "we're all adults here"
+  - **Primitive effects only via references**
+      - Python doesn't enforce this; it's a coding convention
+      - Only access powerful functions inside `if __name__ == '__main__':`
+         - I/O:
+           - pass around `pathlib.Path` objects instead of using `open(str)`,
+             which is like casting an int to a pointer
+           - pass around `urllib.urlopener` objects instead of using `urlopen(str)`
+             - bonus: wrap urllib objects in pathlib API
+        - other sources of non-determinism: random numbers, global mutable state
+
+---
+
+### Luigi serializable tasks vs. OCap discipline
+
+  - *ISSUE*: Luigi's design seem to clash with OCap discipline.
+             Constructors are implict and tasks parameters have to be
+             serializable, which works against the "don't call us,
+             we'll call you" idiom.  Also, the task cache is global
+             mutable state.
+
+---
+
 ### Required python version: 3.7
 
   - Spark, pandas are among [projects that
