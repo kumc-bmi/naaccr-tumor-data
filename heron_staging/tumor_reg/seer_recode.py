@@ -33,17 +33,23 @@ import logging
 from collections import namedtuple
 from itertools import dropwhile, takewhile
 from functools import reduce
+from typing import (
+    Callable, Iterable, Iterator, List, Optional as Opt, TextIO, Tuple
+)
 import csv
 
 log = logging.getLogger(__name__)
 
+ArgIO = Callable[[int], TextIO]
+Range = Tuple[str, Opt[str]]
 
-def main(arg_rd, arg_wr):
+
+def main(arg_rd: ArgIO, arg_wr: ArgIO) -> None:
     with arg_rd(1) as page:
         rules = Rule.from_lines(page)
 
     with arg_wr(2) as termf:
-        write_csv(termf, Term, Rule.as_terms(rules))
+        write_csv(termf, Term._fields, Rule.as_terms(rules))
 
     with arg_wr(3) as rulef:
         rulef.write('case\n' + '\n'.join(
@@ -106,7 +112,7 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
     '''
 
     @classmethod
-    def from_lines(cls, lines):
+    def from_lines(cls, lines: Iterable[str]) -> List['Rule']:
         # drop title, heading
         lines = dropwhile(lambda l: l.startswith('Site '), iter(lines))
         # skip stuff at the bottom
@@ -119,20 +125,20 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
             for (label, site, hist, recode, _) in [line.split(';')])
 
     @classmethod
-    def site_group_paths(cls, records):
+    def site_group_paths(cls, records: List['Rule']) -> Iterator[Tuple[int, List[str], str]]:
         '''Generate hierarchy based on indentation
         '''
-        path = []
+        path = []  # type: List[Tuple[int, str]]
         for label, _site, _exc, recode in records:
-            indent = next (ix for ix in range(len(label))
-                           if label[ix] != ' ')
+            indent = next(ix for ix in range(len(label))
+                          if label[ix] != ' ')
             label = label[indent:]
             path = [(i, txt) for (i, txt) in path
                     if i < indent] + [(indent, label)]
             yield len(path), [seg for (_, seg) in path], recode
 
     @classmethod
-    def as_terms(cls, rules):
+    def as_terms(cls, rules: List['Rule']) -> List['Term']:
         '''Generate i2b2-like terms from seer recode rules.
 
         Some rules reduce to duplicate terms; be sure to skip them:
@@ -152,11 +158,12 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
                  for level, parts, recode in paths)
 
         skip_dups = reduce(lambda acc, p: acc if p in acc else acc + [p],
-                           terms, [])
+                           terms, [])  # type: List[Term]
         return skip_dups
 
-    def as_sql(self, site_col='site', hist_col='histology'):
-        def mk_clause(eb, col):
+    def as_sql(self,
+               site_col: str = 'site', hist_col: str = 'histology') -> str:
+        def mk_clause(eb: Tuple[bool, List[Range]], col: str) -> List[str]:
             excl, bounds = eb
             if not bounds:
                 return []
@@ -178,7 +185,7 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
 Term = namedtuple('Term', 'hlevel path name basecode visualattributes')
 
 
-def ranges(txt, sometimes=True):
+def ranges(txt: str, sometimes: bool = True) -> Tuple[bool, List[Range]]:
     '''
     >>> ranges('')
     (False, [])
@@ -203,28 +210,35 @@ def ranges(txt, sometimes=True):
     ti0 = atoms.split(', and sometimes ')
     t1 = ','.join(ti0 if sometimes else ti0[:1])
     hilos = [t.strip() for t in t1.split(',')]
+
+    def parseBounds(t: str) -> Range:
+        if '-' in t:
+            lo, hi = t.split('-', 1)
+            return (lo, hi)
+        else:
+            return (t, None)
+
     return (len(exc) > 0,
             [(lo, hi) for lo, hi in
-             [t.split('-') if '-' in t else [t, None] for t in hilos if t]])
+             [parseBounds(t) for t in hilos if t]])
 
 
-def write_csv(fp, klass, items):
-    fields = klass._fields
+def write_csv(fp: TextIO, fields: List[str], items: Iterable[Term]) -> None:
     o = csv.DictWriter(fp, fields, lineterminator='\n')
     o.writerow(dict(zip(fields, fields)))
     o.writerows([item._asdict() for item in items])
 
 
 if __name__ == '__main__':
-    def _script():
+    def _script() -> None:
         from sys import argv
 
         logging.basicConfig(level=logging.INFO)
 
-        def arg_rd(ix):
+        def arg_rd(ix: int) -> TextIO:
             return open(argv[ix])
 
-        def arg_wr(ix):
+        def arg_wr(ix: int) -> TextIO:
             return open(argv[ix], 'w')
 
         main(arg_rd, arg_wr)
