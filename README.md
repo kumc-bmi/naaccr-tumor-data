@@ -69,16 +69,7 @@ please cite:
  - **luigi**
    - While Spark automatically breaks down work in a resilient manner, jobs
      fail completely when they fail.
-   - luigi allows us to break down work into tasks so that completion
-     of a task **preserves partial results**.
-
----
-
-### PySpark and jupyter notebooks vs. sqldeveloper
-
-  - jupyter notebooks are great for exploration, visualization
-    - spark integration is a bit klunky: restarts...
-  - sqldeveloper features I miss: selecting and running a subquery
+   - luigi tasks **preserve partial results**
 
 ---
 
@@ -182,7 +173,7 @@ See `test_data/bcNNN_generated.sql`.
 
 ---
 
-## Toward Synthetic NAACCR Test Data
+### Toward Synthetic NAACCR Test Data
 
 In `test_data`:
 
@@ -190,6 +181,15 @@ In `test_data`:
   - synthesize test data with similar distributions
 
 See `test_data/data_char_sim.sql`, `test_data/tr_summary.py`
+
+---
+
+### Goal: data characterization, checks, charts
+
+jupyter notebook of checks, charts
+
+  - PCORNet CDM Emperical Data Characterization report
+  - GPC Breast Cancer QA reports
 
 ---
 

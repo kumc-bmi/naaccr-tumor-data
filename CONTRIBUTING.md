@@ -1,51 +1,25 @@
-luigi tasks
-  - staging
-    - staging validation
-      - stats; e.g. ~50% male/female, x% breast cancer, x cases/year, ...
-        - charts?
+# Design, development notes for contributors
 
+Exploratory design is done using pyspark and jupyter notebook.
 
-### ISSUE: Platform
+*Bootstrap notes below are still a bit rough.*
 
-  - HERON ETL platform is Jenkins + python2 + paver + Oracle SQL with
-    some pandas and some spark; migrating
-    - from paver to luigi
-    - from python2 to python3 (with mypy)
-      - Spark, pandas are among [projects that
-        pledge to drop Python 2 support in or before
-        2020](https://python3statement.org/)
-    - from Oracle SQL to... postgres? to data-lake?
-      - from sqlplus to sqlcl
-      - sql loader isn't essential at O(100K) records
-    - from Java 8 to Java 11
-  - Docker? for integration testing?
-    - stand-alone i2b2 web client, middle tier?
-    - stand-alone DB?
+---
 
-### ISSUE: DB Interop
+## PySpark and jupyter notebooks vs. sqldeveloper
 
-  - Apache Spark runs on the JVM, the i2b2 platform
+  - jupyter notebooks are great for exploration, visualization
+  - Spark / Jupyter integration is a bit klunky: restarts...
+  - sqldeveloper features I miss: selecting and running a subquery
 
-  - [OHSDSI SQLRender](https://ohdsi.github.io/SqlRender/) is a nifty
-    approach: based on a CSV file of rules.
+---
 
+## JVM Dependency: Apache Spark
 
-## Exploratory Notebook
+[Download spark][dl], unpack it, and set `SPARK_HOME` to match. Our
+testing has been with spark 2.2.1.
 
-Currently we're using pyspark and jupyter notebook to explore the
-design space.
-
-
-## QA with doctest and mypy
-
-```
-export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
-  python -m doctest tumor_reg_summary.py && \
-  mypy --strict tumor_reg_summary.py && \
-  python tumor_reg_summary.py naaccr_ddict/record_layout.csv tr1.db NCDB_Export.txt
-```
-
-## pyspark
+[dl]: https://spark.apache.org/downloads.html
 
 As noted in [a tutorial][tut1]:
 
@@ -57,21 +31,83 @@ export PYSPARK_DRIVER_PYTHON_OPTS='notebook'
 [tut1]: https://blog.sicara.com/get-started-pyspark-jupyter-guide-tutorial-ae2fe84f594f
 
 
-## Dependencies: spark, pyspark, pandas
+---
 
-[Download spark][dl], unpack it, and set `SPARK_HOME` to match. Our
-testing has been with spark 2.2.1.
+### Java 8 still OK
 
-[dl]: https://spark.apache.org/downloads.html
+We have no dependencies on more recent versions, yet.
+
+---
+
+### Road not taken: OHDSI SQLRender
+
+[OHSDSI SQLRender](https://ohdsi.github.io/SqlRender/) is a nifty
+approach:
+
+  - Write in MS Sql Server dialect
+  - tool translates to Oracle, postgres, sqlite, ...
+  - somewhat ad-hoc: based on a CSV file of rules
+
+challenge: sqlserver IDE? Intellij?
+
+---
+
+## luigi replaces paver automation library
+
+In production, we use luigi `PySparkTask`.
+
+  - GROUSE experience: 70B+ facts in ~2 weeks
+    - task visualizer is nice
+    - resilient to failure
+    - preserves partial progress
+  - paver execution is serialized
+    - paver has gone fallow
+  - luigi tasks need a `complete` method as well as a `run` method
+    - one approach: save `task_id` in i2b2 `upload_status` record
+
+---
+
+## QA with doctest and mypy
+
+  - ETL code is often hard to unit test: mocking a DB is expensive
+  - static type checking finds typos etc.
+  - types provide documentation
+
+```
+export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
+  python -m doctest tumor_reg_summary.py && \
+  mypy --strict tumor_reg_summary.py && \
+  python tumor_reg_summary.py naaccr_ddict/record_layout.csv tr1.db NCDB_Export.txt
+```
+
+---
+
+### Required python version: 3.7
+
+  - Spark, pandas are among [projects that
+    pledge to drop Python 2 support in or before
+    2020](https://python3statement.org/)
+  - `importlib.resources` is new in 3.7
+    - back-port is available if we want to support 3.6
+
+---
+
+## Context: Jenkins
+
+  - Our shop uses Jenkins
+  - beyond the scope of this document
+  - idea: use jenkinsfiles and check them in here?
 
 
-### Python dependencies (WIP)
+---
 
-ISSUE: migrating from `requirements.txt` to `environment.yml`.
+### Wish: docker for integration testing
 
-Extra dev requirement: `pip install flake8`.
-**ISSUE**: migrate to **pipenv** and `Pipfile`?
+  - spin up a complete i2b2 DB anywhere
+  - middle tier, web client are mostly done already
 
+
+---
 
 ### Bootstrap with anaconda and direnv
 
@@ -86,6 +122,13 @@ $ conda create -n py3tr python=3.7
 ```
 
 (tested with: `Miniconda3-latest-Linux-x86_64.sh`)
+
+**ISSUE**: migrating from `requirements.txt` to `environment.yml`;
+see bootstrapping below
+
+**ISSUE**: migrate to **pipenv** and `Pipfile`?
+
+Extra dev requirements: `pip install flake8 mypy`.
 
 Make an `.envrc` based on `.envrc.template`; install
 [layout_anaconda][la] in `~/.direnvrc`; then:
@@ -103,7 +146,6 @@ Successfully installed MarkupSafe-1.1.1 Send2Trash-1.5.0 attrs-19.1.0 backcall-0
 ```
 
 Then run `pyspark` to launch a jupyter notebook web server.
-
 
 Notebooks start with `spark` bound to a spark context. By default, a
 derby `metastore_db` is created in the current working directory.
