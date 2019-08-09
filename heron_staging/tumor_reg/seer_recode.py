@@ -32,6 +32,7 @@ __ http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
 import logging
 from collections import namedtuple
 from itertools import dropwhile, takewhile
+from functools import reduce
 import csv
 
 log = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
 
     Or as SQL case clauses::
 
-    >>> print r[1].as_sql(),
+    >>> print(r[1].as_sql(), end='')
     /* Stomach */ when (site between 'C160' and 'C169')
       and  not (histology between '9050' and '9055'
        or histology = '9140'
@@ -123,8 +124,8 @@ class Rule(namedtuple('Rule', 'site_group site histology recode')):
         '''
         path = []
         for label, _site, _exc, recode in records:
-            indent = (ix for ix in range(len(label))
-                      if label[ix] != ' ').next()
+            indent = next (ix for ix in range(len(label))
+                           if label[ix] != ' ')
             label = label[indent:]
             path = [(i, txt) for (i, txt) in path
                     if i < indent] + [(indent, label)]
