@@ -367,29 +367,27 @@ select distinct lvl + 1 as c_hlevel
      , icdo.c_visualattributes
 from icd_o_morph icdo, tumor_reg_concepts tr
 where tr.itemnbr in (419, 521)
-
-union all
 */
 
-/* SEER Site Summary concepts --TODO
+union all
+
+/* SEER Site Summary concepts */
 select 2 as c_hlevel
-     , 'SEER Site\' as path
+     , 'SEER Site\\' as path
      , 'SEER Site Summary' as concept_name
      , null as concept_cd
      , 'FA' as c_visualattributes
-from dual
+from (values('X'))
 
 union all
 
 select 3 + hlevel as c_hlevel
-     , 'SEER Site\' || path || '\' as path
+     , concat('SEER Site\\', path, '\\') as path
      , name as concept_name
      , case when basecode is null then null
-       else 'SEER_SITE:' || basecode end as concept_cd
+       else concat('SEER_SITE:', basecode) end as concept_cd
      , visualattributes as c_visualattributes
-from seer_site_terms@deid
-) terms
-*/
+from seer_site_terms
 ;
 
 
