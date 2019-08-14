@@ -51,7 +51,21 @@ please cite:
      breast cancer cohort query ..."
  - [NAACCR_ETL][gpc] - GPC NAACCR ETL wiki page
 
-*TODO: add citations for GPC, BC survey*
+cite:
+
+  * Chrischilles et. al.  [Upper extremity disability and quality of
+   life after breast cancer treatment in the Greater Plains
+   Collaborative clinical research network.][EC2019] Breast Cancer Res
+   Treat. 2019 Jun;175(3):675-689. doi:
+   10.1007/s10549-019-05184-1. Epub 2019 Mar 9.
+  * Waitman LR, Aaronson LS, Nadkarni PM, Connolly DW, Campbell
+    JR. [The greater plains collaborative: a PCORnet clinical research
+    data network.][RW2014] J Am Med Inform
+    Assoc. 2014;21:637–641. doi: 10.1136/amiajnl-2014-002756.
+
+
+[EC2019]: https://www.ncbi.nlm.nih.gov/pubmed/30852760
+[RW2014]: https://www.ncbi.nlm.nih.gov/pubmed/24778202
 
 [TumorRegistry]: https://informatics.kumc.edu/work/wiki/TumorRegistry
 [2017bos]: http://www.kumc.edu/Documents/eami/Using%20the%20NAACCR%20Tumor%20Registry%20in%20i2b2%20with%20HERON%20ETL.pdf
