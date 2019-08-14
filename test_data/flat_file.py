@@ -1,15 +1,17 @@
 """flat_file - read, write NAACCR flat file
 """
+from typing import Iterable, List, Union
 from pathlib import Path as Path_T
 
-from pyspark.sql import functions as func
+from pyspark.sql import functions as func, Column, Row
 from pyspark.sql.dataframe import DataFrame
 from tabulate import tabulate
+import pandas as pd
 
 
 def naaccr_read_fwf(flat_file: DataFrame, record_layout: DataFrame,
-                    value_col='value',
-                    exclude_pfx='reserved'):
+                    value_col: str = 'value',
+                    exclude_pfx: str = 'reserved') -> DataFrame:
     """
     @param flat_file: as from spark.read.text()
                       typically with .value
@@ -21,48 +23,34 @@ def naaccr_read_fwf(flat_file: DataFrame, record_layout: DataFrame,
                        item.start, item.length).alias(item.xmlId)
         for item in record_layout.collect()
         if not item.xmlId.startswith(exclude_pfx)
-    ]
+    ]  # type: List[Union[Column, str]]
     return flat_file.select(fields)
 
 
-def naaccr_write_fwf(dest: Path_T, data: DataFrame, record_layout: DataFrame):
+def naaccr_write_fwf_pd(dest: Path_T,
+                        data: pd.DataFrame, record_layout: DataFrame) -> None:
     """
     ack: Matt Kramer Mar 2016 https://stackoverflow.com/a/35974742
     """
+    items = record_layout.collect()
     with dest.open('w') as outfp:
-        def write_part(records):
-            txt = tabulate(records.toPandas().values.tolist(),
+        txt = tabulate(data.values.tolist(),
+                       list(data.columns),
+                       tablefmt="plain")  # TODO: items.start/end -> tablefmt
+        outfp.write(txt)
+
+
+def naaccr_write_fwf_spark(dest: Path_T,
+                     data: DataFrame, record_layout: DataFrame) -> None:
+    """
+    ack: Matt Kramer Mar 2016 https://stackoverflow.com/a/35974742
+    """
+    items = record_layout.collect()
+    with dest.open('w') as outfp:
+        def write_part(rows: Iterable[Row]) -> None:
+            txt = tabulate([[row[item.xmlId] for item in items]
+                            for row in rows],
                            list(data.columns),
                            tablefmt="plain")
             outfp.write(txt)
-        data.forEachPartition(write_part)
-
-
-def _integration_test(argv, cwd, builder,
-                      driver_memory='8g'):
-    [ddict_dir, flat_file_name, out_filename] = argv[1:4]
-    spark = (builder
-             .appName('flat_file')
-             .config('driver-memory', driver_memory)
-             .getOrCreate())
-    record_layout = read_csv(spark, ddict_dir / 'record_layout.csv')
-    lines = spark.read.text(str(cwd / flat_file_name))
-    extract = naaccr_read_fwf(lines, record_layout)
-    naaccr_write_fwf(cwd / out_filename, extract, record_layout)
-
-
-def read_csv(spark, path):
-    df = spark.read.csv(str(path),
-                        header=True, inferSchema=True)
-    return df
-
-
-if __name__ == '__main__':
-    def _script_io():
-        from sys import argv
-        from pathlib import Path
-        from pyspark.sql import SparkSession
-
-        _integration_test(argv[:], Path('.'), SparkSession.builder)
-
-    _script_io()
+        data.foreachPartition(write_part)

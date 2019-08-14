@@ -28,8 +28,9 @@ from tumor_reg_ont import create_object, DataDictionary  # ISSUE: relative impor
 
 
 def main(argv: List[str], cwd: Path_T,
-         builder: Callable[[], SparkSession_T],
+         builder: SparkSession_T.Builder,
          driver_memory: str = '16g',
+         # TODO: don't limit input. bonus: sample
          tumor_limit: int = 50) -> None:
     [naaccr_file, ddict_dir, stats_out] = argv[1:4]
     spark = (builder
@@ -45,7 +46,7 @@ def main(argv: List[str], cwd: Path_T,
     data_raw = data_raw.limit(tumor_limit)
     stats = DataSummary.nominal_stats(data_raw, spark, ndd)
 
-    stats.to_csv(cwd / 'data_agg_naaccr.csv')
+    stats.to_csv(cwd / stats_out)
     print(stats.head(10))
 
 
