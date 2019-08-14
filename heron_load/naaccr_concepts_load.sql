@@ -269,6 +269,7 @@ left join (
 
 create or replace temporary view t_item as
 select dd.item as ItemNbr
+     , rl.xmlId
      , dd.name as ItemName
      , dd.Format
      , dd.allow_value as AllowValue
