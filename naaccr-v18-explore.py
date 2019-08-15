@@ -20,17 +20,14 @@
 # ### Preface: PyData Tools
 
 # %%
-spark
-
-# %%
-spark.sparkContext.uiWebUrl
-
-# %%
 import pandas as pd
 dict(pandas=pd.__version__)
 
 # %%
-!conda install -y matplotlib
+__name__ == '__main__' and spark
+
+# %%
+__name__ == '__main__' and spark.sparkContext.uiWebUrl
 
 # %%
 %matplotlib inline
@@ -39,9 +36,12 @@ dict(pandas=pd.__version__)
 import logging
 from sys import stderr
 
-logging.basicConfig(level=logging.INFO, stream=stderr)
+
 log = logging.getLogger(__name__)
-log.info('hello!')
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, stream=stderr)
+    log.info('NAACCR exploration...')
 
 
 # %% [markdown]
