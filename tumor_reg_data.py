@@ -14,29 +14,60 @@
 # ---
 
 # %% [markdown]
-# # NAACCR v18 Exploration
+# # NAACCR Tumor Registry Data
+#
+# This is both a notebook and a module, sync'd using [jupytext][]. See also
+#
+#   - README for motivation and usage
+#   - CONTRIBUTING for coding style etc.
+#
+# [jupytext]: https://github.com/mwouts/jupytext
 
 # %% [markdown]
-# ### Preface: PyData Tools
+# ### Preface: PyData Tools: Pandas, PySpark
+#
+#
 
 # %%
-import pandas as pd
-dict(pandas=pd.__version__)
-
-# %%
-__name__ == '__main__' and spark
-
-# %%
-__name__ == '__main__' and spark.sparkContext.uiWebUrl
-
-# %%
-%matplotlib inline
-
-# %%
-import logging
+# python stdlib
+from gzip import GzipFile
+from importlib import resources as res
 from sys import stderr
+from typing import Iterable
+from xml.etree import ElementTree as XML
+import logging
+import datetime
 
 
+# %%
+# 3rd party code: PyData
+from pyspark.sql import functions as func
+from pyspark.sql import types as ty
+from pyspark.sql.dataframe import DataFrame
+from pyspark.sql.functions import col
+import numpy as np
+import pandas as pd
+
+# %% [markdown]
+#  - **ISSUE**: naaccr_xml stuff is currently symlink'd to a git
+#    clone; `naaccr_xml_res` corresponds to
+#    https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/
+
+# %%
+# 3rd party: naaccr-xml
+import naaccr_xml_res  # ISSUE: symlink noted above
+import naaccr_xml_samples
+import naaccr_xml_xsd
+
+# %%
+# this project
+from sql_script import SqlScript
+from test_data.flat_file import naaccr_read_fwf
+from tumor_reg_ont import create_object, DataDictionary
+import heron_load
+
+
+# %%
 log = logging.getLogger(__name__)
 
 if __name__ == '__main__':
@@ -44,38 +75,93 @@ if __name__ == '__main__':
     log.info('NAACCR exploration...')
 
 
+# %%
+log.info('%s', dict(pandas=pd.__version__))
+
 # %% [markdown]
-# ## Access to local files
+# ## I/O Access: local files, Spark / Hive metastore
+
+# %% [markdown]
+# In a notebook context, we have `__name__ == '__main__'`.
+#
+# Otherwise, we maintain ocap discipline (see CONTRIBUTING)
+# and don't import powerful objects.
 
 # %%
-def _cwd():
-    # ISSUE: ambient
-    from pathlib import Path
-    return Path('.')
+CAN_IO = __name__ == '__main__'
 
-cwd = _cwd()
+if CAN_IO:
+    def _cwd():
+        # ISSUE: ambient
+        from pathlib import Path
+        return Path('.')
+
+    cwd = _cwd()
+    log.info('cwd: %s', cwd)
+
+# %% [markdown]
+# The `spark` global is available when we launch as
+# `PYSPARK_DRIVER_PYTHON=jupyter PYSPARK_DRIVER_PYTHON_OPTS=notebook
+#    pyspark ...`.
+
+# %%
+CAN_IO and spark
+
+# %%
+CAN_IO and log.info('spark web UI: %s', spark.sparkContext.uiWebUrl)
+
 
 # %% [markdown]
 # ## `naaccr-xml` Data Dictionary
 
 # %%
-from importlib import resources as res
-from xml.etree import ElementTree as ET
-
-import naaccr_xml_xsd
-
-ET.parse(res.open_text(naaccr_xml_xsd, 'naaccr_dictionary_1.3.xsd'))
+class XSD:
+    uri = 'http://www.w3.org/2001/XMLSchema'
+    ns = {'xsd': uri}
 
 
-# %%
+class NAACCR1:
+    dd13_xsd = XML.parse(res.open_text(
+        naaccr_xml_xsd, 'naaccr_dictionary_1.3.xsd'))
 
-from importlib import resources as res
+    ndd180 = XML.parse(res.open_text(
+        naaccr_xml_res, 'naaccr-dictionary-180.xml'))
 
-from pyspark.sql import types as ty
+    data_xsd = XML.parse(res.open_text(
+        naaccr_xml_xsd, 'naaccr_data_1.3.xsd'))
 
-import naaccr_xml_res
+    s100x = XML.parse(GzipFile(fileobj=res.open_binary(
+        naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
 
-    
+    item_xsd = data_xsd.find(
+        './/xsd:complexType[@name="itemType"]/xsd:simpleContent/xsd:extension',
+        XSD.ns)
+
+    ItemDef = dd13_xsd.find('.//xsd:element[@name="ItemDef"]', XSD.ns)
+
+    uri = 'http://naaccr.org/naaccrxml'
+    ns = {'n': uri}
+
+
+def eltSchema(xsd_complex_type,
+              simpleContent=False):
+    decls = xsd_complex_type.findall('xsd:attribute', XSD.ns)
+    fields = [
+        ty.StructField(
+            name=d.attrib['name'],
+            dataType=ty.IntegerType() if d.attrib['type'] == 'xsd:integer'
+            else ty.BooleanType() if d.attrib['type'] == 'xsd:boolean'
+            else ty.StringType(),
+            nullable=d.attrib.get('use') != 'required',
+            # IDEA/YAGNI?: use pd.Categorical for xsd:enumeration
+            # e.g. tns:parentType
+            metadata=d.attrib)
+        for d in decls]
+    if simpleContent:
+        fields = fields + [ty.StructField('value', ty.StringType(), False)]
+    return ty.StructType(fields)
+
+
 def xmlDF(spark, schema, doc, path, ns,
           eltRecords=None,
           simpleContent=False):
@@ -86,72 +172,37 @@ def xmlDF(spark, schema, doc, path, ns,
             for record in eltRecords(elt, schema, simpleContent))
     return spark.createDataFrame(data, schema)
 
+
 def eltDict(elt, schema,
             simpleContent=False):
     out = {k: int(v) if isinstance(schema[k].dataType, ty.IntegerType)
-              else bool(v) if isinstance(schema[k].dataType, ty.BooleanType)
-              else v
-            for (k, v) in elt.attrib.items()}
+           else bool(v) if isinstance(schema[k].dataType, ty.BooleanType)
+           else v
+           for (k, v) in elt.attrib.items()}
     if simpleContent:
         out['value'] = elt.text
     # print("typed", s2s, out)
     yield out
 
-def eltSchema(xsd_complex_type,
-              simpleContent=False):
-    ns = {'xsd': 'http://www.w3.org/2001/XMLSchema'}
-    decls = xsd_complex_type.findall('xsd:attribute', ns)
-    fields = [ty.StructField(name=d.attrib['name'],
-                             dataType=ty.IntegerType() if d.attrib['type'] == 'xsd:integer'
-                                      else ty.BooleanType() if d.attrib['type'] == 'xsd:boolean'
-                                      else ty.StringType(),
-                             nullable=d.attrib.get('use') != 'required',
-                             # IDEA/YAGNI?: use pd.Categorical for xsd:enumeration e.g. tns:parentType
-                             metadata=d.attrib)
-              for d in decls]
-    if simpleContent:
-        fields = fields + [ty.StructField('value', ty.StringType(), False)]
-    return ty.StructType(fields)
+
+def ddictDF(spark):
+    return xmlDF(spark,
+                 schema=eltSchema(NAACCR1.ItemDef.find('*')),
+                 doc=NAACCR1.ndd180,
+                 path='./n:ItemDefs/n:ItemDef',
+                 ns=NAACCR1.ns)
 
 
-dd_xsd = ET.parse(res.open_text(naaccr_xml_xsd,
-                                'naaccr_dictionary_1.3.xsd'))
-
-# per https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/xsd/naaccr_dictionary_1.3.xsd
-ItemDef_xsd = dd_xsd.find('.//xsd:element[@name="ItemDef"]',
-                          {'xsd': 'http://www.w3.org/2001/XMLSchema'})
-
-
-dd = xmlDF(spark,
-           schema=eltSchema(ItemDef_xsd.find('*')),
-           doc=ET.parse(res.open_text(naaccr_xml_res, 'naaccr-dictionary-180.xml')),
-           path='./n:ItemDefs/n:ItemDef',
-           ns={'n': 'http://naaccr.org/naaccrxml'})
-           
-
-# print(dd.columns)
-dd.limit(5).toPandas().set_index('naaccrId')
+CAN_IO and ddictDF(spark).limit(5).toPandas().set_index('naaccrId')
 
 # %% [markdown]
 # ## NAACCR XML Data
 
 # %%
-data_xsd = ET.parse(res.open_text(naaccr_xml_xsd,
-                                  'naaccr_data_1.3.xsd'))
+eltSchema(NAACCR1.item_xsd, simpleContent=True)
 
-item_xsd = data_xsd.find('.//xsd:complexType[@name="itemType"]/xsd:simpleContent/xsd:extension',
-                         {'xsd': 'http://www.w3.org/2001/XMLSchema'})
-ns = {'xsd': 'http://www.w3.org/2001/XMLSchema'}
-#decls = item_xsd.findall('xsd:attribute', ns)
-#decls
-eltSchema(item_xsd, simpleContent=True)
 
 # %%
-from gzip import GzipFile
-
-import naaccr_xml_samples
-
-
 def tumorDF(spark, doc):
     rownum = 0
     ns = {'n': 'http://naaccr.org/naaccrxml'}
@@ -163,65 +214,64 @@ def tumorDF(spark, doc):
         for item in tumorElt.iterfind('./n:Item', ns):
             # print(tumorElt, item)
             yield dict(next(eltDict(item, schema, simpleContent)),
-                       rownum=rownum)            
+                       rownum=rownum)
         # TODO: ../n:Item for Patient items, ../../n:Item for NaaccrData
-    
-    itemSchema = eltSchema(item_xsd, simpleContent=True)
+
+    itemSchema = eltSchema(NAACCR1.item_xsd, simpleContent=True)
     rownumField = ty.StructField('rownum', ty.IntegerType(), False)
     tumorItemSchema = ty.StructType([rownumField] + itemSchema.fields)
-    data = xmlDF(spark, schema=tumorItemSchema, doc=s10x, path='.//n:Tumor',
+    data = xmlDF(spark, schema=tumorItemSchema, doc=doc, path='.//n:Tumor',
                  eltRecords=tumorItems,
                  ns={'n': 'http://naaccr.org/naaccrxml'},
                  simpleContent=True)
     return data
 
-s10x = ET.parse(GzipFile(fileobj=res.open_binary(naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
 
-s10 = tumorDF(spark, s10x)    
-s10.toPandas().sort_values(['naaccrId', 'rownum']).head(20)
+CAN_IO and (tumorDF(spark, NAACCR1.s100x)
+            .toPandas().sort_values(['naaccrId', 'rownum']).head(20))
 
 
 # %%
-from pyspark.sql import functions as func
-
 def naaccr_pivot(ddict, skinny, key_cols,
                  pivot_on='naaccrId', value_col='value',
                  start='startColumn'):
     groups = skinny.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
     wide = groups.pivot(pivot_on).agg(func.first(value_col))
-    start_by_id = {id: start for (id, start) in dd.select(pivot_on, start).collect()}
+    start_by_id = {id: start
+                   for (id, start) in ddict.select(pivot_on, start).collect()}
     sorted_cols = sorted(wide.columns, key=lambda id: start_by_id.get(id, -1))
     return wide.select(sorted_cols)
 
 
-#s10.select('rownum', 'naaccrId', 'value').groupBy('rownum').pivot('naaccrId').agg(func.first('value')).toPandas()
-naaccr_pivot(dd, s10, ['rownum']).limit(3).toPandas()
+CAN_IO and (naaccr_pivot(ddictDF(spark),
+                         tumorDF(spark, NAACCR1.s100x),
+                         ['rownum'])
+            .limit(3).toPandas())
+
 
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
 
 # %%
-from importlib import resources as res
+def tumor_item_type(spark, cache):
+    DataDictionary.make_in(spark, cache)
 
-import heron_load
-from sql_script import SqlScript
-from tumor_reg_ont import create_object, DataDictionary
+    create_object('t_item',
+                  res.read_text(heron_load, 'naaccr_concepts_load.sql'),
+                  spark)
 
-ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
+    create_object('tumor_item_type',
+                  res.read_text(heron_load, 'naaccr_txform.sql'),
+                  spark)
+    spark.catalog.cacheTable('tumor_item_type')
+    return spark.table('tumor_item_type')
 
-create_object('t_item',
-              res.read_text(heron_load, 'naaccr_concepts_load.sql'),
-              spark)
 
-create_object('tumor_item_type',
-              res.read_text(heron_load, 'naaccr_txform.sql'),
-              spark)
-spark.catalog.cacheTable('tumor_item_type')
-tumor_item_type = spark.sql('select * from tumor_item_type')
-tumor_item_type.limit(5).toPandas().set_index(['ItemNbr', 'xmlId'])
+CAN_IO and (tumor_item_type(spark, cwd / 'naaccr_ddict')
+            .limit(5).toPandas().set_index(['ItemNbr', 'xmlId']))
 
 # %%
-spark.sql('''
+CAN_IO and spark.sql('''
 select valtype_cd, count(*)
 from tumor_item_type
 group by valtype_cd
@@ -234,7 +284,7 @@ group by valtype_cd
 # ### Warning! Identified Data!
 
 # %%
-!hostname
+#@@@!hostname
 
 # %%
 tr_file = cwd / '/d1/naaccr/donotuse_2019_02_naaccr' / 'NCDB_Export_3.31.22_PM.txt'
@@ -267,9 +317,6 @@ stuff = pd.read_pickle('test_data/,test-stuff.pkl')
 stuff.iloc[0]['lines']
 
 # %%
-from test_data.flat_file import naaccr_read_fwf
-from tumor_reg_ont import create_object, DataDictionary
-
 ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
 test_data_coded = naaccr_read_fwf(spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
 test_data_coded.limit(5).toPandas()
@@ -294,10 +341,6 @@ stuff.iloc[0].lines[:41]
 spark.read.text(str(tr_file)).take(1)[0].value[:41]
 
 # %%
-from pyspark.sql import functions as func
-from pyspark.sql import types as ty
-from pyspark.sql.dataframe import DataFrame
-
 
 def naaccr_read_fwf(flat_file, record_layout):
     fields = [
@@ -335,29 +378,24 @@ xp[[
 # Now let's add an id column and make a long-skinny from the wide data, starting with nominals:
 
 # %%
-from functools import reduce
-from typing import Iterable
 
-from pyspark.sql.dataframe import DataFrame
-from pyspark.sql.functions import array, struct, lit, col, explode
 
-    
-def melt(df: DataFrame, 
-         id_vars: Iterable[str], value_vars: Iterable[str], 
-         var_name: str="variable", value_name: str="value") -> DataFrame:
+def melt(df: DataFrame,
+         id_vars: Iterable[str], value_vars: Iterable[str],
+         var_name: str = "variable", value_name: str = "value") -> DataFrame:
     """Convert :class:`DataFrame` from wide to long format."""
-    # ack: user6910411 Jan 2017 https://stackoverflow.com/a/41673644 
+    # ack: user6910411 Jan 2017 https://stackoverflow.com/a/41673644
 
     # Create array<struct<variable: str, value: ...>>
-    _vars_and_vals = array(*(
-        struct(lit(c).alias(var_name), col(c).alias(value_name)) 
+    _vars_and_vals = func.array(*(
+        func.struct(func.lit(c).alias(var_name), func.col(c).alias(value_name))
         for c in value_vars))
 
     # Add to the DataFrame and explode
-    _tmp = df.withColumn("_vars_and_vals", explode(_vars_and_vals))
+    _tmp = df.withColumn("_vars_and_vals", func.explode(_vars_and_vals))
 
     cols = id_vars + [
-            col("_vars_and_vals")[x].alias(x) for x in [var_name, value_name]]
+        func.col("_vars_and_vals")[x].alias(x) for x in [var_name, value_name]]
     return _tmp.select(*cols)
 
 
@@ -382,10 +420,8 @@ tumors_eav.limit(10).foreachPartition(lambda p: len(p))
 tumors_eav.cache()
 
 # %%
-import test_data
-
 create_object('data_agg_naaccr',
-              res.read_text(test_data, 'data_char_sim.sql'),
+              res.read_text(heron_load, 'data_char_sim.sql'),
               spark)
 
 # spark.sql("select * from data_agg_naaccr limit 10").explain()
@@ -448,8 +484,7 @@ spark.catalog.cacheTable('simulated_naaccr_nom')
 # Let's compare observed with synthesized:
 
 # %%
-%matplotlib inline
-import matplotlib.pyplot as plt
+#@@%matplotlib inline
 
 # %%
 stats = data_agg_naaccr.reset_index()
@@ -498,7 +533,6 @@ x
 x.histologyIcdO2.iloc[3]
 
 # %%
-import numpy as np
 sim_records_nom.dateConclusiveDxFlag.iloc[0] is np.nan
 
 # %%
@@ -534,8 +568,6 @@ tr_chunk1.limit(10).toPandas()
 # ## NAACCR Dates
 
 # %%
-from pyspark.sql import functions as func
-
 def naaccr_dates(df, date_cols, keep=False):
     orig_cols = df.columns
     for dtcol in date_cols:
@@ -681,8 +713,6 @@ tumor_reg_coded_facts.printSchema()
 tumor_reg_coded_facts.limit(5).toPandas()
 
 # %%
-from pyspark.sql import functions as func
-
 def naaccr_col(value, xmlId):
     # AMBIENT: spark
     # MAGIC: record_layout
@@ -696,18 +726,20 @@ naaccr_col(naaccr_text_lines.value, 'patientSystemIdHosp')
 # ## Oracle DB Access
 
 # %%
-from os import environ
-environ['PYSPARK_SUBMIT_ARGS']
+if CAN_IO:
+    from os import environ
+    log.info(environ['PYSPARK_SUBMIT_ARGS'])
 
 
 # %%
-def set_pw(name='CDW'):
-    from os import environ
-    from getpass import getpass
-    password = getpass(name)
-    environ[name] = password
+if CAN_IO:
+    def set_pw(name='CDW'):
+        from os import environ
+        from getpass import getpass
+        password = getpass(name)
+        environ[name] = password
 
-set_pw()
+    set_pw()
 
 
 # %%
@@ -715,7 +747,7 @@ def cdw(io, table,
         driver="oracle.jdbc.OracleDriver",
         url='jdbc:oracle:thin:@localhost:1521:nheronA1',
         **kw_args):
-    from os import environ
+    #@@ from os import environ
     return io.jdbc(url, table,
           properties={"user": environ['LOGNAME'], "password": environ['CDW'],
                       "driver": driver}, **kw_args)
@@ -756,9 +788,6 @@ spark.sql('select * from registry').toPandas()
 # ## @@@@@@@@@@
 
 # %%
-from io import StringIO
-import datetime
-
 
 def _raw_data(folder='data-raw'):
     # I'd like to treat these as code, i.e. design-time artifacts,
