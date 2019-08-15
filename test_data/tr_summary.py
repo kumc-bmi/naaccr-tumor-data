@@ -4,7 +4,9 @@ Capture statistics useful for synthesizing data.
 
 Usage:
 
-  tumor_reg_summary naaccr_file ddict_dir tr_stats.parquet
+  tumor_reg_summary naaccr_file 10 ddict_dir tr_stats.parquet
+
+for a 10% sample.
 
 where `ddict_dir` has output from from `../naaccr_ddict/scrape.py`.
 """
@@ -12,11 +14,7 @@ where `ddict_dir` has output from from `../naaccr_ddict/scrape.py`.
 from importlib import resources as res
 from pathlib import Path as Path_T  # use type only, per ocap discipline
 from sys import stderr  # ocap exception for logging
-from typing import (
-    Any,
-    Callable, Iterable,
-    List,
-)
+from typing import Any, Iterable, List
 
 from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import functions as func
@@ -29,10 +27,9 @@ from tumor_reg_ont import create_object, DataDictionary  # ISSUE: relative impor
 
 def main(argv: List[str], cwd: Path_T,
          builder: SparkSession_T.Builder,
-         driver_memory: str = '16g',
-         # TODO: don't limit input. bonus: sample
-         tumor_limit: int = 50) -> None:
-    [naaccr_file, ddict_dir, stats_out] = argv[1:4]
+         driver_memory: str = '16g') -> None:
+    [naaccr_file, sample_, ddict_dir, stats_out] = argv[1:5]
+    sample = int(sample_)
     spark = (builder
              .appName(__file__)
              .config('driver-memory', driver_memory)
@@ -40,10 +37,10 @@ def main(argv: List[str], cwd: Path_T,
 
     ndd = DataDictionary.make_in(spark, cwd / ddict_dir)
     data_raw = naaccr_read_fwf(
-        spark.read.text(str(cwd / naaccr_file)),
+        spark.read.text(str(cwd / naaccr_file)).sample(False, sample / 100),
         ndd.record_layout,
     )
-    data_raw = data_raw.limit(tumor_limit)
+    data_raw = data_raw
     stats = DataSummary.nominal_stats(data_raw, spark, ndd)
 
     stats.to_csv(cwd / stats_out)

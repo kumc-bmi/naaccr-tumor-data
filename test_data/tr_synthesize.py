@@ -49,7 +49,11 @@ def main(argv: List[str], cwd: Path_T,
     stats = spark.read.csv(stats_fn,
                            header=True, inferSchema=True)
     records = job.synthesize_data(stats, ndd.record_layout)
-    flat_file.naaccr_write_fwf_pd(cwd / out_fn, records, ndd.record_layout)
+    records.to_pickle(',syn_records_TMP.pkl')
+    with (cwd / out_fn).open('w') as out:
+        for line in flat_file.naaccr_make_fwf(records,
+                                              ndd.record_layout.toPandas()):
+            out.write(line)
 
 
 class SyntheticData(object):
@@ -68,7 +72,7 @@ class SyntheticData(object):
         self.__spark = spark
 
     def synthesize_data(self, stats_nom: DataFrame, record_layout: DataFrame,
-                        qty: int = 500) -> pd.DataFrame:
+                        qty: int = 100) -> pd.DataFrame:
         spark = self.__spark
 
         create_object(self.t_item_view, self.concepts_script, spark)
@@ -77,7 +81,7 @@ class SyntheticData(object):
         stats_nom.createOrReplaceTempView(self.agg_view)
 
         entity = spark.createDataFrame(
-            [(ix,) for ix in range(1, qty)], ['case_index'])
+            [(ix,) for ix in range(0, qty)], ['case_index'])
         entity.createOrReplaceTempView(self.entity_view)
         # simulated_entity.limit(5).toPandas()
 
@@ -91,7 +95,6 @@ class SyntheticData(object):
         from simulated_naaccr_nom data
         join record_layout rl on rl.xmlId = data.xmlId
         join section on rl.section = section.section
-        where sectionId = 1
         order by case_index, rl.start
         ''').toPandas()
         sim_records_nom = sim_records_nom.pivot(
