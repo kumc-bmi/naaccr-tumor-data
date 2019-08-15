@@ -3,13 +3,58 @@ from pathlib import Path as Path_T  # for type only
 # https://stackoverflow.com/questions/6028000/how-to-read-a-static-file-from-inside-a-python-package
 from importlib import resources as res
 from typing import Iterable, Optional as Opt
+from xml.etree import ElementTree as ET
 
 from pyspark import SparkFiles
 from pyspark.sql import SparkSession as SparkSession_T
+from pyspark.sql import types as ty
 from pyspark.sql.dataframe import DataFrame
 
 from sql_script import SqlScript
 import heron_load
+# https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/
+import naaccr_xml_res
+# https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/xsd/
+import naaccr_xml_xsd
+
+
+class NaaccrXML:
+    dd_xsd = ET.parse(res.open_text(naaccr_xml_xsd,
+                                    'naaccr_dictionary_1.3.xsd'))
+    dd_180 = ET.parse(res.open_text(naaccr_xml_res,
+                                    'naaccr-dictionary-180.xml'))
+
+
+def xmlDF(spark, schema, doc, path, ns):
+    def typed(s2s):
+        out = {k: int(v) if isinstance(schema[k].dataType, ty.IntegerType)
+               else bool(v) if isinstance(schema[k].dataType, ty.BooleanType)
+               else v
+               for (k, v) in s2s.items()}
+        # print("typed", s2s, out)
+        return out
+    data = (typed(elt.attrib) for elt in doc.iterfind(path, ns))
+    return spark.createDataFrame(data, schema)
+
+
+def eltSchema(xsd_complex_type,
+              simpleContent=False):
+    ns = {'xsd': 'http://www.w3.org/2001/XMLSchema'}
+    decls = xsd_complex_type.findall('xsd:attribute', ns)
+    fields = [
+        ty.StructField(
+            name=d.attrib['name'],
+            dataType=ty.IntegerType() if d.attrib['type'] == 'xsd:integer'
+            else ty.BooleanType() if d.attrib['type'] == 'xsd:boolean'
+            else ty.StringType(),
+            nullable=d.attrib.get('use') != 'required',
+            # IDEA/YAGNI?: use pd.Categorical for xsd:enumeration
+            # e.g. tns:parentType
+            metadata=d.attrib)
+        for d in decls]
+    if simpleContent:
+        fields = fields + ty.StructField('value', ty.StringType, False)
+    return ty.StructType(fields)
 
 
 class DataDictionary(object):
