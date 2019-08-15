@@ -181,6 +181,22 @@ s10 = tumorDF(spark, s10x)
 s10.toPandas().sort_values(['naaccrId', 'rownum']).head(20)
 
 
+# %%
+from pyspark.sql import functions as func
+
+def naaccr_pivot(ddict, skinny, key_cols,
+                 pivot_on='naaccrId', value_col='value',
+                 start='startColumn'):
+    groups = skinny.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
+    wide = groups.pivot(pivot_on).agg(func.first(value_col))
+    start_by_id = {id: start for (id, start) in dd.select(pivot_on, start).collect()}
+    sorted_cols = sorted(wide.columns, key=lambda id: start_by_id.get(id, -1))
+    return wide.select(sorted_cols)
+
+
+#s10.select('rownum', 'naaccrId', 'value').groupBy('rownum').pivot('naaccrId').agg(func.first('value')).toPandas()
+naaccr_pivot(dd, s10, ['rownum']).limit(3).toPandas()
+
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
 
