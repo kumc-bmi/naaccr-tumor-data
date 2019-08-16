@@ -214,15 +214,19 @@ def tumorDF(spark, doc):
     rownum = 0
     ns = {'n': 'http://naaccr.org/naaccrxml'}
 
+    to_parent = {c: p for p in doc.iter() for c in p}
+
     def tumorItems(tumorElt, schema, simpleContent=True):
         nonlocal rownum
         assert simpleContent
         rownum += 1
-        for item in tumorElt.iterfind('./n:Item', ns):
-            # print(tumorElt, item)
-            yield dict(next(eltDict(item, schema, simpleContent)),
-                       rownum=rownum)
-        # TODO: ../n:Item for Patient items, ../../n:Item for NaaccrData
+        patElt = to_parent[tumorElt]
+        ndataElt = to_parent[patElt]
+        for elt in [ndataElt, patElt, tumorElt]:
+            for item in elt.iterfind('./n:Item', ns):
+                # print(tumorElt, item)
+                yield dict(next(eltDict(item, schema, simpleContent)),
+                           rownum=rownum)
 
     itemSchema = eltSchema(NAACCR1.item_xsd, simpleContent=True)
     rownumField = ty.StructField('rownum', ty.IntegerType(), False)
@@ -231,11 +235,16 @@ def tumorDF(spark, doc):
                  eltRecords=tumorItems,
                  ns={'n': 'http://naaccr.org/naaccrxml'},
                  simpleContent=True)
-    return data
+    return data.drop('naaccrNum')
 
 
 IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
-                .toPandas().sort_values(['naaccrId', 'rownum']).head(20))
+                .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
+
+# %%
+IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
+                .select('naaccrId').distinct().sort('naaccrId')
+                .toPandas())
 
 
 # %%
@@ -469,6 +478,14 @@ class TumorKeys:
     report_ids = ['naaccrRecordVersion', 'npiRegistryId']
     report_attrs = report_ids + ['dateCaseReportExported']
 
+    dtcols = ['dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
+              'dateCaseCompleted', 'dateCaseLastChanged']
+    key4 = [
+        'patientSystemIdHosp',  # NAACCR stable patient ID
+        'tumorRecordNumber',    # NAACCR stable tumor ID
+        'patientIdNumber',      # patient_mapping
+        'abstractedBy',         # IDEA/YAGNI?: provider_id
+    ]
     @classmethod
     def pat_tmr(cls, spark, naaccr_text_lines):
         dd = ddictDF(spark)
@@ -536,28 +553,46 @@ def naaccr_coded_obs(records, ty):
                   ty.where(ty.valtype_cd == '@').collect()]
     # TODO: test data for morphTypebehavIcdO2 etc.
     value_vars = [xmlId for xmlId in value_vars if xmlId in records.columns]
-    dtcols = ['dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
-              'dateCaseCompleted', 'dateCaseLastChanged']
-    dated = naaccr_dates(records, dtcols)
+
+    dated = naaccr_dates(records, TumorKeys.dtcols)
     df = melt(dated,
-              [
-                  'patientSystemIdHosp',  # NAACCR stable patient ID
-                  'tumorRecordNumber',    # NAACCR stable tumor ID
-                  'patientIdNumber',      # patient_mapping
-                  'abstractedBy',         # provider_id? ISSUE.
-              ] + dtcols,
+              TumorKeys.key4 + TumorKeys.dtcols,
               value_vars, var_name='xmlId', value_name='code')
     return df.where(func.trim(df.code) > '')
 
 
 if IO_TESTING:
-    _coded = naaccr_coded_obs(extract,
+    _coded = naaccr_coded_obs(extract.sample(True, 0.02),
                               tumor_item_type(_spark, cwd / 'naaccr_ddict'))
     _coded = TumorKeys.with_tumor_id(_coded)
 
     _coded.createOrReplaceTempView('tumor_coded_value')
 # coded.explain()
 IO_TESTING and _coded.limit(10).toPandas().set_index(['recordId', 'xmlId'])
+
+
+# %%
+def naaccr_coded_obs2(spark, items,
+                      rownum='rownum',
+                      naaccrId='naaccrId'):
+    # TODO: test data for dateCaseCompleted, dateCaseLastChanged,
+    #       patientSystemIdHosp? abstractedBy?
+    # TODO: or: test that patientIdNumber, tumorRecordNumber is unique?
+    key_items = items.where(
+        items[naaccrId].isin(TumorKeys.key4 + TumorKeys.dtcols))
+    # return key_items
+    key_rows = naaccr_pivot(ddictDF(spark), key_items, [rownum])
+    # TODO: test data for dateCaseCompleted?
+    key_rows = naaccr_dates(key_rows, [c for c in TumorKeys.dtcols
+                                       if c in key_rows.columns])
+    coded_obs = (key_rows
+                 .join(items, items[rownum] == key_rows[rownum])
+                 .drop(items[rownum]))
+    return coded_obs.withColumnRenamed('value', 'code')
+
+
+IO_TESTING and (naaccr_coded_obs2(_spark, tumorDF(_spark, NAACCR1.s100x))
+                .limit(15).toPandas().set_index(['rownum', 'naaccrId']))
 
 # %%
 naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
