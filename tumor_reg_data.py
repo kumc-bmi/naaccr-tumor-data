@@ -20,6 +20,7 @@
 #
 #   - README for motivation and usage
 #   - CONTRIBUTING for coding style etc.
+#     - Note especially **ISSUE**, **TODO** and **IDEA** markers
 #
 # [jupytext]: https://github.com/mwouts/jupytext
 
@@ -33,7 +34,7 @@
 from gzip import GzipFile
 from importlib import resources as res
 from sys import stderr
-from typing import Iterable
+from typing import Iterable, List, Union
 from xml.etree import ElementTree as XML
 import logging
 import datetime
@@ -41,10 +42,9 @@ import datetime
 
 # %%
 # 3rd party code: PyData
-from pyspark.sql import functions as func
-from pyspark.sql import types as ty
+from pyspark.sql import Column
+from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
-from pyspark.sql.functions import col
 import numpy as np
 import pandas as pd
 
@@ -61,8 +61,7 @@ import naaccr_xml_xsd
 
 # %%
 # this project
-from sql_script import SqlScript
-from test_data.flat_file import naaccr_read_fwf
+#from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
 from tumor_reg_ont import create_object, DataDictionary
 import heron_load
 
@@ -88,16 +87,24 @@ log.info('%s', dict(pandas=pd.__version__))
 # and don't import powerful objects.
 
 # %%
-CAN_IO = __name__ == '__main__'
+if __name__ == '__main__':
+    IO_TESTING = True
+    if 'spark' in globals():
+        _spark = spark  # noqa
+        del spark
+else:
+    IO_TESTING = False
+    _spark = None  # for static analysis when not IO_TESTING
 
-if CAN_IO:
+
+if IO_TESTING:
     def _cwd():
         # ISSUE: ambient
         from pathlib import Path
         return Path('.')
 
     cwd = _cwd()
-    log.info('cwd: %s', cwd)
+    log.info('cwd: %s', cwd.resolve())
 
 # %% [markdown]
 # The `spark` global is available when we launch as
@@ -105,10 +112,10 @@ if CAN_IO:
 #    pyspark ...`.
 
 # %%
-CAN_IO and spark
+IO_TESTING and _spark
 
 # %%
-CAN_IO and log.info('spark web UI: %s', spark.sparkContext.uiWebUrl)
+IO_TESTING and log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
 
 
 # %% [markdown]
@@ -193,7 +200,7 @@ def ddictDF(spark):
                  ns=NAACCR1.ns)
 
 
-CAN_IO and ddictDF(spark).limit(5).toPandas().set_index('naaccrId')
+IO_TESTING and ddictDF(_spark).limit(5).toPandas().set_index('naaccrId')
 
 # %% [markdown]
 # ## NAACCR XML Data
@@ -227,8 +234,8 @@ def tumorDF(spark, doc):
     return data
 
 
-CAN_IO and (tumorDF(spark, NAACCR1.s100x)
-            .toPandas().sort_values(['naaccrId', 'rownum']).head(20))
+IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
+                .toPandas().sort_values(['naaccrId', 'rownum']).head(20))
 
 
 # %%
@@ -243,14 +250,18 @@ def naaccr_pivot(ddict, skinny, key_cols,
     return wide.select(sorted_cols)
 
 
-CAN_IO and (naaccr_pivot(ddictDF(spark),
-                         tumorDF(spark, NAACCR1.s100x),
-                         ['rownum'])
-            .limit(3).toPandas())
+IO_TESTING and (naaccr_pivot(ddictDF(_spark),
+                             tumorDF(_spark, NAACCR1.s100x),
+                             ['rownum'])
+                .limit(3).toPandas())
 
 
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
+#
+#  - **ISSUE**: emulating `t_item` from the 2012 MDB is awkward;
+#    better to rewrite queries that use it in terms
+#    of record_layout etc.
 
 # %%
 def tumor_item_type(spark, cache):
@@ -267,15 +278,24 @@ def tumor_item_type(spark, cache):
     return spark.table('tumor_item_type')
 
 
-CAN_IO and (tumor_item_type(spark, cwd / 'naaccr_ddict')
-            .limit(5).toPandas().set_index(['ItemNbr', 'xmlId']))
+IO_TESTING and (tumor_item_type(_spark, cwd / 'naaccr_ddict')
+                .limit(5).toPandas().set_index(['ItemNbr', 'xmlId']))
 
 # %%
-CAN_IO and spark.sql('''
+IO_TESTING and _spark.sql('''
 select valtype_cd, count(*)
 from tumor_item_type
 group by valtype_cd
 ''').toPandas().set_index('valtype_cd')
+
+
+# %%
+def coded_items(tumor_item_type):
+    return tumor_item_type.where("valtype_cd = '@'")
+
+
+IO_TESTING and (coded_items(tumor_item_type(_spark, cwd / 'naaccr_ddict'))
+                .toPandas().tail())
 
 # %% [markdown]
 # ## NAACCR Flat File v18
@@ -283,103 +303,214 @@ group by valtype_cd
 # %% [markdown]
 # ### Warning! Identified Data!
 
-# %%
-#@@@!hostname
+# %% [markdown]
+#  - **IDEA**: use `_tr_file` instead; i.e. be sure not to "export" globals.
 
 # %%
-tr_file = cwd / '/d1/naaccr/donotuse_2019_02_naaccr' / 'NCDB_Export_3.31.22_PM.txt'
-tr_file.exists()
+if IO_TESTING:
+    tr_file = cwd / input()
+    naaccr_text_lines = _spark.read.text(str(tr_file))
+else:
+    tr_file = None
+    naaccr_text_lines = None
+
+IO_TESTING and tr_file.exists()
 
 # %%
-x = spark.read.text(str(tr_file))
-x.rdd.getNumPartitions()
+IO_TESTING and naaccr_text_lines.rdd.getNumPartitions()
 
 # %%
-x.limit(5).toPandas()
-
-
-# %%
-def non_blank(df):
-    return df[[
-        col for col in df.columns
-        if (df[col].str.strip() > '').any()
-    ]]
+IO_TESTING and naaccr_text_lines.limit(5).toPandas()
 
 
 # %%
-syn_records = pd.read_pickle('test_data/,syn_records_TMP.pkl')
-non_blank(syn_records[coded_items[
-    (coded_items.sectionid == 1) &
-    (coded_items.xmlId.isin(syn_records.columns))].xmlId.values.tolist()]).tail(15)
-
-# %%
-stuff = pd.read_pickle('test_data/,test-stuff.pkl')
-stuff.iloc[0]['lines']
-
-# %%
-ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
-test_data_coded = naaccr_read_fwf(spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
-test_data_coded.limit(5).toPandas()
-
-# %%
-xp = test_data_coded.select(coded_items[coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
-
-
-xp[[
-    col for col in xp.columns
-    if (xp[col].str.strip() > '').any()
-]]
-
-# %%
-coded_items = tumor_item_type.where("valtype_cd = '@'").toPandas()
-coded_items.tail()
-
-# %%
-stuff.iloc[0].lines[:41]
-
-# %%
-spark.read.text(str(tr_file)).take(1)[0].value[:41]
-
-# %%
-
-def naaccr_read_fwf(flat_file, record_layout):
+def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
+                    value_col: str = 'value',
+                    exclude_pfx: str = 'reserved') -> DataFrame:
+    """
+    @param flat_file: as from spark.read.text()
+                      typically with .value
+    @param itemDefs: see ddictDF
+    """
     fields = [
-        func.substring(flat_file.value, item.start, item.length).alias(item.xmlId)
-        for item in record_layout.collect()
-        if not item.xmlId.startswith('reserved')
-    ]
+        func.substring(flat_file[value_col],
+                       item.startColumn, item.length).alias(item.naaccrId)
+        for item in itemDefs.collect()
+        if not item.naaccrId.startswith(exclude_pfx)
+    ]  # type: List[Union[Column, str]]
     return flat_file.select(fields)
 
 
-naaccr_text_lines = spark.read.text(str(tr_file))
-
-extract = naaccr_read_fwf(naaccr_text_lines, ndd.record_layout)
-extract.createOrReplaceTempView('naaccr_extract')
+if IO_TESTING:
+    extract = naaccr_read_fwf(naaccr_text_lines, ddictDF(_spark))
+    extract.createOrReplaceTempView('naaccr_extract')
+else:
+    extract = None  # for static analysis when not IO_TESTING
 # extract.explain()
-extract.limit(5).toPandas()
+IO_TESTING and extract.limit(5).toPandas()
+
 
 # %%
-xp = extract.sample(False, 0.01).select(coded_items[coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
+def cancerIdSample(spark, cache, tumors,
+                   portion=0.1, cancerID=1):
+    """Cancer Identification items from a sample
+    """
+    cols = coded_items(tumor_item_type(spark, cache)).toPandas()
+    cols = cols[cols.sectionid == cancerID]
+    colnames = cols.xmlId.values.tolist()
+    # TODO: test data for morphTypebehavIcdO2 etc.
+    colnames = [cn for cn in colnames if cn in tumors.columns]
+    return tumors.sample(False, portion).select(colnames)
 
-xp[[
-    col for col in xp.columns
-    if (xp[col].str.strip() > '').any()
-]]
+
+def skipAllBlank(xp):
+    return xp[[
+        col for col in xp.columns
+        if (xp[col].str.strip() > '').any()
+    ]]
+
+
+IO_TESTING and skipAllBlank(
+    cancerIdSample(_spark, cwd / 'naaccr_ddict', extract).limit(15).toPandas()
+)
+
 
 # %% [markdown]
-# ## Synthesizing Data
+# ## NAACCR Dates
+
+# %%
+def naaccr_dates(df, date_cols, keep=False):
+    orig_cols = df.columns
+    for dtcol in date_cols:
+        strcol = dtcol + '_'
+        df = df.withColumnRenamed(dtcol, strcol)
+        dt = func.to_date(func.unix_timestamp(df[strcol], 'yyyyMMdd')
+                          .cast('timestamp'))
+        df = df.withColumn(dtcol, dt)
+    if not keep:
+        df = df.select(orig_cols)
+    return df
+
+
+IO_TESTING and naaccr_dates(
+    extract.select(['dateOfDiagnosis', 'dateOfLastContact']),
+    ['dateOfDiagnosis', 'dateOfLastContact'],
+    keep=True).limit(10).toPandas()
+
+
+# %% [markdown]
+# ### Strange dates: TODO?
+
+# %%
+def strange_dates(extract):
+    x = naaccr_dates(extract.select(['dateOfDiagnosis']),
+                     ['dateOfDiagnosis'], keep=True)
+    x = x.withColumn('dtlen', func.length(func.trim(x.dateOfDiagnosis_)))
+    x = x.where(x.dtlen > 0)
+    x = x.withColumn('cc', func.substring(func.trim(x.dateOfDiagnosis_), 1, 2))
+
+    return x.where(
+        ~(x.cc.isin(['19', '20'])) |
+        ((x.dtlen < 8) & (x.dtlen > 0)))
+
+
+IO_TESTING and (strange_dates(extract)
+                .toPandas().groupby(['dtlen', 'cc']).count())
+
+
+# %% [markdown]
+# ## Unique key columns
 #
-# Let's take a NAACCR file and gather stats on it so that we can synthesize data with similar characteristics.
-
-# %% [markdown]
-# ### Characteristics of data from our NAACCR file
-
-# %% [markdown]
-# Now let's add an id column and make a long-skinny from the wide data, starting with nominals:
+#  - `patientSystemIdHosp` - "This provides a stable identifier to
+#    link back to all reported tumors for a patient. It also serves as
+#    a reliable linking identifier; useful when central registries
+#    send follow-up information back to hospitals. Other identifiers
+#    such as social security number and medical record number, while
+#    useful, are subject to change and are thus less useful for this
+#    type of record linkage."
+#
+#  - `tumorRecordNumber` - "Description: A system-generated number
+#     assigned to each tumor. The number should never change even if
+#     the tumor sequence is changed or a record (tumor) is deleted.
+#     Rationale: This is a unique number that identifies a specific
+#     tumor so data can be linked. "Sequence Number" cannot be used as
+#     a link because the number is changed if a report identifies an
+#     earlier tumor or if a tumor record is deleted."
+#
+# Turns out to be not enough:
 
 # %%
+def dups(df_spark, key_cols):
+    df_pd = df_spark.toPandas().sort_values(key_cols)
+    df_pd['dup'] = df_pd.duplicated(key_cols, keep=False)
+    return df_pd[df_pd.dup]
 
 
+_key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
+
+IO_TESTING and dups(extract.select('sequenceNumberCentral',
+                                   'dateOfDiagnosis', 'dateCaseCompleted',
+                                   *_key1),
+                    _key1).set_index(_key1)
+
+
+# %%
+class TumorKeys:
+    pat_ids = ['patientSystemIdHosp', 'patientIdNumber', 'accessionNumberHosp']
+    pat_attrs = pat_ids + ['dateOfBirth', 'dateOfLastContact',
+                           'sex', 'vitalStatus']
+    tmr_ids = ['tumorRecordNumber']
+    tmr_attrs = tmr_ids + [
+        'dateOfDiagnosis',
+        'sequenceNumberCentral', 'sequenceNumberHospital', 'primarySite',
+        'ageAtDiagnosis', 'dateOfInptAdm', 'dateOfInptDisch', 'classOfCase',
+        'dateCaseInitiated', 'dateCaseCompleted', 'dateCaseLastChanged',
+    ]
+    report_ids = ['naaccrRecordVersion', 'npiRegistryId']
+    report_attrs = report_ids + ['dateCaseReportExported']
+
+    @classmethod
+    def pat_tmr(cls, spark, naaccr_text_lines):
+        dd = ddictDF(spark)
+        pat_tmr = naaccr_read_fwf(
+            naaccr_text_lines,
+            dd.where(dd.naaccrId.isin(
+                cls.tmr_attrs + cls.pat_attrs + cls.report_attrs)))
+        # pat_tmr.createOrReplaceTempView('pat_tmr')
+        pat_tmr = naaccr_dates(pat_tmr,
+                               [c for c in pat_tmr.columns
+                                if c.startswith('date')])
+        return pat_tmr
+
+    @classmethod
+    def with_tumor_id(cls, data,
+                      name='recordId',
+                      extra=['dateOfDiagnosis', 'dateCaseCompleted'],
+                      # keep recordId length consistent
+                      extra_default=None):
+        if extra_default is None:
+            extra_default = func.lit('0000-00-00')
+        id_col = func.concat(data.patientSystemIdHosp,
+                             data.tumorRecordNumber,
+                             *[func.coalesce(data[col], extra_default)
+                               for col in extra])
+        return data.withColumn(name, id_col)
+
+
+# pat_tmr.cache()
+if IO_TESTING:
+    _pat_tmr = TumorKeys.with_tumor_id(
+        TumorKeys.pat_tmr(_spark, naaccr_text_lines))
+IO_TESTING and _pat_tmr
+
+# %%
+IO_TESTING and _pat_tmr.limit(15).toPandas()
+
+
+# %% [markdown]
+# ## Coded observations
+
+# %%
 def melt(df: DataFrame,
          id_vars: Iterable[str], value_vars: Iterable[str],
          var_name: str = "variable", value_name: str = "value") -> DataFrame:
@@ -398,6 +529,117 @@ def melt(df: DataFrame,
         func.col("_vars_and_vals")[x].alias(x) for x in [var_name, value_name]]
     return _tmp.select(*cols)
 
+
+# %%
+def naaccr_coded_obs(records, ty):
+    value_vars = [row.xmlId for row in
+                  ty.where(ty.valtype_cd == '@').collect()]
+    # TODO: test data for morphTypebehavIcdO2 etc.
+    value_vars = [xmlId for xmlId in value_vars if xmlId in records.columns]
+    dtcols = ['dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
+              'dateCaseCompleted', 'dateCaseLastChanged']
+    dated = naaccr_dates(records, dtcols)
+    df = melt(dated,
+              [
+                  'patientSystemIdHosp',  # NAACCR stable patient ID
+                  'tumorRecordNumber',    # NAACCR stable tumor ID
+                  'patientIdNumber',      # patient_mapping
+                  'abstractedBy',         # provider_id? ISSUE.
+              ] + dtcols,
+              value_vars, var_name='xmlId', value_name='code')
+    return df.where(func.trim(df.code) > '')
+
+
+if IO_TESTING:
+    _coded = naaccr_coded_obs(extract,
+                              tumor_item_type(_spark, cwd / 'naaccr_ddict'))
+    _coded = TumorKeys.with_tumor_id(_coded)
+
+    _coded.createOrReplaceTempView('tumor_coded_value')
+# coded.explain()
+IO_TESTING and _coded.limit(10).toPandas().set_index(['recordId', 'xmlId'])
+
+# %%
+naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
+if IO_TESTING:
+    create_object('tumor_reg_coded_facts', naaccr_txform, _spark)
+
+    tumor_reg_coded_facts = _spark.table('tumor_reg_coded_facts')
+    tumor_reg_coded_facts.printSchema()
+
+IO_TESTING and tumor_reg_coded_facts.limit(5).toPandas()
+
+# %% [markdown]
+# ## Oracle DB Access
+
+# %% [markdown]
+# We use `PYSPARK_SUBMIT_ARGS` to get JDBC jar in both
+# `spark.driver.extraClassPath` and `--jars`:
+
+# %%
+if IO_TESTING:
+    from os import environ as _environ
+    log.info(_environ['PYSPARK_SUBMIT_ARGS'])
+
+
+# %%
+IO_TESTING and _spark.sparkContext.getConf().get('spark.driver.extraClassPath')
+
+# %%
+if IO_TESTING:
+    def _set_pw(name='ID CDW'):
+        from os import environ
+        from getpass import getpass
+        password = getpass(name)
+        environ[name] = password
+
+    _set_pw()
+
+
+# %%
+class Account:
+    def __init__(self, user: str, password: str):
+        self.user = user
+        self.__password = password
+
+    def run(self, io, table,
+            driver="oracle.jdbc.OracleDriver",
+            url='jdbc:oracle:thin:@localhost:1521:nheronA1',
+            **kw_args):
+        return io.jdbc(url, table,
+                       properties={"user": self.user,
+                                   "password": self.__password,
+                                   "driver": driver},
+                       **kw_args)
+
+
+if IO_TESTING:
+    _cdw = Account(_environ['LOGNAME'], _environ['ID CDW'])
+
+IO_TESTING and _cdw.run(_spark.read, "global_name").toPandas()
+
+# %% [markdown]
+#
+#   - **ISSUE**: column name capitalization: `concept_cd` vs.
+#     `CONCEPT_CD`, `dateOfDiagnosis` vs. `DATEOFDIAGNOSIS`
+#     vs. `DATE_OF_DIAGNOSIS`.
+
+# %%
+if IO_TESTING:
+    _cdw.run(tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
+             mode='overwrite')
+
+
+# %% [markdown]
+# ## Synthesizing Data
+#
+# Let's take a NAACCR file and gather stats on it so that we can synthesize data with similar characteristics.
+
+# %% [markdown]
+# ### Characteristics of data from our NAACCR file
+
+# %% [markdown]
+# Now let's add an id column and make a long-skinny from the wide data, starting with nominals:
 
 # %%
 def stack_nominals(data, ty,
@@ -565,91 +807,39 @@ tr_chunk1 = extract.limit(100)
 tr_chunk1.limit(10).toPandas()
 
 # %% [markdown]
-# ## NAACCR Dates
+# ### checking synthetic data
 
 # %%
-def naaccr_dates(df, date_cols, keep=False):
-    orig_cols = df.columns
-    for dtcol in date_cols:
-        strcol = dtcol + '_'
-        df = df.withColumnRenamed(dtcol, strcol)
-        dt = func.to_date(func.unix_timestamp(df[strcol], 'yyyyMMdd').cast('timestamp'))
-        df = df.withColumn(dtcol, dt)
-    if not keep:
-        df = df.select(orig_cols)
-    return df
+def non_blank(df):
+    return df[[
+        col for col in df.columns
+        if (df[col].str.strip() > '').any()
+    ]]
 
-naaccr_dates(extract.select(['dateOfDiagnosis', 'dateOfLastContact']),
-             ['dateOfDiagnosis', 'dateOfLastContact'], keep=True).limit(10).toPandas()
-
-# %% [markdown]
-# ### Strange dates: TODO?
 
 # %%
-x = naaccr_dates(extract.select(['dateOfDiagnosis']),
-             ['dateOfDiagnosis'], keep=True)
-x = x.withColumn('dtlen', func.length(func.trim(x.dateOfDiagnosis_)))
-x = x.where(x.dtlen > 0)
-x = x.withColumn('cc', func.substring(func.trim(x.dateOfDiagnosis_), 1, 2))
-
-x.where(~(x.cc.isin(['19', '20'])) |
-        ((x.dtlen < 8) & (x.dtlen > 0))).toPandas().groupby(['dtlen', 'cc']).count()
-
-
-# %% [markdown]
-# ## Unique key columns
-#
-#  - `patientSystemIdHosp` - "This provides a stable identifier to link back to all reported tumors for a patient. It also serves as a reliable linking identifier; useful when central registries send follow-up information back to hospitals. Other identifiers such as social security number and medical record number, while useful, are subject to change and are thus less useful for this type of record linkage."
-#  - `tumorRecordNumber` - "Description: A system-generated number assigned to each tumor. The number should never change even if the tumor sequence is changed or a record (tumor) is deleted.
-#     Rationale: This is a unique number that identifies a specific tumor so data can be linked. "Sequence Number" cannot be used as a link because the number is changed if a report identifies an earlier tumor or if a tumor record is deleted."
-#
-# Turns out to be not enough:
+syn_records = pd.read_pickle('test_data/,syn_records_TMP.pkl')
+non_blank(syn_records[coded_items[
+    (coded_items.sectionid == 1) &
+    (coded_items.xmlId.isin(syn_records.columns))].xmlId.values.tolist()]).tail(15)
 
 # %%
-def dups(df_spark, key_cols):
-    df_pd = df_spark.toPandas().sort_values(key_cols)
-    df_pd['dup'] = df_pd.duplicated(key_cols, keep=False)
-    return df_pd[df_pd.dup]
-
-key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
-
-dups(extract.select('sequenceNumberCentral', 'dateOfDiagnosis', 'dateCaseCompleted', *key1), key1).set_index(key1)
+stuff = pd.read_pickle('test_data/,test-stuff.pkl')
+stuff.iloc[0]['lines']
 
 # %%
-pat_ids = ['patientSystemIdHosp', 'patientIdNumber' , 'accessionNumberHosp']
-pat_attrs = pat_ids + ['dateOfBirth', 'dateOfLastContact', 'sex', 'vitalStatus']
-tmr_ids = ['tumorRecordNumber']
-tmr_attrs = tmr_ids + ['dateOfDiagnosis',
-                       'sequenceNumberCentral', 'sequenceNumberHospital', 'primarySite',
-          'ageAtDiagnosis', 'dateOfInptAdm', 'dateOfInptDisch', 'classOfCase',
-          'dateCaseInitiated', 'dateCaseCompleted', 'dateCaseLastChanged']
-report_ids = ['naaccrRecordVersion', 'npiRegistryId']
-report_attrs = report_ids + ['dateCaseReportExported']
-
-pat_tmr = naaccr_text_lines.select(
-    *[naaccr_col(naaccr_text_lines.value, xmlId)
-      for xmlId in (tmr_attrs + pat_attrs + report_attrs)
-    ]
-)
-nodate = func.lit('0000-00-00')  # ISSUE: keep recordId length consistent?
-pat_tmr.createOrReplaceTempView('pat_tmr')
-pat_tmr = naaccr_dates(pat_tmr, [c for c in pat_tmr.columns if c.startswith('date')])
-
-def with_tumor_id(data,
-                  name='recordId',
-                  extra=['dateOfDiagnosis', 'dateCaseCompleted'],
-                  extra_default=func.lit('0000-00-00')):
-    return data.withColumn('recordId',
-                           func.concat(data.patientSystemIdHosp,
-                                       data.tumorRecordNumber,
-                                       *[func.coalesce(data[col], extra_default)
-                                         for col in extra]))
-# pat_tmr.cache()
-pat_tmr = with_tumor_id(pat_tmr)
-pat_tmr
+ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
+test_data_coded = naaccr_read_fwf(spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
+test_data_coded.limit(5).toPandas()
 
 # %%
-pat_tmr.limit(15).toPandas()
+xp = test_data_coded.select(coded_items[coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
+
+
+xp[[
+    col for col in xp.columns
+    if (xp[col].str.strip() > '').any()
+]]
 
 # %% [markdown]
 # ## Diagnosed before born??
@@ -676,90 +866,6 @@ dx_age.hist()
 
 # %%
 pat_tmr_pd[pat_tmr_pd.patientSystemIdHosp == '01002923']
-
-
-# %% [markdown]
-# ## Coded observations
-
-# %%
-def naccr_coded(records, ty):
-    value_vars = [row.xmlId for row in ty.where(ty.valtype_cd == '@').collect()]
-    dtcols = ['dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact', 'dateCaseCompleted', 'dateCaseLastChanged']
-    dated = naaccr_dates(records, dtcols)
-    df = melt(dated,
-              [
-                  'patientSystemIdHosp',  # NAACCR stable patient ID
-                  'tumorRecordNumber',    # NAACCR stable tumor ID
-                  'patientIdNumber',      # patient_mapping
-                  'abstractedBy',         # provider_id? ISSUE.
-              ] + dtcols,
-              value_vars, var_name='xmlId', value_name='code')
-    return df.where(func.trim(df.code) > '')
-
-
-coded = naccr_coded(extract, tumor_item_type)
-# coded.cache()  # avoid 'Too many open files' https://stackoverflow.com/questions/25707629
-coded = with_tumor_id(coded)
-
-coded.createOrReplaceTempView('tumor_coded_value')
-# coded.explain()
-coded.limit(10).toPandas().set_index(['recordId', 'xmlId'])
-
-# %%
-SqlScript.create_object('tumor_reg_coded_facts', cwd / 'heron_load' / 'naaccr_txform.sql', spark)
-
-tumor_reg_coded_facts = spark.sql('select * from tumor_reg_coded_facts')
-tumor_reg_coded_facts.printSchema()
-tumor_reg_coded_facts.limit(5).toPandas()
-
-# %%
-def naaccr_col(value, xmlId):
-    # AMBIENT: spark
-    # MAGIC: record_layout
-    # INJECTION: xmlId
-    [item] = spark.sql(f"select * from record_layout where xmlId = '{xmlId}'").collect()
-    return func.substring(value, item.start, item.length).alias(xmlId)
-
-naaccr_col(naaccr_text_lines.value, 'patientSystemIdHosp')
-
-# %% [markdown]
-# ## Oracle DB Access
-
-# %%
-if CAN_IO:
-    from os import environ
-    log.info(environ['PYSPARK_SUBMIT_ARGS'])
-
-
-# %%
-if CAN_IO:
-    def set_pw(name='CDW'):
-        from os import environ
-        from getpass import getpass
-        password = getpass(name)
-        environ[name] = password
-
-    set_pw()
-
-
-# %%
-def cdw(io, table,
-        driver="oracle.jdbc.OracleDriver",
-        url='jdbc:oracle:thin:@localhost:1521:nheronA1',
-        **kw_args):
-    #@@ from os import environ
-    return io.jdbc(url, table,
-          properties={"user": environ['LOGNAME'], "password": environ['CDW'],
-                      "driver": driver}, **kw_args)
-    
-jdbcDF2 = cdw(spark.read, "global_name")
-jdbcDF2.toPandas()
-
-# %% [markdown]
-# **ISSUE**: column name capitalization: `concept_cd` vs. `CONCEPT_CD`, `dateOfDiagnosis` vs. `DATEOFDIAGNOSIS` vs. `DATE_OF_DIAGNOSIS`.
-
-# %%
-cdw(tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS", mode='overwrite')
 
 # %% [markdown]
 # ## registry table
