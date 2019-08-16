@@ -770,6 +770,30 @@ IO_TESTING and bc_var_summary(
     _spark, _tumor_reg_coded_facts, _bc_ddict).where(
         'fact_qty is not null').toPandas()
 
+# %% [markdown]
+# **TODO**: date observations; treating `dateOfDiagnosis` as a coded observation leads to `concept_cd = 'NAACCR|390:20080627'`
+
+# %%
+IO_TESTING and  _tumor_reg_coded_facts.where("xmlId == 'dateOfDiagnosis'").limit(5).toPandas()
+
+
+# %% [markdown]
+# #### TODO: Code labels; e.g. 1 = Male; 2 = Female
+
+# %%
+def pivot_obs_by_enc(skinny_obs,
+                     pivot_on='xmlId',  # cheating... not really in i2b2 observation_fact
+                     # TODO: nval_num etc. for value cols?
+                     value_col='concept_cd',
+                     key_cols=['encounter_ide', 'MRN']):
+    groups = skinny_obs.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
+    wide = groups.pivot(pivot_on).agg(func.first(value_col))
+    return wide
+
+IO_TESTING and pivot_obs_by_enc(_tumor_reg_coded_facts.where(
+    _tumor_reg_coded_facts.xmlId.isin(['dateOfDiagnosis', 'primarySite', 'sex', 'dateOfBirth'])
+)).limit(5).toPandas().set_index(['encounter_ide', 'MRN'])
+
 
 # %% [markdown]
 # ## Synthesizing Data
