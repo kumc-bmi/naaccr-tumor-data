@@ -59,6 +59,8 @@ import naaccr_xml_res  # ISSUE: symlink noted above
 import naaccr_xml_samples
 import naaccr_xml_xsd
 
+import bc_qa
+
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
@@ -588,21 +590,33 @@ def naaccr_coded_obs2(spark, items,
     coded_obs = (key_rows
                  .join(items, items[rownum] == key_rows[rownum])
                  .drop(items[rownum]))
+    coded_obs = (coded_obs
+                 # ISSUE: naaccrId vs. xmlId
+                 .withColumnRenamed('naaccrId', 'xmlId')
+                 .withColumnRenamed('rownum', 'recordId')
+                 # ISSUE: test data for these? make them optiona?
+                 .withColumn('abstractedBy', func.lit('@@'))
+                 .withColumn('dateCaseLastChanged', func.lit('@@')))
     return coded_obs.withColumnRenamed('value', 'code')
 
 
-IO_TESTING and (naaccr_coded_obs2(_spark, tumorDF(_spark, NAACCR1.s100x))
-                .limit(15).toPandas().set_index(['rownum', 'naaccrId']))
+if IO_TESTING:
+    _tumor_coded_value = naaccr_coded_obs2(_spark,
+                                           tumorDF(_spark, NAACCR1.s100x))
+
+IO_TESTING and _tumor_coded_value.limit(15).toPandas().set_index(
+    ['recordId', 'xmlId'])
 
 # %%
 naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
 if IO_TESTING:
+    _tumor_coded_value.createOrReplaceTempView('tumor_coded_value')  # ISSUE: CLOBBER!
     create_object('tumor_reg_coded_facts', naaccr_txform, _spark)
+    _tumor_reg_coded_facts = _spark.table('tumor_reg_coded_facts')
+    _tumor_reg_coded_facts.printSchema()
 
-    tumor_reg_coded_facts = _spark.table('tumor_reg_coded_facts')
-    tumor_reg_coded_facts.printSchema()
-
-IO_TESTING and tumor_reg_coded_facts.limit(5).toPandas()
+# TODO: check for nulls in update_date, start_date, end_date, etc.
+IO_TESTING and _tumor_reg_coded_facts.limit(5).toPandas()
 
 # %% [markdown]
 # ## Oracle DB Access
@@ -663,6 +677,98 @@ IO_TESTING and _cdw.run(_spark.read, "global_name").toPandas()
 if IO_TESTING:
     _cdw.run(tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
              mode='overwrite')
+
+
+# %% [markdown]
+# ## Use Case: GPC Breast Cancer Survey
+#
+# The NAACCR format has 500+ items. To provide initial focus, let's use
+# the variables from the 2016 GPC breast cancer survey:
+
+# %%
+class CancerStudy:
+    bc_variable = pd.read_csv(res.open_text(bc_qa, 'bc-variable.csv'))
+
+
+IO_TESTING and _spark.createDataFrame(
+    CancerStudy.bc_variable).limit(5).toPandas()
+
+
+# %%
+def itemNumOfPath(bc_var,
+                  item='item'):
+    digits = func.regexp_extract('concept_path',
+                                 r'\\i2b2\\naaccr\\S:[^\\]+\\(\d+)', 1)
+    items = bc_var.select(digits.cast('int').alias(item)).dropna().distinct()
+    return items.sort(item)
+
+
+IO_TESTING and itemNumOfPath(_spark.createDataFrame(
+    CancerStudy.bc_variable)).limit(5).toPandas()
+
+
+# %%
+def _selectedItems(ddict, items):
+    return ddict.join(items, ddict.naaccrNum == items.item).drop(items.item)
+
+
+if IO_TESTING:
+    _bc_ddict = _selectedItems(
+        ddictDF(_spark),
+        itemNumOfPath(_spark.createDataFrame(CancerStudy.bc_variable)),
+    ).select('naaccrId', 'naaccrNum', 'parentXmlElement')
+
+IO_TESTING and _bc_ddict.select(
+    'naaccrId', 'naaccrNum', 'parentXmlElement').toPandas()
+
+
+# %% [markdown]
+# ### Patients, Encounters, and Observations per Variable
+#
+#   - **ISSUE**: naaccr-xml test data has no data on classOfCase etc.
+#     at least not the 100 tumor sample.
+
+# %%
+def bc_var_facts(coded_facts, ddict):
+    return coded_facts.join(
+        ddict.select('naaccrId'),
+        coded_facts.xmlId == ddict.naaccrId,
+    ).drop(ddict.naaccrId)
+
+
+def data_summary(spark, obs):
+    obs.createOrReplaceTempView('summary_input')  # ISSUE: CLOBBER!
+    return spark.sql('''
+    select xmlId as variable
+           -- ISSUE: rename MRN back to patientIdNumber?
+         , count(distinct MRN) as pat_qty
+         , count(distinct encounter_ide) as enc_qty
+         , count(*) as fact_qty
+    from summary_input
+    group by xmlId
+    order by 2 desc, 3 desc, 4 desc
+    ''')
+
+
+def bc_var_summary(spark, obs, ddict):
+    agg = data_summary(
+        spark,
+        bc_var_facts(obs, ddict)
+    )
+    dd = ddict.select('naaccrId').withColumnRenamed('naaccrId', 'variable')
+    return (dd
+            .join(agg, dd.variable == agg.variable, how='left_outer')
+            .drop(agg.variable))
+
+
+IO_TESTING and bc_var_summary(
+    _spark, _tumor_reg_coded_facts, _bc_ddict).where(
+        'fact_qty is null').toPandas()
+
+# %%
+IO_TESTING and bc_var_summary(
+    _spark, _tumor_reg_coded_facts, _bc_ddict).where(
+        'fact_qty is not null').toPandas()
 
 
 # %% [markdown]
@@ -1065,40 +1171,3 @@ v18 = RecordFormat(_raw_data())
 # x[x.FIELD_NAME == 'laterality']
 
 v18.fields(_raw_data()).head(40)
-
-# %% [markdown]
-# ## Use Case: GPC Breast Cancer Survey
-#
-# The NAACCR format has 500+ items. To provide initial focus, let's use the variables from the 2016 GPC breast cancer survey:
-
-# %%
-from pyspark import SparkFiles
-
-spark.sparkContext.addFile('https://raw.githubusercontent.com/kumc-bmi/bc_qa/rc_codebook/bc-variable.csv')
-bc_var = spark.read.csv(SparkFiles.get('bc-variable.csv'), header=True)
-bc_var.createOrReplaceTempView("bc_var")
-
-x = spark.sql('''
-select *
-from bc_var
-'''
-)
-
-x.limit(5).toPandas()
-
-# %% [markdown]
-# Among all that i2b2 metadata, what we need is the NAACCR item numbers:
-
-# %%
-bc_item = spark.sql(r'''
-select distinct item from (
-  select cast(regexp_extract(concept_path, '\\\\i2b2\\\\naaccr\\\\S:[^\\\\]+\\\\(\\d+)', 1) as int) as item 
-  from bc_var
-)
-where item is not null
-order by item
-'''
-)
-bc_item.createOrReplaceTempView("bc_item")
-
-bc_item.limit(5).toPandas()
