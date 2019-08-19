@@ -14,11 +14,6 @@ You may need to use::
 
 due to an ISSUE with code organization.
 
-And in case you have set `PYSPARK_DRIVER_PYTHON=jupyter` or the like,
-be sure to override that::
-
-  $ PYSPARK_DRIVER_PYTHON=python spark-submit ...
-
 """
 
 from importlib import resources as res

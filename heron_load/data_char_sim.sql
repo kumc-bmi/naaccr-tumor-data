@@ -108,6 +108,14 @@ cross join cases
 
 ;
 
+create or replace temporary view data_char_naaccr_nom as
+select s.sectionId, rl.section, nom.*
+from data_agg_naaccr nom
+join record_layout rl
+  on rl.xmlId = nom.xmlId
+join section s
+  on s.section = rl.section
+;
 
 create or replace temporary view data_char_naaccr as
 select ty.sectionid, ty.section, ty.itemnbr, ty.xmlId, ty.valtype_cd
@@ -116,7 +124,7 @@ select ty.sectionid, ty.section, ty.itemnbr, ty.xmlId, ty.valtype_cd
      , mean                           , sd
      , value, round(pct, 3) pct
 from tumor_item_type ty
-join data_agg_naaccr d on d.itemnbr = ty.ItemNbr
+join data_agg_naaccr d on d.ItemNbr = ty.ItemNbr
 order by ty.sectionid, ty.ItemNbr, value
 ;
 

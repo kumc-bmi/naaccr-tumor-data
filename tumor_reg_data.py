@@ -64,7 +64,7 @@ import bc_qa
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
-from tumor_reg_ont import create_object, DataDictionary
+from tumor_reg_ont import create_object, DataDictionary, tumor_item_type
 import heron_load
 
 
@@ -246,7 +246,7 @@ IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
 # %%
 IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
                 .select('naaccrId').distinct().sort('naaccrId')
-                .toPandas())
+                .toPandas().naaccrId.values)
 
 
 # %%
@@ -266,7 +266,6 @@ IO_TESTING and (naaccr_pivot(ddictDF(_spark),
                              ['rownum'])
                 .limit(3).toPandas())
 
-
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
 #
@@ -275,20 +274,6 @@ IO_TESTING and (naaccr_pivot(ddictDF(_spark),
 #    of record_layout etc.
 
 # %%
-def tumor_item_type(spark, cache):
-    DataDictionary.make_in(spark, cache)
-
-    create_object('t_item',
-                  res.read_text(heron_load, 'naaccr_concepts_load.sql'),
-                  spark)
-
-    create_object('tumor_item_type',
-                  res.read_text(heron_load, 'naaccr_txform.sql'),
-                  spark)
-    spark.catalog.cacheTable('tumor_item_type')
-    return spark.table('tumor_item_type')
-
-
 IO_TESTING and (tumor_item_type(_spark, cwd / 'naaccr_ddict')
                 .limit(5).toPandas().set_index(['ItemNbr', 'xmlId']))
 
@@ -709,17 +694,17 @@ IO_TESTING and itemNumOfPath(_spark.createDataFrame(
 
 # %%
 def _selectedItems(ddict, items):
-    return ddict.join(items, ddict.naaccrNum == items.item).drop(items.item)
-
+    selected = ddict.join(items, ddict.naaccrNum == items.item).drop(items.item)
+    return selected.sort(selected.length.desc(), selected.naaccrNum)
 
 if IO_TESTING:
     _bc_ddict = _selectedItems(
         ddictDF(_spark),
         itemNumOfPath(_spark.createDataFrame(CancerStudy.bc_variable)),
-    ).select('naaccrId', 'naaccrNum', 'parentXmlElement')
+    ).select('naaccrId', 'naaccrNum', 'parentXmlElement', 'length')
 
 IO_TESTING and _bc_ddict.select(
-    'naaccrId', 'naaccrNum', 'parentXmlElement').toPandas()
+    'naaccrId', 'naaccrNum', 'parentXmlElement', 'length').toPandas().set_index(['naaccrNum', 'naaccrId'])
 
 
 # %% [markdown]
@@ -798,92 +783,37 @@ IO_TESTING and pivot_obs_by_enc(_tumor_reg_coded_facts.where(
 # %% [markdown]
 # ## Synthesizing Data
 #
-# Let's take a NAACCR file and gather stats on it so that we can synthesize data with similar characteristics.
-
-# %% [markdown]
-# ### Characteristics of data from our NAACCR file
-
-# %% [markdown]
-# Now let's add an id column and make a long-skinny from the wide data, starting with nominals:
-
-# %%
-def stack_nominals(data, ty,
-                   var_name='xmlId',
-                   id_col='record'):
-    value_vars = [row.xmlId for row in ty.where(ty.valtype_cd == '@').collect()]
-    df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),
-              value_vars=value_vars, id_vars=[id_col], var_name=var_name)
-    return df.where(func.trim(df.value) > '')
-
-tumors_eav = stack_nominals(extract, tumor_item_type)
-tumors_eav.createOrReplaceTempView('tumors_eav')
-
-tumors_eav.limit(10).toPandas().set_index(['record', 'xmlId'])
-
-# %%
-tumors_eav.limit(10).foreachPartition(lambda p: len(p))
-
-# %%
-tumors_eav.cache()
-
-# %%
-create_object('data_agg_naaccr',
-              res.read_text(heron_load, 'data_char_sim.sql'),
-              spark)
-
-# spark.sql("select * from data_agg_naaccr limit 10").explain()
-spark.catalog.cacheTable('data_agg_naaccr')
-
-# %%
-data_agg_naaccr = spark.sql('''
-select * from data_agg_naaccr
-''').toPandas().set_index(['itemnbr', 'xmlId', 'value'])
-
-# %%
-data_agg_naaccr = data_agg_naaccr.sort_index()
-(10)
-
-# %%
-data_agg_naaccr = spark.sql('''
-select s.sectionId, rl.section, nom.*
-from data_agg_naaccr nom
-join (select xmlId, section from record_layout) rl on rl.xmlId = nom.xmlId
-join (select sectionId, section from section) s on s.section = rl.section
-''').toPandas().set_index(['sectionId', 'section', 'itemnbr', 'xmlId', 'value']).sort_index()
-data_agg_naaccr.to_csv(cwd / 'data_agg_naaccr.csv')
-data_agg_naaccr.head(10)
-
-# %% [markdown]
-# ## Synthesizing Data
-#
-# Let's take a NAACCR file and gather stats on it so that we can synthesize data with similar characteristics.
+# Let's take stats gathered about a NAACCR file and synthesize data with similar characteristics.
 #
 # **ISSUE**: combine with OMOP cohort based on syn-puf?
 
 # %%
-simulated_entity = spark.createDataFrame([(ix,) for ix in range(1, 500)], ['case_index'])
-simulated_entity.createOrReplaceTempView('simulated_entity')
-simulated_entity.limit(5).toPandas()
-
-# %%
-create_object('data_char_naaccr',
-              res.read_text(test_data, 'data_char_sim.sql'),
+def define_simulated_naaccr(spark, data_agg_naaccr):
+    data_agg_naaccr.createOrReplaceTempView('data_agg_naaccr')
+    simulated_entity = spark.createDataFrame([(ix,) for ix in range(1, 500)], ['case_index'])
+    simulated_entity.createOrReplaceTempView('simulated_entity')
+    # simulated_entity.limit(5).toPandas()
+    create_object('data_char_naaccr',
+              res.read_text(heron_load, 'data_char_sim.sql'),
               spark)
-create_object('nominal_cdf',
-              res.read_text(test_data, 'data_char_sim.sql'),
+    create_object('nominal_cdf',
+              res.read_text(heron_load, 'data_char_sim.sql'),
               spark)
-create_object('simulated_naaccr_nom',
-              res.read_text(test_data, 'data_char_sim.sql'),
+    create_object('simulated_naaccr_nom',
+              res.read_text(heron_load, 'data_char_sim.sql'),
               spark)
+    spark.catalog.cacheTable('simulated_naaccr_nom')
+    return spark
 
-# %%
-x = spark.sql('''
-select * from nominal_cdf
-''')
-x.limit(10).toPandas()
 
-# %%
-spark.catalog.cacheTable('simulated_naaccr_nom')
+IO_TESTING and (
+    define_simulated_naaccr(_spark,
+                            _spark.read.csv('test_data/,data_agg_naaccr_all.csv',
+                                            header=True, inferSchema=True))
+    .table('nominal_cdf')
+    .limit(10).toPandas()
+)
+
 
 # %% [markdown]
 # For **nominal data**, what's the prevalence of each value of each variable?
@@ -891,85 +821,38 @@ spark.catalog.cacheTable('simulated_naaccr_nom')
 # Let's compare observed with synthesized:
 
 # %%
-#@@%matplotlib inline
+def codedObservedDistribution(spark, naaccrId):
+    stats = spark.table('data_agg_naaccr').toPandas()
+    byval = stats[stats.xmlId == naaccrId].set_index('value')
+    return byval[['itemnbr', 'freq', 'tumor_qty', 'pct']]
+
+def codedSyntheticDistribution(spark, itemnbr: int):
+    itemnbr = int(itemnbr)  # prevent SQL injection
+    obs_sim = spark.sql(f'''
+    select *
+    from simulated_naaccr_nom
+    where itemnbr = {itemnbr}
+    ''').toPandas().set_index('case_index')
+    sim_by_val = obs_sim.groupby('value').count()
+    pct = sim_by_val.itemnbr * 100 / len(obs_sim)
+    return pct
+
+IO_TESTING and (
+    codedObservedDistribution(_spark, 'sequenceNumberCentral')
+    .assign(pct_syn=codedSyntheticDistribution(_spark, 380)))
 
 # %%
-stats = data_agg_naaccr.reset_index()
-seq = stats[stats.itemnbr == 380].set_index('value')
+IO_TESTING and (
+    codedObservedDistribution(_spark, 'sequenceNumberCentral')
+    .assign(pct_syn=codedSyntheticDistribution(_spark, 380))[['pct', 'pct_syn']]
+    .plot.pie(figsize=(12, 8), subplots=True)
+);
 
-print(seq[['itemnbr', 'xmlId', 'freq', 'present', 'pct']].head())
-seq.pct.astype(float).plot.pie();
-
-# %%
-seq_sim = spark.sql('''
-select *
-from simulated_naaccr_nom
-where itemnbr = 380
-''').toPandas().set_index('case_index')
-
-seq_sim_by_val = seq_sim.groupby('value').count()
-
-print(seq_sim_by_val.itemnbr * 100 / len(seq_sim))
-seq_sim_by_val.itemnbr.plot.pie();
-
-# %%
-col_order = { row.xmlId: row.start for row in 
-              spark.sql("select start, xmlId from record_layout").collect()}
-list(col_order.items())[:10]
-
-# %%
-sim_records_nom = spark.sql('''
-select data.case_index, data.xmlId, data.value
-from simulated_naaccr_nom data
-join record_layout rl on rl.xmlId = data.xmlId
-join section on rl.section = section.section
-where sectionId = 1
-order by case_index, rl.start
-''').toPandas()
-sim_records_nom = sim_records_nom.pivot(index='case_index', columns='xmlId', values='value')
-for col in sim_records_nom.columns:
-    sim_records_nom[col] = sim_records_nom[col].astype('category')
-sim_records_nom = sim_records_nom[sorted(sim_records_nom.columns, key=lambda xid: col_order[xid])]
-sim_records_nom.head(15)
-
-# %%
-x = extract.limit(15).toPandas()[sim_records_nom.columns]
-x
-
-# %%
-x.histologyIcdO2.iloc[3]
-
-# %%
-sim_records_nom.dateConclusiveDxFlag.iloc[0] is np.nan
-
-# %%
-sim_records_nom.dtypes
 
 # %% [markdown]
-# For dates, how long before/after diagnosis?
+# **TODO**: For dates, how long before/after diagnosis?
 #
 # For diagnosis, how long ago?
-
-# %%
-stats[stats.valtype_cd == 'D'].head(3)
-
-# %%
-sim = pd.read_sql('''select count(*), case_index, itemnbr from simulated_naaccr group by case_index, itemnbr having count(*) > 1''', tr1)
-sim.head(20)
-
-# %%
-pd.read_sql('''
-            select count(*), case_index, itemnbr from simulated_naaccr
-            group by case_index, itemnbr
-            order by 1 desc
-''', tr1).head()
-
-# %% [markdown]
-# ## ???
-
-# %%
-tr_chunk1 = extract.limit(100)
-tr_chunk1.limit(10).toPandas()
 
 # %% [markdown]
 # ### checking synthetic data
@@ -983,215 +866,49 @@ def non_blank(df):
 
 
 # %%
-syn_records = pd.read_pickle('test_data/,syn_records_TMP.pkl')
-non_blank(syn_records[coded_items[
-    (coded_items.sectionid == 1) &
-    (coded_items.xmlId.isin(syn_records.columns))].xmlId.values.tolist()]).tail(15)
+if IO_TESTING:
+    syn_records = pd.read_pickle('test_data/,syn_records_TMP.pkl')
+    non_blank(syn_records[coded_items[
+        (coded_items.sectionid == 1) &
+        (coded_items.xmlId.isin(syn_records.columns))].xmlId.values.tolist()]).tail(15)
+    ###
 
-# %%
-stuff = pd.read_pickle('test_data/,test-stuff.pkl')
-stuff.iloc[0]['lines']
+    stuff = pd.read_pickle('test_data/,test-stuff.pkl')
+    stuff.iloc[0]['lines']
 
-# %%
-ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
-test_data_coded = naaccr_read_fwf(spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
-test_data_coded.limit(5).toPandas()
+    ###
 
-# %%
-xp = test_data_coded.select(coded_items[coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
+    ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
+    test_data_coded = naaccr_read_fwf(spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
+    test_data_coded.limit(5).toPandas()
 
+    ###
 
-xp[[
-    col for col in xp.columns
-    if (xp[col].str.strip() > '').any()
-]]
+    xp = test_data_coded.select(coded_items[coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
+
+    xp[[
+        col for col in xp.columns
+        if (xp[col].str.strip() > '').any()
+    ]]
 
 # %% [markdown]
 # ## Diagnosed before born??
 
 # %%
-x = naaccr_dates(pat_tmr, ['dateOfDiagnosis', 'dateOfBirth']).toPandas()
-x['ddx_orig'] = pat_tmr.select('dateOfDiagnosis', 'dateOfDiagnosisFlag').toPandas().dateOfDiagnosis
-x = x[x.ageAtDiagnosis.str.startswith('-')]
-x['age2'] = (x.dateOfDiagnosis - x.dateOfBirth).dt.days / 365.25
-x[['ageAtDiagnosis', 'age2', 'ddx_orig', 'dateOfDiagnosis', 'dateOfDiagnosisFlag', 'dateOfBirth']].sort_values('ddx_orig')
+if IO_TESTING:
+    x = naaccr_dates(pat_tmr, ['dateOfDiagnosis', 'dateOfBirth']).toPandas()
+    x['ddx_orig'] = pat_tmr.select('dateOfDiagnosis', 'dateOfDiagnosisFlag').toPandas().dateOfDiagnosis
+    x = x[x.ageAtDiagnosis.str.startswith('-')]
+    x['age2'] = (x.dateOfDiagnosis - x.dateOfBirth).dt.days / 365.25
+    x[['ageAtDiagnosis', 'age2', 'ddx_orig', 'dateOfDiagnosis', 'dateOfDiagnosisFlag', 'dateOfBirth']].sort_values('ddx_orig')
 
 
 # %%
-dx_age = pat_tmr_pd.groupby('ageAtDiagnosis')
-dx_age[['dateOfBirth']].count()
-#dx_age = dx_age[dx_age != '999']
-#dx_age.unique()
+if IO_TESTING:
+    dx_age = pat_tmr_pd.groupby('ageAtDiagnosis')
+    dx_age[['dateOfBirth']].count()
+    #dx_age = dx_age[dx_age != '999']
+    #dx_age.unique()
 
-#dx_age = dx_age.astype(int)
-#dx_age.describe()
-
-# %%
-dx_age.hist()
-
-# %%
-pat_tmr_pd[pat_tmr_pd.patientSystemIdHosp == '01002923']
-
-# %% [markdown]
-# ## registry table
-#
-# Information about the registry; or rather: the export from the registry.
-
-# %%
-registry0 = tr_chunk1.select(
-    ['naaccrRecordVersion', 'npiRegistryId', 'dateCaseReportExported']
-).limit(1)
-registry0.createOrReplaceTempView('registry0')
-
-registry = spark.sql('''
-select cast(naaccrRecordVersion as int) naaccrRecordVersion
-     , npiRegistryId
-     , to_date(cast(unix_timestamp(dateCaseReportExported, 'yyyyMMdd')
-                    as timestamp)) dateCaseReportExported
-from registry0
-''')
-registry.printSchema()
-registry.createOrReplaceTempView('registry')
-
-spark.sql('select * from registry').toPandas()
-
-# %% [markdown]
-# ## @@@@@@@@@@
-
-# %%
-
-def _raw_data(folder='data-raw'):
-    # I'd like to treat these as code, i.e. design-time artifacts,
-    # but pkg_resouces isn't cooperating.
-    from pathlib import Path
-    return Path(folder)
-
-
-def noop(chars):
-    return chars
-
-
-def from_date(chars):
-    if len(chars) not in (6, 7):
-        raise ValueError(chars)
-    return datetime.datetime.strptime(
-        chars[1:] if len(chars) == 7 and chars[0] in '09' else chars, '%y%m%d')
-
-
-class RecordFormat(object):
-    def __init__(self, data_raw,
-                 version=18):
-        self.items = pd.read_csv(
-            data_raw / 'record-formats' / ('version-%s.csv' % version)).set_index('item')
-        self.field_info = pd.read_csv(
-            data_raw / 'field_info.csv').set_index('item')
-
-    table_name = 'TUMOR'
-    description = '''
-    tumor stuff...@@@
-    '''
-
-    def domains(self):
-        return pd.Series(dict(
-            TABLE_NAME=self.table_name,
-            DOMAIN_DESCRIPTION=self.description,
-            DOMAIN_ORDER=-1,
-        ))
-
-    # TODO: RELATIONAL: table_name, relation, integrity details, order
-    # TODO: constraints
-
-    def fields(self, data_raw):
-        
-        fields = pd.DataFrame({
-            'TABLE_NAME': self.table_name,
-            'FIELD_NAME': self.field_info.name,       # ISSUE: UPPER_SNAKE_CASE?
-            'RDBMS_DATA_TYPE': self.field_info.type,  # ISSUE@@@
-            'SAS_DATA_TYPE': self.field_info.type,    # ISSUE
-            'DATA_FORMAT': self.field_info.type,      # ISSUE
-            'REPLICATED_FIELD': 'NO',
-            'UNIT_OF_MEASURE': '',  # ISSUE
-            'FIELD_DEFINITION': 'TODO',
-        })
-        fields['FIELD_ORDER'] = range(len(fields))
-        fields = fields.set_index(['TABLE_NAME', 'FIELD_NAME']).sort_values('FIELD_ORDER')
-        vals = self.valuesets(data_raw)
-        vals = vals.groupby(['TABLE_NAME', 'FIELD_NAME'])
-        fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
-        fields['VALUESET_DESCRIPTOR'] = vals.VALUESET_ITEM_DESCRIPTOR.apply(';'.join)
-        return fields
-
-    def valuesets(self, data_raw):
-        found = []
-        for info in (data_raw / 'code-labels').glob('*.csv'):
-            skiprows = 0
-            if info.open().readline().startswith('#'):
-                skiprows = 1
-            codes = pd.read_csv(info, skiprows=skiprows,
-                                na_filter=False,
-                                dtype={'code': str, 'label': str})
-            if 'code' not in codes.columns or 'label' not in codes.columns:
-                raise ValueError((info, codes.columns))
-            codes['TABLE_NAME'] = self.table_name
-            codes['FIELD_NAME'] = info.stem
-            codes['VALUESET_ITEM'] = codes.code
-            codes['VALUESET_ITEM_DESCRIPTOR'] = codes.code + '=' + codes.label
-            found.append(codes)
-        return pd.concat(found)
-
-    converters = pd.Series({
-        'factor': noop,  # category?
-        'character': noop,
-        'facility': noop,
-        'city': noop,
-        'county': noop,
-        'postal': noop,
-        'census_tract': noop,
-        'boolean01': lambda ch: not not int(ch),
-        'age': int,
-        'Date': from_date,
-        'census_block': noop,
-        'sentineled_integer': noop,
-        'count': int,
-        'integer': int,
-        'boolean12': lambda ch: ch == '2',
-        'icd_code': noop,
-        'override': noop,
-        'ssn': noop,
-        'address': noop,
-        'numeric': float,
-        'telephone': noop,
-        'physician': noop,
-        'icd_9': noop,
-        'sentineled_numeric': noop,
-        'datetime': noop,
-    })
-    
-    def ncdb(self, fp,
-             items=[390, 400, 410, 380, 560],
-             nrows=20):
-        field = self.items.loc[items].merge(
-            self.field_info.loc[items],
-            left_index=True, right_index=True)
-        print(field)
-        converters = { ix: self.converters[f.type]
-                       for ix, (_, f) in enumerate(field.iterrows()) }
-
-        return pd.read_fwf(fp,
-                           header=None,
-                           memory_map=True,
-                           nrows=nrows,
-                           colspecs=list(zip(field.start_col, field.end_col + 1)),
-                           converters=converters,
-                           names=field.name)
-
-v18 = RecordFormat(_raw_data())
-
-# print(v18.items.head())
-
-# v18.ncdb(tr_file.open())
-
-# x = v18.valuesets(_raw_data())
-# x[x.FIELD_NAME == 'laterality']
-
-v18.fields(_raw_data()).head(40)
+    #dx_age = dx_age.astype(int)
+    #dx_age.describe()

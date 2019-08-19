@@ -112,3 +112,17 @@ def csv_view(spark: SparkSession_T, path: Path_T,
                         header=True, inferSchema=True)
     df.createOrReplaceTempView(name or path.stem)
     return df
+
+
+def tumor_item_type(spark: SparkSession_T, cache: Path_T) -> DataFrame:
+    DataDictionary.make_in(spark, cache)
+
+    create_object('t_item',
+                  res.read_text(heron_load, 'naaccr_concepts_load.sql'),
+                  spark)
+
+    create_object('tumor_item_type',
+                  res.read_text(heron_load, 'naaccr_txform.sql'),
+                  spark)
+    spark.catalog.cacheTable('tumor_item_type')
+    return spark.table('tumor_item_type')

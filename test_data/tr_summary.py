@@ -1,20 +1,27 @@
-"""tr_summary -- summarize NAACCR tumor registry file
+r"""tr_summary -- summarize NAACCR tumor registry file
 
 Capture statistics useful for synthesizing data.
 
-Usage:
+Usage
 
-  tumor_reg_summary naaccr_file 10 ddict_dir tr_stats.parquet
+For a 10% sample:
 
-for a 10% sample.
+  $ spark-submit tr_summary.py \
+    naaccr_flat_file 10 ../naaccr_ddict data_agg_naaccr.csv
 
-where `ddict_dir` has output from from `../naaccr_ddict/scrape.py`.
+where `../naaccr_ddict` includes `record_layout.csv` etc. from `scrape.py`.
+
+You may need to use::
+
+  $ PYTHONPATH=.. spark-submit tr_synthesize.py ...
+
+due to an ISSUE with code organization.
+
 """
 
 from importlib import resources as res
 from pathlib import Path as Path_T  # use type only, per ocap discipline
-from sys import stderr  # ocap exception for logging
-from typing import Any, Iterable, List
+from typing import Iterable, List
 
 from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import functions as func
@@ -47,10 +54,6 @@ def main(argv: List[str], cwd: Path_T,
     print(stats.head(10))
 
 
-def _log(*args: Any) -> None:
-    print(*args, file=stderr)
-
-
 class DataSummary(object):
     tumors_view = 'naaccr_extract'
     eav_view = 'tumors_eav'
@@ -62,6 +65,7 @@ class DataSummary(object):
     t_item_view = 't_item'
 
     script = res.read_text(heron_load, 'data_char_sim.sql')
+    view_nom = 'data_char_naaccr_nom'
     views = ['data_agg_naaccr', 'data_char_naaccr']
 
     @classmethod
@@ -82,15 +86,8 @@ class DataSummary(object):
 
         spark.catalog.cacheTable(cls.txform_view)
 
-        # ISSUE: SQL goes in SQL files; move to data_char_sim.sql?
-        stats = spark.sql('''
-        select s.sectionId, rl.section, nom.*
-        from data_agg_naaccr nom
-        join (select xmlId, section from record_layout) rl
-          on rl.xmlId = nom.xmlId
-        join (select sectionId, section from section) s
-          on s.section = rl.section
-        ''').toPandas()
+        create_object(cls.view_nom, cls.script, spark)
+        stats = spark.table(cls.view_nom).toPandas()
         return stats.set_index(['sectionId', 'section',
                                 'itemnbr', 'xmlId', 'value']).sort_index()
 
