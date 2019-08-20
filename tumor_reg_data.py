@@ -18,20 +18,21 @@
 # python stdlib
 from gzip import GzipFile
 from importlib import resources as res
+from pathlib import Path as Path_T
 from sys import stderr
-from typing import Iterable, List, Union
+from typing import Callable, Dict, Iterator, List
+from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import logging
-import datetime
 
 
 # %%
 # 3rd party code: PyData
-from pyspark.sql import Column
+from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
-import numpy as np
-import pandas as pd
+from pyspark import sql as sq
+import pandas as pd  # type: ignore
 
 # %% [markdown]
 #  - **ISSUE**: naaccr_xml stuff is currently symlink'd to a git
@@ -74,24 +75,20 @@ log.info('%s', dict(pandas=pd.__version__))
 # and don't import powerful objects.
 
 # %%
-if __name__ == '__main__':
-    IO_TESTING = True
-    if 'spark' in globals():
-        _spark = spark  # noqa
-        del spark
-else:
-    IO_TESTING = False
-    _spark = None  # for static analysis when not IO_TESTING
-
-
+IO_TESTING = __name__ == '__main__'
+_spark = cast(SparkSession_T, None)
 if IO_TESTING:
-    def _cwd():
+    if 'spark' in globals():
+        _spark = spark  # type: ignore  # noqa
+        del spark       # type: ignore
+
+    def _get_cwd() -> Path_T:
         # ISSUE: ambient
         from pathlib import Path
         return Path('.')
 
-    cwd = _cwd()
-    log.info('cwd: %s', cwd.resolve())
+    _cwd = _get_cwd()
+    log.info('cwd: %s', _cwd.resolve())
 
 # %% [markdown]
 # The `spark` global is available when we launch as
@@ -102,7 +99,8 @@ if IO_TESTING:
 IO_TESTING and _spark
 
 # %%
-IO_TESTING and log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
+if IO_TESTING:
+    log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
 
 
 # %% [markdown]
@@ -112,6 +110,20 @@ IO_TESTING and log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
 class XSD:
     uri = 'http://www.w3.org/2001/XMLSchema'
     ns = {'xsd': uri}
+
+    @classmethod
+    def the(cls, elt: XML.Element, path: str,
+            ns: Dict[str, str] = ns) -> XML.Element:
+        """Get _the_ match for an XPath expression on an Element.
+
+        The XML.Element.find() method may return None, but when
+        we're dealing with static data that we know matches,
+        we can refine the type by asserting that there's a match.
+
+        """
+        found = elt.find(path, ns)
+        assert found, (elt, path)
+        return found
 
 
 class NAACCR1:
@@ -124,21 +136,21 @@ class NAACCR1:
     data_xsd = XML.parse(res.open_text(
         naaccr_xml_xsd, 'naaccr_data_1.3.xsd'))
 
-    s100x = XML.parse(GzipFile(fileobj=res.open_binary(
+    s100x = XML.parse(GzipFile(fileobj=res.open_binary(  # type: ignore # typeshed/issues/2580
         naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
 
-    item_xsd = data_xsd.find(
-        './/xsd:complexType[@name="itemType"]/xsd:simpleContent/xsd:extension',
-        XSD.ns)
+    item_xsd = XSD.the(
+        data_xsd.getroot(),
+        './/xsd:complexType[@name="itemType"]/xsd:simpleContent/xsd:extension')
 
-    ItemDef = dd13_xsd.find('.//xsd:element[@name="ItemDef"]', XSD.ns)
+    ItemDef = XSD.the(dd13_xsd.getroot(), './/xsd:element[@name="ItemDef"]')
 
     uri = 'http://naaccr.org/naaccrxml'
     ns = {'n': uri}
 
 
-def eltSchema(xsd_complex_type,
-              simpleContent=False):
+def eltSchema(xsd_complex_type: XML.Element,
+              simpleContent: bool = False) -> ty.StructType:
     decls = xsd_complex_type.findall('xsd:attribute', XSD.ns)
     fields = [
         ty.StructField(
@@ -156,19 +168,23 @@ def eltSchema(xsd_complex_type,
     return ty.StructType(fields)
 
 
-def xmlDF(spark, schema, doc, path, ns,
-          eltRecords=None,
-          simpleContent=False):
-    if eltRecords is None:
-        eltRecords = eltDict
+RecordMaker = Callable[[XML.Element, ty.StructType, bool],
+                       Iterator[Dict[str, object]]]
+
+
+def xmlDF(spark: SparkSession_T, schema: ty.StructType,
+          doc: XML.ElementTree, path: str, ns: Dict[str, str],
+          eltRecords: Opt[RecordMaker] = None,
+          simpleContent: bool = False) -> DataFrame:
+    getRecords = eltRecords or eltDict
     data = (record
             for elt in doc.iterfind(path, ns)
-            for record in eltRecords(elt, schema, simpleContent))
-    return spark.createDataFrame(data, schema)
+            for record in getRecords(elt, schema, simpleContent))
+    return spark.createDataFrame(data, schema)  # type: ignore
 
 
-def eltDict(elt, schema,
-            simpleContent=False):
+def eltDict(elt: XML.Element, schema: ty.StructType,
+            simpleContent: bool = False) -> Iterator[Dict[str, object]]:
     out = {k: int(v) if isinstance(schema[k].dataType, ty.IntegerType)
            else bool(v) if isinstance(schema[k].dataType, ty.BooleanType)
            else v
@@ -179,9 +195,9 @@ def eltDict(elt, schema,
     yield out
 
 
-def ddictDF(spark):
+def ddictDF(spark: SparkSession_T) -> DataFrame:
     return xmlDF(spark,
-                 schema=eltSchema(NAACCR1.ItemDef.find('*')),
+                 schema=eltSchema(XSD.the(NAACCR1.ItemDef, '*')),
                  doc=NAACCR1.ndd180,
                  path='./n:ItemDefs/n:ItemDef',
                  ns=NAACCR1.ns)
@@ -197,13 +213,14 @@ eltSchema(NAACCR1.item_xsd, simpleContent=True)
 
 
 # %%
-def tumorDF(spark, doc):
+def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
     rownum = 0
     ns = {'n': 'http://naaccr.org/naaccrxml'}
 
     to_parent = {c: p for p in doc.iter() for c in p}
 
-    def tumorItems(tumorElt, schema, simpleContent=True):
+    def tumorItems(tumorElt: XML.Element, schema: ty.StructType,
+                   simpleContent: bool = True) -> Iterator[Dict[str, object]]:
         nonlocal rownum
         assert simpleContent
         rownum += 1
@@ -211,9 +228,8 @@ def tumorDF(spark, doc):
         ndataElt = to_parent[patElt]
         for elt in [ndataElt, patElt, tumorElt]:
             for item in elt.iterfind('./n:Item', ns):
-                # print(tumorElt, item)
-                yield dict(next(eltDict(item, schema, simpleContent)),
-                           rownum=rownum)
+                for itemRecord in eltDict(item, schema, simpleContent):
+                    yield dict(itemRecord, rownum=rownum)
 
     itemSchema = eltSchema(NAACCR1.item_xsd, simpleContent=True)
     rownumField = ty.StructField('rownum', ty.IntegerType(), False)
@@ -229,21 +245,22 @@ IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
                 .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
 
 # %%
-IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
-                .select('naaccrId').distinct().sort('naaccrId')
-                .toPandas().naaccrId.values)
+#@@@@
+# IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
+#                 .select('naaccrId').distinct().sort('naaccrId')
+#                 .toPandas().naaccrId.values)
 
 
 # %%
-def naaccr_pivot(ddict, skinny, key_cols,
-                 pivot_on='naaccrId', value_col='value',
-                 start='startColumn'):
+def naaccr_pivot(ddict: DataFrame, skinny: DataFrame, key_cols: List[str],
+                 pivot_on: str = 'naaccrId', value_col: str = 'value',
+                 start: str = 'startColumn') -> DataFrame:
     groups = skinny.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
     wide = groups.pivot(pivot_on).agg(func.first(value_col))
     start_by_id = {id: start
                    for (id, start) in ddict.select(pivot_on, start).collect()}
     sorted_cols = sorted(wide.columns, key=lambda id: start_by_id.get(id, -1))
-    return wide.select(sorted_cols)
+    return wide.select(cast(List[Union[sq.Column, str]], sorted_cols))
 
 
 IO_TESTING and (naaccr_pivot(ddictDF(_spark),
@@ -259,7 +276,7 @@ IO_TESTING and (naaccr_pivot(ddictDF(_spark),
 #    of record_layout etc.
 
 # %%
-IO_TESTING and (tumor_item_type(_spark, cwd / 'naaccr_ddict')
+IO_TESTING and (tumor_item_type(_spark, _cwd / 'naaccr_ddict')
                 .limit(5).toPandas().set_index(['ItemNbr', 'xmlId']))
 
 # %%
@@ -271,11 +288,11 @@ group by valtype_cd
 
 
 # %%
-def coded_items(tumor_item_type):
+def coded_items(tumor_item_type: DataFrame) -> DataFrame:
     return tumor_item_type.where("valtype_cd = '@'")
 
 
-IO_TESTING and (coded_items(tumor_item_type(_spark, cwd / 'naaccr_ddict'))
+IO_TESTING and (coded_items(tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
                 .toPandas().tail())
 
 # %% [markdown]
@@ -289,19 +306,19 @@ IO_TESTING and (coded_items(tumor_item_type(_spark, cwd / 'naaccr_ddict'))
 
 # %%
 if IO_TESTING:
-    tr_file = cwd / input()
-    naaccr_text_lines = _spark.read.text(str(tr_file))
+    _tr_file = _cwd / input()
+    _naaccr_text_lines = _spark.read.text(str(_tr_file))
 else:
-    tr_file = None
-    naaccr_text_lines = None
+    _tr_file = cast(Path_T, None)
+    _naaccr_text_lines = cast(DataFrame, None)
 
-IO_TESTING and tr_file.exists()
-
-# %%
-IO_TESTING and naaccr_text_lines.rdd.getNumPartitions()
+IO_TESTING and _tr_file.exists()
 
 # %%
-IO_TESTING and naaccr_text_lines.limit(5).toPandas()
+IO_TESTING and _naaccr_text_lines.rdd.getNumPartitions()
+
+# %%
+IO_TESTING and _naaccr_text_lines.limit(5).toPandas()
 
 
 # %%
@@ -318,22 +335,21 @@ def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
                        item.startColumn, item.length).alias(item.naaccrId)
         for item in itemDefs.collect()
         if not item.naaccrId.startswith(exclude_pfx)
-    ]  # type: List[Union[Column, str]]
+    ]  # type: List[Union[sq.Column, str]]
     return flat_file.select(fields)
 
 
+_extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
 if IO_TESTING:
-    extract = naaccr_read_fwf(naaccr_text_lines, ddictDF(_spark))
-    extract.createOrReplaceTempView('naaccr_extract')
-else:
-    extract = None  # for static analysis when not IO_TESTING
-# extract.explain()
-IO_TESTING and extract.limit(5).toPandas()
+    _extract = naaccr_read_fwf(_naaccr_text_lines, ddictDF(_spark))
+    _extract.createOrReplaceTempView('naaccr_extract')
+# _extract.explain()
+IO_TESTING and _extract.limit(5).toPandas()
 
 
 # %%
-def cancerIdSample(spark, cache, tumors,
-                   portion=0.1, cancerID=1):
+def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
+                   portion: float = 0.1, cancerID: int = 1) -> DataFrame:
     """Cancer Identification items from a sample
     """
     cols = coded_items(tumor_item_type(spark, cache)).toPandas()
@@ -344,7 +360,7 @@ def cancerIdSample(spark, cache, tumors,
     return tumors.sample(False, portion).select(colnames)
 
 
-def skipAllBlank(xp):
+def skipAllBlank(xp: pd.DataFrame) -> pd.DataFrame:
     return xp[[
         col for col in xp.columns
         if (xp[col].str.strip() > '').any()
@@ -352,7 +368,8 @@ def skipAllBlank(xp):
 
 
 IO_TESTING and skipAllBlank(
-    cancerIdSample(_spark, cwd / 'naaccr_ddict', extract).limit(15).toPandas()
+    cancerIdSample(_spark, _cwd / 'naaccr_ddict', _extract)
+    .limit(15).toPandas()
 )
 
 
@@ -360,21 +377,21 @@ IO_TESTING and skipAllBlank(
 # ## NAACCR Dates
 
 # %%
-def naaccr_dates(df, date_cols, keep=False):
+def naaccr_dates(df: DataFrame, date_cols: List[str],
+                 keep: bool = False) -> DataFrame:
     orig_cols = df.columns
     for dtcol in date_cols:
         strcol = dtcol + '_'
         df = df.withColumnRenamed(dtcol, strcol)
-        dt = func.to_date(func.unix_timestamp(df[strcol], 'yyyyMMdd')
-                          .cast('timestamp'))
+        dt = func.to_date(df[strcol], 'yyyyMMdd')
         df = df.withColumn(dtcol, dt)
     if not keep:
-        df = df.select(orig_cols)
+        df = df.select(cast(Union[sq.Column, str], orig_cols))
     return df
 
 
 IO_TESTING and naaccr_dates(
-    extract.select(['dateOfDiagnosis', 'dateOfLastContact']),
+    _extract.select(['dateOfDiagnosis', 'dateOfLastContact']),
     ['dateOfDiagnosis', 'dateOfLastContact'],
     keep=True).limit(10).toPandas()
 
@@ -383,7 +400,7 @@ IO_TESTING and naaccr_dates(
 # ### Strange dates: TODO?
 
 # %%
-def strange_dates(extract):
+def strange_dates(extract: DataFrame) -> DataFrame:
     x = naaccr_dates(extract.select(['dateOfDiagnosis']),
                      ['dateOfDiagnosis'], keep=True)
     x = x.withColumn('dtlen', func.length(func.trim(x.dateOfDiagnosis_)))
@@ -395,7 +412,7 @@ def strange_dates(extract):
         ((x.dtlen < 8) & (x.dtlen > 0)))
 
 
-IO_TESTING and (strange_dates(extract)
+IO_TESTING and (strange_dates(_extract)
                 .toPandas().groupby(['dtlen', 'cc']).count())
 
 
@@ -421,7 +438,7 @@ IO_TESTING and (strange_dates(extract)
 # Turns out to be not enough:
 
 # %%
-def dups(df_spark, key_cols):
+def dups(df_spark: DataFrame, key_cols: List[str]) -> pd.DataFrame:
     df_pd = df_spark.toPandas().sort_values(key_cols)
     df_pd['dup'] = df_pd.duplicated(key_cols, keep=False)
     return df_pd[df_pd.dup]
@@ -429,9 +446,9 @@ def dups(df_spark, key_cols):
 
 _key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
 
-IO_TESTING and dups(extract.select('sequenceNumberCentral',
-                                   'dateOfDiagnosis', 'dateCaseCompleted',
-                                   *_key1),
+IO_TESTING and dups(_extract.select('sequenceNumberCentral',
+                                    'dateOfDiagnosis', 'dateCaseCompleted',
+                                    *_key1),
                     _key1).set_index(_key1)
 
 
@@ -459,7 +476,8 @@ class TumorKeys:
         'abstractedBy',         # IDEA/YAGNI?: provider_id
     ]
     @classmethod
-    def pat_tmr(cls, spark, naaccr_text_lines):
+    def pat_tmr(cls, spark: SparkSession_T,
+                naaccr_text_lines: DataFrame) -> DataFrame:
         dd = ddictDF(spark)
         pat_tmr = naaccr_read_fwf(
             naaccr_text_lines,
@@ -472,11 +490,12 @@ class TumorKeys:
         return pat_tmr
 
     @classmethod
-    def with_tumor_id(cls, data,
-                      name='recordId',
-                      extra=['dateOfDiagnosis', 'dateCaseCompleted'],
+    def with_tumor_id(cls, data: DataFrame,
+                      name: str = 'recordId',
+                      extra: List[str] = ['dateOfDiagnosis',
+                                          'dateCaseCompleted'],
                       # keep recordId length consistent
-                      extra_default=None):
+                      extra_default: Opt[sq.Column] = None) -> DataFrame:
         if extra_default is None:
             extra_default = func.lit('0000-00-00')
         id_col = func.concat(data.patientSystemIdHosp,
@@ -489,7 +508,7 @@ class TumorKeys:
 # pat_tmr.cache()
 if IO_TESTING:
     _pat_tmr = TumorKeys.with_tumor_id(
-        TumorKeys.pat_tmr(_spark, naaccr_text_lines))
+        TumorKeys.pat_tmr(_spark, _naaccr_text_lines))
 IO_TESTING and _pat_tmr
 
 # %%
@@ -501,8 +520,8 @@ IO_TESTING and _pat_tmr.limit(15).toPandas()
 
 # %%
 def melt(df: DataFrame,
-         id_vars: Iterable[str], value_vars: Iterable[str],
-         var_name: str = "variable", value_name: str = "value") -> DataFrame:
+         id_vars: List[str], value_vars: List[str],
+         var_name: str = 'variable', value_name: str = 'value') -> DataFrame:
     """Convert :class:`DataFrame` from wide to long format."""
     # ack: user6910411 Jan 2017 https://stackoverflow.com/a/41673644
 
@@ -514,13 +533,13 @@ def melt(df: DataFrame,
     # Add to the DataFrame and explode
     _tmp = df.withColumn("_vars_and_vals", func.explode(_vars_and_vals))
 
-    cols = id_vars + [
+    cols = [func.col(v) for v in id_vars] + [
         func.col("_vars_and_vals")[x].alias(x) for x in [var_name, value_name]]
     return _tmp.select(*cols)
 
 
 # %%
-def naaccr_coded_obs(records, ty):
+def naaccr_coded_obs(records: DataFrame, ty: DataFrame) -> DataFrame:
     value_vars = [row.xmlId for row in
                   ty.where(ty.valtype_cd == '@').collect()]
     # TODO: test data for morphTypebehavIcdO2 etc.
@@ -534,8 +553,8 @@ def naaccr_coded_obs(records, ty):
 
 
 if IO_TESTING:
-    _coded = naaccr_coded_obs(extract.sample(True, 0.02),
-                              tumor_item_type(_spark, cwd / 'naaccr_ddict'))
+    _coded = naaccr_coded_obs(_extract.sample(True, 0.02),
+                              tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
     _coded = TumorKeys.with_tumor_id(_coded)
 
     _coded.createOrReplaceTempView('tumor_coded_value')
@@ -544,9 +563,9 @@ IO_TESTING and _coded.limit(10).toPandas().set_index(['recordId', 'xmlId'])
 
 
 # %%
-def naaccr_coded_obs2(spark, items,
-                      rownum='rownum',
-                      naaccrId='naaccrId'):
+def naaccr_coded_obs2(spark: SparkSession_T, items: DataFrame,
+                      rownum: str = 'rownum',
+                      naaccrId: str = 'naaccrId') -> DataFrame:
     # TODO: test data for dateCaseCompleted, dateCaseLastChanged,
     #       patientSystemIdHosp? abstractedBy?
     # TODO: or: test that patientIdNumber, tumorRecordNumber is unique?
@@ -606,7 +625,7 @@ IO_TESTING and _spark.sparkContext.getConf().get('spark.driver.extraClassPath')
 
 # %%
 if IO_TESTING:
-    def _set_pw(name='ID CDW'):
+    def _set_pw(name: str = 'ID CDW') -> None:
         from os import environ
         from getpass import getpass
         password = getpass(name)
@@ -617,25 +636,29 @@ if IO_TESTING:
 
 # %%
 class Account:
-    def __init__(self, user: str, password: str):
-        self.user = user
-        self.__password = password
+    def __init__(self, user: str, password: str,
+                 url: str = 'jdbc:oracle:thin:@localhost:1521:nheronA1',
+                 driver: str = "oracle.jdbc.OracleDriver") -> None:
+        self.url = url
+        self.__properties = {"user": user,
+                             "password": password,
+                             "driver": driver}
 
-    def run(self, io, table,
-            driver="oracle.jdbc.OracleDriver",
-            url='jdbc:oracle:thin:@localhost:1521:nheronA1',
-            **kw_args):
-        return io.jdbc(url, table,
-                       properties={"user": self.user,
-                                   "password": self.__password,
-                                   "driver": driver},
-                       **kw_args)
+    def rd(self, io: sq.DataFrameReader, table: str) -> DataFrame:
+        return io.jdbc(self.url, table,
+                       properties=self.__properties)
+
+    def wr(self, io: sq.DataFrameWriter, table: str,
+           mode: Opt[str] = None) -> None:
+        io.jdbc(self.url, table,
+                properties=self.__properties,
+                mode=mode)
 
 
 if IO_TESTING:
     _cdw = Account(_environ['LOGNAME'], _environ['ID CDW'])
 
-IO_TESTING and _cdw.run(_spark.read, "global_name").toPandas()
+IO_TESTING and _cdw.rd(_spark.read, "global_name").toPandas()
 
 # %% [markdown]
 #
@@ -645,7 +668,7 @@ IO_TESTING and _cdw.run(_spark.read, "global_name").toPandas()
 
 # %%
 if IO_TESTING:
-    _cdw.run(tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
+    _cdw.wr(_tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
              mode='overwrite')
 
 
@@ -665,11 +688,11 @@ IO_TESTING and _spark.createDataFrame(
 
 
 # %%
-def itemNumOfPath(bc_var,
-                  item='item'):
+def itemNumOfPath(bc_var: DataFrame,
+                  item: str = 'item') -> DataFrame:
     digits = func.regexp_extract('concept_path',
                                  r'\\i2b2\\naaccr\\S:[^\\]+\\(\d+)', 1)
-    items = bc_var.select(digits.cast('int').alias(item)).dropna().distinct()
+    items = bc_var.select(digits.cast('int').alias(item))   #@@.dropna().distinct()
     return items.sort(item)
 
 
@@ -678,9 +701,11 @@ IO_TESTING and itemNumOfPath(_spark.createDataFrame(
 
 
 # %%
-def _selectedItems(ddict, items):
-    selected = ddict.join(items, ddict.naaccrNum == items.item).drop(items.item)
+def _selectedItems(ddict: DataFrame, items: DataFrame) -> DataFrame:
+    selected = ddict.join(items,
+                          ddict.naaccrNum == items.item).drop(items.item)
     return selected.sort(selected.length.desc(), selected.naaccrNum)
+
 
 if IO_TESTING:
     _bc_ddict = _selectedItems(
@@ -688,8 +713,10 @@ if IO_TESTING:
         itemNumOfPath(_spark.createDataFrame(CancerStudy.bc_variable)),
     ).select('naaccrId', 'naaccrNum', 'parentXmlElement', 'length')
 
-IO_TESTING and _bc_ddict.select(
-    'naaccrId', 'naaccrNum', 'parentXmlElement', 'length').toPandas().set_index(['naaccrNum', 'naaccrId'])
+IO_TESTING and (
+    _bc_ddict.select('naaccrId', 'naaccrNum', 'parentXmlElement', 'length')
+    .toPandas().set_index(['naaccrNum', 'naaccrId'])
+)
 
 
 # %% [markdown]
@@ -699,14 +726,14 @@ IO_TESTING and _bc_ddict.select(
 #     at least not the 100 tumor sample.
 
 # %%
-def bc_var_facts(coded_facts, ddict):
+def bc_var_facts(coded_facts: DataFrame, ddict: DataFrame) -> DataFrame:
     return coded_facts.join(
         ddict.select('naaccrId'),
         coded_facts.xmlId == ddict.naaccrId,
     ).drop(ddict.naaccrId)
 
 
-def data_summary(spark, obs):
+def data_summary(spark: SparkSession_T, obs: DataFrame) -> DataFrame:
     obs.createOrReplaceTempView('summary_input')  # ISSUE: CLOBBER!
     return spark.sql('''
     select xmlId as variable
@@ -720,7 +747,8 @@ def data_summary(spark, obs):
     ''')
 
 
-def bc_var_summary(spark, obs, ddict):
+def bc_var_summary(spark: SparkSession_T,
+                   obs: DataFrame, ddict: DataFrame) -> DataFrame:
     agg = data_summary(
         spark,
         bc_var_facts(obs, ddict)
@@ -751,11 +779,11 @@ IO_TESTING and  _tumor_reg_coded_facts.where("xmlId == 'dateOfDiagnosis'").limit
 # #### TODO: Code labels; e.g. 1 = Male; 2 = Female
 
 # %%
-def pivot_obs_by_enc(skinny_obs,
-                     pivot_on='xmlId',  # cheating... not really in i2b2 observation_fact
+def pivot_obs_by_enc(skinny_obs: DataFrame,
+                     pivot_on: str = 'xmlId',  # cheating... not really in i2b2 observation_fact
                      # TODO: nval_num etc. for value cols?
-                     value_col='concept_cd',
-                     key_cols=['encounter_ide', 'MRN']):
+                     value_col: str = 'concept_cd',
+                     key_cols: List[str] = ['encounter_ide', 'MRN']) -> DataFrame:
     groups = skinny_obs.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
     wide = groups.pivot(pivot_on).agg(func.first(value_col))
     return wide
@@ -773,7 +801,7 @@ IO_TESTING and pivot_obs_by_enc(_tumor_reg_coded_facts.where(
 # **ISSUE**: combine with OMOP cohort based on syn-puf?
 
 # %%
-def define_simulated_naaccr(spark, data_agg_naaccr):
+def define_simulated_naaccr(spark: SparkSession_T, data_agg_naaccr: DataFrame) -> SparkSession_T:
     data_agg_naaccr.createOrReplaceTempView('data_agg_naaccr')
     simulated_entity = spark.createDataFrame([(ix,) for ix in range(1, 500)], ['case_index'])
     simulated_entity.createOrReplaceTempView('simulated_entity')
@@ -806,12 +834,13 @@ IO_TESTING and (
 # Let's compare observed with synthesized:
 
 # %%
-def codedObservedDistribution(spark, naaccrId):
+def codedObservedDistribution(spark: SparkSession_T, naaccrId: str) -> pd.DataFrame:
     stats = spark.table('data_agg_naaccr').toPandas()
     byval = stats[stats.xmlId == naaccrId].set_index('value')
     return byval[['itemnbr', 'freq', 'tumor_qty', 'pct']]
 
-def codedSyntheticDistribution(spark, itemnbr: int):
+
+def codedSyntheticDistribution(spark: SparkSession_T, itemnbr: int) -> pd.DataFrame:
     itemnbr = int(itemnbr)  # prevent SQL injection
     obs_sim = spark.sql(f'''
     select *
@@ -843,7 +872,7 @@ IO_TESTING and (
 # ### checking synthetic data
 
 # %%
-def non_blank(df):
+def non_blank(df: pd.DataFrame) -> pd.DataFrame:
     return df[[
         col for col in df.columns
         if (df[col].str.strip() > '').any()
@@ -852,10 +881,11 @@ def non_blank(df):
 
 # %%
 if IO_TESTING:
-    syn_records = pd.read_pickle('test_data/,syn_records_TMP.pkl')
-    non_blank(syn_records[coded_items[
-        (coded_items.sectionid == 1) &
-        (coded_items.xmlId.isin(syn_records.columns))].xmlId.values.tolist()]).tail(15)
+    _syn_records = pd.read_pickle('test_data/,syn_records_TMP.pkl')
+    _coded_items = coded_items(tumor_item_type(_spark, _cwd / 'naaccr_ddict')).toPandas()
+    non_blank(_syn_records[_coded_items[
+        (_coded_items.sectionid == 1) &
+        (_coded_items.xmlId.isin(_syn_records.columns))].xmlId.values.tolist()]).tail(15)
     ###
 
     stuff = pd.read_pickle('test_data/,test-stuff.pkl')
@@ -863,13 +893,13 @@ if IO_TESTING:
 
     ###
 
-    ndd = DataDictionary.make_in(spark, cwd / 'naaccr_ddict')
-    test_data_coded = naaccr_read_fwf(spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
-    test_data_coded.limit(5).toPandas()
+    ndd = DataDictionary.make_in(_spark, _cwd / 'naaccr_ddict')
+    _test_data_coded = naaccr_read_fwf(_spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
+    _test_data_coded.limit(5).toPandas()
 
     ###
 
-    xp = test_data_coded.select(coded_items[coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
+    xp = _test_data_coded.select(_coded_items[_coded_items.sectionid == 1].xmlId.values.tolist()).limit(15).toPandas()
 
     xp[[
         col for col in xp.columns
@@ -881,8 +911,8 @@ if IO_TESTING:
 
 # %%
 if IO_TESTING:
-    x = naaccr_dates(pat_tmr, ['dateOfDiagnosis', 'dateOfBirth']).toPandas()
-    x['ddx_orig'] = pat_tmr.select('dateOfDiagnosis', 'dateOfDiagnosisFlag').toPandas().dateOfDiagnosis
+    x = naaccr_dates(_pat_tmr, ['dateOfDiagnosis', 'dateOfBirth']).toPandas()
+    x['ddx_orig'] = _pat_tmr.select('dateOfDiagnosis', 'dateOfDiagnosisFlag').toPandas().dateOfDiagnosis
     x = x[x.ageAtDiagnosis.str.startswith('-')]
     x['age2'] = (x.dateOfDiagnosis - x.dateOfBirth).dt.days / 365.25
     x[['ageAtDiagnosis', 'age2', 'ddx_orig', 'dateOfDiagnosis', 'dateOfDiagnosisFlag', 'dateOfBirth']].sort_values('ddx_orig')
@@ -890,8 +920,8 @@ if IO_TESTING:
 
 # %%
 if IO_TESTING:
-    dx_age = pat_tmr_pd.groupby('ageAtDiagnosis')
-    dx_age[['dateOfBirth']].count()
+    _dx_age = _pat_tmr.toPandas().groupby('ageAtDiagnosis') #@@pd?
+    _dx_age[['dateOfBirth']].count()
     #dx_age = dx_age[dx_age != '999']
     #dx_age.unique()
 
