@@ -19,6 +19,7 @@
 from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
+from pprint import pformat
 from sys import stderr
 from typing import Callable, Dict, Iterator, List
 from typing import Optional as Opt, Union, cast
@@ -81,6 +82,19 @@ if IO_TESTING:
     if 'spark' in globals():
         _spark = spark  # type: ignore  # noqa
         del spark       # type: ignore
+    else:
+        def _make_spark_session(appName: str = "tumor_reg_data") -> SparkSession_T:
+            """
+            ref:
+            https://spark.apache.org/docs/latest/sql-getting-started.html
+            """
+            from pyspark.sql import SparkSession
+
+            return SparkSession \
+                .builder \
+                .appName(appName) \
+                .getOrCreate()
+        _spark = _make_spark_session()
 
     def _get_cwd() -> Path_T:
         # ISSUE: ambient
@@ -127,6 +141,40 @@ class XSD:
 
 
 class NAACCR1:
+    """NAACCR XML assets
+
+    Data dictionaries such as `ndd180` (version 18) contain `ItemDefs`:
+
+    >>> def show(elt):
+    ...     print(XML.tostring(elt).decode('utf-8').strip())
+    >>> show(NAACCR1.ndd180.find('n:ItemDefs/n:ItemDef[3]', NAACCR1.ns))
+    ... # doctest: +NORMALIZE_WHITESPACE
+    <ns0:ItemDef xmlns:ns0="http://naaccr.org/naaccrxml"
+      dataType="digits" length="3" naaccrId="naaccrRecordVersion"
+      naaccrName="NAACCR Record Version" naaccrNum="50"
+      parentXmlElement="NaaccrData" recordTypes="A,M,C,I" startColumn="17" />
+
+    The XML schema for an `ItemDef` is:
+
+    >>> show(NAACCR1.ItemDef)
+    ... # doctest: +NORMALIZE_WHITESPACE
+    <xs:element xmlns:xs="http://www.w3.org/2001/XMLSchema" name="ItemDef">
+      <xs:complexType>
+        <xs:attribute name="naaccrId" type="xsd:ID" use="required" />
+        <xs:attribute name="naaccrNum" type="xsd:integer" use="required" />
+        <xs:attribute name="naaccrName" type="xsd:string" use="optional" />
+        <xs:attribute name="parentXmlElement" type="tns:parentType" use="required" />
+        <xs:attribute default="text" name="dataType" type="tns:datatypeType" use="optional" />
+        <xs:attribute default="rightBlank" name="padding" type="tns:paddingType" use="optional" />
+        <xs:attribute default="all" name="trim" type="tns:trimType" use="optional" />
+        <xs:attribute name="startColumn" type="xsd:integer" use="optional" />
+        <xs:attribute name="length" type="xsd:integer" use="required" />
+            <xs:attribute name="allowUnlimitedText" type="xsd:boolean" use="optional" />
+        <xs:attribute name="sourceOfStandard" type="xsd:string" use="optional" />
+        <xs:attribute name="recordTypes" type="xsd:string" use="optional" />
+      </xs:complexType>
+    </xs:element>
+    """
     dd13_xsd = XML.parse(res.open_text(
         naaccr_xml_xsd, 'naaccr_dictionary_1.3.xsd'))
 
@@ -149,6 +197,8 @@ class NAACCR1:
     ns = {'n': uri}
 
 
+
+# %%
 def eltSchema(xsd_complex_type: XML.Element,
               simpleContent: bool = False) -> ty.StructType:
     decls = xsd_complex_type.findall('xsd:attribute', XSD.ns)
@@ -166,7 +216,6 @@ def eltSchema(xsd_complex_type: XML.Element,
     if simpleContent:
         fields = fields + [ty.StructField('value', ty.StringType(), False)]
     return ty.StructType(fields)
-
 
 RecordMaker = Callable[[XML.Element, ty.StructType, bool],
                        Iterator[Dict[str, object]]]
