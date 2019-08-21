@@ -209,7 +209,6 @@ class NAACCR1:
     ns = {'n': uri}
 
 
-
 # %%
 def eltSchema(xsd_complex_type: XML.Element,
               simpleContent: bool = False) -> ty.StructType:
@@ -461,6 +460,7 @@ order by section, type, nd.length
 
 # %%
 _spark.sql('''
+create or replace temporary view tumor_item_type as
 with src as (
 select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
      , nd.dataType, nd.length, nd.allowUnlimitedText
@@ -472,20 +472,26 @@ select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
          when naaccrId like 'pathOrderPhysLicNo%' and nd.length = 20 then 'physician'
          when naaccrId like 'pathReportNumber%' and nd.length = 20 then 'pathReportNumber'
          when naaccrId in ('censusIndCode2010', 'censusOccCode2010',
-                           'schemaId', 'ajccId') then naaccrId
+                           'schemaId', 'ajccId', 'primarySite', 'histologyIcdO2', 'histologicTypeIcdO3') then naaccrId
          when naaccrId in ('npiRegistryId') then naaccrId
-         when naaccrId in ('reportingFacility', 'npiReportingFacility')
+         when naaccrId in ('reportingFacility', 'npiReportingFacility', 'npiArchiveFin')
            or naaccrId like 'pathReportingFacId%'
            or (naaccrId like '%FacNo%' and nd.length = 25)
            then 'facility'
          when naaccrId in ('vendorName') then naaccrId
          when (naaccrId like 'stateAtDxGeocode%') then 'state'
          when (naaccrId like 'secondaryDiagnosis%' and nd.length = 7) then 'ICD10'
+         when (naaccrId like 'comorbidComplication%' and nd.length = 5) then 'ICD9'
          when (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') and nd.length = 2 then 'dateFlag'
          when naaccrId in ('diagnosticProc7387', 'gradeIcdO1') then '?'
-         when naaccrId like 'subsqRx%RegLnRem' then 'LnRem?'
+         when naaccrId like 'subsqRx%RegLnRem' then 'LnRem?' -- ISSUE: Nom vs Ord?
          when naaccrId like 'subsqRx%ScopeLnSu' or naaccrId like 'subsqRx%SurgOth' then 'Surg?'
-         when source in ('SEER', 'AJCC', 'NPCR') and nd.length in (5, 13, 15) and dataType is null then 'staging'
+         when
+           (source in ('SEER', 'AJCC', 'NPCR') and nd.length in (5, 13, 15) and dataType is null)
+           or
+           naaccrId in ('tnmPathDescriptor', 'tnmClinDescriptor')
+           then 'staging'
+         when naaccrId like 'csVersion%' then 'version'
          when s.section like 'Stage%' and sectionId = 11 and dataType is null and nd.length <= 5 then naaccrId
          when r.type = 'factor' and nd.length <= 5 then naaccrId
          when r.type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
@@ -521,37 +527,61 @@ from src
 select with_scale.*
      , case
        when
-         (naaccrId in ('patientIdNumber', 'accessionNumberHosp', 'patientSystemIdHosp',
-                       'reportingFacility', 'npiReportingFacility', 'archiveFin', 'npiArchiveFin')) or
-         (scale_typ = 'Nar' and allowUnlimitedText) or
-         (r_type in ('city', 'census_tract', 'census_block', 'county', 'postal')) or
-         (naaccrId like 'text%' and length >= 100)
+         (scale_typ = 'Nar' and length >= 10)
+         or
+         (scale_typ = 'Nom' and
+          (length >= 20
+           or
+           nom_scheme in ('patientIdNumber', 'facility', 'geo')))
        then 'Ti'
        when naaccrId = 'ageAtDiagnosis' then 'Ni'
-       when dataType = 'digits' and scale_typ = 'Qn' and length <= 4 then 'N'
-       when dataType = 'date' and scale_typ = 'Qn' and r_type = 'Date' then 'D'
-       when naaccrId like 'date%Flag' and length = 2 then '@'
-       when
+       when scale_typ = 'Qn' and (
+         naaccrId like '%LabValue'
+         or
+         (dataType = 'digits' and length <= 6)
+       ) then 'N'
+       when dataType = 'date' and scale_typ = 'Qn' and length in (8, 14) then 'D'
+       when nom_scheme in ('dateFlag', 'staging') then '@'
+       when scale_typ in ('Nom', 'Ord') and (
          naaccrId in ('primarySite', 'histologyIcdO2', 'histologicTypeIcdO3') -- lists from WHO
          or
-         (naaccrId in ('censusIndCode2010', 'censusOccCode2010')) -- Werth has these organized
+         naaccrId in ('censusIndCode2010', 'censusOccCode2010') -- Werth has these organized
          or
-         (AnswerListId is not null and length <= 4) or
-         (scale_typ = 'Nom' and length <= 3)
-         then '@'
-       when naaccrId in ('registryId', 'npiRegistryId', 'vendorName') then 'T'
+         nom_scheme in ('ICD9', 'ICD10', 'registryId', 'npiRegistryId', 'vendorName', 'version')
+         or
+         (AnswerListId is not null and length <= 4)
+         or
+         length <= 5
+       ) then '@'
        when naaccrId in ('gradeIcdO1', 'siteIcdO1', 'histologyIcdO1', 'diagnosticProc7387',
-                         'crcChecksum')
+                         'crcChecksum', 'unusualFollowUpMethod')
                          or
             (source in ('SEER', 'AJCC', 'NPCR') and length in (13, 15) and dataType is null)
         then '?'
        end as valtype_cd
 from with_scale
 )
-select * from with_valtype
-where section not like '%Confidential' and (scale_typ is null) -- @@TODO: valtype_cd is null or 
+select sectionId, section, parentXmlElement
+     , naaccrNum, naaccrId
+     -- , dataType
+     , length
+     , source
+     , AnswerListId
+     , scale_typ
+     , valtype_cd
+     , nom_scheme
+
+from with_valtype
+where section not like '%Confidential'
+''')
+
+_spark.table('tumor_item_type').toPandas().sort_values(['sectionId', 'parentXmlElement', 'length', 'naaccrNum']).to_csv('tumor_item_type.csv')
+
+_spark.sql('''
+select *
+from tumor_item_type
+where valtype_cd is null or  scale_typ is null
 order by sectionId, parentXmlElement, length desc, naaccrNum
--- limit 15
 ''').toPandas()
 
 # %% [markdown]
@@ -1288,7 +1318,6 @@ IO_TESTING and (
     .assign(pct_syn=codedSyntheticDistribution(_spark, 380))[['pct', 'pct_syn']]
     .plot.pie(figsize=(12, 8), subplots=True)
 );
-
 
 # %% [markdown]
 # **TODO**: For dates, how long before/after diagnosis?
