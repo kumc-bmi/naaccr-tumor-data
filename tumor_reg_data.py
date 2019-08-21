@@ -75,6 +75,9 @@ log.info('%s', dict(pandas=pd.__version__))
 # Otherwise, we maintain ocap discipline (see CONTRIBUTING)
 # and don't import powerful objects.
 
+# %% [markdown]
+#  - **TODO/WIP**: use `_spark` and `_cwd`; i.e. be sure not to "export" ambient authority.
+
 # %%
 IO_TESTING = __name__ == '__main__'
 _spark = cast(SparkSession_T, None)
@@ -186,6 +189,15 @@ class NAACCR1:
 
     s100x = XML.parse(GzipFile(fileobj=res.open_binary(  # type: ignore # typeshed/issues/2580
         naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
+
+    @classmethod
+    def s100t(cls):
+        """
+        TODO: check in results of converting from XML sample
+        using `java -jar ~/opt/naaccr-xml-utility-6.2/lib/naaccr-xml-utility.jar`
+        """
+        return res.path(
+            naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.txt')
 
     item_xsd = XSD.the(
         data_xsd.getroot(),
@@ -347,27 +359,27 @@ IO_TESTING and (coded_items(tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
 # %% [markdown]
 # ## NAACCR Flat File v18
 
-# %% [markdown]
-# ### Warning! Identified Data!
-
-# %% [markdown]
-#  - **IDEA**: use `_tr_file` instead; i.e. be sure not to "export" globals.
-
 # %%
 if IO_TESTING:
-    _tr_file = _cwd / input()
-    _naaccr_text_lines = _spark.read.text(str(_tr_file))
+    with NAACCR1.s100t() as _tr_file:
+        log.info('tr_file: %s', _tr_file)
+        _naaccr_text_lines = _spark.read.text(str(_tr_file))
 else:
-    _tr_file = cast(Path_T, None)
     _naaccr_text_lines = cast(DataFrame, None)
-
-IO_TESTING and _tr_file.exists()
 
 # %%
 IO_TESTING and _naaccr_text_lines.rdd.getNumPartitions()
 
 # %%
 IO_TESTING and _naaccr_text_lines.limit(5).toPandas()
+
+
+# %%
+def non_blank(df: pd.DataFrame) -> pd.DataFrame:
+    return df[[
+        col for col in df.columns
+        if (df[col].str.strip() > '').any()
+    ]]
 
 
 # %%
@@ -393,13 +405,15 @@ if IO_TESTING:
     _extract = naaccr_read_fwf(_naaccr_text_lines, ddictDF(_spark))
     _extract.createOrReplaceTempView('naaccr_extract')
 # _extract.explain()
-IO_TESTING and _extract.limit(5).toPandas()
+IO_TESTING and non_blank(_extract.limit(5).toPandas())
 
 
 # %%
 def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
-                   portion: float = 0.1, cancerID: int = 1) -> DataFrame:
+                   portion: float = 1.0, cancerID: int = 1) -> DataFrame:
     """Cancer Identification items from a sample
+
+    TODO: remove limitation to coded items
     """
     cols = coded_items(tumor_item_type(spark, cache)).toPandas()
     cols = cols[cols.sectionid == cancerID]
@@ -409,17 +423,13 @@ def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
     return tumors.sample(False, portion).select(colnames)
 
 
-def skipAllBlank(xp: pd.DataFrame) -> pd.DataFrame:
-    return xp[[
-        col for col in xp.columns
-        if (xp[col].str.strip() > '').any()
-    ]]
+if IO_TESTING:
+    _cancer_id = cancerIdSample(_spark, _cwd / 'naaccr_ddict', _extract)
 
+IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
 
-IO_TESTING and skipAllBlank(
-    cancerIdSample(_spark, _cwd / 'naaccr_ddict', _extract)
-    .limit(15).toPandas()
-)
+# %%
+_cancer_id.toPandas().describe()
 
 
 # %% [markdown]
@@ -919,14 +929,6 @@ IO_TESTING and (
 
 # %% [markdown]
 # ### checking synthetic data
-
-# %%
-def non_blank(df: pd.DataFrame) -> pd.DataFrame:
-    return df[[
-        col for col in df.columns
-        if (df[col].str.strip() > '').any()
-    ]]
-
 
 # %%
 if IO_TESTING:
