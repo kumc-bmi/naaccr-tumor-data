@@ -62,9 +62,9 @@ def create_object(name: str, script: str, spark: SparkSession_T) -> None:
 
 def csv_view(spark: SparkSession_T, path: Path_T,
              name: Opt[str] = None) -> DataFrame:
-    spark.sparkContext.addFile(str(path))
-    df = spark.read.csv(SparkFiles.get(path.name),
-                        header=True, inferSchema=True)
+    df = spark.read.csv(str(path),
+                        header=True, escape='"', multiLine=True,
+                        inferSchema=True, mode='FAILFAST')
     df.createOrReplaceTempView(name or path.stem)
     return df
 
