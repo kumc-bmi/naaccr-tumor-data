@@ -429,8 +429,49 @@ where ln.code_value = 390
 # ### Try Werth PADoH curation
 
 # %%
-_r = _spark.read.csv('vendor/naaccr-r/data-raw/field_info.csv', inferSchema=True, header=True)
-_r.createOrReplaceTempView('field_info')
+import naaccr_r_raw
+
+class NAACCR_R:
+    # ISSUE: design-time or run-time? license?
+
+    field_info = pd.read_csv(res.open_text(naaccr_r_raw, 'field_info.csv'))
+    field_code_scheme = pd.read_csv(res.open_text(naaccr_r_raw, 'field_code_scheme.csv'))
+
+    @classmethod
+    def _code_labels(cls):
+        return res.path(naaccr_r_raw, 'code-labels')
+
+    @classmethod
+    def field_info_in(cls, spark,
+                      name='field_info'):
+        info = spark.createDataFrame(cls.field_info)
+        info.createOrReplaceTempView(name)
+
+    @classmethod
+    def code_labels(cls,
+                    implicit=['iso_country']):
+        found = []
+        with cls._code_labels() as cl_dir:
+            for scheme in cls.field_code_scheme.scheme.unique():
+                if scheme in implicit:
+                    continue
+                info = (cl_dir / scheme).with_suffix('.csv')
+                skiprows = 0
+                if info.open().readline().startswith('#'):
+                    skiprows = 1
+                codes = pd.read_csv(info, skiprows=skiprows,
+                                    na_filter=False,
+                                    dtype={'code': str, 'label': str})
+                codes['scheme'] = info.stem
+                if 'code' not in codes.columns or 'label' not in codes.columns:
+                    raise ValueError((info, codes.columns))
+                found.append(codes)
+        all_schemes = pd.concat(found)
+        with_fields = cls.field_code_scheme.merge(all_schemes)
+        with_field_info = cls.field_info[['item', 'name']].merge(with_fields)
+        return with_field_info
+
+NAACCR_R.field_info_in(_spark)
 _spark.table('field_info').limit(5).toPandas()
 
 # %% [markdown]
@@ -449,6 +490,9 @@ group by has_r
 order by has_r
 ''').toPandas()
 
+# %% [markdown]
+# Werth assigns a `type` to each item:
+
 # %%
 _spark.sql('''
 select rl.section, type, nd.length, count(*), collect_list(rl.item), collect_list(naaccrId)
@@ -459,6 +503,17 @@ group by section, type, nd.length
 order by section, type, nd.length
 ''').toPandas()
 
+# %% [markdown]
+# #### Werth Code Values
+
+# %%
+_spark.createDataFrame(NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
+_spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
+_spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
+
+# %% [markdown]
+# ### Mix naaccr-xml, LOINC, and Werth
+
 # %%
 _spark.sql('''
 create or replace temporary view tumor_item_type as
@@ -466,64 +521,69 @@ with src as (
 select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
      , nd.dataType, nd.length, nd.allowUnlimitedText
      , idesc.source
-     , ln.scale_typ, ln.AnswerListId
-     , r.type r_type
-     , case
-         when r.type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
-         when (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') and nd.length = 2 then 'dateFlag'
-         when AnswerListId is not null then AnswerListId
-         when naaccrId in ('patientIdNumber', 'accessionNumberHosp', 'patientSystemIdHosp') then 'patientIdNumber'
-         when naaccrId like 'pathOrderPhysLicNo%' and nd.length = 20 then 'physician'
-         when naaccrId like 'pathReportNumber%' and nd.length = 20 then 'pathReportNumber'
-         when naaccrId in ('censusIndCode2010', 'censusOccCode2010',
-                           'schemaId', 'ajccId', 'primarySite', 'histologyIcdO2', 'histologicTypeIcdO3') then naaccrId
-         when naaccrId in ('npiRegistryId') then naaccrId
-         when naaccrId in ('reportingFacility', 'npiReportingFacility', 'npiArchiveFin')
-           or naaccrId like 'pathReportingFacId%'
-           or (naaccrId like '%FacNo%' and nd.length = 25)
-           then 'facility'
-         when naaccrId in ('vendorName') then naaccrId
-         when (naaccrId like 'stateAtDxGeocode%') then 'state'
-         when (naaccrId like 'secondaryDiagnosis%' and nd.length = 7) then 'ICD10'
-         when (naaccrId like 'comorbidComplication%' and nd.length = 5) then 'ICD9'
-         when naaccrId in ('diagnosticProc7387', 'gradeIcdO1') then '?'
-         when naaccrId like 'subsqRx%RegLnRem' then 'LnRem?' -- ISSUE: Nom vs Ord?
-         when naaccrId like 'subsqRx%ScopeLnSu' or naaccrId like 'subsqRx%SurgOth' then 'Surg?'
-         when
-           (source in ('SEER', 'AJCC', 'NPCR') and nd.length in (5, 13, 15) and dataType is null)
-           or
-           naaccrId in ('tnmPathDescriptor', 'tnmClinDescriptor')
-           then 'staging'
-         when naaccrId like 'csVersion%' then 'version'
-         when s.section like 'Stage%' and sectionId = 11 and dataType is null and nd.length <= 5 then naaccrId
-         when r.type = 'factor' and nd.length <= 5 then naaccrId
-         when r.type in ('override', 'facility', 'boolean01') then r.type
-       end nom_scheme
+     , loinc_num, ln.AnswerListId, ln.scale_typ
+     , r.type r_type, rcs.scheme
 from ndd180 nd
 left join record_layout rl on rl.item = nd.naaccrNum
 left join item_description idesc on idesc.item = nd.naaccrNum
 left join section s on s.section = rl.section
 left join loinc_naaccr ln on ln.code_value = nd.naaccrNum
 left join field_info r on r.item = nd.naaccrNum
+left join field_code_scheme rcs on rcs.name = nd.naaccrId
+)
+, with_phi as (
+select src.*
+     , case
+         when r_type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
+         when naaccrId in ('patientIdNumber', 'accessionNumberHosp', 'patientSystemIdHosp') then 'patientIdNumber'
+         when naaccrId like 'pathOrderPhysLicNo%' and length = 20 then 'physician'
+         when naaccrId like 'pathReportNumber%' and length = 20 then 'pathReportNumber'
+         when naaccrId in ('reportingFacility', 'npiReportingFacility', 'archiveFin', 'npiArchiveFin')
+           or naaccrId like 'pathReportingFacId%'
+           or (naaccrId like '%FacNo%' and length = 25)
+           then 'facility'
+       end phi_id_kind
+from src
 )
 ,
 with_scale as (
 select sectionId, section, parentXmlElement, naaccrNum, naaccrId
      , dataType, length, allowUnlimitedText, source
-     , AnswerListId
-     , r_type
-     , nom_scheme
+     , loinc_num, AnswerListId
      , case
-       when scale_typ is not null then scale_typ
+       when scale_typ is not null and scale_typ != '-' then scale_typ
        when allowUnlimitedText then 'Nar'
-       when nom_scheme is not null then 'Nom'
+       when r_type in ('boolean01', 'boolean12', 'override') then 'Ord'
+       when
+         AnswerListId is not null or
+         scheme is not null or
+         phi_id_kind is not null or
+         naaccrId in ('registryId', 'npiRegistryId', 'vendorName') or
+         naaccrId like 'stateAtDxGeocode%' or
+         (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') or
+         naaccrId like 'csVersion%' or
+         (section like 'Stage%' and sectionId = 11 and length <= 5) or
+         (naaccrId like 'secondaryDiagnosis%' and length = 7) or -- 'ICD10'
+         (naaccrId like 'comorbidComplication%' and length = 5) or -- 'ICD9'
+         (source in ('SEER', 'AJCC', 'NPCR') and length in (5, 13, 15) and dataType is null) or
+         naaccrId in ('tnmPathDescriptor', 'tnmClinDescriptor') or
+         naaccrId like 'subsqRx%RegLnRem' or -- lynpm nodes ISSUE: Nom vs Ord?
+         (naaccrId like 'subsqRx%ScopeLnSu' or naaccrId like 'subsqRx%SurgOth') or -- Surgery
+         (r_type = 'factor' and length <= 5)
+       then 'Nom' -- ISSUE: Nom vs. Ord
        when
          (dataType = 'date' and r_type = 'Date')
          or
          (r_type in ('integer', 'sentineled_integer', 'sentineled_numeric'))
        then 'Qn'
+       when
+         naaccrId = 'diagnosticProc7387' or
+         (source in ('SEER', 'AJCC', 'NPCR') and length in (13, 15) and dataType is null)
+       then '?'
        end scale_typ
-from src
+     , r_type, scheme
+     , phi_id_kind
+from with_phi
 )
 , with_valtype as (
 select with_scale.*
@@ -532,10 +592,14 @@ select with_scale.*
        when
          (scale_typ = 'Nar' and length >= 10)
          or
+         (r_type in ('city', 'census_tract', 'census_block', 'county', 'postal'))
+         or
          (scale_typ = 'Nom' and
           (length >= 20
            or
-           nom_scheme in ('patientIdNumber', 'facility', 'geo')))
+           (length >= 13 and r_type = 'character')
+           or
+           phi_id_kind is not null))
        then 'Ti'
        when scale_typ = 'Nar' and AnswerListId is not null and length <= 2 then '@'
        when scale_typ = 'Qn' and (
@@ -544,40 +608,55 @@ select with_scale.*
          (dataType = 'digits' and length <= 6)
        ) then 'N'
        when dataType = 'date' and scale_typ = 'Qn' and length in (8, 14) then 'D'
-       when nom_scheme in ('dateFlag', 'staging') then '@'
+       -- when nom_scheme in ('dateFlag', 'staging') then '@'
        when scale_typ in ('Nom', 'Ord') and (
-         naaccrId in ('primarySite', 'histologyIcdO2', 'histologicTypeIcdO3') -- lists from WHO
+         naaccrId in ('primarySite', 'histologyIcdO2', 'histologicTypeIcdO3', 'behaviorCodeIcdO3') -- lists from WHO
          or
-         naaccrId in ('censusIndCode2010', 'censusOccCode2010') -- Werth has these organized
+         naaccrId in ('registryId', 'npiRegistryId', 'vendorName')
          or
-         nom_scheme in ('ICD9', 'ICD10', 'registryId', 'npiRegistryId', 'vendorName', 'version')
+         (naaccrId like 'secondaryDiagnosis%' and length = 7) -- 'ICD10'
          or
-         (AnswerListId is not null and length <= 4)
+         (naaccrId like 'comorbidComplication%' and length = 5) -- 'ICD9'
+         or
+         naaccrId like 'csVersion%'
+         or
+         (AnswerListId is not null and length <= 5)
+         or
+         (scheme is not null and length <= 5)
          or
          length <= 5
+         -- @@ nom_scheme in ('ICD9', 'ICD10', , 'version')
        ) then '@'
-       when naaccrId in ('gradeIcdO1', 'siteIcdO1', 'histologyIcdO1', 'diagnosticProc7387',
-                         'crcChecksum', 'unusualFollowUpMethod')
-                         or
-            (source in ('SEER', 'AJCC', 'NPCR') and length in (13, 15) and dataType is null)
-        then '?'
+       when
+         scale_typ = '?'or
+         naaccrId in ('gradeIcdO1', 'siteIcdO1', 'histologyIcdO1',
+                      'crcChecksum', 'unusualFollowUpMethod')
+       then '?'
        end as valtype_cd
 from with_scale
 )
-select sectionId, section, parentXmlElement
+select sectionId, section
+     -- , parentXmlElement
      , naaccrNum, naaccrId
      -- , dataType
-     , length
-     , source
-     , AnswerListId
-     , scale_typ
+     , length, source
+     , loinc_num, scale_typ, AnswerListId
+     , scheme -- , r_type
      , valtype_cd
-     , nom_scheme
+     , phi_id_kind
 
 from with_valtype
 where section not like '%Confidential'
 ''')
 
+
+_spark.sql('''
+select *
+from tumor_item_type
+where valtype_cd is null or  scale_typ is null
+''').toPandas().sort_values(['sectionId', 'naaccrNum']).reset_index(drop=True)
+
+# %%
 (_spark.table('tumor_item_type')
  .toPandas()
  .sort_values(['sectionId', 'naaccrNum'])
@@ -585,11 +664,10 @@ where section not like '%Confidential'
  .to_csv('tumor_item_type.csv')
 )
 
+# %%
 _spark.sql('''
-select *
-from tumor_item_type
-where valtype_cd is null or  scale_typ is null
-''').toPandas().sort_values(['sectionId', 'naaccrNum']).set_index('naaccrNum')
+create table ty2 as select * from tumor_item_type
+''')
 
 # %% [markdown]
 # ### Curate item type rules spreadsheet?
