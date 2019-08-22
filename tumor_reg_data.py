@@ -429,8 +429,49 @@ where ln.code_value = 390
 # ### Try Werth PADoH curation
 
 # %%
-_r = _spark.read.csv('vendor/naaccr-r/data-raw/field_info.csv', inferSchema=True, header=True)
-_r.createOrReplaceTempView('field_info')
+import naaccr_r_raw
+
+class NAACCR_R:
+    # ISSUE: design-time or run-time? license?
+
+    field_info = pd.read_csv(res.open_text(naaccr_r_raw, 'field_info.csv'))
+    field_code_scheme = pd.read_csv(res.open_text(naaccr_r_raw, 'field_code_scheme.csv'))
+
+    @classmethod
+    def _code_labels(cls):
+        return res.path(naaccr_r_raw, 'code-labels')
+
+    @classmethod
+    def field_info_in(cls, spark,
+                      name='field_info'):
+        info = spark.createDataFrame(cls.field_info)
+        info.createOrReplaceTempView(name)
+
+    @classmethod
+    def code_labels(cls,
+                    implicit=['iso_country']):
+        found = []
+        with cls._code_labels() as cl_dir:
+            for scheme in cls.field_code_scheme.scheme.unique():
+                if scheme in implicit:
+                    continue
+                info = (cl_dir / scheme).with_suffix('.csv')
+                skiprows = 0
+                if info.open().readline().startswith('#'):
+                    skiprows = 1
+                codes = pd.read_csv(info, skiprows=skiprows,
+                                    na_filter=False,
+                                    dtype={'code': str, 'label': str})
+                codes['scheme'] = info.stem
+                if 'code' not in codes.columns or 'label' not in codes.columns:
+                    raise ValueError((info, codes.columns))
+                found.append(codes)
+        all_schemes = pd.concat(found)
+        with_fields = cls.field_code_scheme.merge(all_schemes)
+        with_field_info = cls.field_info[['item', 'name']].merge(with_fields)
+        return with_field_info
+
+NAACCR_R.field_info_in(_spark)
 _spark.table('field_info').limit(5).toPandas()
 
 # %% [markdown]
@@ -449,6 +490,9 @@ group by has_r
 order by has_r
 ''').toPandas()
 
+# %% [markdown]
+# Werth assigns a `type` to each item:
+
 # %%
 _spark.sql('''
 select rl.section, type, nd.length, count(*), collect_list(rl.item), collect_list(naaccrId)
@@ -458,6 +502,17 @@ left join record_layout rl on rl.item = nd.naaccrNum
 group by section, type, nd.length
 order by section, type, nd.length
 ''').toPandas()
+
+# %% [markdown]
+# #### Werth Code Values
+
+# %%
+_spark.createDataFrame(NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
+_spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
+_spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
+
+# %% [markdown]
+# ### Mix naaccr-xml, LOINC, and Werth
 
 # %%
 _spark.sql('''
