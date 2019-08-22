@@ -51,7 +51,7 @@ import bc_qa
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
-from tumor_reg_ont import create_object, DataDictionary, tumor_item_type
+from tumor_reg_ont import create_object, DataDictionary
 import heron_load
 
 
@@ -265,12 +265,9 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
 
 IO_TESTING and ddictDF(_spark).limit(5).toPandas().set_index('naaccrId')
 
+
 # %% [markdown]
 # ## NAACCR XML Data
-
-# %%
-eltSchema(NAACCR1.item_xsd, simpleContent=True)
-
 
 # %%
 def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
@@ -304,11 +301,13 @@ def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
 IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
                 .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
 
+# %% [markdown]
+# What columns are covered by the 100 tumor sample?
+
 # %%
-#@@@@
-# IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
-#                 .select('naaccrId').distinct().sort('naaccrId')
-#                 .toPandas().naaccrId.values)
+IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
+                .select('naaccrId').distinct().sort('naaccrId')
+                .toPandas().naaccrId.values)
 
 
 # %%
@@ -330,13 +329,9 @@ IO_TESTING and (naaccr_pivot(ddictDF(_spark),
 
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
-#
-#  - **ISSUE**: emulating `t_item` from the 2012 MDB is awkward;
-#    better to rewrite queries that use it in terms
-#    of record_layout etc.
 
 # %%
-_spark.sql('''
+IO_TESTING and _spark.sql('''
 select *
 from ndd180 as idef
 ''').limit(8).toPandas()
@@ -345,9 +340,10 @@ from ndd180 as idef
 # Add year implemented, retired from chapter 10...
 
 # %%
-DataDictionary.make_in(_spark, _cwd / 'naaccr_ddict')
+if IO_TESTING:
+    DataDictionary.make_in(_spark, _cwd / 'naaccr_ddict')
 
-_spark.sql('''
+IO_TESTING and _spark.sql('''
 select yr_retired, count(*)
 from item_description idesc
 where xmlId is null
@@ -361,7 +357,7 @@ order by yr_retired
 # Well, that's what [the spec](http://datadictionary.naaccr.org/default.aspx?c=10) says.
 
 # %%
-_spark.sql('''
+IO_TESTING and _spark.sql('''
 select *
 from item_description idesc
 where yr_impl = '366'
@@ -376,13 +372,18 @@ class LOINC_NAACCR:
     # spark CSV parser doesn't seem to be up to parsing these.
     measure = pd.read_csv('relma/loinc_naaccr.csv')
     measure = measure.where(measure.notnull(), None)
+    measure_cols = ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']
+    measure_struct = ty.StructType([
+        ty.StructField(n, ty.StringType()) for n in measure_cols])
     answer = pd.read_csv('relma/loinc_naaccr_answer.csv')
 
-_spark.createDataFrame(
-    LOINC_NAACCR.measure[['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']],
-    ty.StructType([ty.StructField(n, ty.StringType())
-                   for n in ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']])
-).createOrReplaceTempView('loinc_naaccr')
+    @classmethod
+    def measure_in(cls, spark):
+        meas_df = spark.createDataFrame(
+            cls.measure[cls.measure_cols],
+            cls.measure_struct)
+        meas_df.createOrReplaceTempView('loinc_naaccr')
+        return meas_df
 
 LOINC_NAACCR.measure[['LOINC_NUM', 'CODE_VALUE', 'COMPONENT', 'SCALE_TYP', 'AnswerListId']].set_index(['LOINC_NUM', 'COMPONENT']).head()
 
@@ -398,7 +399,7 @@ LOINC_NAACCR.measure.groupby('SCALE_TYP')[['COMPONENT']].count()
 # Ideally I'd check by facts as well, but...
 
 # %%
-_spark.sql('''
+IO_TESTING and  _spark.sql('''
 with check as (
 select idesc.yr_impl, idesc.yr_retired
      , case when ln.code_value is null then 0 else 1 end as has_loinc
@@ -416,10 +417,10 @@ order by has_loinc, yr_impl, yr_retired
 ''').toPandas()
 
 # %% [markdown]
-# How does LOINC do dates?
+# #### LOINC scale_typ for dates: Qn
 
 # %%
-_spark.sql('''
+IO_TESTING and _spark.sql('''
 select *
 from loinc_naaccr ln
 where ln.code_value = 390
@@ -443,9 +444,12 @@ class NAACCR_R:
 
     @classmethod
     def field_info_in(cls, spark,
-                      name='field_info'):
+                      name='field_info',
+                      name_scheme='field_code_scheme'):
         info = spark.createDataFrame(cls.field_info)
         info.createOrReplaceTempView(name)
+        to_scheme = spark.createDataFrame(cls.field_code_scheme)
+        to_scheme.createOrReplaceTempView(name_scheme)
 
     @classmethod
     def code_labels(cls,
@@ -471,14 +475,16 @@ class NAACCR_R:
         with_field_info = cls.field_info[['item', 'name']].merge(with_fields)
         return with_field_info
 
-NAACCR_R.field_info_in(_spark)
-_spark.table('field_info').limit(5).toPandas()
+if IO_TESTING:
+    NAACCR_R.field_info_in(_spark)
+IO_TESTING and _spark.table('field_info').limit(5).toPandas()
 
 # %% [markdown]
 # `WerthPADOH/naaccr` has complete coverage:
 
 # %%
-_spark.sql('''
+# TODO: turn this into a doctest, independent of Spark
+IO_TESTING and _spark.sql('''
 with check as (
 select case when r.item is null then 0 else 1 end as has_r
 from ndd180 v18
@@ -494,7 +500,7 @@ order by has_r
 # Werth assigns a `type` to each item:
 
 # %%
-_spark.sql('''
+IO_TESTING and _spark.sql('''
 select rl.section, type, nd.length, count(*), collect_list(rl.item), collect_list(naaccrId)
 from ndd180 nd
 left join field_info f on f.item = nd.naaccrNum
@@ -507,316 +513,93 @@ order by section, type, nd.length
 # #### Werth Code Values
 
 # %%
-_spark.createDataFrame(NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
-_spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
-_spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
+if IO_TESTING:
+    _spark.createDataFrame(NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
+    _spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
+IO_TESTING and _spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
+
 
 # %% [markdown]
 # ### Mix naaccr-xml, LOINC, and Werth
 
 # %%
-_spark.sql('''
-create or replace temporary view tumor_item_type as
-with src as (
-select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
-     , nd.dataType, nd.length, nd.allowUnlimitedText
-     , idesc.source
-     , loinc_num, ln.AnswerListId, ln.scale_typ
-     , r.type r_type, rcs.scheme
-from ndd180 nd
-left join record_layout rl on rl.item = nd.naaccrNum
-left join item_description idesc on idesc.item = nd.naaccrNum
-left join section s on s.section = rl.section
-left join loinc_naaccr ln on ln.code_value = nd.naaccrNum
-left join field_info r on r.item = nd.naaccrNum
-left join field_code_scheme rcs on rcs.name = nd.naaccrId
-)
-, with_phi as (
-select src.*
-     , case
-         when r_type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
-         when naaccrId in ('patientIdNumber', 'accessionNumberHosp', 'patientSystemIdHosp') then 'patientIdNumber'
-         when naaccrId like 'pathOrderPhysLicNo%' and length = 20 then 'physician'
-         when naaccrId like 'pathReportNumber%' and length = 20 then 'pathReportNumber'
-         when naaccrId in ('reportingFacility', 'npiReportingFacility', 'archiveFin', 'npiArchiveFin')
-           or naaccrId like 'pathReportingFacId%'
-           or (naaccrId like '%FacNo%' and length = 25)
-           then 'facility'
-       end phi_id_kind
-from src
-)
-,
-with_scale as (
-select sectionId, section, parentXmlElement, naaccrNum, naaccrId
-     , dataType, length, allowUnlimitedText, source
-     , loinc_num, AnswerListId
-     , case
-       when scale_typ is not null and scale_typ != '-' then scale_typ
-       when allowUnlimitedText then 'Nar'
-       when r_type in ('boolean01', 'boolean12', 'override') then 'Ord'
-       when
-         AnswerListId is not null or
-         scheme is not null or
-         phi_id_kind is not null or
-         naaccrId in ('registryId', 'npiRegistryId', 'vendorName') or
-         naaccrId like 'stateAtDxGeocode%' or
-         (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') or
-         naaccrId like 'csVersion%' or
-         (section like 'Stage%' and sectionId = 11 and length <= 5) or
-         (naaccrId like 'secondaryDiagnosis%' and length = 7) or -- 'ICD10'
-         (naaccrId like 'comorbidComplication%' and length = 5) or -- 'ICD9'
-         (source in ('SEER', 'AJCC', 'NPCR') and length in (5, 13, 15) and dataType is null) or
-         naaccrId in ('tnmPathDescriptor', 'tnmClinDescriptor') or
-         naaccrId like 'subsqRx%RegLnRem' or -- lynpm nodes ISSUE: Nom vs Ord?
-         (naaccrId like 'subsqRx%ScopeLnSu' or naaccrId like 'subsqRx%SurgOth') or -- Surgery
-         (r_type = 'factor' and length <= 5)
-       then 'Nom' -- ISSUE: Nom vs. Ord
-       when
-         (dataType = 'date' and r_type = 'Date')
-         or
-         (r_type in ('integer', 'sentineled_integer', 'sentineled_numeric'))
-       then 'Qn'
-       when
-         naaccrId = 'diagnosticProc7387' or
-         (source in ('SEER', 'AJCC', 'NPCR') and length in (13, 15) and dataType is null)
-       then '?'
-       end scale_typ
-     , r_type, scheme
-     , phi_id_kind
-from with_phi
-)
-, with_valtype as (
-select with_scale.*
-     , case  -- LOINC scale_typ -> i2b2 valtype_cd, identifier flag
-       when naaccrId = 'ageAtDiagnosis' then 'Ni'
-       when
-         (scale_typ = 'Nar' and length >= 10)
-         or
-         (r_type in ('city', 'census_tract', 'census_block', 'county', 'postal'))
-         or
-         (scale_typ = 'Nom' and
-          (length >= 20
-           or
-           (length >= 13 and r_type = 'character')
-           or
-           phi_id_kind is not null))
-       then 'Ti'
-       when scale_typ = 'Nar' and AnswerListId is not null and length <= 2 then '@'
-       when scale_typ = 'Qn' and (
-         naaccrId like '%LabValue'
-         or
-         (dataType = 'digits' and length <= 6)
-       ) then 'N'
-       when dataType = 'date' and scale_typ = 'Qn' and length in (8, 14) then 'D'
-       -- when nom_scheme in ('dateFlag', 'staging') then '@'
-       when scale_typ in ('Nom', 'Ord') and (
-         naaccrId in ('primarySite', 'histologyIcdO2', 'histologicTypeIcdO3', 'behaviorCodeIcdO3') -- lists from WHO
-         or
-         naaccrId in ('registryId', 'npiRegistryId', 'vendorName')
-         or
-         (naaccrId like 'secondaryDiagnosis%' and length = 7) -- 'ICD10'
-         or
-         (naaccrId like 'comorbidComplication%' and length = 5) -- 'ICD9'
-         or
-         naaccrId like 'csVersion%'
-         or
-         (AnswerListId is not null and length <= 5)
-         or
-         (scheme is not null and length <= 5)
-         or
-         length <= 5
-         -- @@ nom_scheme in ('ICD9', 'ICD10', , 'version')
-       ) then '@'
-       when
-         scale_typ = '?'or
-         naaccrId in ('gradeIcdO1', 'siteIcdO1', 'histologyIcdO1',
-                      'crcChecksum', 'unusualFollowUpMethod')
-       then '?'
-       end as valtype_cd
-from with_scale
-)
-select sectionId, section
-     -- , parentXmlElement
-     , naaccrNum, naaccrId
-     -- , dataType
-     , length, source
-     , loinc_num, scale_typ, AnswerListId
-     , scheme -- , r_type
-     , valtype_cd
-     , phi_id_kind
+def tumor_item_type(spark: SparkSession_T, cache: Path_T) -> DataFrame:
+    DataDictionary.make_in(spark, cache)  # ISSUE: DataDictionary is ambiguous
 
-from with_valtype
-where section not like '%Confidential'
-''')
+    NAACCR_R.field_info_in(spark)
+    spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
+    
+    create_object('tumor_item_type',
+                  res.read_text(heron_load, 'naaccr_txform.sql'),
+                  spark)
+    spark.catalog.cacheTable('tumor_item_type')
+    return spark.table('tumor_item_type')
 
 
-_spark.sql('''
+# %% [markdown]
+# #### Any missing?
+
+# %%
+IO_TESTING and _spark.sql('''
 select *
 from tumor_item_type
 where valtype_cd is null or  scale_typ is null
 ''').toPandas().sort_values(['sectionId', 'naaccrNum']).reset_index(drop=True)
 
-# %%
-(_spark.table('tumor_item_type')
- .toPandas()
- .sort_values(['sectionId', 'naaccrNum'])
- .set_index('naaccrNum')
- .to_csv('tumor_item_type.csv')
-)
-
-# %%
-_spark.sql('''
-create table ty2 as select * from tumor_item_type
-''')
-
 # %% [markdown]
-# ### Curate item type rules spreadsheet?
+# #### Ambiguous valtype_cd?
 
 # %%
-_r = _spark.read.csv('heron_load/item_type_rules.csv', inferSchema=True, header=True)
-_r.createOrReplaceTempView('item_type_rules')
-_spark.table('item_type_rules').limit(5).toPandas()
-
-# %%
-ddictDF(_spark).createOrReplaceTempView('ndd180')
-_spark.sql('''
-create or replace temporary view tumor_item_type as
-select rl.section
-     , idef.naaccrNum
-     , idef.naaccrId
-     , idef.dataType
-     , ln.scale_typ
-     , idef.length
-     , ir.valtype_cd
-     , rulenum
-     -- , max(ir.valtype_cd) as valtype_cd
-from ndd180 as idef
-left join loinc_naaccr ln on ln.code_value = idef.naaccrNum
-left join (select item, section from record_layout) rl on rl.item = idef.naaccrNum
-left join item_type_rules ir on
-    (ir.naaccrId is null or ir.naaccrId = idef.naaccrId) and
-    (ir.naaccrId_pat is null or idef.naaccrId like ir.naaccrId_pat) and
-    (ir.dataType is null or ir.dataType = idef.dataType
-     or (ir.dataType = '$NULL' and idef.dataType is null)) and
-    (ir.scale_typ is null or ir.scale_typ = ln.scale_typ
-     or (ir.scale_typ = '$NULL' and ln.scale_typ is null)) and
-    ((ir.section_pat is null and rl.section not like '%Confidential')
-      or rl.section like ir.section_pat) and
-    (ir.length_min is null or idef.length >= ir.length_min) and
-    (ir.length_max is null or idef.length <= ir.length_max)
-/* group by ln.scale_typ
-     , rl.section
-     , idef.dataType
-     , idef.naaccrId
-     , idef.naaccrNum
-     , idef.length */
-order by section, naaccrNum
-''')
-
-_spark.sql('select * from tumor_item_type where valtype_cd is not null order by section, naaccrNum').toPandas()
-
-# %% [markdown]
-# #### Any Items with missing valtype_cd?
-
-# %%
-_spark.sql('''
-select *
-from tumor_item_type
-where valtype_cd is null
-order by section, length desc''').toPandas()
-
-# %% [markdown]
-# #### Ambiguios valtype_cd?
-
-# %%
-_spark.sql('''
-select naaccrId, length, count(distinct valtype_cd), collect_list(valtype_cd), collect_list(rulenum)
+IO_TESTING and _spark.sql('''
+select naaccrId, length, count(distinct valtype_cd), collect_list(valtype_cd)
 from tumor_item_type
 group by naaccrId, length
 having count(distinct valtype_cd) > 1
 ''').toPandas()
 
 # %%
-_spark.sql('''
-select *
-from tumor_item_type
-where naaccrId = 'countyCurrent'
-order by section, length desc''').toPandas()
-
-# %%
-_spark.sql('''
-select *
-from item_type_rules
-where rulenum in (31, 41)
-''').toPandas()
-
-# %%
-_spark.sql('''
-select *
-from tumor_item_type
-where scale_typ is not null and dataType is null and length >= 11
-order by length
-''').toPandas()
-
-# %%
-ddictDF(_spark).createOrReplaceTempView('ndd180')
-_spark.sql('''
-select dataType, length, ln.scale_typ, section
-     , count(*), collect_list(naaccrNum), collect_list(naaccrId)
-from ndd180 idef
-left join loinc_naaccr ln on ln.code_value = idef.naaccrNum
-left join (select item, section from record_layout) rl on rl.item = idef.naaccrNum
-where naaccrNum not in (select naaccrNum from tumor_item_type where valtype_cd is not null)
-group by dataType, length, ln.scale_typ, section
-order by length desc, dataType, ln.scale_typ
-''').toPandas()
-
-# %%
-_spark.sql('''
-select *
-from ndd180 idef
-where length = 5 and dataType = 'digits' -- naaccrName like '%Regional Dose%'
-order by idef.length desc
-''').toPandas()
+if IO_TESTING:
+    (_spark.table('tumor_item_type')
+     .toPandas()
+     .sort_values(['sectionId', 'naaccrNum'])
+     .set_index('naaccrNum')
+     .to_csv('tumor_item_type.csv')
+    )
 
 # %% [markdown]
-# ISSUE
-# phase1DosePerFraction
-# Codes
-# 00000	Radiation therapy was not administered
-# 00001-99997	Record the actual Phase I dose delivered in cGy
-# 99998	Not applicable, brachytherapy or radioisotopes administered to the patient
-# 99999	Regional radiation therapy was administered but dose is unknown, it is unknown whether radiation therapy was administered. Death Certificate only.
-#
+# ### Compare with `tumor_item_type` from heron_load
 
 # %%
-# tumor item type from heron_load
-ty_hl = pd.read_csv('heron_load/tumor_item_type.csv').rename(columns=lambda c: c.lower())
-print(len(ty_hl.drop_duplicates()))
-ty_hl.head()
+# ty_hl = pd.read_csv('heron_load/tumor_item_type.csv').rename(columns=lambda c: c.lower())
+if IO_TESTING:
+    ty_hl = _spark.table('ty1').toPandas()
+    print(len(ty_hl.drop_duplicates()))
+IO_TESTING and ty_hl.head()
 
 # %%
-ty2 = tumor_item_type(_spark, _cwd / 'naaccr_ddict')
-print(ty2.distinct().count())
-ty2.limit(5).toPandas()
+if IO_TESTING:
+    ty2 = tumor_item_type(_spark, _cwd / 'naaccr_ddict')
+    print(ty2.distinct().count())
+IO_TESTING and ty2.limit(5).toPandas()
 
 # %%
-ty_cmp = ty2.toPandas().merge(ty_hl, left_on='ItemNbr', right_on='itemnbr',
-                              how='outer', suffixes=['_18', '_hl'])
-ty_cmp = ty_cmp[['ItemNbr', 'valtype_cd_18', 'valtype_cd_hl', 'itemnbr', 'section', 'xmlId', 'itemname', 'FieldLength']]
-ty_cmp['same'] = ty_cmp.valtype_cd_18.fillna('') == ty_cmp.valtype_cd_hl.fillna('')
-ty_cmp[~ty_cmp.same & ~ty_cmp.valtype_cd_18.isnull() & ~ty_cmp.valtype_cd_hl.isnull()]
+if IO_TESTING:
+    ty_cmp = ty2.toPandas().merge(ty_hl, left_on='ItemNbr', right_on='itemnbr',
+                                  how='outer', suffixes=['_18', '_hl'])
+    ty_cmp = ty_cmp[['ItemNbr', 'valtype_cd_18', 'valtype_cd_hl', 'itemnbr', 'section', 'xmlId', 'itemname', 'FieldLength']]
+    ty_cmp['same'] = ty_cmp.valtype_cd_18.fillna('') == ty_cmp.valtype_cd_hl.fillna('')
+    ty_cmp[~ty_cmp.same & ~ty_cmp.valtype_cd_18.isnull() & ~ty_cmp.valtype_cd_hl.isnull()]
 
 # %%
-ty_cmp[~ty_cmp.valtype_cd_18.isnull() & ty_cmp.valtype_cd_hl.isnull()]
+    ty_cmp[~ty_cmp.valtype_cd_18.isnull() & ty_cmp.valtype_cd_hl.isnull()]
 
 # %%
-ty_cmp[ty_cmp.valtype_cd_18.isnull() & ~ty_cmp.valtype_cd_hl.isnull()]
+    ty_cmp[ty_cmp.valtype_cd_18.isnull() & ~ty_cmp.valtype_cd_hl.isnull()]
 
 # %%
-_hl_missing = ty_cmp[ty_cmp.valtype_cd_18.isnull() & ~ty_cmp.valtype_cd_hl.isnull()].itemname
-print(' or \n'.join(f'"{n}" is not null'
-                    for n in _hl_missing))
+    _hl_missing = ty_cmp[ty_cmp.valtype_cd_18.isnull() & ~ty_cmp.valtype_cd_hl.isnull()].itemname
+    print(' or \n'.join(f'"{n}" is not null'
+                        for n in _hl_missing))
 
 
 # %%
@@ -912,7 +695,7 @@ if IO_TESTING:
 IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
 
 # %%
-_cancer_id.toPandas().describe()
+IO_TESTING and _cancer_id.toPandas().describe()
 
 
 # %% [markdown]
