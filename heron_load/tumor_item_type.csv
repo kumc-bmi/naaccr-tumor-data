@@ -1,518 +1,734 @@
-"SECTIONID","ITEMNBR","ITEMNAME","VALTYPE_CD"
-9,"10","Record Type","@"
-9,"20","Patient ID Number","Ti"
-9,"30","Registry Type","@"
-9,"35","FIN Coding System","@"
-9,"40","Registry ID","Ni"
-9,"50","NAACCR Record Version","@"
-9,"60","Tumor Record Number","@"
-2,"70","Addr at DX--City","Ti"
-2,"80","Addr at DX--State","@"
-2,"90","County at DX","@"
-2,"100","Addr at DX--Postal Code","Ti"
-2,"110","Census Tract 1970/80/90","Ti"
-2,"120","Census Cod Sys 1970/80/90","@"
-2,"130","Census Tract 2000","Ti"
-2,"164","Race 5","@"
-2,"170","Race Coding Sys--Current","@"
-2,"180","Race Coding Sys--Original","@"
-2,"190","Spanish/Hispanic Origin","@"
-2,"200","Computed Ethnicity","@"
-2,"210","Computed Ethnicity Source","@"
-2,"220","Sex","@"
-2,"230","Age at Diagnosis","Ni"
-2,"240","Date of Birth","D"
-2,"150","Marital Status at DX","@"
-2,"160","Race 1","@"
-2,"161","Race 2","@"
-2,"162","Race 3","@"
-2,"163","Race 4","@"
-1,"430","Behavior (92-00) ICD-O-2","@"
-1,"440","Grade","@"
-1,"450","Site Coding Sys--Current","@"
-1,"460","Site Coding Sys--Original","@"
-1,"470","Morph Coding Sys--Current","@"
-1,"480","Morph Coding Sys--Originl","@"
-1,"490","Diagnostic Confirmation","@"
-1,"500","Type of Reporting Source","@"
-1,"521","Morph--Type&Behav ICD-O-3","@"
-1,"522","Histologic Type ICD-O-3","@"
-1,"523","Behavior Code ICD-O-3","@"
-6,"540","Reporting Facility","Ni"
-6,"550","Accession Number--Hosp","Ti"
-6,"560","Sequence Number--Hospital","@"
-6,"570","Abstracted By","@"
-6,"580","Date of 1st Contact","D"
-6,"590","Date of Inpatient Adm","D"
-6,"600","Date of Inpatient Disch","D"
-6,"610","Class of Case","@"
-6,"630","Primary Payer at DX","@"
-6,"670","RX Hosp--Surg Prim Site","@"
-2,"250","Birthplace","@"
-2,"270","Occupation Code--Census","@"
-2,"280","Industry Code--Census","@"
-2,"290","Occupation Source","@"
-2,"300","Industry Source","@"
-2,"310","Text--Usual Occupation","Ti"
-2,"320","Text--Usual Industry","Ti"
-2,"330","Occup/Ind Coding System","@"
-2,"362","Census Block Group 2000","@"
-2,"364","Census Tr Cert 1970/80/90","@"
-2,"365","Census Tr Certainty 2000","@"
-1,"380","Sequence Number--Central","@"
-1,"390","Date of Diagnosis","D"
-1,"400","Primary Site","@"
-1,"410","Laterality","@"
-1,"419","Morph--Type&Behav ICD-O-2","@"
-1,"420","Histology (92-00) ICD-O-2","@"
-6,"710","RX Hosp--Hormone","@"
-6,"720","RX Hosp--BRM","@"
-6,"730","RX Hosp--Other","@"
-6,"740","RX Hosp--DX/Stg Proc","@"
-11,"940","TNM Clin T","@"
-11,"950","TNM Clin N","@"
-11,"960","TNM Clin M","@"
-11,"970","TNM Clin Stage Group","@"
-11,"980","TNM Clin Descriptor","@"
-11,"990","TNM Clin Staged By","@"
-11,"1060","TNM Edition Number","@"
-11,"1120","Pediatric Stage","@"
-11,"1130","Pediatric Staging System","@"
-11,"1140","Pediatric Staged By","@"
-11,"1150","Tumor Marker 1","@"
-11,"1160","Tumor Marker 2","@"
-11,"1170","Tumor Marker 3","@"
-15,"1200","RX Date--Surgery","D"
-11,"759","SEER Summary Stage 2000","@"
-11,"760","SEER Summary Stage 1977","@"
-11,"779","Extent of Disease 10-Dig","Ti"
-11,"780","EOD--Tumor Size","N"
-11,"790","EOD--Extension","@"
-11,"800","EOD--Extension Prost Path","@"
-11,"810","EOD--Lymph Node Involv","@"
-11,"820","Regional Nodes Positive","@"
-11,"830","Regional Nodes Examined","@"
-11,"840","EOD--Old 13 Digit","Ti"
-11,"850","EOD--Old 2 Digit","@"
-11,"860","EOD--Old 4 Digit","@"
-11,"870","Coding System for EOD","@"
-11,"880","TNM Path T","@"
-11,"890","TNM Path N","@"
-11,"900","TNM Path M","@"
-11,"910","TNM Path Stage Group","@"
-11,"920","TNM Path Descriptor","@"
-11,"930","TNM Path Staged By","@"
-6,"672","RX Hosp--Scope Reg LN Sur","@"
-6,"674","RX Hosp--Surg Oth Reg/Dis","@"
-6,"676","RX Hosp--Reg LN Removed","@"
-6,"690","RX Hosp--Radiation","@"
-6,"700","RX Hosp--Chemo","@"
-16,"1660","Subsq RX 2nd Course Date","D"
-16,"1670","Subsq RX 2nd Course Codes","Ti"
-16,"1671","Subsq RX 2nd Course Surg","@"
-16,"1672","Subsq RX 2nd Course Rad","@"
-16,"1673","Subsq RX 2nd Course Chemo","@"
-16,"1674","Subsq RX 2nd Course Horm","@"
-16,"1675","Subsq RX 2nd Course BRM","@"
-16,"1676","Subsq RX 2nd Course Oth","@"
-16,"1677","Subsq RX 2nd--Scope LN SU","@"
-16,"1678","Subsq RX 2nd--Surg Oth","@"
-16,"1679","Subsq RX 2nd--Reg LN Rem","@"
-16,"1680","Subsq RX 3rd Course Date","D"
-16,"1690","Subsq RX 3rd Course Codes","Ti"
-16,"1691","Subsq RX 3rd Course Surg","@"
-16,"1692","Subsq RX 3rd Course Rad","@"
-16,"1693","Subsq RX 3rd Course Chemo","@"
-16,"1694","Subsq RX 3rd Course Horm","@"
-16,"1695","Subsq RX 3rd Course BRM","@"
-16,"1696","Subsq RX 3rd Course Oth","@"
-16,"1697","Subsq RX 3rd--Scope LN Su","@"
-16,"1698","Subsq RX 3rd--Surg Oth","@"
-16,"1699","Subsq RX 3rd--Reg LN Rem","@"
-16,"1700","Subsq RX 4th Course Date","D"
-16,"1710","Subsq RX 4th Course Codes","Ti"
-16,"1711","Subsq RX 4th Course Surg","@"
-16,"1712","Subsq RX 4th Course Rad","@"
-16,"1713","Subsq RX 4th Course Chemo","@"
-16,"1714","Subsq RX 4th Course Horm","@"
-16,"1715","Subsq RX 4th Course BRM","@"
-16,"1716","Subsq RX 4th Course Oth","@"
-16,"1717","Subsq RX 4th--Scope LN Su","@"
-16,"1718","Subsq RX 4th--Surg Oth","@"
-16,"1719","Subsq RX 4th--Reg LN Rem","@"
-16,"1741","Subsq RX--Reconstruct Del","@"
-4,"1750","Date of Last Contact","D"
-4,"1760","Vital Status","@"
-4,"1770","Cancer Status","@"
-4,"1780","Quality of Survival","@"
-4,"1790","Follow-Up Source","@"
-4,"1800","Next Follow-Up Source","@"
-4,"1810","Addr Current--City","Ti"
-4,"1820","Addr Current--State","@"
-15,"1210","RX Date--Radiation","D"
-15,"1220","RX Date--Chemo","D"
-15,"1230","RX Date--Hormone","D"
-15,"1240","RX Date--BRM","D"
-15,"1250","RX Date--Other","D"
-15,"1260","Date of Initial RX--SEER","D"
-15,"1270","Date of 1st Crs RX--CoC","D"
-15,"1280","RX Date--DX/Stg Proc","D"
-15,"1290","RX Summ--Surg Prim Site","@"
-15,"1292","RX Summ--Scope Reg LN Sur","@"
-15,"1294","RX Summ--Surg Oth Reg/Dis","@"
-15,"1296","RX Summ--Reg LN Examined","@"
-15,"1310","RX Summ--Surgical Approch","@"
-15,"1320","RX Summ--Surgical Margins","@"
-15,"1330","RX Summ--Reconstruct 1st","@"
-15,"1340","Reason for No Surgery","@"
-15,"1350","RX Summ--DX/Stg Proc","@"
-15,"1360","RX Summ--Radiation","@"
-15,"1370","RX Summ--Rad to CNS","@"
-15,"1380","RX Summ--Surg/Rad Seq","@"
-15,"1390","RX Summ--Chemo","@"
-15,"1400","RX Summ--Hormone","@"
-15,"1410","RX Summ--BRM","@"
-15,"1420","RX Summ--Other","@"
-15,"1430","Reason for No Radiation","@"
-15,"1460","RX Coding System--Current","@"
-15,"1500","First Course Calc Method","@"
-15,"1510","Rad--Regional Dose: CGY","N"
-15,"1520","Rad--No of Treatment Vol","@"
-15,"1540","Rad--Treatment Volume","@"
-15,"1550","Rad--Location of RX","@"
-15,"1570","Rad--Regional RX Modality","@"
-15,"1640","RX Summ--Surgery Type","@"
-4,"1880","Recurrence Type--1st","@"
-4,"1910","Cause of Death","@"
-4,"1920","ICD Revision Number","@"
-4,"1930","Autopsy","@"
-4,"1940","Place of Death","@"
-3,"1960","Site (73-91) ICD-O-1","@"
-3,"1970","Morph (73-91) ICD-O-1","@"
-3,"1971","Histology (73-91) ICD-O-1","@"
-3,"1972","Behavior (73-91) ICD-O-1","@"
-3,"1973","Grade (73-91) ICD-O-1","@"
-3,"1980","ICD-O-2 Conversion Flag","@"
-3,"1981","Over-ride SS/NodesPos","@"
-3,"1989","Over-ride Site/TNM-StgGrp","@"
-3,"1990","Over-ride Age/Site/Morph","@"
-3,"2000","Over-ride SeqNo/DxConf","@"
-3,"2010","Over-ride Site/Lat/SeqNo","@"
-3,"2020","Over-ride Surg/DxConf","@"
-3,"1982","Over-ride SS/TNM-N","@"
-3,"1983","Over-ride SS/TNM-M","@"
-3,"1985","Over-ride Acsn/Class/Seq","@"
-3,"1986","Over-ride HospSeq/DxConf","@"
-3,"1987","Over-ride CoC-Site/Type","@"
-3,"1988","Over-ride HospSeq/Site","@"
-4,"1830","Addr Current--Postal Code","Ti"
-4,"1840","County--Current","@"
-4,"1842","Follow-Up Contact--City","Ti"
-4,"1844","Follow-Up Contact--State","@"
-4,"1846","Follow-Up Contact--Postal","Ti"
-4,"1850","Unusual Follow-Up Method","@"
-4,"1860","Recurrence Date--1st","D"
-8,"2330","Addr at DX--No & Street","Ti"
-8,"2335","Addr at DX--Supplementl","Ti"
-8,"2350","Addr Current--No & Street","Ti"
-8,"2352","Latitude","Ni"
-8,"2354","Longitude","Ni"
-8,"2355","Addr Current--Supplementl","Ti"
-8,"2360","Telephone","Ti"
-8,"2380","DC State File Number","Ti"
-8,"2390","Name--Maiden","Ti"
-3,"2030","Over-ride Site/Type","@"
-3,"2050","Over-ride Report Source","@"
-3,"2060","Over-ride Ill-define Site","@"
-3,"2070","Over-ride Leuk, Lymphoma","@"
-3,"2071","Over-ride Site/Behavior","@"
-3,"2072","Over-ride Site/EOD/DX Dt","@"
-3,"2073","Over-ride Site/Lat/EOD","@"
-3,"2074","Over-ride Site/Lat/Morph","@"
-3,"2081","CRC CHECKSUM","Ti"
-3,"2090","Date Case Completed","D"
-3,"2100","Date Case Last Changed","D"
-3,"2110","Date Case Report Exported","D"
-3,"2111","Date Case Report Received","D"
-3,"2112","Date Case Report Loaded","D"
-3,"2113","Date Tumor Record Availbl","D"
-3,"2116","ICD-O-3 Conversion Flag","@"
-3,"2120","SEER Coding Sys--Current","@"
-3,"2130","SEER Coding Sys--Original","@"
-3,"2140","CoC Coding Sys--Current","@"
-3,"2150","CoC Coding Sys--Original","@"
-3,"2170","Vendor Name","Ti"
-3,"2180","SEER Type of Follow-Up","@"
-3,"2190","SEER Record Number","@"
-3,"2200","Diagnostic Proc 73-87","@"
-10,"2220","State/Requestor Items","Ti"
-8,"2230","Name--Last","Ti"
-8,"2240","Name--First","Ti"
-8,"2250","Name--Middle","Ti"
-8,"2260","Name--Prefix","@"
-8,"2270","Name--Suffix","@"
-8,"2280","Name--Alias","Ti"
-8,"2290","Name--Spouse/Parent","Ti"
-8,"2300","Medical Record Number","Ti"
-8,"2310","Military Record No Suffix","@"
-8,"2320","Social Security Number","Ti"
-5,"2440","Following Registry","Ni"
-7,"2460","Physician--Managing","Ti"
-7,"2470","Physician--Follow-Up","Ti"
-7,"2480","Physician--Primary Surg","Ti"
-7,"2490","Physician 3","Ti"
-7,"2500","Physician 4","Ti"
-12,"2520","Text--DX Proc--PE","Ti"
-12,"2530","Text--DX Proc--X-ray/Scan","Ti"
-12,"2540","Text--DX Proc--Scopes","Ti"
-12,"2550","Text--DX Proc--Lab Tests","Ti"
-12,"2560","Text--DX Proc--Op","Ti"
-12,"2570","Text--DX Proc--Path","Ti"
-12,"2580","Text--Primary Site Title","Ti"
-12,"2590","Text--Histology Title","Ti"
-12,"2600","Text--Staging","Ti"
-14,"2610","RX Text--Surgery","Ti"
-14,"2620","RX Text--Radiation (Beam)","Ti"
-8,"2392","Follow-Up Contact--No&St","Ti"
-8,"2393","Follow-Up Contact--Suppl","Ti"
-8,"2394","Follow-Up Contact--Name","Ti"
-5,"2410","Institution Referred From","Ni"
-5,"2420","Institution Referred To","Ni"
-14,"2630","RX Text--Radiation Other","Ti"
-14,"2640","RX Text--Chemo","Ti"
-14,"2650","RX Text--Hormone","Ti"
-14,"2660","RX Text--BRM","Ti"
-14,"2670","RX Text--Other","Ti"
-13,"2680","Text--Remarks","Ti"
-13,"2690","Text--Place of Diagnosis","Ti"
-11,"2800","CS Tumor Size","N"
-11,"2810","CS Extension","@"
-11,"2820","CS Tumor Size/Ext Eval","N"
-11,"2830","CS Lymph Nodes","@"
-11,"2840","CS Lymph Nodes Eval","@"
-11,"2850","CS Mets at DX","@"
-11,"2860","CS Mets Eval","@"
-11,"2880","CS Site-Specific Factor 1","@"
-11,"2890","CS Site-Specific Factor 2","@"
-11,"2900","CS Site-Specific Factor 3","@"
-11,"2910","CS Site-Specific Factor 4","@"
-11,"2920","CS Site-Specific Factor 5","@"
-11,"2930","CS Site-Specific Factor 6","@"
-11,"2940","Derived AJCC-6 T","@"
-11,"2950","Derived AJCC-6 T Descript","@"
-11,"2960","Derived AJCC-6 N","@"
-11,"2970","Derived AJCC-6 N Descript","@"
-11,"2980","Derived AJCC-6 M","@"
-11,"2990","Derived AJCC-6 M Descript","@"
-11,"3000","Derived AJCC-6 Stage Grp","@"
-11,"3010","Derived SS1977","@"
-11,"3020","Derived SS2000","@"
-11,"3030","Derived AJCC--Flag","@"
-11,"3040","Derived SS1977--Flag","@"
-11,"3050","Derived SS2000--Flag","@"
-6,"3100","Archive FIN","Ni"
-11,"3110","Comorbid/Complication 1","@"
-11,"3120","Comorbid/Complication 2","@"
-15,"3180","RX Date--Surgical Disch","D"
-15,"3190","Readm Same Hosp 30 Days","@"
-15,"3200","Rad--Boost RX Modality","@"
-15,"3210","Rad--Boost Dose cGy","@"
-15,"3220","RX Date--Radiation Ended","D"
-15,"3230","RX Date--Systemic","D"
-15,"3250","RX Summ--Transplnt/Endocr","@"
-15,"3270","RX Summ--Palliative Proc","@"
-6,"3280","RX Hosp--Palliative Proc","@"
-11,"3165","ICD Revision Comorbid","@"
-11,"3161","Comorbid/Complication 7","@"
-11,"3162","Comorbid/Complication 8","@"
-11,"3163","Comorbid/Complication 9","@"
-11,"3164","Comorbid/Complication 10","@"
-9,"21","Patient System ID-Hosp","Ni"
-15,"1639","RX Summ--Systemic/Sur Seq","@"
-1,"444","Mult Tum Rpt as One Prim","@"
-1,"445","Date of Multiple Tumors","D"
-1,"446","Multiplicity Counter","@"
-2,"3300","RuralUrban Continuum 1993","@"
-2,"3310","RuralUrban Continuum 2003","@"
-6,"747","RX Hosp--Scope Reg 98-02","@"
-6,"748","RX Hosp--Surg Oth 98-02","@"
-6,"746","RX Hosp--Surg Site 98-02","@"
-15,"1647","RX Summ--Scope Reg 98-02","@"
-15,"1648","RX Summ--Surg Oth 98-02","@"
-15,"1646","RX Summ--Surg Site 98-02","@"
-11,"2935","CS Version Input Original","Ti"
-11,"2936","CS Version Derived","Ti"
-2,"191","NHIA Derived Hisp Origin","@"
-1,"501","Casefinding Source","@"
-4,"1791","Follow-up Source Central","@"
-2,"366","GIS Coordinate Quality","@"
-11,"3130","Comorbid/Complication 3","@"
-11,"3140","Comorbid/Complication 4","@"
-11,"3150","Comorbid/Complication 5","@"
-11,"3160","Comorbid/Complication 6","@"
-15,"3170","RX Date--Most Defin Surg","D"
-11,"2740","CS PreRx Tum Sz/Ext Eval","@"
-11,"2755","CS PreRx Reg Nodes Eval","@"
-11,"2765","CS PreRx Mets Eval","@"
-11,"2861","CS Site-Specific Factor 7","@"
-11,"2862","CS Site-Specific Factor 8","@"
-11,"2863","CS Site-Specific Factor 9","@"
-11,"2864","CS Site-Specific Factor10","@"
-11,"2865","CS Site-Specific Factor11","@"
-11,"2866","CS Site-Specific Factor12","@"
-11,"2867","CS Site-Specific Factor13","@"
-11,"2868","CS Site-Specific Factor14","@"
-11,"2869","CS Site-Specific Factor15","@"
-11,"2937","CS Version Input Current","Ti"
-3,"2092","Date Case Completed--CoC","D"
-3,"2085","Date Case Initiated","D"
-1,"448","Date Conclusive DX Flag","@"
-6,"581","Date of 1st Contact Flag","@"
-15,"1271","Date of 1st Crs Rx Flag","@"
-2,"241","Date of Birth Flag","@"
-4,"1756","Date of Death--CanadaFlag","@"
-1,"391","Date of Diagnosis Flag","@"
-15,"1261","Date of Initial RX Flag","@"
-6,"591","Date of Inpt Adm Flag","@"
-6,"601","Date of Inpt Disch Flag","@"
-4,"1751","Date of Last Contact Flag","@"
-1,"439","Date of Mult Tumors Flag","@"
-11,"3600","Derived Neoadjuv Rx Flag","@"
-1,"449","Grade Path System","@"
-1,"441","Grade Path Value","@"
-6,"605","Inpatient Status","@"
-11,"1182","Lymph-vascular Invasion","@"
-17,"7100","Path Order Phys Lic No 1","Ti"
-17,"7101","Path Order Phys Lic No 2","Ti"
-17,"7102","Path Order Phys Lic No 3","Ti"
-1,"442","Ambiguous Terminology DX","@"
-1,"443","Date of Conclusive DX","D"
-2,"192","IHS Link","@"
-9,"45","NPI--Registry ID","Ti"
-6,"545","NPI--Reporting Facility","Ni"
-5,"2415","NPI--Inst Referred From","Ni"
-5,"2425","NPI--Inst Referred To","Ni"
-5,"2445","NPI--Following Registry","Ni"
-6,"3105","NPI--Archive FIN","Ni"
-7,"2465","NPI--Physician--Managing","Ni"
-7,"2475","NPI--Physician--Follow-Up","Ni"
-7,"2485","NPI--Physician--Primary Surg","Ni"
-7,"2495","NPI--Physician 3","Ni"
-7,"2505","NPI--Physician 4","Ni"
-2,"368","CensusBlockGroup 70/80/90","@"
-4,"1755","Date of Death--Canada","D"
-2,"193","Race--NAPIIA(derived API)","@"
-11,"2851","CS Mets at Dx-Bone","@"
-11,"2852","CS Mets at Dx-Brain","@"
-11,"2853","CS Mets at Dx-Liver","@"
-11,"2854","CS Mets at Dx-Lung","@"
-11,"2775","CS PostRx Extension","@"
-11,"2780","CS PostRx Lymph Nodes","@"
-11,"2785","CS PostRx Mets at DX","@"
-11,"2770","CS PostRx Tumor Size","N"
-11,"2735","CS PreRx Extension","@"
-11,"2750","CS PreRx Lymph Nodes","@"
-11,"2760","CS PreRx Mets at DX","@"
-11,"2730","CS PreRx Tumor Size","N"
-17,"7194","Path Ordering Fac No 5","Ti"
-17,"7090","Path Report Number 1","Ti"
-17,"7091","Path Report Number 2","Ti"
-17,"7092","Path Report Number 3","Ti"
-17,"7093","Path Report Number 4","Ti"
-17,"7094","Path Report Number 5","Ti"
-17,"7320","Path Date Spec Collect 1","Ti"
-17,"7321","Path Date Spec Collect 2","Ti"
-17,"7322","Path Date Spec Collect 3","Ti"
-11,"3700","SEER Site-Specific Fact 1","@"
-11,"3702","SEER Site-Specific Fact 2","@"
-11,"3704","SEER Site-Specific Fact 3","@"
-11,"3706","SEER Site-Specific Fact 4","@"
-11,"3708","SEER Site-Specific Fact 5","@"
-11,"3710","SEER Site-Specific Fact 6","@"
-16,"1661","Subsq RX 2ndCrs Date Flag","@"
-16,"1681","Subsq RX 3rdCrs Date Flag","@"
-16,"1701","Subsq RX 4thCrs Date Flag","@"
-11,"3420","Derived AJCC-7 M","@"
-11,"3422","Derived AJCC-7 M Descript","@"
-11,"3410","Derived AJCC-7 N","@"
-11,"3412","Derived AJCC-7 N Descript","@"
-11,"3430","Derived AJCC-7 Stage Grp","@"
-11,"3400","Derived AJCC-7 T","@"
-11,"3402","Derived AJCC-7 T Descript","@"
-11,"3480","Derived PostRx-7 T","@"
-11,"3482","Derived PostRx-7 N","@"
-17,"7323","Path Date Spec Collect 4","Ti"
-17,"7324","Path Date Spec Collect 5","Ti"
-17,"7480","Path Report Type 1","@"
-17,"7481","Path Report Type 2","@"
-17,"7482","Path Report Type 3","@"
-17,"7483","Path Report Type 4","@"
-17,"7484","Path Report Type 5","@"
-17,"7010","Path Reporting Fac ID 1","Ti"
-17,"7011","Path Reporting Fac ID 2","Ti"
-17,"7012","Path Reporting Fac ID 3","Ti"
-17,"7013","Path Reporting Fac ID 4","Ti"
-17,"7014","Path Reporting Fac ID 5","Ti"
-4,"1861","Recurrence Date--1st Flag","@"
-15,"1251","RX Date--Other Flag","@"
-15,"3171","RX Date Mst Defn Srg Flag","@"
-15,"1241","RX Date--BRM Flag","@"
-15,"1221","RX Date--Chemo Flag","@"
-15,"1281","RX Date--Dx/Stg Proc Flag","@"
-15,"3221","RX Date Rad Ended Flag","@"
-15,"3181","RX Date Surg Disch Flag","@"
-15,"3231","RX Date Systemic Flag","@"
-15,"1231","RX Date--Hormone Flag","@"
-15,"1211","RX Date--Radiation Flag","@"
-15,"1201","RX Date--Surgery Flag","@"
-6,"668","RX Hosp--Surg App 2010","@"
-15,"1285","RX Summ--Treatment Status","@"
-17,"7103","Path Order Phys Lic No 4","Ti"
-17,"7104","Path Order Phys Lic No 5","Ti"
-17,"7190","Path Ordering Fac No 1","Ti"
-17,"7191","Path Ordering Fac No 2","Ti"
-17,"7192","Path Ordering Fac No 3","Ti"
-17,"7193","Path Ordering Fac No 4","Ti"
-2,"135","Census Tract 2010","Ti"
-2,"363","Census Block Group 2010","@"
-2,"367","Census Tr Certainty 2010","@"
-3,"3750","Over-ride CS 1","@"
-3,"3751","Over-ride CS 2","@"
-3,"3752","Over-ride CS 3","@"
-3,"3753","Over-ride CS 4","@"
-3,"3754","Over-ride CS 5","@"
-3,"3755","Over-ride CS 6","@"
-3,"3756","Over-ride CS 7","@"
-3,"3757","Over-ride CS 8","@"
-3,"3758","Over-ride CS 9","@"
-3,"3759","Over-ride CS 10","@"
-3,"3760","Over-ride CS 11","@"
-3,"3761","Over-ride CS 12","@"
-3,"3762","Over-ride CS 13","@"
-3,"3763","Over-ride CS 14","@"
-3,"3764","Over-ride CS 15","@"
-3,"3765","Over-ride CS 16","@"
-3,"3766","Over-ride CS 17","@"
-3,"3767","Over-ride CS 18","@"
-3,"3768","Over-ride CS 19","@"
-3,"3769","Over-ride CS 20","@"
-11,"3490","Derived PostRx-7 M","@"
-11,"3492","Derived PostRx-7 Stge Grp","@"
-11,"3460","Derived PreRx-7 M","@"
-3,"2040","Over-ride Histology","@"
-11,"3462","Derived PreRx-7 M Descrip","@"
-11,"3450","Derived PreRx-7 N","@"
-11,"3452","Derived PreRx-7 N Descrip","@"
-11,"2870","CS Site-Specific Factor16","@"
-11,"3470","Derived PreRx-7 Stage Grp","@"
-11,"3440","Derived PreRx-7 T","@"
-11,"3442","Derived PreRx-7 T Descrip","@"
-11,"2871","CS Site-Specific Factor17","@"
-11,"2872","CS Site-Specific Factor18","@"
-11,"2873","CS Site-Specific Factor19","@"
-11,"2874","CS Site-Specific Factor20","@"
-11,"2875","CS Site-Specific Factor21","@"
-11,"2876","CS Site-Specific Factor22","@"
-11,"2877","CS Site-Specific Factor23","@"
-11,"2878","CS Site-Specific Factor24","@"
-11,"2879","CS Site-Specific Factor25","@"
+naaccrNum,sectionId,section,parentXmlElement,naaccrId,length,source,AnswerListId,scale_typ,valtype_cd,nom_scheme
+380,1,Cancer Identification,Tumor,sequenceNumberCentral,2,SEER,LL210-6,Ord,@,LL210-6
+390,1,Cancer Identification,Tumor,dateOfDiagnosis,8,SEER/CoC,,Qn,D,
+391,1,Cancer Identification,Tumor,dateOfDiagnosisFlag,2,NAACCR,LL929-1,Nom,@,dateFlag
+400,1,Cancer Identification,Tumor,primarySite,4,SEER/CoC,,Nom,@,primarySite
+410,1,Cancer Identification,Tumor,laterality,1,SEER/CoC,,Nom,@,laterality
+420,1,Cancer Identification,Tumor,histologyIcdO2,4,SEER/CoC,,Nom,@,histologyIcdO2
+430,1,Cancer Identification,Tumor,behaviorIcdO2,1,SEER/CoC,LL212-2,Nom,@,LL212-2
+439,1,Cancer Identification,Tumor,dateOfMultTumorsFlag,2,NAACCR,LL930-9,-,@,dateFlag
+440,1,Cancer Identification,Tumor,grade,1,SEER/CoC,LL213-0,Nom,@,LL213-0
+441,1,Cancer Identification,Tumor,gradePathValue,1,AJCC,LL931-7,Nom,@,LL931-7
+442,1,Cancer Identification,Tumor,ambiguousTerminologyDx,1,SEER,,Nom,@,ambiguousTerminologyDx
+443,1,Cancer Identification,Tumor,dateConclusiveDx,8,SEER,,Qn,D,
+444,1,Cancer Identification,Tumor,multTumRptAsOnePrim,2,SEER,,Nom,@,multTumRptAsOnePrim
+445,1,Cancer Identification,Tumor,dateOfMultTumors,8,SEER,,Qn,D,
+446,1,Cancer Identification,Tumor,multiplicityCounter,2,SEER,,Qn,N,
+448,1,Cancer Identification,Tumor,dateConclusiveDxFlag,2,NAACCR,LL932-5,Nom,@,dateFlag
+449,1,Cancer Identification,Tumor,gradePathSystem,1,AJCC,LL933-3,Nom,@,LL933-3
+450,1,Cancer Identification,Tumor,siteCodingSysCurrent,1,NAACCR,LL214-8,Nom,@,LL214-8
+460,1,Cancer Identification,Tumor,siteCodingSysOriginal,1,NAACCR,LL214-8,Nom,@,LL214-8
+470,1,Cancer Identification,Tumor,morphCodingSysCurrent,1,NAACCR,LL216-3,Nom,@,LL216-3
+480,1,Cancer Identification,Tumor,morphCodingSysOriginl,1,NAACCR,LL216-3,Nom,@,LL216-3
+490,1,Cancer Identification,Tumor,diagnosticConfirmation,1,SEER/CoC,LL218-9,Nom,@,LL218-9
+500,1,Cancer Identification,Tumor,typeOfReportingSource,1,SEER,LL220-5,Nom,@,LL220-5
+501,1,Cancer Identification,Tumor,casefindingSource,2,NAACCR,,Nom,@,casefindingSource
+522,1,Cancer Identification,Tumor,histologicTypeIcdO3,4,SEER/CoC,,Nom,@,histologicTypeIcdO3
+523,1,Cancer Identification,Tumor,behaviorCodeIcdO3,1,SEER/CoC,,Nom,@,
+70,2,Demographic,Tumor,addrAtDxCity,50,CoC,,Nom,Ti,geo
+80,2,Demographic,Tumor,addrAtDxState,2,CoC,,Nom,@,addrAtDxState
+81,2,Demographic,Tumor,stateAtDxGeocode19708090,2,NAACCR,,Nom,@,state
+82,2,Demographic,Tumor,stateAtDxGeocode2000,2,NAACCR,,Nom,@,state
+83,2,Demographic,Tumor,stateAtDxGeocode2010,2,NAACCR,,Nom,@,state
+84,2,Demographic,Tumor,stateAtDxGeocode2020,2,NAACCR,,Nom,@,state
+89,2,Demographic,Tumor,countyAtDxAnalysis,3,NAACCR,,Nom,Ti,geo
+90,2,Demographic,Tumor,countyAtDx,3,FIPS/SEER,,Nom,Ti,geo
+94,2,Demographic,Tumor,countyAtDxGeocode1990,3,NAACCR,,Nom,Ti,geo
+95,2,Demographic,Tumor,countyAtDxGeocode2000,3,NAACCR,,Nom,Ti,geo
+96,2,Demographic,Tumor,countyAtDxGeocode2010,3,NAACCR,,Nom,Ti,geo
+97,2,Demographic,Tumor,countyAtDxGeocode2020,3,NAACCR,,Nom,Ti,geo
+100,2,Demographic,Tumor,addrAtDxPostalCode,9,CoC,,Nom,Ti,geo
+102,2,Demographic,Tumor,addrAtDxCountry,3,NAACCR,,Nom,@,addrAtDxCountry
+110,2,Demographic,Tumor,censusTract19708090,6,SEER,,Nom,Ti,geo
+120,2,Demographic,Tumor,censusCodSys19708090,1,SEER,LL71-2,Nom,@,LL71-2
+125,2,Demographic,Tumor,censusTract2020,6,NAACCR,,Nom,Ti,geo
+130,2,Demographic,Tumor,censusTract2000,6,NAACCR,LL85-2,Nom,Ti,geo
+135,2,Demographic,Tumor,censusTract2010,6,NAACCR,,Nom,Ti,geo
+145,2,Demographic,Tumor,censusTrPovertyIndictr,1,NAACCR,,Nom,@,censusTrPovertyIndictr
+150,2,Demographic,Tumor,maritalStatusAtDx,1,SEER,,Nom,@,maritalStatusAtDx
+160,2,Demographic,Patient,race1,2,SEER/CoC,,Nom,@,race1
+161,2,Demographic,Patient,race2,2,SEER/CoC,,Nom,@,race2
+162,2,Demographic,Patient,race3,2,SEER/CoC,,Nom,@,race3
+163,2,Demographic,Patient,race4,2,SEER/CoC,,Nom,@,race4
+164,2,Demographic,Patient,race5,2,SEER/CoC,,Nom,@,race5
+170,2,Demographic,Patient,raceCodingSysCurrent,1,NAACCR,LL127-2,Nom,@,LL127-2
+180,2,Demographic,Patient,raceCodingSysOriginal,1,NAACCR,LL127-2,Nom,@,LL127-2
+190,2,Demographic,Patient,spanishHispanicOrigin,1,SEER/CoC,LL146-2,Nom,@,LL146-2
+191,2,Demographic,Patient,nhiaDerivedHispOrigin,1,NAACCR,,Nom,@,nhiaDerivedHispOrigin
+192,2,Demographic,Patient,ihsLink,1,NPCR,,Nom,@,boolean01
+193,2,Demographic,Patient,raceNapiia,2,NAACCR,LL613-1,Nom,@,LL613-1
+200,2,Demographic,Patient,computedEthnicity,1,SEER,LL162-9,Nom,@,LL162-9
+210,2,Demographic,Patient,computedEthnicitySource,1,SEER,LL175-1,Nom,@,LL175-1
+220,2,Demographic,Patient,sex,1,SEER/CoC,LL183-5,Nom,@,LL183-5
+230,2,Demographic,Tumor,ageAtDiagnosis,3,SEER/CoC,LL184-3,Qn,Ni,LL184-3
+240,2,Demographic,Patient,dateOfBirth,8,SEER/CoC,,Qn,D,
+241,2,Demographic,Patient,dateOfBirthFlag,2,NAACCR,LL923-4,Nom,@,dateFlag
+250,2,Demographic,Patient,birthplace,3,SEER/CoC,LL197-5,Nom,@,LL197-5
+252,2,Demographic,Patient,birthplaceState,2,NAACCR,,Nom,@,birthplaceState
+254,2,Demographic,Patient,birthplaceCountry,3,NAACCR,,Nom,@,birthplaceCountry
+270,2,Demographic,Tumor,censusOccCode19702000,3,Census/NPCR,LL3926-4,Nom,@,LL3926-4
+272,2,Demographic,Tumor,censusIndCode2010,4,Census/NPCR,,Nom,@,censusIndCode2010
+280,2,Demographic,Tumor,censusIndCode19702000,3,Census/NPCR,LL3925-6,Nom,@,LL3925-6
+282,2,Demographic,Tumor,censusOccCode2010,4,Census/NPCR,,Nom,@,censusOccCode2010
+290,2,Demographic,Tumor,occupationSource,1,NPCR,LL200-7,Nom,@,LL200-7
+300,2,Demographic,Tumor,industrySource,1,NPCR,LL202-3,Nom,@,LL202-3
+310,2,Demographic,Tumor,textUsualOccupation,100,NPCR,,Nar,Ti,
+320,2,Demographic,Tumor,textUsualIndustry,100,NPCR,,Nar,Ti,
+330,2,Demographic,Tumor,censusOccIndSys7000,1,NPCR,LL203-1,Nom,@,LL203-1
+339,2,Demographic,Tumor,ruca2000,1,NAACCR,,Nom,@,ruca2000
+341,2,Demographic,Tumor,ruca2010,1,NAACCR,,Nom,@,ruca2010
+345,2,Demographic,Tumor,uric2000,1,NAACCR,,Nom,@,uric2000
+346,2,Demographic,Tumor,uric2010,1,NAACCR,,Nom,@,uric2010
+361,2,Demographic,Tumor,censusBlockGroup2020,1,Census,,Nom,Ti,geo
+362,2,Demographic,Tumor,censusBlockGroup2000,1,Census,,Nom,Ti,geo
+363,2,Demographic,Tumor,censusBlockGroup2010,1,Census,,Nom,Ti,geo
+364,2,Demographic,Tumor,censusTrCert19708090,1,SEER,LL209-8,Nom,@,LL209-8
+365,2,Demographic,Tumor,censusTrCertainty2000,1,NAACCR,,Nom,@,censusTrCertainty2000
+366,2,Demographic,Tumor,gisCoordinateQuality,2,NAACCR,,Nom,@,gisCoordinateQuality
+367,2,Demographic,Tumor,censusTrCertainty2010,1,NAACCR,,Nom,@,censusTrCertainty2010
+368,2,Demographic,Tumor,censusBlockGrp197090,1,Census,,Nom,Ti,geo
+369,2,Demographic,Tumor,censusTractCertainty2020,1,NAACCR,,Nom,@,censusTractCertainty2020
+1832,2,Demographic,Patient,addrCurrentCountry,3,NAACCR,,Nom,@,addrCurrentCountry
+1847,2,Demographic,Tumor,followupContactCountry,3,NAACCR,,Nom,@,followupContactCountry
+1942,2,Demographic,Patient,placeOfDeathState,2,NAACCR,,Nom,@,placeOfDeathState
+1944,2,Demographic,Patient,placeOfDeathCountry,3,NAACCR,,Nom,@,placeOfDeathCountry
+3300,2,Demographic,Tumor,ruralurbanContinuum1993,2,NAACCR,LL204-9,Ord,@,LL204-9
+3310,2,Demographic,Tumor,ruralurbanContinuum2003,2,NAACCR,,Ord,@,ruralurbanContinuum2003
+3312,2,Demographic,Tumor,ruralurbanContinuum2013,2,NAACCR,,Nom,@,ruralurbanContinuum2013
+1960,3,Edit Overrides/Conversion History/System Admin,Tumor,siteIcdO1,4,SEER,,Nom,@,
+1971,3,Edit Overrides/Conversion History/System Admin,Tumor,histologyIcdO1,4,SEER,,Nom,@,
+1972,3,Edit Overrides/Conversion History/System Admin,Tumor,behaviorIcdO1,1,SEER,,Nom,@,
+1973,3,Edit Overrides/Conversion History/System Admin,Tumor,gradeIcdO1,1,SEER,,Nom,@,?
+1980,3,Edit Overrides/Conversion History/System Admin,Tumor,icdO2ConversionFlag,1,SEER,LL151-2,Nom,@,LL151-2
+1981,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSsNodespos,1,NAACCR,LL152-0,Ord,@,LL152-0
+1982,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSsTnmN,1,NAACCR,LL152-0,Ord,@,LL152-0
+1983,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSsTnmM,1,NAACCR,LL152-0,Ord,@,LL152-0
+1985,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideAcsnClassSeq,1,CoC,LL152-0,Ord,@,LL152-0
+1986,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideHospseqDxconf,1,CoC,LL152-0,Ord,@,LL152-0
+1987,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCocSiteType,1,CoC,LL152-0,Ord,@,LL152-0
+1988,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideHospseqSite,1,CoC,LL152-0,Ord,@,LL152-0
+1989,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteTnmStggrp,1,CoC,LL152-0,Ord,@,LL152-0
+1990,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideAgeSiteMorph,1,SEER,LL152-0,Ord,@,LL152-0
+1992,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideTnmStage,1,NAACCR,,Nom,@,override
+1993,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideTnmTis,1,NAACCR,,Nom,@,override
+1994,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideTnm3,1,NAACCR,,Nom,@,override
+2000,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSeqnoDxconf,1,SEER,LL152-0,Ord,@,LL152-0
+2010,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteLatSeqno,1,SEER,LL152-0,Ord,@,LL152-0
+2020,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSurgDxconf,1,SEER,LL152-0,Ord,@,LL152-0
+2030,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteType,1,SEER,LL152-0,Ord,@,LL152-0
+2040,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideHistology,1,SEER,LL167-8,Ord,@,LL167-8
+2050,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideReportSource,1,SEER,LL152-0,Ord,@,LL152-0
+2060,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideIllDefineSite,1,SEER,LL152-0,Ord,@,LL152-0
+2070,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideLeukLymphoma,1,SEER,LL152-0,Ord,@,LL152-0
+2071,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteBehavior,1,SEER,LL152-0,Ord,@,LL152-0
+2072,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteEodDxDt,1,SEER,LL152-0,Ord,@,LL152-0
+2073,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteLatEod,1,SEER,LL152-0,Ord,@,LL152-0
+2074,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideSiteLatMorph,1,SEER,LL152-0,Ord,@,LL152-0
+2078,3,Edit Overrides/Conversion History/System Admin,Patient,overRideNameSex,1,NAACCR,,Nom,@,override
+2081,3,Edit Overrides/Conversion History/System Admin,Tumor,crcChecksum,10,NAACCR,,Qn,?,
+2085,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseInitiated,8,NAACCR,,Qn,D,
+2090,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseCompleted,8,NAACCR,,Qn,D,
+2092,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseCompletedCoc,8,CoC,,Qn,D,
+2100,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseLastChanged,8,NAACCR,,Qn,D,
+2110,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseReportExported,8,NPCR,,Qn,D,
+2111,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseReportReceived,8,NPCR,,Qn,D,
+2112,3,Edit Overrides/Conversion History/System Admin,Tumor,dateCaseReportLoaded,8,NPCR,,Qn,D,
+2113,3,Edit Overrides/Conversion History/System Admin,Tumor,dateTumorRecordAvailbl,8,NPCR,,Qn,D,
+2116,3,Edit Overrides/Conversion History/System Admin,Tumor,icdO3ConversionFlag,1,SEER/CoC,LL176-9,Nom,@,LL176-9
+2120,3,Edit Overrides/Conversion History/System Admin,Tumor,seerCodingSysCurrent,1,NAACCR,LL177-7,Nom,@,LL177-7
+2130,3,Edit Overrides/Conversion History/System Admin,Tumor,seerCodingSysOriginal,1,NAACCR,LL177-7,Nom,@,LL177-7
+2140,3,Edit Overrides/Conversion History/System Admin,Tumor,cocCodingSysCurrent,2,CoC,LL179-3,Nom,@,LL179-3
+2150,3,Edit Overrides/Conversion History/System Admin,Tumor,cocCodingSysOriginal,2,CoC,LL179-3,Nom,@,LL179-3
+2152,3,Edit Overrides/Conversion History/System Admin,Tumor,cocAccreditedFlag,1,NPCR,,Nom,@,cocAccreditedFlag
+2155,3,Edit Overrides/Conversion History/System Admin,Tumor,rqrsNcdbSubmissionFlag,1,CoC,,Nom,@,rqrsNcdbSubmissionFlag
+2170,3,Edit Overrides/Conversion History/System Admin,Tumor,vendorName,10,NAACCR,,Nom,@,vendorName
+2180,3,Edit Overrides/Conversion History/System Admin,Tumor,seerTypeOfFollowUp,1,SEER,LL181-9,Nom,@,LL181-9
+2190,3,Edit Overrides/Conversion History/System Admin,Tumor,seerRecordNumber,2,SEER,LL182-7,Ord,@,LL182-7
+2200,3,Edit Overrides/Conversion History/System Admin,Tumor,diagnosticProc7387,2,SEER,,Nom,@,?
+3750,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs1,1,AJCC,,Nom,@,override
+3751,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs2,1,AJCC,,Nom,@,override
+3752,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs3,1,AJCC,,Nom,@,override
+3753,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs4,1,AJCC,,Nom,@,override
+3754,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs5,1,AJCC,,Nom,@,override
+3755,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs6,1,AJCC,,Nom,@,override
+3756,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs7,1,AJCC,,Nom,@,override
+3757,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs8,1,AJCC,,Nom,@,override
+3758,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs9,1,AJCC,,Nom,@,override
+3759,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs10,1,AJCC,,Nom,@,override
+3760,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs11,1,AJCC,,Nom,@,override
+3761,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs12,1,AJCC,,Nom,@,override
+3762,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs13,1,AJCC,,Nom,@,override
+3763,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs14,1,AJCC,,Nom,@,override
+3764,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs15,1,AJCC,,Nom,@,override
+3765,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs16,1,AJCC,,Nom,@,override
+3766,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs17,1,AJCC,,Nom,@,override
+3767,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs18,1,AJCC,,Nom,@,override
+3768,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs19,1,AJCC,,Nom,@,override
+3769,3,Edit Overrides/Conversion History/System Admin,Tumor,overRideCs20,1,AJCC/NPCR,,Nom,@,overRideCs20
+1750,4,Follow-up/Recurrence/Death,Patient,dateOfLastContact,8,SEER/CoC,,Qn,D,
+1751,4,Follow-up/Recurrence/Death,Patient,dateOfLastContactFlag,2,NAACCR,LL920-0,-,@,dateFlag
+1755,4,Follow-up/Recurrence/Death,Patient,dateOfDeathCanada,8,CCCR,LL612-3,Qn,D,LL612-3
+1756,4,Follow-up/Recurrence/Death,Patient,dateOfDeathCanadaFlag,2,NAACCR,LL921-8,Nom,@,dateFlag
+1760,4,Follow-up/Recurrence/Death,Patient,vitalStatus,1,SEER/CoC,LL130-6,Nom,@,LL130-6
+1762,4,Follow-up/Recurrence/Death,Patient,vitalStatusRecode,1,NAACCR,,Nom,@,boolean01
+1770,4,Follow-up/Recurrence/Death,Tumor,cancerStatus,1,CoC,LL131-4,Nom,@,LL131-4
+1772,4,Follow-up/Recurrence/Death,Patient,dateOfLastCancerStatus,8,CoC,,Qn,D,
+1773,4,Follow-up/Recurrence/Death,Patient,dateOfLastCancerStatusFlag,2,CoC,,Nom,@,dateFlag
+1775,4,Follow-up/Recurrence/Death,Tumor,recordNumberRecode,2,NAACCR,,Qn,N,
+1780,4,Follow-up/Recurrence/Death,Tumor,qualityOfSurvival,1,CoC,LL132-2,Nom,@,LL132-2
+1782,4,Follow-up/Recurrence/Death,Tumor,survDateActiveFollowup,8,NAACCR,,Qn,D,
+1783,4,Follow-up/Recurrence/Death,Tumor,survFlagActiveFollowup,1,NAACCR,,Nom,@,survFlagActiveFollowup
+1784,4,Follow-up/Recurrence/Death,Tumor,survMosActiveFollowup,4,NAACCR,,Qn,N,
+1785,4,Follow-up/Recurrence/Death,Tumor,survDatePresumedAlive,8,NAACCR,,Qn,D,
+1786,4,Follow-up/Recurrence/Death,Tumor,survFlagPresumedAlive,1,NAACCR,,Nom,@,survFlagPresumedAlive
+1787,4,Follow-up/Recurrence/Death,Tumor,survMosPresumedAlive,4,NAACCR,,Qn,N,
+1788,4,Follow-up/Recurrence/Death,Tumor,survDateDxRecode,8,NAACCR,,Qn,D,
+1790,4,Follow-up/Recurrence/Death,Tumor,followUpSource,1,CoC,LL133-0,Nom,@,LL133-0
+1791,4,Follow-up/Recurrence/Death,Tumor,followUpSourceCentral,2,NAACCR,,Nom,@,followUpSourceCentral
+1800,4,Follow-up/Recurrence/Death,Tumor,nextFollowUpSource,1,CoC,LL135-5,Nom,@,LL135-5
+1810,4,Follow-up/Recurrence/Death,Patient,addrCurrentCity,50,CoC,,Nom,Ti,geo
+1820,4,Follow-up/Recurrence/Death,Patient,addrCurrentState,2,CoC,,Nom,@,addrCurrentState
+1830,4,Follow-up/Recurrence/Death,Patient,addrCurrentPostalCode,9,CoC,,Nom,Ti,geo
+1840,4,Follow-up/Recurrence/Death,Patient,countyCurrent,3,NAACCR,LL138-9,Nom,Ti,geo
+1842,4,Follow-up/Recurrence/Death,Tumor,followUpContactCity,50,SEER,,Nom,Ti,geo
+1844,4,Follow-up/Recurrence/Death,Tumor,followUpContactState,2,SEER,,Nom,@,followUpContactState
+1846,4,Follow-up/Recurrence/Death,Tumor,followUpContactPostal,9,SEER,,Nom,Ti,geo
+1850,4,Follow-up/Recurrence/Death,Tumor,unusualFollowUpMethod,2,NAACCR,,Nar,?,
+1860,4,Follow-up/Recurrence/Death,Tumor,recurrenceDate1st,8,CoC,,Qn,D,
+1861,4,Follow-up/Recurrence/Death,Tumor,recurrenceDate1stFlag,2,NAACCR,LL932-5,Nom,@,LL932-5
+1880,4,Follow-up/Recurrence/Death,Tumor,recurrenceType1st,2,CoC,LL144-7,Nom,@,LL144-7
+1910,4,Follow-up/Recurrence/Death,Patient,causeOfDeath,4,SEER,LL147-0,Nom,@,LL147-0
+1914,4,Follow-up/Recurrence/Death,Tumor,seerCauseSpecificCod,1,SEER,,Nom,@,boolean01
+1915,4,Follow-up/Recurrence/Death,Tumor,seerOtherCod,1,SEER,,Nom,@,boolean01
+1920,4,Follow-up/Recurrence/Death,Patient,icdRevisionNumber,1,SEER,LL148-8,Nom,@,LL148-8
+1930,4,Follow-up/Recurrence/Death,Patient,autopsy,1,NAACCR,LL149-6,Nom,@,LL149-6
+1940,4,Follow-up/Recurrence/Death,Patient,placeOfDeath,3,NPCR,LL150-4,Nom,@,LL150-4
+540,6,Hospital-Specific,Tumor,reportingFacility,10,CoC,,Nom,Ti,facility
+545,6,Hospital-Specific,Tumor,npiReportingFacility,10,CMS,,Nom,Ti,facility
+550,6,Hospital-Specific,Tumor,accessionNumberHosp,9,CoC,,Nom,Ti,patientIdNumber
+560,6,Hospital-Specific,Tumor,sequenceNumberHospital,2,CoC,LL223-9,Ord,@,LL223-9
+570,6,Hospital-Specific,Tumor,abstractedBy,3,CoC,,Nom,@,
+580,6,Hospital-Specific,Tumor,dateOf1stContact,8,CoC,,Qn,D,
+581,6,Hospital-Specific,Tumor,dateOf1stContactFlag,2,NAACCR,LL934-1,Nom,@,dateFlag
+590,6,Hospital-Specific,Tumor,dateOfInptAdm,8,NAACCR,LL224-7,Qn,D,LL224-7
+591,6,Hospital-Specific,Tumor,dateOfInptAdmFlag,2,NAACCR,LL935-8,Nom,@,dateFlag
+600,6,Hospital-Specific,Tumor,dateOfInptDisch,8,NAACCR,LL225-4,Qn,D,LL225-4
+601,6,Hospital-Specific,Tumor,dateOfInptDischFlag,2,NAACCR,LL936-6,-,@,dateFlag
+605,6,Hospital-Specific,Tumor,inpatientStatus,1,NAACCR,LL937-4,Nom,@,LL937-4
+610,6,Hospital-Specific,Tumor,classOfCase,2,CoC,LL226-2,Nom,@,LL226-2
+630,6,Hospital-Specific,Tumor,primaryPayerAtDx,2,CoC,,Nom,@,primaryPayerAtDx
+668,6,Hospital-Specific,Tumor,rxHospSurgApp2010,1,CoC,LL938-2,Nom,@,LL938-2
+670,6,Hospital-Specific,Tumor,rxHospSurgPrimSite,2,CoC,LL227-0,Nom,@,LL227-0
+672,6,Hospital-Specific,Tumor,rxHospScopeRegLnSur,1,CoC,,Nom,@,rxHospScopeRegLnSur
+674,6,Hospital-Specific,Tumor,rxHospSurgOthRegDis,1,CoC,,Nom,@,rxHospSurgOthRegDis
+676,6,Hospital-Specific,Tumor,rxHospRegLnRemoved,2,CoC,,Qn,N,
+690,6,Hospital-Specific,Tumor,rxHospRadiation,1,SEER,LL456-5,Nom,@,LL456-5
+700,6,Hospital-Specific,Tumor,rxHospChemo,2,CoC,LL458-1,Nom,@,LL458-1
+710,6,Hospital-Specific,Tumor,rxHospHormone,2,CoC,LL459-9,Nom,@,LL459-9
+720,6,Hospital-Specific,Tumor,rxHospBrm,2,CoC,LL457-3,Nom,@,LL457-3
+730,6,Hospital-Specific,Tumor,rxHospOther,1,CoC,LL454-0,Nom,@,LL454-0
+740,6,Hospital-Specific,Tumor,rxHospDxStgProc,2,CoC,LL461-5,Nom,@,LL461-5
+746,6,Hospital-Specific,Tumor,rxHospSurgSite9802,2,CoC,,Nom,@,
+747,6,Hospital-Specific,Tumor,rxHospScopeReg9802,1,CoC,,Nom,@,
+748,6,Hospital-Specific,Tumor,rxHospSurgOth9802,1,CoC,,Nom,@,
+3100,6,Hospital-Specific,Tumor,archiveFin,10,CoC,,Nom,Ti,facility
+3105,6,Hospital-Specific,Tumor,npiArchiveFin,10,CMS,,Nom,Ti,facility
+3280,6,Hospital-Specific,Tumor,rxHospPalliativeProc,1,CoC,,Nom,@,rxHospPalliativeProc
+10,9,Record ID,NaaccrData,recordType,1,NAACCR,LL51-4,Nom,@,LL51-4
+20,9,Record ID,Patient,patientIdNumber,8,Reporting Registry,,Nom,Ti,patientIdNumber
+21,9,Record ID,Tumor,patientSystemIdHosp,8,NAACCR,,Nom,Ti,patientIdNumber
+30,9,Record ID,NaaccrData,registryType,1,NAACCR,LL201-5,Nom,@,LL201-5
+40,9,Record ID,NaaccrData,registryId,10,NAACCR,,Nom,Ti,facility
+45,9,Record ID,NaaccrData,npiRegistryId,10,CMS,,Nom,@,npiRegistryId
+50,9,Record ID,NaaccrData,naaccrRecordVersion,3,NAACCR,LL219-7,Nom,@,LL219-7
+60,9,Record ID,Tumor,tumorRecordNumber,2,NAACCR,,Nom,@,
+682,11,Stage/Prognostic Factors,Tumor,dateRegionalLNDissection,8,NAACCR,,Qn,D,
+683,11,Stage/Prognostic Factors,Tumor,dateRegionalLNDissectionFlag,2,NAACCR,,Nom,@,dateFlag
+752,11,Stage/Prognostic Factors,Tumor,tumorSizeClinical,3,SEER,,Qn,N,
+754,11,Stage/Prognostic Factors,Tumor,tumorSizePathologic,3,SEER,,Qn,N,
+756,11,Stage/Prognostic Factors,Tumor,tumorSizeSummary,3,NPCR/CoC,,Qn,N,
+759,11,Stage/Prognostic Factors,Tumor,seerSummaryStage2000,1,SEER,LL228-8,Nom,@,LL228-8
+760,11,Stage/Prognostic Factors,Tumor,seerSummaryStage1977,1,SEER,LL228-8,Nom,@,LL228-8
+762,11,Stage/Prognostic Factors,Tumor,derivedSummaryStage2018,1,SEER,,Nom,@,derivedSummaryStage2018
+764,11,Stage/Prognostic Factors,Tumor,summaryStage2018,1,SEER,,Nom,@,summaryStage2018
+772,11,Stage/Prognostic Factors,Tumor,eodPrimaryTumor,3,SEER,,Nom,@,eodPrimaryTumor
+774,11,Stage/Prognostic Factors,Tumor,eodRegionalNodes,3,SEER,,Nom,@,eodRegionalNodes
+776,11,Stage/Prognostic Factors,Tumor,eodMets,2,SEER,,Nom,@,eodMets
+780,11,Stage/Prognostic Factors,Tumor,eodTumorSize,3,SEER/CoC,,Qn,N,
+785,11,Stage/Prognostic Factors,Tumor,derivedEod2018T,15,SEER,,Nom,@,staging
+790,11,Stage/Prognostic Factors,Tumor,eodExtension,2,SEER,,Nom,@,
+795,11,Stage/Prognostic Factors,Tumor,derivedEod2018M,15,SEER,,Nom,@,staging
+800,11,Stage/Prognostic Factors,Tumor,eodExtensionProstPath,2,SEER,,Nom,@,
+810,11,Stage/Prognostic Factors,Tumor,eodLymphNodeInvolv,1,SEER,,Nom,@,eodLymphNodeInvolv
+815,11,Stage/Prognostic Factors,Tumor,derivedEod2018N,15,SEER,,Nom,@,staging
+818,11,Stage/Prognostic Factors,Tumor,derivedEod2018StageGroup,15,SEER,,Nom,@,staging
+820,11,Stage/Prognostic Factors,Tumor,regionalNodesPositive,2,SEER/CoC,,Qn,N,
+830,11,Stage/Prognostic Factors,Tumor,regionalNodesExamined,2,SEER/CoC,,Qn,N,
+832,11,Stage/Prognostic Factors,Tumor,dateSentinelLymphNodeBiopsy,8,CoC,,Qn,D,
+833,11,Stage/Prognostic Factors,Tumor,dateSentinelLymphNodeBiopsyFlag,2,CoC,,Nom,@,dateFlag
+834,11,Stage/Prognostic Factors,Tumor,sentinelLymphNodesExamined,2,CoC,,Qn,N,
+835,11,Stage/Prognostic Factors,Tumor,sentinelLymphNodesPositive,2,CoC,,Qn,N,
+840,11,Stage/Prognostic Factors,Tumor,eodOld13Digit,13,SEER,,Nom,@,staging
+850,11,Stage/Prognostic Factors,Tumor,eodOld2Digit,2,SEER,,Nom,@,eodOld2Digit
+860,11,Stage/Prognostic Factors,Tumor,eodOld4Digit,4,SEER,,Nom,@,eodOld4Digit
+870,11,Stage/Prognostic Factors,Tumor,codingSystemForEod,1,SEER,LL453-2,Nom,@,LL453-2
+880,11,Stage/Prognostic Factors,Tumor,tnmPathT,4,AJCC,LL232-0,Nom,@,LL232-0
+890,11,Stage/Prognostic Factors,Tumor,tnmPathN,4,AJCC,LL3136-0,Nom,@,LL3136-0
+900,11,Stage/Prognostic Factors,Tumor,tnmPathM,4,AJCC,LL3137-8,Nom,@,LL3137-8
+910,11,Stage/Prognostic Factors,Tumor,tnmPathStageGroup,4,AJCC,LL234-6,Nom,@,LL234-6
+920,11,Stage/Prognostic Factors,Tumor,tnmPathDescriptor,1,CoC,LL235-3,Nar,@,LL235-3
+930,11,Stage/Prognostic Factors,Tumor,tnmPathStagedBy,2,CoC,LL236-1,Nom,@,LL236-1
+940,11,Stage/Prognostic Factors,Tumor,tnmClinT,4,AJCC,LL237-9,Nom,@,LL237-9
+950,11,Stage/Prognostic Factors,Tumor,tnmClinN,4,AJCC,LL238-7,Nom,@,LL238-7
+960,11,Stage/Prognostic Factors,Tumor,tnmClinM,4,AJCC,LL239-5,Nom,@,LL239-5
+970,11,Stage/Prognostic Factors,Tumor,tnmClinStageGroup,4,AJCC,LL240-3,Nom,@,LL240-3
+980,11,Stage/Prognostic Factors,Tumor,tnmClinDescriptor,1,CoC,LL241-1,Nar,@,LL241-1
+990,11,Stage/Prognostic Factors,Tumor,tnmClinStagedBy,2,CoC,LL57-1,Nom,@,LL57-1
+995,11,Stage/Prognostic Factors,Tumor,ajccId,4,NAACCR,,Nom,@,ajccId
+1001,11,Stage/Prognostic Factors,Tumor,ajccTnmClinT,15,AJCC,,Nom,@,staging
+1002,11,Stage/Prognostic Factors,Tumor,ajccTnmClinN,15,AJCC,,Nom,@,staging
+1003,11,Stage/Prognostic Factors,Tumor,ajccTnmClinM,15,AJCC,,Nom,@,staging
+1004,11,Stage/Prognostic Factors,Tumor,ajccTnmClinStageGroup,15,AJCC,,Nom,@,staging
+1011,11,Stage/Prognostic Factors,Tumor,ajccTnmPathT,15,AJCC,,Nom,@,staging
+1012,11,Stage/Prognostic Factors,Tumor,ajccTnmPathN,15,AJCC,,Nom,@,staging
+1013,11,Stage/Prognostic Factors,Tumor,ajccTnmPathM,15,AJCC,,Nom,@,staging
+1014,11,Stage/Prognostic Factors,Tumor,ajccTnmPathStageGroup,15,AJCC,,Nom,@,staging
+1021,11,Stage/Prognostic Factors,Tumor,ajccTnmPostTherapyT,15,AJCC,,Nom,@,staging
+1022,11,Stage/Prognostic Factors,Tumor,ajccTnmPostTherapyN,15,AJCC,,Nom,@,staging
+1023,11,Stage/Prognostic Factors,Tumor,ajccTnmPostTherapyM,15,AJCC,,Nom,@,staging
+1024,11,Stage/Prognostic Factors,Tumor,ajccTnmPostTherapyStageGroup,15,AJCC,,Nom,@,staging
+1031,11,Stage/Prognostic Factors,Tumor,ajccTnmClinTSuffix,4,AJCC,,Nom,@,ajccTnmClinTSuffix
+1032,11,Stage/Prognostic Factors,Tumor,ajccTnmPathTSuffix,4,AJCC,,Nom,@,ajccTnmPathTSuffix
+1033,11,Stage/Prognostic Factors,Tumor,ajccTnmPostTherapyTSuffix,4,AJCC,,Nom,@,ajccTnmPostTherapyTSuffix
+1034,11,Stage/Prognostic Factors,Tumor,ajccTnmClinNSuffix,4,AJCC,,Nom,@,ajccTnmClinNSuffix
+1035,11,Stage/Prognostic Factors,Tumor,ajccTnmPathNSuffix,4,AJCC,,Nom,@,ajccTnmPathNSuffix
+1036,11,Stage/Prognostic Factors,Tumor,ajccTnmPostTherapyNSuffix,4,AJCC,,Nom,@,ajccTnmPostTherapyNSuffix
+1060,11,Stage/Prognostic Factors,Tumor,tnmEditionNumber,2,CoC,LL59-7,Nom,@,LL59-7
+1112,11,Stage/Prognostic Factors,Tumor,metsAtDxBone,1,SEER,,Nom,@,boolean01
+1113,11,Stage/Prognostic Factors,Tumor,metsAtDxBrain,1,SEER,,Nom,@,boolean01
+1114,11,Stage/Prognostic Factors,Tumor,metsAtDxDistantLn,1,SEER,,Nom,@,boolean01
+1115,11,Stage/Prognostic Factors,Tumor,metsAtDxLiver,1,SEER,,Nom,@,boolean01
+1116,11,Stage/Prognostic Factors,Tumor,metsAtDxLung,1,SEER,,Nom,@,boolean01
+1117,11,Stage/Prognostic Factors,Tumor,metsAtDxOther,1,SEER,,Nom,@,boolean01
+1120,11,Stage/Prognostic Factors,Tumor,pediatricStage,2,CoC,LL65-4,Nom,@,LL65-4
+1130,11,Stage/Prognostic Factors,Tumor,pediatricStagingSystem,2,CoC,LL66-2,Nom,@,LL66-2
+1140,11,Stage/Prognostic Factors,Tumor,pediatricStagedBy,1,CoC,LL67-0,Nom,@,LL67-0
+1150,11,Stage/Prognostic Factors,Tumor,tumorMarker1,1,SEER,LL68-8,Nom,@,LL68-8
+1160,11,Stage/Prognostic Factors,Tumor,tumorMarker2,1,SEER,,Nom,@,tumorMarker2
+1170,11,Stage/Prognostic Factors,Tumor,tumorMarker3,1,SEER,,Nom,@,tumorMarker3
+1182,11,Stage/Prognostic Factors,Tumor,lymphVascularInvasion,1,AJCC,LL906-9,Nom,@,LL906-9
+2800,11,Stage/Prognostic Factors,Tumor,csTumorSize,3,AJCC,,Qn,N,
+2810,11,Stage/Prognostic Factors,Tumor,csExtension,3,AJCC,,Nom,@,
+2820,11,Stage/Prognostic Factors,Tumor,csTumorSizeExtEval,1,AJCC,,Nom,@,
+2830,11,Stage/Prognostic Factors,Tumor,csLymphNodes,3,AJCC,,Nom,@,
+2840,11,Stage/Prognostic Factors,Tumor,csLymphNodesEval,1,AJCC,,Nom,@,
+2850,11,Stage/Prognostic Factors,Tumor,csMetsAtDx,2,AJCC,,Nom,@,
+2851,11,Stage/Prognostic Factors,Tumor,csMetsAtDxBone,1,AJCC,,Nom,@,
+2852,11,Stage/Prognostic Factors,Tumor,csMetsAtDxBrain,1,AJCC,,Nom,@,
+2853,11,Stage/Prognostic Factors,Tumor,csMetsAtDxLiver,1,AJCC,,Nom,@,
+2854,11,Stage/Prognostic Factors,Tumor,csMetsAtDxLung,1,AJCC,,Nom,@,
+2860,11,Stage/Prognostic Factors,Tumor,csMetsEval,1,AJCC,,Nom,@,
+2861,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor7,3,AJCC,,Nom,@,
+2862,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor8,3,AJCC,,Nom,@,
+2863,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor9,3,AJCC,,Nom,@,
+2864,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor10,3,AJCC,,Nom,@,
+2865,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor11,3,AJCC,,Nom,@,
+2866,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor12,3,AJCC,,Nom,@,
+2867,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor13,3,AJCC,,Nom,@,
+2868,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor14,3,AJCC,,Nom,@,
+2869,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor15,3,AJCC,,Nom,@,
+2870,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor16,3,AJCC,,Nom,@,
+2871,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor17,3,AJCC,,Nom,@,
+2872,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor18,3,AJCC,,Nom,@,
+2873,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor19,3,AJCC,,Nom,@,
+2874,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor20,3,AJCC,,Nom,@,
+2875,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor21,3,AJCC,,Nom,@,
+2876,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor22,3,AJCC,,Nom,@,
+2877,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor23,3,AJCC,,Nom,@,
+2878,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor24,3,AJCC,,Nom,@,
+2879,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor25,3,AJCC,,Nom,@,
+2880,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor1,3,AJCC,,Nom,@,
+2890,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor2,3,AJCC,,Nom,@,
+2900,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor3,3,AJCC,,Nom,@,
+2910,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor4,3,AJCC,,Nom,@,
+2920,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor5,3,AJCC,,Nom,@,
+2930,11,Stage/Prognostic Factors,Tumor,csSiteSpecificFactor6,3,AJCC,,Nom,@,
+2935,11,Stage/Prognostic Factors,Tumor,csVersionInputOriginal,6,AJCC,,Nom,@,version
+2936,11,Stage/Prognostic Factors,Tumor,csVersionDerived,6,AJCC,,Nom,@,version
+2937,11,Stage/Prognostic Factors,Tumor,csVersionInputCurrent,6,AJCC,,Nom,@,version
+2940,11,Stage/Prognostic Factors,Tumor,derivedAjcc6T,2,AJCC,,Nom,@,
+2950,11,Stage/Prognostic Factors,Tumor,derivedAjcc6TDescript,1,AJCC,,Nom,@,derivedAjcc6TDescript
+2960,11,Stage/Prognostic Factors,Tumor,derivedAjcc6N,2,AJCC,,Nom,@,
+2970,11,Stage/Prognostic Factors,Tumor,derivedAjcc6NDescript,1,AJCC,,Nom,@,derivedAjcc6NDescript
+2980,11,Stage/Prognostic Factors,Tumor,derivedAjcc6M,2,AJCC,,Nom,@,
+2990,11,Stage/Prognostic Factors,Tumor,derivedAjcc6MDescript,1,AJCC,,Nom,@,derivedAjcc6MDescript
+3000,11,Stage/Prognostic Factors,Tumor,derivedAjcc6StageGrp,2,AJCC,,Nom,@,
+3010,11,Stage/Prognostic Factors,Tumor,derivedSs1977,1,AJCC,,Nom,@,
+3020,11,Stage/Prognostic Factors,Tumor,derivedSs2000,1,AJCC,,Nom,@,
+3030,11,Stage/Prognostic Factors,Tumor,derivedAjccFlag,1,AJCC,,Ord,@,derivedAjccFlag
+3040,11,Stage/Prognostic Factors,Tumor,derivedSs1977Flag,1,AJCC,,Ord,@,derivedSs1977Flag
+3050,11,Stage/Prognostic Factors,Tumor,derivedSs2000Flag,1,AJCC,,Ord,@,derivedSs2000Flag
+3110,11,Stage/Prognostic Factors,Tumor,comorbidComplication1,5,CoC,,Nom,@,ICD9
+3120,11,Stage/Prognostic Factors,Tumor,comorbidComplication2,5,CoC,,Nom,@,ICD9
+3130,11,Stage/Prognostic Factors,Tumor,comorbidComplication3,5,CoC,,Nom,@,ICD9
+3140,11,Stage/Prognostic Factors,Tumor,comorbidComplication4,5,CoC,,Nom,@,ICD9
+3150,11,Stage/Prognostic Factors,Tumor,comorbidComplication5,5,CoC,,Nom,@,ICD9
+3160,11,Stage/Prognostic Factors,Tumor,comorbidComplication6,5,CoC,,Nom,@,ICD9
+3161,11,Stage/Prognostic Factors,Tumor,comorbidComplication7,5,CoC,,Nom,@,ICD9
+3162,11,Stage/Prognostic Factors,Tumor,comorbidComplication8,5,CoC,,Nom,@,ICD9
+3163,11,Stage/Prognostic Factors,Tumor,comorbidComplication9,5,CoC,,Nom,@,ICD9
+3164,11,Stage/Prognostic Factors,Tumor,comorbidComplication10,5,CoC,,Nom,@,ICD9
+3165,11,Stage/Prognostic Factors,Tumor,icdRevisionComorbid,1,CoC,,Nom,@,icdRevisionComorbid
+3400,11,Stage/Prognostic Factors,Tumor,derivedAjcc7T,3,AJCC,,Nom,@,
+3402,11,Stage/Prognostic Factors,Tumor,derivedAjcc7TDescript,1,AJCC,,Nom,@,derivedAjcc7TDescript
+3410,11,Stage/Prognostic Factors,Tumor,derivedAjcc7N,3,AJCC,,Nom,@,
+3412,11,Stage/Prognostic Factors,Tumor,derivedAjcc7NDescript,1,AJCC,,Nom,@,derivedAjcc7NDescript
+3420,11,Stage/Prognostic Factors,Tumor,derivedAjcc7M,3,AJCC,,Nom,@,
+3422,11,Stage/Prognostic Factors,Tumor,derivedAjcc7MDescript,1,AJCC,,Nom,@,derivedAjcc7MDescript
+3430,11,Stage/Prognostic Factors,Tumor,derivedAjcc7StageGrp,3,AJCC,,Nom,@,
+3440,11,Stage/Prognostic Factors,Tumor,derivedPrerx7T,3,AJCC,,Nom,@,
+3442,11,Stage/Prognostic Factors,Tumor,derivedPrerx7TDescrip,1,AJCC,,Nom,@,derivedPrerx7TDescrip
+3450,11,Stage/Prognostic Factors,Tumor,derivedPrerx7N,3,AJCC,,Nom,@,
+3452,11,Stage/Prognostic Factors,Tumor,derivedPrerx7NDescrip,1,AJCC,,Nom,@,derivedPrerx7NDescrip
+3460,11,Stage/Prognostic Factors,Tumor,derivedPrerx7M,3,AJCC,,Nom,@,
+3462,11,Stage/Prognostic Factors,Tumor,derivedPrerx7MDescrip,1,AJCC,,Nom,@,derivedPrerx7MDescrip
+3470,11,Stage/Prognostic Factors,Tumor,derivedPrerx7StageGrp,3,AJCC,,Nom,@,
+3480,11,Stage/Prognostic Factors,Tumor,derivedPostrx7T,3,AJCC,,Nom,@,
+3482,11,Stage/Prognostic Factors,Tumor,derivedPostrx7N,3,AJCC,,Nom,@,
+3490,11,Stage/Prognostic Factors,Tumor,derivedPostrx7M,2,AJCC,,Nom,@,
+3492,11,Stage/Prognostic Factors,Tumor,derivedPostrx7StgeGrp,3,AJCC,,Nom,@,
+3600,11,Stage/Prognostic Factors,Tumor,derivedNeoadjuvRxFlag,1,AJCC,LL928-3,Nom,@,LL928-3
+3605,11,Stage/Prognostic Factors,Tumor,derivedSeerPathStgGrp,5,SEER,,Nom,@,staging
+3610,11,Stage/Prognostic Factors,Tumor,derivedSeerClinStgGrp,5,SEER,,Nom,@,staging
+3614,11,Stage/Prognostic Factors,Tumor,derivedSeerCmbStgGrp,5,SEER,,Nom,@,staging
+3616,11,Stage/Prognostic Factors,Tumor,derivedSeerCombinedT,5,SEER,,Nom,@,staging
+3618,11,Stage/Prognostic Factors,Tumor,derivedSeerCombinedN,5,SEER,,Nom,@,staging
+3620,11,Stage/Prognostic Factors,Tumor,derivedSeerCombinedM,5,SEER,,Nom,@,staging
+3622,11,Stage/Prognostic Factors,Tumor,derivedSeerCmbTSrc,1,SEER,,Nom,@,derivedSeerCmbTSrc
+3624,11,Stage/Prognostic Factors,Tumor,derivedSeerCmbNSrc,1,SEER,,Nom,@,derivedSeerCmbNSrc
+3626,11,Stage/Prognostic Factors,Tumor,derivedSeerCmbMSrc,1,SEER,,Nom,@,derivedSeerCmbMSrc
+3645,11,Stage/Prognostic Factors,Tumor,npcrDerivedAjcc8TnmClinStgGrp,15,NPCR,,Nom,@,staging
+3646,11,Stage/Prognostic Factors,Tumor,npcrDerivedAjcc8TnmPathStgGrp,15,NPCR,,Nom,@,staging
+3647,11,Stage/Prognostic Factors,Tumor,npcrDerivedAjcc8TnmPostStgGrp,15,NPCR,,Nom,@,staging
+3650,11,Stage/Prognostic Factors,Tumor,npcrDerivedClinStgGrp,4,NPCR,,Nom,@,npcrDerivedClinStgGrp
+3655,11,Stage/Prognostic Factors,Tumor,npcrDerivedPathStgGrp,4,NPCR,,Nom,@,npcrDerivedPathStgGrp
+3700,11,Stage/Prognostic Factors,Tumor,seerSiteSpecificFact1,1,SEER,,Nom,@,
+3702,11,Stage/Prognostic Factors,Tumor,seerSiteSpecificFact2,1,SEER,,Nom,@,
+3704,11,Stage/Prognostic Factors,Tumor,seerSiteSpecificFact3,1,SEER,,Nom,@,
+3706,11,Stage/Prognostic Factors,Tumor,seerSiteSpecificFact4,1,SEER,,Nom,@,
+3708,11,Stage/Prognostic Factors,Tumor,seerSiteSpecificFact5,1,SEER,,Nom,@,
+3710,11,Stage/Prognostic Factors,Tumor,seerSiteSpecificFact6,1,SEER,,Nom,@,
+3780,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis1,7,CoC,,Nom,@,ICD10
+3782,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis2,7,CoC,,Nom,@,ICD10
+3784,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis3,7,CoC,,Nom,@,ICD10
+3786,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis4,7,CoC,,Nom,@,ICD10
+3788,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis5,7,CoC,,Nom,@,ICD10
+3790,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis6,7,CoC,,Nom,@,ICD10
+3792,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis7,7,CoC,,Nom,@,ICD10
+3794,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis8,7,CoC,,Nom,@,ICD10
+3796,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis9,7,CoC,,Nom,@,ICD10
+3798,11,Stage/Prognostic Factors,Tumor,secondaryDiagnosis10,7,CoC,,Nom,@,ICD10
+3800,11,Stage/Prognostic Factors,Tumor,schemaId,5,NAACCR,,Nom,@,schemaId
+3801,11,Stage/Prognostic Factors,Tumor,chromosome1pLossHeterozygosity,1,NAACCR,,Nom,@,boolean01
+3802,11,Stage/Prognostic Factors,Tumor,chromosome19qLossHeterozygosity,1,NAACCR,,Nom,@,boolean01
+3803,11,Stage/Prognostic Factors,Tumor,adenoidCysticBasaloidPattern,5,NAACCR,,Nom,@,adenoidCysticBasaloidPattern
+3804,11,Stage/Prognostic Factors,Tumor,adenopathy,1,NAACCR,,Nom,@,boolean01
+3805,11,Stage/Prognostic Factors,Tumor,afpPostOrchiectomyLabValue,7,NAACCR,,Qn,N,
+3806,11,Stage/Prognostic Factors,Tumor,afpPostOrchiectomyRange,1,NAACCR,,Nom,@,afpPostOrchiectomyRange
+3807,11,Stage/Prognostic Factors,Tumor,afpPreOrchiectomyLabValue,7,NAACCR,,Qn,N,
+3808,11,Stage/Prognostic Factors,Tumor,afpPreOrchiectomyRange,1,NAACCR,,Nom,@,afpPreOrchiectomyRange
+3809,11,Stage/Prognostic Factors,Tumor,afpPretreatmentInterpretation,1,NAACCR,,Nom,@,afpPretreatmentInterpretation
+3810,11,Stage/Prognostic Factors,Tumor,afpPretreatmentLabValue,6,NAACCR,,Qn,N,
+3811,11,Stage/Prognostic Factors,Tumor,anemia,1,NAACCR,,Nom,@,anemia
+3812,11,Stage/Prognostic Factors,Tumor,bSymptoms,1,NAACCR,,Nom,@,boolean01
+3813,11,Stage/Prognostic Factors,Tumor,bilirubinPretxTotalLabValue,5,NAACCR,,Nom,@,bilirubinPretxTotalLabValue
+3814,11,Stage/Prognostic Factors,Tumor,bilirubinPretxUnitOfMeasure,1,NAACCR,,Nom,@,bilirubinPretxUnitOfMeasure
+3815,11,Stage/Prognostic Factors,Tumor,boneInvasion,1,NAACCR,,Nom,@,boolean01
+3816,11,Stage/Prognostic Factors,Tumor,brainMolecularMarkers,2,NAACCR,,Nom,@,brainMolecularMarkers
+3817,11,Stage/Prognostic Factors,Tumor,breslowTumorThickness,4,NAACCR,,Nom,@,breslowTumorThickness
+3818,11,Stage/Prognostic Factors,Tumor,ca125PretreatmentInterpretation,1,NAACCR,,Nom,@,ca125PretreatmentInterpretation
+3819,11,Stage/Prognostic Factors,Tumor,ceaPretreatmentInterpretation,1,NAACCR,,Nom,@,ceaPretreatmentInterpretation
+3820,11,Stage/Prognostic Factors,Tumor,ceaPretreatmentLabValue,6,NAACCR,,Qn,N,
+3821,11,Stage/Prognostic Factors,Tumor,chromosome3Status,1,NAACCR,,Nom,@,chromosome3Status
+3822,11,Stage/Prognostic Factors,Tumor,chromosome8qStatus,1,NAACCR,,Nom,@,chromosome8qStatus
+3823,11,Stage/Prognostic Factors,Tumor,circumferentialResectionMargin,4,NAACCR,,Nom,@,circumferentialResectionMargin
+3824,11,Stage/Prognostic Factors,Tumor,creatininePretreatmentLabValue,4,NAACCR,,Nom,@,creatininePretreatmentLabValue
+3825,11,Stage/Prognostic Factors,Tumor,creatininePretxUnitOfMeasure,1,NAACCR,,Nom,@,creatininePretxUnitOfMeasure
+3826,11,Stage/Prognostic Factors,Tumor,estrogenReceptorPercntPosOrRange,3,NAACCR,,Nom,@,estrogenReceptorPercntPosOrRange
+3827,11,Stage/Prognostic Factors,Tumor,estrogenReceptorSummary,1,NAACCR,,Nom,@,boolean01
+3828,11,Stage/Prognostic Factors,Tumor,estrogenReceptorTotalAllredScore,2,NAACCR,,Nom,@,estrogenReceptorTotalAllredScore
+3829,11,Stage/Prognostic Factors,Tumor,esophagusAndEgjTumorEpicenter,1,NAACCR,,Nom,@,esophagusAndEgjTumorEpicenter
+3830,11,Stage/Prognostic Factors,Tumor,extranodalExtensionClin,1,NAACCR,,Nom,@,extranodalExtensionClin
+3831,11,Stage/Prognostic Factors,Tumor,extranodalExtensionHeadNeckClin,1,NAACCR,,Nom,@,extranodalExtensionHeadNeckClin
+3832,11,Stage/Prognostic Factors,Tumor,extranodalExtensionHeadNeckPath,3,NAACCR,,Nom,@,extranodalExtensionHeadNeckPath
+3833,11,Stage/Prognostic Factors,Tumor,extranodalExtensionPath,1,NAACCR,,Nom,@,extranodalExtensionPath
+3834,11,Stage/Prognostic Factors,Tumor,extravascularMatrixPatterns,1,NAACCR,,Nom,@,boolean01
+3835,11,Stage/Prognostic Factors,Tumor,fibrosisScore,1,NAACCR,,Nom,@,fibrosisScore
+3836,11,Stage/Prognostic Factors,Tumor,figoStage,2,NAACCR,,Nom,@,figoStage
+3837,11,Stage/Prognostic Factors,Tumor,gestationalTrophoblasticPxIndex,2,NAACCR,,Nom,@,gestationalTrophoblasticPxIndex
+3838,11,Stage/Prognostic Factors,Tumor,gleasonPatternsClinical,2,NAACCR,,Nom,@,gleasonPatternsClinical
+3839,11,Stage/Prognostic Factors,Tumor,gleasonPatternsPathological,2,NAACCR,,Nom,@,gleasonPatternsPathological
+3840,11,Stage/Prognostic Factors,Tumor,gleasonScoreClinical,2,NAACCR,,Nom,@,gleasonScoreClinical
+3841,11,Stage/Prognostic Factors,Tumor,gleasonScorePathological,2,NAACCR,,Nom,@,gleasonScorePathological
+3842,11,Stage/Prognostic Factors,Tumor,gleasonTertiaryPattern,2,NAACCR,,Nom,@,gleasonTertiaryPattern
+3843,11,Stage/Prognostic Factors,Tumor,gradeClinical,1,NAACCR,,Nom,@,gradeClinical
+3844,11,Stage/Prognostic Factors,Tumor,gradePathological,1,NAACCR,,Nom,@,gradePathological
+3845,11,Stage/Prognostic Factors,Tumor,gradePostTherapy,1,NAACCR,,Nom,@,gradePostTherapy
+3846,11,Stage/Prognostic Factors,Tumor,hcgPostOrchiectomyLabValue,7,NAACCR,,Qn,N,
+3847,11,Stage/Prognostic Factors,Tumor,hcgPostOrchiectomyRange,1,NAACCR,,Nom,@,hcgPostOrchiectomyRange
+3848,11,Stage/Prognostic Factors,Tumor,hcgPreOrchiectomyLabValue,7,NAACCR,,Qn,N,
+3849,11,Stage/Prognostic Factors,Tumor,hcgPreOrchiectomyRange,1,NAACCR,,Nom,@,hcgPreOrchiectomyRange
+3850,11,Stage/Prognostic Factors,Tumor,her2IhcSummary,1,NAACCR,,Nom,@,her2IhcSummary
+3851,11,Stage/Prognostic Factors,Tumor,her2IshDualProbeCopyNumber,4,NAACCR,,Nom,@,her2IshDualProbeCopyNumber
+3852,11,Stage/Prognostic Factors,Tumor,her2IshDualProbeRatio,4,NAACCR,,Nom,@,her2IshDualProbeRatio
+3853,11,Stage/Prognostic Factors,Tumor,her2IshSingleProbeCopyNumber,4,NAACCR,,Nom,@,her2IshSingleProbeCopyNumber
+3854,11,Stage/Prognostic Factors,Tumor,her2IshSummary,1,NAACCR,,Nom,@,her2IshSummary
+3855,11,Stage/Prognostic Factors,Tumor,her2OverallSummary,1,NAACCR,,Nom,@,boolean01
+3856,11,Stage/Prognostic Factors,Tumor,heritableTrait,1,NAACCR,,Nom,@,boolean01
+3857,11,Stage/Prognostic Factors,Tumor,highRiskCytogenetics,1,NAACCR,,Nom,@,highRiskCytogenetics
+3858,11,Stage/Prognostic Factors,Tumor,highRiskHistologicFeatures,1,NAACCR,,Nom,@,highRiskHistologicFeatures
+3859,11,Stage/Prognostic Factors,Tumor,hivStatus,1,NAACCR,,Nom,@,boolean01
+3860,11,Stage/Prognostic Factors,Tumor,iNRProthrombinTime,3,NAACCR,,Nom,@,iNRProthrombinTime
+3861,11,Stage/Prognostic Factors,Tumor,ipsilateralAdrenalGlandInvolve,1,NAACCR,,Nom,@,ipsilateralAdrenalGlandInvolve
+3862,11,Stage/Prognostic Factors,Tumor,jak2,1,NAACCR,,Nom,@,jak2
+3863,11,Stage/Prognostic Factors,Tumor,ki67,5,NAACCR,,Qn,N,
+3864,11,Stage/Prognostic Factors,Tumor,invasionBeyondCapsule,1,NAACCR,,Nom,@,invasionBeyondCapsule
+3865,11,Stage/Prognostic Factors,Tumor,kitGeneImmunohistochemistry,1,NAACCR,,Nom,@,kitGeneImmunohistochemistry
+3866,11,Stage/Prognostic Factors,Tumor,kras,1,NAACCR,,Nom,@,kras
+3867,11,Stage/Prognostic Factors,Tumor,ldhPostOrchiectomyRange,1,NAACCR,,Nom,@,ldhPostOrchiectomyRange
+3868,11,Stage/Prognostic Factors,Tumor,ldhPreOrchiectomyRange,1,NAACCR,,Nom,@,ldhPreOrchiectomyRange
+3869,11,Stage/Prognostic Factors,Tumor,ldhPretreatmentLevel,1,NAACCR,,Nom,@,ldhPretreatmentLevel
+3870,11,Stage/Prognostic Factors,Tumor,ldhUpperLimitsOfNormal,3,NAACCR,,Nom,@,ldhUpperLimitsOfNormal
+3871,11,Stage/Prognostic Factors,Tumor,lnAssessMethodFemoralInguinal,1,NAACCR,,Nom,@,lnAssessMethodFemoralInguinal
+3872,11,Stage/Prognostic Factors,Tumor,lnAssessMethodParaaortic,1,NAACCR,,Nom,@,lnAssessMethodParaaortic
+3873,11,Stage/Prognostic Factors,Tumor,lnAssessMethodPelvic,1,NAACCR,,Nom,@,lnAssessMethodPelvic
+3874,11,Stage/Prognostic Factors,Tumor,lnDistantAssessMethod,1,NAACCR,,Nom,@,lnDistantAssessMethod
+3875,11,Stage/Prognostic Factors,Tumor,lnDistantMediastinalScalene,1,NAACCR,,Nom,@,lnDistantMediastinalScalene
+3876,11,Stage/Prognostic Factors,Tumor,lnHeadAndNeckLevels1To3,1,NAACCR,,Nom,@,lnHeadAndNeckLevels1To3
+3877,11,Stage/Prognostic Factors,Tumor,lnHeadAndNeckLevels4To5,1,NAACCR,,Nom,@,lnHeadAndNeckLevels4To5
+3878,11,Stage/Prognostic Factors,Tumor,lnHeadAndNeckLevels6To7,1,NAACCR,,Nom,@,lnHeadAndNeckLevels6To7
+3879,11,Stage/Prognostic Factors,Tumor,lnHeadAndNeckOther,1,NAACCR,,Nom,@,lnHeadAndNeckOther
+3880,11,Stage/Prognostic Factors,Tumor,lnIsolatedTumorCells,1,NAACCR,,Nom,@,boolean01
+3881,11,Stage/Prognostic Factors,Tumor,lnLaterality,1,NAACCR,,Nom,@,lnLaterality
+3882,11,Stage/Prognostic Factors,Tumor,lnPositiveAxillaryLevel1To2,2,NAACCR,,Nom,@,lnPositiveAxillaryLevel1To2
+3883,11,Stage/Prognostic Factors,Tumor,lnSize,4,NAACCR,,Nom,@,lnSize
+3884,11,Stage/Prognostic Factors,Tumor,lnStatusFemorInguinParaaortPelv,1,NAACCR,,Nom,@,lnStatusFemorInguinParaaortPelv
+3885,11,Stage/Prognostic Factors,Tumor,lymphocytosis,1,NAACCR,,Nom,@,lymphocytosis
+3886,11,Stage/Prognostic Factors,Tumor,majorVeinInvolvement,1,NAACCR,,Nom,@,majorVeinInvolvement
+3887,11,Stage/Prognostic Factors,Tumor,measuredBasalDiameter,4,NAACCR,,Nom,@,measuredBasalDiameter
+3888,11,Stage/Prognostic Factors,Tumor,measuredThickness,4,NAACCR,,Nom,@,measuredThickness
+3889,11,Stage/Prognostic Factors,Tumor,methylationOfO6MGMT,1,NAACCR,,Nom,@,methylationOfO6MGMT
+3890,11,Stage/Prognostic Factors,Tumor,microsatelliteInstability,1,NAACCR,,Nom,@,microsatelliteInstability
+3891,11,Stage/Prognostic Factors,Tumor,microvascularDensity,2,NAACCR,,Nom,@,microvascularDensity
+3892,11,Stage/Prognostic Factors,Tumor,mitoticCountUvealMelanoma,4,NAACCR,,Nom,@,mitoticCountUvealMelanoma
+3893,11,Stage/Prognostic Factors,Tumor,mitoticRateMelanoma,2,NAACCR,,Nom,@,mitoticRateMelanoma
+3894,11,Stage/Prognostic Factors,Tumor,multigeneSignatureMethod,1,NAACCR,,Nom,@,multigeneSignatureMethod
+3895,11,Stage/Prognostic Factors,Tumor,multigeneSignatureResults,2,NAACCR,,Nom,@,multigeneSignatureResults
+3896,11,Stage/Prognostic Factors,Tumor,nccnInternationalPrognosticIndex,2,NAACCR,,Nom,@,nccnInternationalPrognosticIndex
+3897,11,Stage/Prognostic Factors,Tumor,numberOfCoresExamined,2,NAACCR,,Nom,@,numberOfCoresExamined
+3898,11,Stage/Prognostic Factors,Tumor,numberOfCoresPositive,2,NAACCR,,Nom,@,numberOfCoresPositive
+3899,11,Stage/Prognostic Factors,Tumor,numberOfExaminedParaAorticNodes,2,NAACCR,,Nom,@,numberOfExaminedParaAorticNodes
+3900,11,Stage/Prognostic Factors,Tumor,numberOfExaminedPelvicNodes,2,NAACCR,,Nom,@,numberOfExaminedPelvicNodes
+3901,11,Stage/Prognostic Factors,Tumor,numberOfPositiveParaAorticNodes,2,NAACCR,,Nom,@,numberOfPositiveParaAorticNodes
+3902,11,Stage/Prognostic Factors,Tumor,numberOfPositivePelvicNodes,2,NAACCR,,Nom,@,numberOfPositivePelvicNodes
+3903,11,Stage/Prognostic Factors,Tumor,oncotypeDxRecurrenceScoreDcis,3,NAACCR,,Nom,@,oncotypeDxRecurrenceScoreDcis
+3904,11,Stage/Prognostic Factors,Tumor,oncotypeDxRecurrenceScoreInvasiv,3,NAACCR,,Nom,@,oncotypeDxRecurrenceScoreInvasiv
+3905,11,Stage/Prognostic Factors,Tumor,oncotypeDxRiskLevelDcis,1,NAACCR,,Nom,@,oncotypeDxRiskLevelDcis
+3906,11,Stage/Prognostic Factors,Tumor,oncotypeDxRiskLevelInvasive,1,NAACCR,,Nom,@,oncotypeDxRiskLevelInvasive
+3907,11,Stage/Prognostic Factors,Tumor,organomegaly,1,NAACCR,,Nom,@,boolean01
+3908,11,Stage/Prognostic Factors,Tumor,percentNecrosisPostNeoadjuvant,5,NAACCR,,Nom,@,percentNecrosisPostNeoadjuvant
+3909,11,Stage/Prognostic Factors,Tumor,perineuralInvasion,1,NAACCR,,Nom,@,boolean01
+3910,11,Stage/Prognostic Factors,Tumor,peripheralBloodInvolvement,1,NAACCR,,Nom,@,peripheralBloodInvolvement
+3911,11,Stage/Prognostic Factors,Tumor,peritonealCytology,1,NAACCR,,Nom,@,peritonealCytology
+3913,11,Stage/Prognostic Factors,Tumor,pleuralEffusion,1,NAACCR,,Nom,@,pleuralEffusion
+3914,11,Stage/Prognostic Factors,Tumor,progesteroneRecepPrcntPosOrRange,3,NAACCR,,Nom,@,progesteroneRecepPrcntPosOrRange
+3915,11,Stage/Prognostic Factors,Tumor,progesteroneRecepSummary,1,NAACCR,,Nom,@,boolean01
+3916,11,Stage/Prognostic Factors,Tumor,progesteroneRecepTotalAllredScor,2,NAACCR,,Nom,@,progesteroneRecepTotalAllredScor
+3917,11,Stage/Prognostic Factors,Tumor,primarySclerosingCholangitis,1,NAACCR,,Nom,@,boolean01
+3918,11,Stage/Prognostic Factors,Tumor,profoundImmuneSuppression,1,NAACCR,,Nom,@,profoundImmuneSuppression
+3919,11,Stage/Prognostic Factors,Tumor,prostatePathologicalExtension,3,NAACCR,,Nom,@,prostatePathologicalExtension
+3920,11,Stage/Prognostic Factors,Tumor,psaLabValue,5,NAACCR,,Nom,@,psaLabValue
+3921,11,Stage/Prognostic Factors,Tumor,residualTumVolPostCytoreduction,2,NAACCR,,Nom,@,residualTumVolPostCytoreduction
+3922,11,Stage/Prognostic Factors,Tumor,responseToNeoadjuvantTherapy,1,NAACCR,,Nom,@,responseToNeoadjuvantTherapy
+3923,11,Stage/Prognostic Factors,Tumor,sCategoryClinical,1,NAACCR,,Nom,@,sCategoryClinical
+3924,11,Stage/Prognostic Factors,Tumor,sCategoryPathological,1,NAACCR,,Nom,@,sCategoryPathological
+3925,11,Stage/Prognostic Factors,Tumor,sarcomatoidFeatures,3,NAACCR,,Nom,@,sarcomatoidFeatures
+3926,11,Stage/Prognostic Factors,Tumor,schemaDiscriminator1,1,NAACCR,,Nom,@,schemaDiscriminator1
+3927,11,Stage/Prognostic Factors,Tumor,schemaDiscriminator2,1,NAACCR,,Nom,@,schemaDiscriminator2
+3928,11,Stage/Prognostic Factors,Tumor,schemaDiscriminator3,1,NAACCR,,Nom,@,schemaDiscriminator3
+3929,11,Stage/Prognostic Factors,Tumor,separateTumorNodules,1,NAACCR,,Nom,@,separateTumorNodules
+3930,11,Stage/Prognostic Factors,Tumor,serumAlbuminPretreatmentLevel,1,NAACCR,,Nom,@,serumAlbuminPretreatmentLevel
+3931,11,Stage/Prognostic Factors,Tumor,serumBeta2MicroglobulinPretxLvl,1,NAACCR,,Nom,@,serumBeta2MicroglobulinPretxLvl
+3932,11,Stage/Prognostic Factors,Tumor,ldhPretreatmentLabValue,7,NAACCR,,Qn,N,
+3933,11,Stage/Prognostic Factors,Tumor,thrombocytopenia,1,NAACCR,,Nom,@,thrombocytopenia
+3934,11,Stage/Prognostic Factors,Tumor,tumorDeposits,2,NAACCR,,Nom,@,tumorDeposits
+3935,11,Stage/Prognostic Factors,Tumor,tumorGrowthPattern,1,NAACCR,,Nom,@,tumorGrowthPattern
+3936,11,Stage/Prognostic Factors,Tumor,ulceration,1,NAACCR,,Nom,@,boolean01
+3937,11,Stage/Prognostic Factors,Tumor,visceralParietalPleuralInvasion,1,NAACCR,,Nom,@,visceralParietalPleuralInvasion
+2520,12,Text-Diagnosis,Tumor,textDxProcPe,1000,NPCR,,Nar,Ti,
+2530,12,Text-Diagnosis,Tumor,textDxProcXRayScan,1000,NPCR,,Nar,Ti,
+2540,12,Text-Diagnosis,Tumor,textDxProcScopes,1000,NPCR,,Nar,Ti,
+2550,12,Text-Diagnosis,Tumor,textDxProcLabTests,1000,NPCR,,Nar,Ti,
+2560,12,Text-Diagnosis,Tumor,textDxProcOp,1000,NPCR,,Nar,Ti,
+2570,12,Text-Diagnosis,Tumor,textDxProcPath,1000,NPCR,,Nar,Ti,
+2580,12,Text-Diagnosis,Tumor,textPrimarySiteTitle,100,NPCR,,Nar,Ti,
+2590,12,Text-Diagnosis,Tumor,textHistologyTitle,100,NPCR,,Nar,Ti,
+2600,12,Text-Diagnosis,Tumor,textStaging,1000,NPCR,,Nar,Ti,
+2680,13,Text-Miscellaneous,Tumor,textRemarks,1000,NPCR,,Nar,Ti,
+2690,13,Text-Miscellaneous,Tumor,textPlaceOfDiagnosis,60,NPCR,,Nar,Ti,
+2610,14,Text-Treatment,Tumor,rxTextSurgery,1000,NPCR,,Nar,Ti,
+2620,14,Text-Treatment,Tumor,rxTextRadiation,1000,NPCR,,Nar,Ti,
+2630,14,Text-Treatment,Tumor,rxTextRadiationOther,1000,NPCR,,Nar,Ti,
+2640,14,Text-Treatment,Tumor,rxTextChemo,1000,NPCR,,Nar,Ti,
+2650,14,Text-Treatment,Tumor,rxTextHormone,1000,NPCR,,Nar,Ti,
+2660,14,Text-Treatment,Tumor,rxTextBrm,1000,NPCR,,Nar,Ti,
+2670,14,Text-Treatment,Tumor,rxTextOther,1000,NPCR,,Nar,Ti,
+1200,15,Treatment-1st Course,Tumor,rxDateSurgery,8,CoC,LL72-0,Qn,D,LL72-0
+1201,15,Treatment-1st Course,Tumor,rxDateSurgeryFlag,2,NAACCR,LL907-7,Nom,@,LL907-7
+1210,15,Treatment-1st Course,Tumor,rxDateRadiation,8,CoC,LL73-8,Qn,D,LL73-8
+1211,15,Treatment-1st Course,Tumor,rxDateRadiationFlag,2,NAACCR,LL908-5,Nom,@,LL908-5
+1220,15,Treatment-1st Course,Tumor,rxDateChemo,8,CoC,LL74-6,Qn,D,LL74-6
+1221,15,Treatment-1st Course,Tumor,rxDateChemoFlag,2,NAACCR,LL909-3,Nom,@,LL909-3
+1230,15,Treatment-1st Course,Tumor,rxDateHormone,8,CoC,LL75-3,Qn,D,LL75-3
+1231,15,Treatment-1st Course,Tumor,rxDateHormoneFlag,2,NAACCR,LL910-1,Nom,@,LL910-1
+1240,15,Treatment-1st Course,Tumor,rxDateBrm,8,CoC,LL76-1,Qn,D,LL76-1
+1241,15,Treatment-1st Course,Tumor,rxDateBrmFlag,2,NAACCR,LL911-9,Nom,@,LL911-9
+1250,15,Treatment-1st Course,Tumor,rxDateOther,8,CoC,LL77-9,Qn,D,LL77-9
+1251,15,Treatment-1st Course,Tumor,rxDateOtherFlag,2,NAACCR,LL912-7,Nom,@,LL912-7
+1260,15,Treatment-1st Course,Tumor,dateInitialRxSeer,8,SEER,LL78-7,Qn,D,LL78-7
+1261,15,Treatment-1st Course,Tumor,dateInitialRxSeerFlag,2,NAACCR,LL913-5,Nom,@,dateFlag
+1270,15,Treatment-1st Course,Tumor,date1stCrsRxCoc,8,CoC,LL79-5,Qn,D,LL79-5
+1271,15,Treatment-1st Course,Tumor,date1stCrsRxCocFlag,2,NAACCR,LL914-3,Nom,@,dateFlag
+1280,15,Treatment-1st Course,Tumor,rxDateDxStgProc,8,CoC,LL80-3,Qn,D,LL80-3
+1281,15,Treatment-1st Course,Tumor,rxDateDxStgProcFlag,2,NAACCR,LL915-0,Nom,@,LL915-0
+1285,15,Treatment-1st Course,Tumor,rxSummTreatmentStatus,1,SEER/CoC,LL916-8,Nom,@,LL916-8
+1290,15,Treatment-1st Course,Tumor,rxSummSurgPrimSite,2,SEER/CoC,LL81-1,Nom,@,LL81-1
+1292,15,Treatment-1st Course,Tumor,rxSummScopeRegLnSur,1,SEER/CoC,LL82-9,Nom,@,LL82-9
+1294,15,Treatment-1st Course,Tumor,rxSummSurgOthRegDis,1,SEER/CoC,LL83-7,Nom,@,LL83-7
+1296,15,Treatment-1st Course,Tumor,rxSummRegLnExamined,2,SEER/CoC,LL84-5,Qn,N,LL84-5
+1310,15,Treatment-1st Course,Tumor,rxSummSurgicalApproch,1,CoC,LL86-0,Nom,@,LL86-0
+1320,15,Treatment-1st Course,Tumor,rxSummSurgicalMargins,1,CoC,LL87-8,Nom,@,LL87-8
+1330,15,Treatment-1st Course,Tumor,rxSummReconstruct1st,1,SEER,LL88-6,Nom,@,LL88-6
+1340,15,Treatment-1st Course,Tumor,reasonForNoSurgery,1,SEER/CoC,LL89-4,Nom,@,LL89-4
+1350,15,Treatment-1st Course,Tumor,rxSummDxStgProc,2,CoC,LL90-2,Nom,@,LL90-2
+1360,15,Treatment-1st Course,Tumor,rxSummRadiation,1,SEER,LL91-0,Nom,@,LL91-0
+1370,15,Treatment-1st Course,Tumor,rxSummRadToCns,1,SEER/CoC,LL92-8,Nom,@,LL92-8
+1380,15,Treatment-1st Course,Tumor,rxSummSurgRadSeq,1,SEER/CoC,LL93-6,Nom,@,LL93-6
+1390,15,Treatment-1st Course,Tumor,rxSummChemo,2,SEER/CoC,LL94-4,Nom,@,LL94-4
+1400,15,Treatment-1st Course,Tumor,rxSummHormone,2,SEER/CoC,LL96-9,Nom,@,LL96-9
+1410,15,Treatment-1st Course,Tumor,rxSummBrm,2,SEER/CoC,LL98-5,Nom,@,LL98-5
+1420,15,Treatment-1st Course,Tumor,rxSummOther,1,SEER/CoC,LL99-3,Nom,@,LL99-3
+1430,15,Treatment-1st Course,Tumor,reasonForNoRadiation,1,CoC,LL100-9,Nom,@,LL100-9
+1460,15,Treatment-1st Course,Tumor,rxCodingSystemCurrent,2,NAACCR,LL103-3,Nom,@,LL103-3
+1501,15,Treatment-1st Course,Tumor,phase1DosePerFraction,5,CoC,,Qn,N,
+1502,15,Treatment-1st Course,Tumor,phase1RadiationExternalBeamTech,2,CoC,,Nom,@,phase1RadiationExternalBeamTech
+1503,15,Treatment-1st Course,Tumor,phase1NumberOfFractions,3,CoC,,Qn,N,
+1504,15,Treatment-1st Course,Tumor,phase1RadiationPrimaryTxVolume,2,CoC,,Nom,@,phase1RadiationPrimaryTxVolume
+1505,15,Treatment-1st Course,Tumor,phase1RadiationToDrainingLN,2,CoC,,Nom,@,phase1RadiationToDrainingLN
+1506,15,Treatment-1st Course,Tumor,phase1RadiationTreatmentModality,2,CoC,,Nom,@,phase1RadiationTreatmentModality
+1507,15,Treatment-1st Course,Tumor,phase1TotalDose,6,CoC,,Qn,N,
+1510,15,Treatment-1st Course,Tumor,radRegionalDoseCgy,5,CoC,LL109-0,Qn,N,LL109-0
+1511,15,Treatment-1st Course,Tumor,phase2DosePerFraction,5,CoC,,Qn,N,
+1512,15,Treatment-1st Course,Tumor,phase2RadiationExternalBeamTech,2,CoC,,Nom,@,phase2RadiationExternalBeamTech
+1513,15,Treatment-1st Course,Tumor,phase2NumberOfFractions,3,CoC,,Qn,N,
+1514,15,Treatment-1st Course,Tumor,phase2RadiationPrimaryTxVolume,2,CoC,,Nom,@,phase2RadiationPrimaryTxVolume
+1515,15,Treatment-1st Course,Tumor,phase2RadiationToDrainingLN,2,CoC,,Nom,@,phase2RadiationToDrainingLN
+1516,15,Treatment-1st Course,Tumor,phase2RadiationTreatmentModality,2,CoC,,Nom,@,phase2RadiationTreatmentModality
+1517,15,Treatment-1st Course,Tumor,phase2TotalDose,6,CoC,,Qn,N,
+1520,15,Treatment-1st Course,Tumor,radNoOfTreatmentVol,3,CoC,LL110-8,Qn,N,LL110-8
+1521,15,Treatment-1st Course,Tumor,phase3DosePerFraction,5,CoC,,Qn,N,
+1522,15,Treatment-1st Course,Tumor,phase3RadiationExternalBeamTech,2,CoC,,Nom,@,phase3RadiationExternalBeamTech
+1523,15,Treatment-1st Course,Tumor,phase3NumberOfFractions,3,CoC,,Qn,N,
+1524,15,Treatment-1st Course,Tumor,phase3RadiationPrimaryTxVolume,2,CoC,,Nom,@,phase3RadiationPrimaryTxVolume
+1525,15,Treatment-1st Course,Tumor,phase3RadiationToDrainingLN,2,CoC,,Nom,@,phase3RadiationToDrainingLN
+1526,15,Treatment-1st Course,Tumor,phase3RadiationTreatmentModality,2,CoC,,Nom,@,phase3RadiationTreatmentModality
+1527,15,Treatment-1st Course,Tumor,phase3TotalDose,6,CoC,,Qn,N,
+1531,15,Treatment-1st Course,Tumor,radiationTxDiscontinuedEarly,2,CoC,,Nom,@,radiationTxDiscontinuedEarly
+1532,15,Treatment-1st Course,Tumor,numberPhasesOfRadTxToVolume,2,CoC,,Qn,N,
+1533,15,Treatment-1st Course,Tumor,totalDose,6,CoC,,Qn,N,
+1540,15,Treatment-1st Course,Tumor,radTreatmentVolume,2,CoC,LL112-4,Nom,@,LL112-4
+1550,15,Treatment-1st Course,Tumor,radLocationOfRx,1,CoC,LL113-2,Nom,@,LL113-2
+1570,15,Treatment-1st Course,Tumor,radRegionalRxModality,2,CoC,LL115-7,Nom,@,LL115-7
+1639,15,Treatment-1st Course,Tumor,rxSummSystemicSurSeq,1,CoC,,Nom,@,rxSummSystemicSurSeq
+1640,15,Treatment-1st Course,Tumor,rxSummSurgeryType,2,SEER,,Nom,@,
+1646,15,Treatment-1st Course,Tumor,rxSummSurgSite9802,2,SEER/CoC,LL124-9,Nom,@,LL124-9
+1646,15,Treatment-1st Course,Tumor,rxSummSurgSite9802,2,SEER/CoC,LL124-9,Nom,@,LL124-9
+1647,15,Treatment-1st Course,Tumor,rxSummScopeReg9802,1,SEER/CoC,,Nom,@,
+1648,15,Treatment-1st Course,Tumor,rxSummSurgOth9802,1,SEER/CoC,,Nom,@,
+3170,15,Treatment-1st Course,Tumor,rxDateMostDefinSurg,8,CoC,,Qn,D,
+3171,15,Treatment-1st Course,Tumor,rxDateMostDefinSurgFlag,2,NAACCR,LL924-2,Nom,@,LL924-2
+3180,15,Treatment-1st Course,Tumor,rxDateSurgicalDisch,8,CoC,,Qn,D,
+3181,15,Treatment-1st Course,Tumor,rxDateSurgicalDischFlag,2,NAACCR,LL925-9,Nom,@,LL925-9
+3190,15,Treatment-1st Course,Tumor,readmSameHosp30Days,1,CoC,,Ord,@,readmSameHosp30Days
+3200,15,Treatment-1st Course,Tumor,radBoostRxModality,2,CoC,,Nom,@,radBoostRxModality
+3210,15,Treatment-1st Course,Tumor,radBoostDoseCgy,5,CoC,,Qn,N,
+3220,15,Treatment-1st Course,Tumor,rxDateRadiationEnded,8,CoC,,Qn,D,
+3221,15,Treatment-1st Course,Tumor,rxDateRadiationEndedFlag,2,NAACCR,LL926-7,Nom,@,LL926-7
+3230,15,Treatment-1st Course,Tumor,rxDateSystemic,8,CoC,,Qn,D,
+3231,15,Treatment-1st Course,Tumor,rxDateSystemicFlag,2,NAACCR,,Nom,@,
+3250,15,Treatment-1st Course,Tumor,rxSummTransplntEndocr,2,CoC,,Nom,@,rxSummTransplntEndocr
+3270,15,Treatment-1st Course,Tumor,rxSummPalliativeProc,1,CoC,,Nom,@,rxSummPalliativeProc
+1660,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseDate,8,CoC,LL125-6,Qn,D,LL125-6
+1661,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndcrsDateFlag,2,NAACCR,LL917-6,Nom,@,dateFlag
+1671,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseSurg,2,CoC,,Nom,@,
+1672,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseRad,1,CoC,,Nom,@,
+1673,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseChemo,1,CoC,,Nom,@,
+1674,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseHorm,1,CoC,,Nom,@,
+1675,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseBrm,1,CoC,,Nom,@,
+1676,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndCourseOth,1,CoC,,Nom,@,
+1677,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndScopeLnSu,1,CoC,,Nom,@,Surg?
+1678,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndSurgOth,1,CoC,,Nom,@,Surg?
+1679,16,Treatment-Subsequent & Other,Tumor,subsqRx2ndRegLnRem,2,CoC,,Nom,@,LnRem?
+1680,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseDate,8,CoC,,Qn,D,
+1681,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdcrsDateFlag,2,NAACCR,,Nom,@,dateFlag
+1691,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseSurg,2,CoC,,Nom,@,
+1692,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseRad,1,CoC,,Nom,@,
+1693,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseChemo,1,CoC,,Nom,@,
+1694,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseHorm,1,CoC,,Nom,@,
+1695,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseBrm,1,CoC,,Nom,@,
+1696,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdCourseOth,1,CoC,,Nom,@,
+1697,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdScopeLnSu,1,CoC,,Nom,@,Surg?
+1698,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdSurgOth,1,CoC,,Nom,@,Surg?
+1699,16,Treatment-Subsequent & Other,Tumor,subsqRx3rdRegLnRem,2,CoC,,Nom,@,LnRem?
+1700,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseDate,8,CoC,,Qn,D,
+1701,16,Treatment-Subsequent & Other,Tumor,subsqRx4thcrsDateFlag,2,NAACCR,,Nom,@,dateFlag
+1711,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseSurg,2,CoC,,Nom,@,
+1712,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseRad,1,CoC,,Nom,@,
+1713,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseChemo,1,CoC,,Nom,@,
+1714,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseHorm,1,CoC,,Nom,@,
+1715,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseBrm,1,CoC,,Nom,@,
+1716,16,Treatment-Subsequent & Other,Tumor,subsqRx4thCourseOth,1,CoC,,Nom,@,
+1717,16,Treatment-Subsequent & Other,Tumor,subsqRx4thScopeLnSu,1,CoC,,Nom,@,Surg?
+1718,16,Treatment-Subsequent & Other,Tumor,subsqRx4thSurgOth,1,CoC,,Nom,@,Surg?
+1719,16,Treatment-Subsequent & Other,Tumor,subsqRx4thRegLnRem,2,CoC,,Nom,@,LnRem?
+1741,16,Treatment-Subsequent & Other,Tumor,subsqRxReconstructDel,1,CoC,LL452-4,Nom,@,LL452-4
+7010,17,Pathology,Tumor,pathReportingFacId1,25,HL7,,Nom,Ti,facility
+7011,17,Pathology,Tumor,pathReportingFacId2,25,HL7,,Nom,Ti,facility
+7012,17,Pathology,Tumor,pathReportingFacId3,25,HL7,,Nom,Ti,facility
+7013,17,Pathology,Tumor,pathReportingFacId4,25,HL7,,Nom,Ti,facility
+7014,17,Pathology,Tumor,pathReportingFacId5,25,HL7,,Nom,Ti,facility
+7090,17,Pathology,Tumor,pathReportNumber1,20,HL7,,Nom,Ti,pathReportNumber
+7091,17,Pathology,Tumor,pathReportNumber2,20,HL7,,Nom,Ti,pathReportNumber
+7092,17,Pathology,Tumor,pathReportNumber3,20,HL7,,Nom,Ti,pathReportNumber
+7093,17,Pathology,Tumor,pathReportNumber4,20,HL7,,Nom,Ti,pathReportNumber
+7094,17,Pathology,Tumor,pathReportNumber5,20,HL7,,Nom,Ti,pathReportNumber
+7100,17,Pathology,Tumor,pathOrderPhysLicNo1,20,HL7,,Nom,Ti,physician
+7101,17,Pathology,Tumor,pathOrderPhysLicNo2,20,HL7,,Nom,Ti,physician
+7102,17,Pathology,Tumor,pathOrderPhysLicNo3,20,HL7,,Nom,Ti,physician
+7103,17,Pathology,Tumor,pathOrderPhysLicNo4,20,HL7,,Nom,Ti,physician
+7104,17,Pathology,Tumor,pathOrderPhysLicNo5,20,HL7,,Nom,Ti,physician
+7190,17,Pathology,Tumor,pathOrderingFacNo1,25,HL7,,Nom,Ti,facility
+7191,17,Pathology,Tumor,pathOrderingFacNo2,25,HL7,,Nom,Ti,facility
+7192,17,Pathology,Tumor,pathOrderingFacNo3,25,HL7,,Nom,Ti,facility
+7193,17,Pathology,Tumor,pathOrderingFacNo4,25,HL7,,Nom,Ti,facility
+7194,17,Pathology,Tumor,pathOrderingFacNo5,25,HL7,,Nom,Ti,facility
+7320,17,Pathology,Tumor,pathDateSpecCollect1,14,HL7,,Qn,D,
+7321,17,Pathology,Tumor,pathDateSpecCollect2,14,HL7,,Qn,D,
+7322,17,Pathology,Tumor,pathDateSpecCollect3,14,HL7,,Qn,D,
+7323,17,Pathology,Tumor,pathDateSpecCollect4,14,HL7,,Qn,D,
+7324,17,Pathology,Tumor,pathDateSpecCollect5,14,HL7,,Qn,D,
+7480,17,Pathology,Tumor,pathReportType1,2,HL7,,Nom,@,pathReportType1
+7481,17,Pathology,Tumor,pathReportType2,2,HL7,,Nom,@,pathReportType2
+7482,17,Pathology,Tumor,pathReportType3,2,HL7,,Nom,@,pathReportType3
+7483,17,Pathology,Tumor,pathReportType4,2,HL7,,Nom,@,pathReportType4
+7484,17,Pathology,Tumor,pathReportType5,2,HL7,,Nom,@,pathReportType5
