@@ -262,8 +262,9 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
                  path='./n:ItemDefs/n:ItemDef',
                  ns=NAACCR1.ns)
 
-
-IO_TESTING and ddictDF(_spark).limit(5).toPandas().set_index('naaccrId')
+if IO_TESTING:
+    ddictDF(_spark).createOrReplaceTempView('ndd180')
+IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
 
 
 # %% [markdown]
@@ -399,6 +400,9 @@ LOINC_NAACCR.measure.groupby('SCALE_TYP')[['COMPONENT']].count()
 # Ideally I'd check by facts as well, but...
 
 # %%
+if IO_TESTING:
+    LOINC_NAACCR.measure_in(_spark)
+
 IO_TESTING and  _spark.sql('''
 with check as (
 select idesc.yr_impl, idesc.yr_retired
@@ -535,6 +539,8 @@ def tumor_item_type(spark: SparkSession_T, cache: Path_T) -> DataFrame:
     spark.catalog.cacheTable('tumor_item_type')
     return spark.table('tumor_item_type')
 
+if IO_TESTING:
+    tumor_item_type(_spark, _cwd / 'naaccr_ddict')
 
 # %% [markdown]
 # #### Any missing?
@@ -556,6 +562,15 @@ from tumor_item_type
 group by naaccrId, length
 having count(distinct valtype_cd) > 1
 ''').toPandas()
+
+
+# %%
+def coded_items(tumor_item_type: DataFrame) -> DataFrame:
+    return tumor_item_type.where("valtype_cd = '@'")
+
+
+IO_TESTING and (coded_items(tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
+                .toPandas().tail())
 
 # %%
 if IO_TESTING:
@@ -612,15 +627,6 @@ select valtype_cd, count(*)
 from tumor_item_type
 group by valtype_cd
 ''').toPandas().set_index('valtype_cd')
-
-
-# %%
-def coded_items(tumor_item_type: DataFrame) -> DataFrame:
-    return tumor_item_type.where("valtype_cd = '@'")
-
-
-IO_TESTING and (coded_items(tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
-                .toPandas().tail())
 
 # %% [markdown]
 # ## NAACCR Flat File v18
@@ -682,8 +688,8 @@ def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
     TODO: remove limitation to coded items
     """
     cols = coded_items(tumor_item_type(spark, cache)).toPandas()
-    cols = cols[cols.sectionid == cancerID]
-    colnames = cols.xmlId.values.tolist()
+    cols = cols[cols.sectionId == cancerID]
+    colnames = cols.naaccrId.values.tolist()
     # TODO: test data for morphTypebehavIcdO2 etc.
     colnames = [cn for cn in colnames if cn in tumors.columns]
     return tumors.sample(False, portion).select(colnames)
@@ -865,15 +871,15 @@ def melt(df: DataFrame,
 
 # %%
 def naaccr_coded_obs(records: DataFrame, ty: DataFrame) -> DataFrame:
-    value_vars = [row.xmlId for row in
+    value_vars = [row.naaccrId for row in
                   ty.where(ty.valtype_cd == '@').collect()]
     # TODO: test data for morphTypebehavIcdO2 etc.
-    value_vars = [xmlId for xmlId in value_vars if xmlId in records.columns]
+    value_vars = [naaccrId for naaccrId in value_vars if naaccrId in records.columns]
 
     dated = naaccr_dates(records, TumorKeys.dtcols)
     df = melt(dated,
               TumorKeys.key4 + TumorKeys.dtcols,
-              value_vars, var_name='xmlId', value_name='code')
+              value_vars, var_name='naaccrId', value_name='code')
     return df.where(func.trim(df.code) > '')
 
 
