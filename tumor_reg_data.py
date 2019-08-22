@@ -375,15 +375,16 @@ where yr_impl = '366'
 class LOINC_NAACCR:
     # spark CSV parser doesn't seem to be up to parsing these.
     measure = pd.read_csv('relma/loinc_naaccr.csv')
+    measure = measure.where(measure.notnull(), None)
     answer = pd.read_csv('relma/loinc_naaccr_answer.csv')
 
 _spark.createDataFrame(
-    LOINC_NAACCR.measure[['CODE_VALUE', 'SCALE_TYP', 'AnswerListId']],
+    LOINC_NAACCR.measure[['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']],
     ty.StructType([ty.StructField(n, ty.StringType())
-                   for n in ['CODE_VALUE', 'SCALE_TYP', 'AnswerListId']])
+                   for n in ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']])
 ).createOrReplaceTempView('loinc_naaccr')
 
-LOINC_NAACCR.measure[['CODE_VALUE', 'COMPONENT', 'SCALE_TYP', 'AnswerListId']].set_index('CODE_VALUE').head()
+LOINC_NAACCR.measure[['LOINC_NUM', 'CODE_VALUE', 'COMPONENT', 'SCALE_TYP', 'AnswerListId']].set_index(['LOINC_NUM', 'COMPONENT']).head()
 
 # %%
 LOINC_NAACCR.measure.groupby('SCALE_TYP')[['COMPONENT']].count()
@@ -468,6 +469,9 @@ select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
      , ln.scale_typ, ln.AnswerListId
      , r.type r_type
      , case
+         when r.type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
+         when (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') and nd.length = 2 then 'dateFlag'
+         when AnswerListId is not null then AnswerListId
          when naaccrId in ('patientIdNumber', 'accessionNumberHosp', 'patientSystemIdHosp') then 'patientIdNumber'
          when naaccrId like 'pathOrderPhysLicNo%' and nd.length = 20 then 'physician'
          when naaccrId like 'pathReportNumber%' and nd.length = 20 then 'pathReportNumber'
@@ -482,7 +486,6 @@ select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
          when (naaccrId like 'stateAtDxGeocode%') then 'state'
          when (naaccrId like 'secondaryDiagnosis%' and nd.length = 7) then 'ICD10'
          when (naaccrId like 'comorbidComplication%' and nd.length = 5) then 'ICD9'
-         when (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') and nd.length = 2 then 'dateFlag'
          when naaccrId in ('diagnosticProc7387', 'gradeIcdO1') then '?'
          when naaccrId like 'subsqRx%RegLnRem' then 'LnRem?' -- ISSUE: Nom vs Ord?
          when naaccrId like 'subsqRx%ScopeLnSu' or naaccrId like 'subsqRx%SurgOth' then 'Surg?'
@@ -494,7 +497,6 @@ select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
          when naaccrId like 'csVersion%' then 'version'
          when s.section like 'Stage%' and sectionId = 11 and dataType is null and nd.length <= 5 then naaccrId
          when r.type = 'factor' and nd.length <= 5 then naaccrId
-         when r.type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
          when r.type in ('override', 'facility', 'boolean01') then r.type
        end nom_scheme
 from ndd180 nd
@@ -525,7 +527,8 @@ from src
 )
 , with_valtype as (
 select with_scale.*
-     , case
+     , case  -- LOINC scale_typ -> i2b2 valtype_cd, identifier flag
+       when naaccrId = 'ageAtDiagnosis' then 'Ni'
        when
          (scale_typ = 'Nar' and length >= 10)
          or
@@ -534,7 +537,7 @@ select with_scale.*
            or
            nom_scheme in ('patientIdNumber', 'facility', 'geo')))
        then 'Ti'
-       when naaccrId = 'ageAtDiagnosis' then 'Ni'
+       when scale_typ = 'Nar' and AnswerListId is not null and length <= 2 then '@'
        when scale_typ = 'Qn' and (
          naaccrId like '%LabValue'
          or
@@ -575,14 +578,18 @@ from with_valtype
 where section not like '%Confidential'
 ''')
 
-_spark.table('tumor_item_type').toPandas().sort_values(['sectionId', 'parentXmlElement', 'length', 'naaccrNum']).to_csv('tumor_item_type.csv')
+(_spark.table('tumor_item_type')
+ .toPandas()
+ .sort_values(['sectionId', 'naaccrNum'])
+ .set_index('naaccrNum')
+ .to_csv('tumor_item_type.csv')
+)
 
 _spark.sql('''
 select *
 from tumor_item_type
 where valtype_cd is null or  scale_typ is null
-order by sectionId, parentXmlElement, length desc, naaccrNum
-''').toPandas()
+''').toPandas().sort_values(['sectionId', 'naaccrNum']).set_index('naaccrNum')
 
 # %% [markdown]
 # ### Curate item type rules spreadsheet?
