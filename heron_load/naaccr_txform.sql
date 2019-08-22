@@ -151,41 +151,44 @@ from (
   ) where i > 960 and i < 970) ne;
 */
 
-create or replace view tumor_item_type as
+create or replace temporary view tumor_item_type as
 select ns.sectionid
      , ns.section
-     , ni."ItemNbr" ItemNbr
-     , ni."Format"
-     , ni."AllowValue"
+     , ni.ItemNbr ItemNbr
+     , concat('NAACCR|', ni.ItemNbr, ':') concept_cd
+     , cast(FieldLength as integer) as FieldLength
+     , ni.Format
+     , ni.AllowValue
      , ni.valtype_cd
-     , ni."ItemName" as ItemName
-     , ni."ItemID" as itemid
+     , ni.ItemName as ItemName
+     , ni.xmlId
+     , ni.ItemID as itemid
 from (
 select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
-         when ni."ItemName" like 'Reserved%' then null
-         when ni."FieldLength" is null then null
+         when ni.ItemName like 'Reserved%' then null
+         when ni.FieldLength is null then null
 
-         when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
-         when ni."ItemName" like '%Tumor Size%' then 'N'
-         when ni."ItemName" like '%ICD-O-1' then '@'
-         when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
-         when ni."ItemName" like 'Comorbid/Complication%' then '@'
+         when ni.ItemName =  'Rad--Regional Dose: CGY' then 'N'
+         when ni.ItemName like '%Tumor Size%' then 'N'
+         when ni.ItemName like '%ICD-O-1' then '@'
+         when ni.AllowValue like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
+         when ni.ItemName like 'Comorbid/Complication%' then '@'
 
-         when ni."ItemName" = 'Patient ID Number' then 'Ti'
-         when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
-         when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
+         when ni.ItemName = 'Patient ID Number' then 'Ti'
+         when ni.ItemName in ('Latitude', 'Longitude') then 'Ni'         
+         when ni.AllowValue = 'City name or UNKNOWN' then 'Ti'
          -- TODO: handle YYYYMMDDhhmmss as date?
-         when ni."Format" = 'YYYYMMDD' then 'D'
-         when ni."ItemName" like 'Text--%' then 'Ti'
-         when ni."ItemName" like 'Age%' then 'Ni'
-         when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
-         when ni."AllowValue" like '10-digit%' and ni."ItemName" not like '%ID' then 'Ni'
-         when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
- 
+         when ni.Format = 'YYYYMMDD' then 'D'
+         when ni.ItemName like 'Text--%' then 'Ti'
+         when ni.ItemName like 'Age%' then 'Ni'
+         when ni.AllowValue like 'Census Tract Codes 00%' then 'Ti'
+         when ni.AllowValue like '10-digit%' and ni.ItemName not like '%ID' then 'Ni'
+         when ni.Format like 'Numbers or upper case letters%' then 'Ti'
+
           -- fields 3 characters or smaller are codes that aren't PHI
-         when to_number("FieldLength") <= 3 then '@'
+         when cast(FieldLength as integer) <= 3 then '@'
           -- In certain sections, fields up to 5 characters are non-PHI codes
-         when to_number("FieldLength") <= 5 and ni."SectionID" in (
+         when cast(FieldLength as integer) <= 5 and ni.SectionID in (
   1 -- Cancer Identification
  , 2 -- Demographic
 -- , 3 -- Edit Overrides/Conversion History/System Admin
@@ -207,14 +210,14 @@ select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_dei
 , 16 -- Treatment-Subsequent & Other
 , 17 -- Pathology
          ) then '@'
-         when ni."Format" like '%zero filled' then 'Ni'
+         when ni.Format like '%zero filled' then 'Ni'
          else 'Ti'
        end valtype_cd
      , ni.*
-from naacr.t_item ni
+from t_item ni
 ) ni
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-and ni.valtype_cd is not null
+left join section ns on ns.SectionID = ni.SectionID
+where ni.valtype_cd is not null
 ;
 
 insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1)
@@ -282,7 +285,7 @@ select case_index
 from naacr.extract_eav ne
 join tumor_item_type ni
   on ne.itemnbr = ni.ItemNbr
-join NAACR.t_section ns on ns.sectionid = to_number(ni.SectionID)
+join section ns on ns.sectionid = to_number(ni.SectionID)
 where ne.value is not null
 and ni.valtype_cd is not null
 ;
@@ -313,14 +316,54 @@ from naacr.extract ne
 where ne."Accession Number--Hosp" is not null;
 
 
-
+/*
 -- select * from tumor_reg_visits;
 -- select count(*) from tumor_reg_visits;
 -- 65576
+*/
 
 /**
  * i2b2 style facts
  */
+create or replace temporary view tumor_reg_coded_facts as
+select patientIdNumber MRN, recordId encounter_ide
+     , concept_cd, xmlId
+     , abstractedBy  -- ISSUE: use as provider_id?
+     , '@' provider_id
+     , start_date
+     , '@' modifier_cd
+     , 1 instance_num
+     , valtype_cd
+     , cast(null as string) tval_char
+     , cast(null as float) nval_num
+     , cast(null as string) valueflag_cd
+     , cast(null as string) units_cd
+     , start_date as end_date
+     , '@' location_cd
+     , dateCaseLastChanged as update_date
+from (
+select
+  cv.recordId,
+  cv.patientIdNumber,
+  cv.abstractedBy,
+  cv.dateCaseLastChanged,
+  concat(ty.concept_cd, cv.code) as concept_cd,
+  ty.xmlId,
+  ty.valtype_cd,
+  case
+  -- Use Date of Last Contact for Follow-up/Recurrence/Death
+  when ty.sectionid = 4
+  then cv.dateOfLastContact
+  -- Use Date of Diagnosis for everything else
+  else cv.DateOfDiagnosis
+  end as start_date
+from tumor_coded_value cv
+join tumor_item_type ty on ty.xmlId = cv.xmlId
+/* TODO: figure out what's up with the 42 records with no Date of Diagnosis
+and the ones with no date of last contact */
+)
+where start_date is not null;
+
 create or replace view tumor_reg_facts as
 select MRN, encounter_ide
      , concept_cd, ItemName

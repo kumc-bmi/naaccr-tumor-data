@@ -10,6 +10,14 @@ part of the HERON* open source codebase; see NOTICE file for license details.
  * see also: naacr_init.sql, naacr_txform.sql
  */
 
+/* check that the data dictionary is loaded */
+select 1 from data_descriptor where 1 = 0;
+select 1 from record_layout where 1 = 0;
+select 1 from section where 1 = 0;
+
+/* oh for bind parameters... */
+select task_id from current_task where 1=0;
+
 /* Check that we're running in the identified repository. */
 select * from NightHeronData.observation_fact where 1=0;
 
@@ -166,6 +174,7 @@ and label = 'title'
 select * from icd_o_morph order by path;
 */
 
+
 /** tumor_reg_codes - one row for each distinct concept_cd in the data
  *  - NAACCR|III:CCC concept codes: one row per code value per coded item
  *  - NAACCR|NNN: concept codes: one per non-coded (numeric, date, ...) item
@@ -250,80 +259,69 @@ left join (
  and label.codenbr = tc.codenbr
 ;
 
+/*
 -- eyeball it:
 -- select * from tumor_reg_concepts order by sectionid, itemnbr, codenbr;
 -- select count(*) from tumor_reg_concepts;
 -- 1849 (in test)
+*/
 
 
-delete from BlueHeronMetadata.NAACCR_ONTOLOGY@deid;
+create or replace temporary view t_item as
+select dd.item as ItemNbr
+     , rl.xmlId
+     , dd.name as ItemName
+     , dd.Format
+     , dd.allow_value as AllowValue
+     , dd.length as FieldLength
+     , s.sectionid as SectionID
+     , monotonically_increasing_id() as ItemId
+from data_descriptor dd
+join record_layout rl on rl.item = dd.item
+join section s on s.section = rl.section;
 
-insert into BlueHeronMetadata.NAACCR_ONTOLOGY@deid (
-  c_hlevel, c_fullname, c_name, c_basecode, c_dimcode, c_visualattributes,
-  c_synonym_cd, c_facttablecolumn, c_tablename, c_columnname, c_columndatatype,
-  c_operator, m_applied_path,
-  update_date, import_date, sourcesystem_cd
-)
-select i2b2_root.c_hlevel + terms.c_hlevel as c_hlevel
-     , i2b2_root.c_fullname || naaccr_folder.path || terms.path as c_fullname
-     , terms.concept_name
-     , terms.concept_cd
-     , i2b2_root.c_fullname || naaccr_folder.path || terms.path as c_dimcode
-     , c_visualattributes,
-  norm.*,
-  sysdate as update_date, sysdate as import_date,
-  tumor_reg_source.source_cd as sourcesystem_cd
-from
-(
+create or replace temporary view naaccr_ont_aux as
+
 select 1 as c_hlevel
      , '' as path
      , 'Cancer Cases (NAACCR Hierarchy)' as concept_name
      , null as concept_cd
      , 'FA' as c_visualattributes
-from dual
+from (values('X'))
 
 union all
 /* Section concepts */
 select 2 as c_hlevel
-     , 'S:' || nts.sectionid || ' ' || section || '\' as path
-     , trim(to_char(nts.sectionid, '09')) || ' ' || section as concept_name
+     , concat('S:', nts.sectionid, ' ', section, '\\') as path
+     , concat(trim(format_string('%02d', nts.sectionid)), ' ', section) as concept_name
      , null as concept_cd
      , case
-       when trc.sectionid is null then 'FH'
+       when '@@trc.sectionid' is null then 'FH'
        else 'FA'
        end as c_visualattributes
-from NAACR.t_section nts
-left join (
-  select distinct sectionid
-  from tumor_reg_codes) trc
-  on trc.sectionid = nts.sectionid
+from section nts
 
 union all
 /* Item concepts */
 select 3 as c_hlevel
-     , 'S:' || ns.sectionid || ' ' || ns.section || '\'
-       || substr(trim(to_char(ni."ItemNbr", '0999')) || ' ' || ni."ItemName", 1, 40) || '\' as path
-     , trim(to_char(ni."ItemNbr", '0999')) || ' ' || ni."ItemName" as concept_name
-     , 'NAACCR|' || ni."ItemNbr" || ':' as concept_cd
+     , concat('S:', ns.sectionid, ' ', ns.section, '\\',
+              substr(concat(trim(format_string('%04d', ni.ItemNbr)), ' ', ni.ItemName), 1, 40), '\\') as path
+     , concat(trim(format_string('%04d', ni.ItemNbr)), ' ', ni.ItemName) as concept_name
+     , concat('NAACCR|', ni.ItemNbr, ':') as concept_cd
      , case
-         when ni."ItemNbr" in (
+         when ni.ItemNbr in (
                     -- hide Histology since
                     -- we already have Morph--Type/Behav
                     '0420', '0522')
-              or viz1 is null -- hide concepts where we have no data
+              or '@@viz1' is null -- hide concepts where we have no data
               then 'LH'
-         else viz1 || 'A'
+         else concat('L', 'A')  -- @@TODO: case when codenbr is null then 'L' else 'F' end as viz1
        end c_visualattributes
-from NAACR.t_section ns
-join NAACR.t_item ni on ns.sectionid = to_number(ni."SectionID")
-left join (
-  select distinct itemnbr,
-    case when codenbr is null then 'L' else 'F' end as viz1
-  from tumor_reg_codes) trc
-  on ni."ItemNbr" = trc.itemnbr
+from section ns
+join t_item ni on ns.sectionid = cast(ni.SectionID as int)
 
-union all
-/* Code concepts */
+
+/* Code concepts -- TODO
 select distinct 4 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
        || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\'
@@ -343,8 +341,9 @@ from tumor_reg_concepts
 where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
 
 union all
+*/
 
-/* Primary site concepts */
+/* Primary site concepts -- TODO
 select distinct lvl + 1 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
        || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\'
@@ -355,8 +354,9 @@ select distinct lvl + 1 as c_hlevel
      , icdo.c_visualattributes
 from icd_o_topo icdo, tumor_reg_concepts
 where itemnbr  = 400
+*/
 
-/* Morph--Type/Behav concepts */
+/* Morph--Type/Behav concepts -- TODO
 union all
 select distinct lvl + 1 as c_hlevel
      , 'S:' || sectionid || ' ' || section || '\'
@@ -370,7 +370,9 @@ from icd_o_morph icdo, tumor_reg_concepts tr
 where tr.itemnbr in (419, 521)
 
 union all
-/* SEER Site Summary concepts*/
+*/
+
+/* SEER Site Summary concepts --TODO
 select 2 as c_hlevel
      , 'SEER Site\' as path
      , 'SEER Site Summary' as concept_name
@@ -388,13 +390,41 @@ select 3 + hlevel as c_hlevel
      , visualattributes as c_visualattributes
 from seer_site_terms@deid
 ) terms
-, (select 'naaccr\' as path
+*/
+;
+
+
+create or replace temporary view naaccr_ontology as
+select i2b2_root.c_hlevel + terms.c_hlevel as c_hlevel
+     , concat(i2b2_root.c_fullname, naaccr_folder.path, terms.path) as c_fullname
+     , terms.concept_name as c_name
+     , terms.concept_cd as c_basecode
+     , concat(i2b2_root.c_fullname, naaccr_folder.path, terms.path) as c_dimcode
+     , (select task_id from current_task) as c_comment
+     , c_visualattributes
+     , norm.*
+     , current_timestamp as update_date, current_timestamp as import_date -- @@ISSUE: ambient
+     , tumor_reg_source.source_cd as sourcesystem_cd
+from
+
+naaccr_ont_aux terms
+cross join (select 'naaccr\\' as path
      , 'NAACCR' as concept_name
-     from dual) naaccr_folder
-, (select 0 c_hlevel, '\i2b2\' c_fullname from dual) i2b2_root
-, BlueHeronMetadata.normal_concept@deid norm
-, (select * from NightHeronData.source_master
-   where source_cd like 'tumor_registry@%') tumor_reg_source;
+     from (values('X'))) naaccr_folder
+cross join (select 0 c_hlevel, '\\i2b2\\' c_fullname from (values('X'))) i2b2_root
+cross join (
+  select 'N' as c_synonym_cd
+       , 'concept_cd' as c_facttablecolumn
+       , 'concept_dimension' as c_tablename
+       , 'CONCEPT_PATH' as c_columnname
+       , 'T' c_columndatatype
+       , 'like' c_operator
+       , '@' m_applied_path
+  from (values('X'))
+) norm
+cross join (select 'tumor_registry@kumed.com' as source_cd
+   from (values('X'))) tumor_reg_source
+;
 
 
 /* Regression tests for earlier bugs. */

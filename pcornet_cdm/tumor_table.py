@@ -13,9 +13,12 @@ and ch10 is from running naaccr_dd_scrape.py on
 """
 
 import re
+import logging
 
 # See requirements.txt, CONTRIBUTING.md
 import pandas as pd
+
+log = logging.getLogger(__name__)
 
 
 def main(argv, cwd):
@@ -61,32 +64,27 @@ class DataDictionary(object):
 
     def fields(self, data_raw, ch10):
         fields = pd.DataFrame({
+            'name': self.info.name_literal,
+            'xmlId': self.info.name,
             'TABLE_NAME': self.table_name,
             'FIELD_NAME': self.info.name.apply(upper_snake_case),
-            # TODO: 'RDBMS_DATA_TYPE': self.info.type,
-            # TODO: 'SAS_DATA_TYPE': self.info.type,
-            # TODO: 'DATA_FORMAT': self.field_info.type,
-            # TODO: 'REPLICATED_FIELD': 'NO',
-            # TODO: 'UNIT_OF_MEASURE': '',
-        })
-        fields['item'] = self.info.index
+            'RDBMS_DATA_TYPE': 'TODO',  # self.info.type,
+            'SAS_DATA_TYPE': 'TODO',  # self.info.type,
+            'DATA_FORMAT': self.info.type,
+            'REPLICATED_FIELD': 'NO',
+            'UNIT_OF_MEASURE': '',
+        },
+                              index=self.info.index)
         fields = fields[~fields.FIELD_NAME.str.startswith('RESERVED')]
         fields['FIELD_ORDER'] = range(1, len(fields) + 1)
 
-        fields = fields.set_index('item')
-        ch10 = ch10.set_index('item')
-        fields['FIELD_DEFINITION'] = ch10.description
-        fields = fields.reset_index()
+        fields['FIELD_DEFINITION'] = ch10.set_index('item').description
 
-        fields = fields.set_index(['TABLE_NAME', 'FIELD_NAME'])\
-                       .sort_values('FIELD_ORDER')
-        vals = self.valuesets(data_raw).reset_index()
-        vals = vals.groupby(['TABLE_NAME', 'FIELD_NAME'])
+        vals = self.valuesets(data_raw).reset_index().groupby(['item'])
         fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
         desc = vals.VALUESET_ITEM_DESCRIPTOR.apply(';'.join)
         fields['VALUESET_DESCRIPTOR'] = desc
-        return fields[['VALUESET', 'VALUESET_DESCRIPTOR',
-                       'FIELD_DEFINITION', 'FIELD_ORDER']]
+        return fields
 
     def valuesets(self, data_raw):
         found = []
@@ -97,6 +95,12 @@ class DataDictionary(object):
             codes = pd.read_csv(info, skiprows=skiprows,
                                 na_filter=False,
                                 dtype={'code': str, 'label': str})
+            items = self.info[self.info.name == info.stem]
+            if not len(items):
+                log.warn('bad valueset filename? %s', info)
+                continue
+            codes['item'] = items.index[0]
+            codes['xmlId'] = info.stem
             if 'code' not in codes.columns or 'label' not in codes.columns:
                 raise ValueError((info, codes.columns))
             codes['TABLE_NAME'] = self.table_name
@@ -106,7 +110,7 @@ class DataDictionary(object):
             found.append(codes)
         vals = pd.concat(found)
         vals = vals.set_index(['TABLE_NAME', 'FIELD_NAME', 'VALUESET_ITEM'])
-        return vals[['VALUESET_ITEM_DESCRIPTOR', 'means_missing']]
+        return vals[['VALUESET_ITEM_DESCRIPTOR', 'means_missing', 'item']]
 
 
 def upper_snake_case(camel):
@@ -122,6 +126,8 @@ if __name__ == '__main__':
         from pathlib import Path
         from sys import argv
 
+        logging.basicConfig(level=logging.DEBUG if '--verbose' in argv
+                            else logging.INFO)
         main(argv[:], Path('.'))
 
     _script()
