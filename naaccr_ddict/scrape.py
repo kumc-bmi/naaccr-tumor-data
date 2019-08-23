@@ -25,7 +25,7 @@ organized in a straightforward table)::
     >>> (ItemDescription.chapter, ItemDescription.filename)
     (10, 'item_description.csv')
     >>> csv_hd(ItemDescription)
-    item,xmlId,parentTag,description
+    item,length,source,yr_impl,vs_impl,yr_retired,vs_retired,cols,xmlId,parentTag,description
 
 
 In addition to the CSV headers, we distinguish int from string fields
@@ -203,23 +203,35 @@ class RecordLayout(PageData, namedtuple(
 
 
 class ItemDescription(PageData, namedtuple(
-        'ItemDescription', ['item', 'xmlId', 'parentTag', 'description'])):
+        'ItemDescription', [
+            'item', 'length', 'source',
+            'yr_impl', 'vs_impl', 'yr_retired', 'vs_retired',
+            'cols',
+            'xmlId', 'parentTag',
+            'description'
+        ])):
 
     chapter = 10
     filename = 'item_description.csv'
 
     @classmethod
     def scrapeDoc(cls, doc):
-        item = xmlId = parentTag = description = None
+        item = itemDetail = xmlId = parentTag = description = None
 
         for section in doc.findall('body/form/div[@id="Panel2"]/*'):
             if section.tag == 'table' and section.find(
                     'tr[@class="tableColTitle"]'):
                 if item:
-                    yield cls(item, xmlId, parentTag, description)
-                    item = xmlId = parentTag = description = None
+                    [item, length, source,
+                     yr_impl, vs_impl, yr_retired, vs_retired,
+                     cols] = itemDetail
+                    yield cls(item, length, source,
+                              yr_impl, vs_impl, yr_retired, vs_retired,
+                              cols, xmlId, parentTag, description)
+                    item = itemDetail = xmlId = parentTag = description = None
                 detail = section.find('tr[@class="tableColData"]')
-                item = _text(detail.find('td'))
+                itemDetail = [_text(cell) for cell in detail.findall('td')]
+                item = itemDetail[0]
             elif section.tag == 'table' and 'XML NAACCR ID' in _text(section):
                 rows = section.findall('tr')
                 xmlId = _text(rows[1].findall('td')[1])
@@ -233,7 +245,12 @@ class ItemDescription(PageData, namedtuple(
                 pass
 
         if item:
-            yield cls(item, xmlId, parentTag, description)
+            [item, length, source,
+             yr_impl, vs_impl, yr_retired, vs_retired,
+             cols] = itemDetail
+            yield cls(item, length, source,
+                      yr_impl, vs_impl, yr_retired, vs_retired,
+                      cols, xmlId, parentTag, description)
 
 
 class Section(PageData, namedtuple(

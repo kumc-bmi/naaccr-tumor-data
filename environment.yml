@@ -1,0 +1,13 @@
+# Usage:
+#   $ conda env create -f environment.yml
+# or perhaps
+#   $ conda env create --force -n pytr3b -f environment.yml
+#
+# See also Dependencies section of CONTRIBUTING
+name: py3tr
+dependencies:
+  - python=3.7
+  - tabulate
+  - pyspark==2.4.3
+  - pandas==0.24.2
+  - luigi

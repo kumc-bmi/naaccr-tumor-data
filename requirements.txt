@@ -18,3 +18,7 @@ jupyter==1.0.0
 
 pandas==0.24.2
 # Successfully installed numpy-1.16.4 pandas-0.24.2 pytz-2019.1
+
+luigi
+# Successfully installed docutils-0.15.2 lockfile-0.12.2 luigi-2.8.7
+# python-daemon-2.1.2 tornado-4.5.3
