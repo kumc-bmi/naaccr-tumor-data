@@ -101,7 +101,7 @@ class JDBCTableTarget(luigi.Target):
 
 class NAACCR_Ontology1(SparkJDBCTask):
     design_id = pv.StrParam(
-        default='upper',
+        default='leafs',
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which

@@ -14,7 +14,12 @@ select itemnbr from naacr.extract_eav where 1=0;
 select name from seer_site_terms@deid where 1=0;
 
 -- check for metadata tables
-select * from naacr.t_item where 1=0;
+select naaccrId from ndd180 where dep = 'naaccr-dictionary-180.xml'
+select section from record_layout where dep = 'naaccr_ddict/record_layout.csv';
+select source from item_description where dep = 'naaccr_ddict/item_description.csv';
+select loinc_num from loinc_naaccr where dep = 'loinc_naaccr.csv'
+select type from field_info where dep = 'naaccr_r_raw/field_info.csv'
+select scheme from field_code_scheme where dep = 'naaccr_r_raw/field_code_scheme.csv'
 
 alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 
@@ -153,7 +158,7 @@ from (
 
 create or replace temporary view tumor_item_type as
 with src as (
-select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId
+select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId, naaccrName
      , nd.dataType, nd.length, nd.allowUnlimitedText
      , idesc.source
      , loinc_num, ln.AnswerListId, ln.scale_typ
@@ -182,7 +187,7 @@ from src
 )
 ,
 with_scale as (
-select sectionId, section, parentXmlElement, naaccrNum, naaccrId
+select sectionId, section, parentXmlElement, naaccrNum, naaccrId, naaccrName
      , dataType, length, allowUnlimitedText, source
      , loinc_num, AnswerListId
      , case
@@ -272,7 +277,7 @@ from with_scale
 )
 select sectionId, section
      -- , parentXmlElement
-     , naaccrNum, naaccrId
+     , naaccrNum, naaccrId, naaccrName
      -- , dataType
      , length, source
      , loinc_num, scale_typ, AnswerListId
