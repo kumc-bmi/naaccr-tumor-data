@@ -241,6 +241,8 @@ select with_scale.*
            or
            phi_id_kind is not null))
        then 'Ti'
+       when naaccrId in ('registryId', 'npiRegistryId', 'vendorName')
+       then 'T'
        when scale_typ = 'Nar' and AnswerListId is not null and length <= 2 then '@'
        when scale_typ = 'Qn' and (
          naaccrId like '%LabValue'
@@ -251,8 +253,6 @@ select with_scale.*
        -- when nom_scheme in ('dateFlag', 'staging') then '@'
        when scale_typ in ('Nom', 'Ord') and (
          naaccrId in ('primarySite', 'histologyIcdO2', 'histologicTypeIcdO3', 'behaviorCodeIcdO3') -- lists from WHO
-         or
-         naaccrId in ('registryId', 'npiRegistryId', 'vendorName')
          or
          (naaccrId like 'secondaryDiagnosis%' and length = 7) -- 'ICD10'
          or
