@@ -4,6 +4,7 @@ clues from:
 https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 """
 
+from importlib import resources as res
 from contextlib import contextmanager
 import logging
 
@@ -12,9 +13,10 @@ from py4j.java_gateway import JavaGateway, GatewayParameters
 from pyspark.sql import SparkSession, functions as func
 import luigi
 
+import tumor_reg_data as td
+import tumor_reg_ont as tr_ont
+import heron_load
 import param_val as pv
-from tumor_reg_ont import NAACCR1, NAACCR_I2B2
-from tumor_reg_data import TumorKeys
 
 log = logging.getLogger(__name__)
 
@@ -90,12 +92,12 @@ class JDBCTableTarget(luigi.Target):
         self.query = query
         self._task = jdbc_task
 
-    def exists(self):
+    def exists(self) -> bool:
         with self._task.connection() as conn:
             try:
                 stmt = conn.createStatement()
                 rs = stmt.executeQuery(self.query)
-                return rs.next()  # at least one row
+                return not not rs.next()  # at least one row
             except Exception:
                 return False
 
@@ -134,8 +136,9 @@ class NAACCR_Ontology1(SparkJDBCTask):
           select "{self.task_id}" as task_id from (values('X'))
         ''')
 
-        ont = NAACCR_I2B2.ont_view_in(spark, self.naaccr_ddict.resolve())
-        ont_upper = ont.toDF(*[n.upper() for n in ont.columns])
+        ont = tr_ont.NAACCR_I2B2.ont_view_in(
+            spark, self.naaccr_ddict.resolve())
+        ont_upper = tr_ont.toDF(*[n.upper() for n in ont.columns])
         self.jdbc_access(ont_upper.write, self.table_name, mode='overwrite')
 
 
@@ -170,7 +173,7 @@ class NAACCR_FlatFile(luigi.Task):
         >>> NAACCR_FlatFile._checkItem(record0, 'npiRegistryId', 'XXX')
         False
         '''
-        itemDef = NAACCR1.itemDef(naaccrId)
+        itemDef = tr_ont.NAACCR1.itemDef(naaccrId)
         [startColumn, length] = [int(itemDef.attrib[it])
                                  for it in ['startColumn', 'length']]
         startColumn -= 1
@@ -186,9 +189,8 @@ class NAACCR_FlatFile(luigi.Task):
         raise NotImplementedError('NAACCR flat file staging is manual.')
 
 
-class NAACCR_Patients(SparkJDBCTask):
-    design_id = pv.StrParam('patient_num')
-    table_name = "NAACCR_PATIENTS"
+class _NAACCR_JDBC(SparkJDBCTask):
+    table_name: str
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
 
@@ -200,9 +202,7 @@ class NAACCR_Patients(SparkJDBCTask):
     def output(self):
         query = f"""
           (select 1 from {self.table_name}
-           where task_id = '{self.task_id}'
-           and row_number() over (patientIdNumber) = 1
-          )
+           where task_id = '{self.task_id}')
         """
         return JDBCTableTarget(self, query)
 
@@ -210,9 +210,57 @@ class NAACCR_Patients(SparkJDBCTask):
         spark = SparkSession(sparkContext)
         [ff] = self.requires()
         naaccr_text_lines = spark.read.text(str(ff.flat_file))
-        patients = TumorKeys.patients(spark, naaccr_text_lines)
-        patients = patients.withColumn('task_id', func.lit(self.task_id))
+
+        data = self._data(spark, naaccr_text_lines)
+        data = data.withColumn('task_id', func.lit(self.task_id))
+        data = data.toDF(*[n.upper() for n in data.columns])
+        self.jdbc_access(data.write, self.table_name, mode='overwrite')
+
+    def _data(self, spark, naaccr_text_lines):
+        raise NotImplementedError('subclass must implement')
+
+
+class NAACCR_Visits(_NAACCR_JDBC):
+    design_id = pv.StrParam('patient_num')
+    table_name = "NAACCR_TUMORS"
+    encounter_num_start = pv.IntParam(description='see client.cfg')
+
+    def _data(self, spark, naaccr_text_lines):
+        tumors = td.TumorKeys.with_tumor_id(
+            td.TumorKeys.pat_tmr(spark, naaccr_text_lines))
+        tumors = td.TumorKeys.with_rownum(
+            tumors, start=self.encounter_num_start)
+        return tumors
+
+
+class NAACCR_Patients(_NAACCR_JDBC):
+    design_id = pv.StrParam('refactor dimensions')
+    table_name = "NAACCR_PATIENTS"
+
+    def _data(self, spark, naaccr_text_lines):
+        patients = td.TumorKeys.patients(spark, naaccr_text_lines)
         patients = patients.withColumn('patient_num',
                                        func.lit(None).cast('int'))
-        pat_upper = patients.toDF(*[n.upper() for n in patients.columns])
-        self.jdbc_access(pat_upper.write, self.table_name, mode='overwrite')
+        return patients
+
+
+class NAACCR_Facts(_NAACCR_JDBC):
+    table_name = "NAACCR_OBSERVATIONS"
+
+    naaccr_ddict = pv.PathParam(significant=False)
+
+    coded_view = 'tumor_coded_value'  # in
+    naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
+    fact_view = 'tumor_reg_coded_facts'  # out
+
+    design_id = pv.StrParam('loinc map dups 3 (%d)' % len(naaccr_txform))
+
+    def _data(self, spark, naaccr_text_lines):
+        extract = td.naaccr_read_fwf(naaccr_text_lines, tr_ont.ddictDF(spark))
+        ty = tr_ont.NAACCR_I2B2.tumor_item_type(spark, self.naaccr_ddict)
+        obs = td.naaccr_coded_obs(extract, ty)
+        obs = td.TumorKeys.with_tumor_id(obs)
+        obs.createOrReplaceTempView(self.coded_view)
+        tr_ont.create_object(self.fact_view, self.naaccr_txform, spark)
+        data = spark.table(self.fact_view)
+        return data

@@ -29,7 +29,7 @@ import logging
 
 # %%
 # 3rd party code: PyData
-from pyspark.sql import SparkSession as SparkSession_T
+from pyspark.sql import SparkSession as SparkSession_T, Window
 from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
 from pyspark import sql as sq
@@ -266,7 +266,7 @@ import tumor_reg_ont
 importlib.reload(tumor_reg_ont)
 
 # %%
-IO_TESTING and tumor_item_type(_spark, _cwd / 'naaccr_ddict').limit(5).toPandas()
+IO_TESTING and tumor_reg_ont.NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict').limit(5).toPandas()
 
 # %% [markdown]
 # #### Any missing?
@@ -684,11 +684,21 @@ class TumorKeys:
                                for col in extra])
         return data.withColumn(name, id_col)
 
+    @classmethod
+    def with_rownum(cls, tumors: DataFrame,
+                    start=1,
+                    new_col='encounter_num',
+                    key_col='recordId') -> DataFrame:
+        tumors = tumors.withColumn(
+            new_col,
+            func.lit(start) +
+            func.row_number().over(Window.orderBy(key_col)))
+        return tumors
 
 # pat_tmr.cache()
 if IO_TESTING:
-    _pat_tmr = TumorKeys.with_tumor_id(
-        TumorKeys.pat_tmr(_spark, _naaccr_text_lines))
+    _pat_tmr = TumorKeys.with_rownum(TumorKeys.with_tumor_id(
+        TumorKeys.pat_tmr(_spark, _naaccr_text_lines)))
     _patients = TumorKeys.patients(_spark, _naaccr_text_lines)
 IO_TESTING and (_pat_tmr, _patients)
 
