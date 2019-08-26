@@ -20,7 +20,6 @@ import loinc_naaccr  # included with permission
 # naaccr_xml_res corresponds to
 # https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/
 import naaccr_xml_res
-import naaccr_xml_samples
 import naaccr_xml_xsd
 
 
