@@ -1,0 +1,11 @@
+name: py3tr
+dependencies:
+  - python=3.7
+  - pyspark==2.4.3
+  - pandas==0.24.2
+  - luigi
+  - jupyter
+  - mypy
+  - flake8
+  - pip:
+      - pyspark-stubs
