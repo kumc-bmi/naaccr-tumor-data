@@ -13,7 +13,7 @@ from pyspark.sql import SparkSession
 import luigi
 
 import param_val as pv
-from tumor_reg_ont import NAACCR_I2B2
+from tumor_reg_ont import NAACCR1, NAACCR_I2B2
 
 log = logging.getLogger(__name__)
 
@@ -136,3 +136,54 @@ class NAACCR_Ontology1(SparkJDBCTask):
         ont = NAACCR_I2B2.ont_view_in(spark, self.naaccr_ddict.resolve())
         ont_upper = ont.toDF(*[n.upper() for n in ont.columns])
         self.jdbc_access(ont_upper.write, self.table_name, mode='overwrite')
+
+
+class NAACCR_FlatFile(luigi.Task):
+    naaccrRecordVersion = pv.IntParam(default=180)
+    dateCaseReportExported = pv.DateParam()
+    npiRegistryId = pv.StrParam()
+    flat_file = pv.PathParam()
+
+    def complete(self):
+        if self.naaccrRecordVersion != 180:
+            raise NotImplementedError()
+
+        with self.flat_file.open() as records:
+            record0 = records.readline()
+
+        vOk = self._checkItem(record0, 'naaccrRecordVersion',
+                              str(self.naaccrRecordVersion))
+        regOk = self._checkItem(record0, 'npiRegistryId',
+                                self.npiRegistryId)
+        dtOk = self._checkItem(record0, 'dateCaseReportExported',
+                               self.dateCaseReportExported.strftime('%Y%m%d'))
+        return vOk and regOk and dtOk
+
+    @classmethod
+    def _checkItem(cls, record, naaccrId, expected):
+        '''
+        >>> npi = '12345678901'
+        >>> record0 = ' ' * 19 + npi
+        >>> NAACCR_FlatFile._checkItem(record0, 'npiRegistryId', npi)
+        True
+        >>> NAACCR_FlatFile._checkItem(record0, 'npiRegistryId', 'XXX')
+        False
+        '''
+        itemDef = NAACCR1.itemDef(naaccrId)
+        [startColumn, length] = [int(itemDef.attrib[it])
+                                 for it in ['startColumn', 'length']]
+        startColumn -= 1
+        actual = record[startColumn:startColumn + length]
+        if actual != expected:
+            log.warn('%s: expected %s [%s:%s] = {%s} but found {%s}',
+                     cls.__name__, naaccrId,
+                     startColumn - 1, startColumn + length,
+                     expected, actual)
+        return actual == expected
+
+    def run(self):
+        raise NotImplementedError('NAACCR flat file staging is manual.')
+
+
+class NAACCR_Patients(luigi.Task):
+    pass

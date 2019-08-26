@@ -102,6 +102,16 @@ class NAACCR1:
     uri = 'http://naaccr.org/naaccrxml'
     ns = {'n': uri}
 
+    @classmethod
+    def itemDef(cls, naaccrId):
+        """
+        >>> NAACCR1.itemDef('npiRegistryId').attrib['startColumn']
+        '20'
+        """
+        ndd = cls.ndd180.getroot()
+        defPath = f'./n:ItemDefs/n:ItemDef[@naaccrId="{naaccrId}"]'
+        return ndd.find(defPath, cls.ns)
+
 
 def eltSchema(xsd_complex_type: XML.Element,
               simpleContent: bool = False) -> ty.StructType:
