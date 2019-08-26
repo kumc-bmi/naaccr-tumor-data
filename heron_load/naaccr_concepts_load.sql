@@ -10,10 +10,12 @@ part of the HERON* open source codebase; see NOTICE file for license details.
  * see also: naacr_init.sql, naacr_txform.sql
  */
 
-/* check that the data dictionary is loaded */
+/* check that the LOINC answers, scraped chapters, and R labels loaded */
+select answer_code from loinc_naaccr_answers where dep = 'loinc_naaccr_answers.csv';
 select 1 from data_descriptor where 1 = 0;
 select 1 from record_layout where 1 = 0;
 select 1 from section where 1 = 0;
+select label from code_labels where dep = 'code-labels';
 
 /* oh for bind parameters... */
 select task_id from current_task where 1=0;
@@ -27,6 +29,7 @@ oops... typo in schema name. keep it that way?
 select * from naacr.extract where 1=0;
 
 /* check that transformation views are in place */
+select valtype_cd from tumor_item_type where dep = 'naaccr_txform.sql';
 select * from tumor_item_value tiv where 1=0;
 
 /* check that metadata_init.sql was run to create the ontology table. */
@@ -266,81 +269,90 @@ left join (
 -- 1849 (in test)
 */
 
+create or replace temporary view naaccr_code_values as
+select sectionId, section, naaccrNum, naaccrId
+     , concat('NAACCR|', naaccrNum, ':',
+              coalesce(rl.code, la.answer_code)) concept_cd
+     , answer_code, rl.code
+     , concat(coalesce(rl.code, la.answer_code), ' ',
+              coalesce(rl.label, la.answer_string)) as name_char
+     , answer_string
+     , rl.label
+     , rl.description c_tooltip
+     , loinc_num, ty.AnswerListId, sequence_no
+     , rl.scheme, rl.means_missing
+from tumor_item_type ty
+left join loinc_naaccr_answers la
+       on la.code_value = ty.naaccrNum
+      and la.answerlistid = ty.AnswerListId
+      and answer_code is not null
+left join code_labels rl
+       on rl.item = ty.naaccrNum
+      and (la.answerlistid is null or rl.code = la.answer_code)
+where ty.valtype_cd = '@'
+;
 
-create or replace temporary view t_item as
-select dd.item as ItemNbr
-     , dd.name as ItemName
-     , dd.Format
-     , dd.allow_value as AllowValue
-     , dd.length as FieldLength
-     , s.sectionid as SectionID
-     , monotonically_increasing_id() as ItemId
-from data_descriptor dd
-join record_layout rl on rl.item = dd.item
-join section s on s.section = rl.section;
 
 create or replace temporary view naaccr_ont_aux as
 
+with root as (
 select 1 as c_hlevel
      , '' as path
      , 'Cancer Cases (NAACCR Hierarchy)' as concept_name
      , null as concept_cd
      , 'FA' as c_visualattributes
 from (values('X'))
+),
 
-union all
-/* Section concepts */
+section_concepts as (
 select 2 as c_hlevel
      , concat('S:', nts.sectionid, ' ', section, '\\') as path
      , concat(trim(format_string('%02d', nts.sectionid)), ' ', section) as concept_name
      , null as concept_cd
-     , case
-       when '@@trc.sectionid' is null then 'FH'
-       else 'FA'
-       end as c_visualattributes
+     , 'FA' as c_visualattributes
+     , nts.section
 from section nts
+),
 
-union all
-/* Item concepts */
+item_concepts as (
 select 3 as c_hlevel
-     , concat('S:', ns.sectionid, ' ', ns.section, '\\',
-              substr(concat(trim(format_string('%04d', ni.ItemNbr)), ' ', ni.ItemName), 1, 40), '\\') as path
-     , concat(trim(format_string('%04d', ni.ItemNbr)), ' ', ni.ItemName) as concept_name
-     , concat('NAACCR|', ni.ItemNbr, ':') as concept_cd
+     , concat(sc.path,
+       -- ISSUE: migrate from naaccrName to naaccrId for path?
+              substr(concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName), 1, 40), '\\') as path
+     , concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName) as concept_name
+     , concat('NAACCR|', ni.naaccrNum, ':') as concept_cd
      , case
-         when ni.ItemNbr in (
-                    -- hide Histology since
-                    -- we already have Morph--Type/Behav
-                    '0420', '0522')
-              or '@@viz1' is null -- hide concepts where we have no data
-              then 'LH'
-         else concat('L', 'A')  -- @@TODO: case when codenbr is null then 'L' else 'F' end as viz1
-       end c_visualattributes
-from section ns
-join t_item ni on ns.sectionid = cast(ni.SectionID as int)
+       when ni.valtype_cd = '@' then 'FA'
+       else 'LA' -- TODO: hide concepts where we have no data
+                 -- TODO: hide Histology since '0420', '0522'
+                 -- we already have Morph--Type/Behav
+       end as c_visualattributes
+     , ni.naaccrNum
+from tumor_item_type ni
+join section_concepts sc on sc.section = ni.section
+),
 
-
-/* Code concepts -- TODO
+code_concepts as (
 select distinct 4 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\'
-       || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\'
-       || substr(c_name, 1, 40) || '\'
-       as concept_path
-     , c_name as concept_name
-     , concept_cd
-     , case
+     , concat(ic.path,
+              substr(v.name_char, 1, 40), '\\')
+       as path
+     , v.name_char as concept_name
+     , v.concept_cd
+     , /* TODO: case
        when itemnbr in (
                     -- hide Histology since
                     -- we already have Morph--Type/Behav
                     '0420', '0522')
        then 'LH'
        else c_visualattributes
-       end as c_visualattributes
-from tumor_reg_concepts
-where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
+       end as*/ 'LA' as c_visualattributes
+from naaccr_code_values v
+join item_concepts ic on ic.naaccrNum = v.naaccrNum
+),
 
-union all
-*/
+-- TODO: where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
+
 
 /* Primary site concepts -- TODO
 select distinct lvl + 1 as c_hlevel
@@ -369,9 +381,8 @@ from icd_o_morph icdo, tumor_reg_concepts tr
 where tr.itemnbr in (419, 521)
 */
 
-union all
 
-/* SEER Site Summary concepts */
+seer_terms as (
 select 2 as c_hlevel
      , 'SEER Site\\' as path
      , 'SEER Site Summary' as concept_name
@@ -388,13 +399,23 @@ select 3 + hlevel as c_hlevel
        else concat('SEER_SITE:', basecode) end as concept_cd
      , visualattributes as c_visualattributes
 from seer_site_terms
+)
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from root
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from section_concepts
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from item_concepts
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from code_concepts
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from seer_site_terms
 ;
 
 
 create or replace temporary view naaccr_ontology as
 select i2b2_root.c_hlevel + terms.c_hlevel as c_hlevel
      , concat(i2b2_root.c_fullname, naaccr_folder.path, terms.path) as c_fullname
-     , terms.concept_name as c_name
+     , substr(terms.concept_name, 1, 200) as c_name
      , terms.concept_cd as c_basecode
      , concat(i2b2_root.c_fullname, naaccr_folder.path, terms.path) as c_dimcode
      , (select task_id from current_task) as c_comment

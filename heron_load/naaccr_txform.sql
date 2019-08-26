@@ -14,7 +14,12 @@ select itemnbr from naacr.extract_eav where 1=0;
 select name from seer_site_terms@deid where 1=0;
 
 -- check for metadata tables
-select * from naacr.t_item where 1=0;
+select naaccrId from ndd180 where dep = 'naaccr-dictionary-180.xml';
+select section from record_layout where dep = 'naaccr_ddict/record_layout.csv';
+select source from item_description where dep = 'naaccr_ddict/item_description.csv';
+select loinc_num from loinc_naaccr where dep = 'loinc_naaccr.csv'
+select type from field_info where dep = 'naaccr_r_raw/field_info.csv'
+select scheme from field_code_scheme where dep = 'naaccr_r_raw/field_code_scheme.csv'
 
 alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 
@@ -151,70 +156,137 @@ from (
   ) where i > 960 and i < 970) ne;
 */
 
-create or replace view tumor_item_type as
-select ns.sectionid
-     , ns.section
-     , ni."ItemNbr" ItemNbr
-     , ni."Format"
-     , ni."AllowValue"
-     , ni.valtype_cd
-     , ni."ItemName" as ItemName
-     , ni."ItemID" as itemid
-from (
-select case -- Determine valtype_cd, including '_i' PHI flag (see i2b2_facts_deid.sql)
-         when ni."ItemName" like 'Reserved%' then null
-         when ni."FieldLength" is null then null
+create or replace temporary view tumor_item_type as
+with src as (
+select s.sectionId, rl.section, nd.parentXmlElement, nd.naaccrNum, nd.naaccrId, naaccrName
+     , nd.dataType, nd.length, nd.allowUnlimitedText
+     , idesc.source
+     , loinc_num, ln.AnswerListId, ln.scale_typ
+     , r.type r_type, rcs.scheme
+from ndd180 nd
+left join record_layout rl on rl.item = nd.naaccrNum
+left join item_description idesc on idesc.item = nd.naaccrNum
+left join section s on s.section = rl.section
+left join loinc_naaccr ln on ln.code_value = nd.naaccrNum
+left join field_info r on r.item = nd.naaccrNum
+left join field_code_scheme rcs on rcs.name = nd.naaccrId
+)
+, with_phi as (
+select src.*
+     , case
+         when r_type in ('city', 'census_tract', 'census_block', 'county', 'postal') then 'geo'
+         when naaccrId in ('patientIdNumber', 'accessionNumberHosp', 'patientSystemIdHosp') then 'patientIdNumber'
+         when naaccrId like 'pathOrderPhysLicNo%' and length = 20 then 'physician'
+         when naaccrId like 'pathReportNumber%' and length = 20 then 'pathReportNumber'
+         when naaccrId in ('reportingFacility', 'npiReportingFacility', 'archiveFin', 'npiArchiveFin')
+           or naaccrId like 'pathReportingFacId%'
+           or (naaccrId like '%FacNo%' and length = 25)
+           then 'facility'
+       end phi_id_kind
+from src
+)
+,
+with_scale as (
+select sectionId, section, parentXmlElement, naaccrNum, naaccrId, naaccrName
+     , dataType, length, allowUnlimitedText, source
+     , loinc_num, AnswerListId
+     , case
+       when scale_typ is not null and scale_typ != '-' then scale_typ
+       when allowUnlimitedText then 'Nar'
+       when r_type in ('boolean01', 'boolean12', 'override') then 'Ord'
+       when
+         AnswerListId is not null or
+         scheme is not null or
+         phi_id_kind is not null or
+         naaccrId in ('registryId', 'npiRegistryId', 'vendorName') or
+         naaccrId like 'stateAtDxGeocode%' or
+         (naaccrId like 'date%Flag' or naaccrId like '%DateFlag') or
+         naaccrId like 'csVersion%' or
+         (section like 'Stage%' and sectionId = 11 and length <= 5) or
+         (naaccrId like 'secondaryDiagnosis%' and length = 7) or -- 'ICD10'
+         (naaccrId like 'comorbidComplication%' and length = 5) or -- 'ICD9'
+         (source in ('SEER', 'AJCC', 'NPCR') and length in (5, 13, 15) and dataType is null) or
+         naaccrId in ('tnmPathDescriptor', 'tnmClinDescriptor') or
+         naaccrId like 'subsqRx%RegLnRem' or -- lynpm nodes ISSUE: Nom vs Ord?
+         (naaccrId like 'subsqRx%ScopeLnSu' or naaccrId like 'subsqRx%SurgOth') or -- Surgery
+         (r_type = 'factor' and length <= 5)
+       then 'Nom' -- ISSUE: Nom vs. Ord
+       when
+         (dataType = 'date' and r_type = 'Date')
+         or
+         (r_type in ('integer', 'sentineled_integer', 'sentineled_numeric'))
+       then 'Qn'
+       when
+         naaccrId = 'diagnosticProc7387' or
+         (source in ('SEER', 'AJCC', 'NPCR') and length in (13, 15) and dataType is null)
+       then '?'
+       end scale_typ
+     , r_type, scheme
+     , phi_id_kind
+from with_phi
+)
+, with_valtype as (
+select with_scale.*
+     , case  -- LOINC scale_typ -> i2b2 valtype_cd, identifier flag
+       when naaccrId = 'ageAtDiagnosis' then 'Ni'
+       when
+         (scale_typ = 'Nar' and length >= 10)
+         or
+         (r_type in ('city', 'census_tract', 'census_block', 'county', 'postal'))
+         or
+         (scale_typ = 'Nom' and
+          (length >= 20
+           or
+           (length >= 13 and r_type = 'character')
+           or
+           phi_id_kind is not null))
+       then 'Ti'
+       when naaccrId in ('registryId', 'npiRegistryId', 'vendorName')
+       then 'T'
+       when scale_typ = 'Nar' and AnswerListId is not null and length <= 2 then '@'
+       when scale_typ = 'Qn' and (
+         naaccrId like '%LabValue'
+         or
+         (dataType = 'digits' and length <= 6)
+       ) then 'N'
+       when dataType = 'date' and scale_typ = 'Qn' and length in (8, 14) then 'D'
+       -- when nom_scheme in ('dateFlag', 'staging') then '@'
+       when scale_typ in ('Nom', 'Ord') and (
+         naaccrId in ('primarySite', 'histologyIcdO2', 'histologicTypeIcdO3', 'behaviorCodeIcdO3') -- lists from WHO
+         or
+         (naaccrId like 'secondaryDiagnosis%' and length = 7) -- 'ICD10'
+         or
+         (naaccrId like 'comorbidComplication%' and length = 5) -- 'ICD9'
+         or
+         naaccrId like 'csVersion%'
+         or
+         (AnswerListId is not null and length <= 5)
+         or
+         (scheme is not null and length <= 5)
+         or
+         length <= 5
+         -- @@ nom_scheme in ('ICD9', 'ICD10', , 'version')
+       ) then '@'
+       when
+         scale_typ = '?'or
+         naaccrId in ('gradeIcdO1', 'siteIcdO1', 'histologyIcdO1',
+                      'crcChecksum', 'unusualFollowUpMethod')
+       then '?'
+       end as valtype_cd
+from with_scale
+)
+select sectionId, section
+     -- , parentXmlElement
+     , naaccrNum, naaccrId, naaccrName
+     -- , dataType
+     , length, source
+     , loinc_num, scale_typ, AnswerListId
+     , scheme -- , r_type
+     , valtype_cd
+     , phi_id_kind
 
-         when ni."ItemName" =  'Rad--Regional Dose: CGY' then 'N'
-         when ni."ItemName" like '%Tumor Size%' then 'N'
-         when ni."ItemName" like '%ICD-O-1' then '@'
-         when ni."AllowValue" like 'Valid ICD-7, ICD-8, ICD-9%' then '@'
-         when ni."ItemName" like 'Comorbid/Complication%' then '@'
-
-         when ni."ItemName" = 'Patient ID Number' then 'Ti'
-         when ni."ItemName" in ('Latitude', 'Longitude') then 'Ni'         
-         when ni."AllowValue" = 'City name or UNKNOWN' then 'Ti'
-         -- TODO: handle YYYYMMDDhhmmss as date?
-         when ni."Format" = 'YYYYMMDD' then 'D'
-         when ni."ItemName" like 'Text--%' then 'Ti'
-         when ni."ItemName" like 'Age%' then 'Ni'
-         when ni."AllowValue" like 'Census Tract Codes 00%' then 'Ti'
-         when ni."AllowValue" like '10-digit%' and ni."ItemName" not like '%ID' then 'Ni'
-         when ni."Format" like 'Numbers or upper case letters%' then 'Ti'
- 
-          -- fields 3 characters or smaller are codes that aren't PHI
-         when to_number("FieldLength") <= 3 then '@'
-          -- In certain sections, fields up to 5 characters are non-PHI codes
-         when to_number("FieldLength") <= 5 and ni."SectionID" in (
-  1 -- Cancer Identification
- , 2 -- Demographic
--- , 3 -- Edit Overrides/Conversion History/System Admin
- , 4 -- Follow-up/Recurrence/Death
--- , 5 -- Hospital-Confidential
- , 6 -- Hospital-Specific
--- , 7 -- Other-Confidential
--- , 8 -- Patient-Confidential
--- , 9 -- Record ID
--- , 10 -- Special Use
- , 11 -- Stage/Prognostic Factors
-     -- TODO: for long lists of numeric codes, find metadata
-     -- and chunking strategy
-     -- TODO: consider normalizing complication 1, complication 2, ...
--- , 12 -- Text-Diagnosis
--- , 13 -- Text-Miscellaneous
--- , 14 -- Text-Treatment
-, 15 -- Treatment-1st Course
-, 16 -- Treatment-Subsequent & Other
-, 17 -- Pathology
-         ) then '@'
-         when ni."Format" like '%zero filled' then 'Ni'
-         else 'Ti'
-       end valtype_cd
-     , ni.*
-from naacr.t_item ni
-) ni
-join NAACR.t_section ns on ns.sectionid = to_number(ni."SectionID")
-and ni.valtype_cd is not null
+from with_valtype
+where section not like '%Confidential'
 ;
 
 insert into etl_test_values (test_domain, test_name, test_value, result_id, result_date, detail_num_1, detail_char_1)
@@ -282,7 +354,7 @@ select case_index
 from naacr.extract_eav ne
 join tumor_item_type ni
   on ne.itemnbr = ni.ItemNbr
-join NAACR.t_section ns on ns.sectionid = to_number(ni.SectionID)
+join section ns on ns.sectionid = to_number(ni.SectionID)
 where ne.value is not null
 and ni.valtype_cd is not null
 ;
@@ -313,14 +385,58 @@ from naacr.extract ne
 where ne."Accession Number--Hosp" is not null;
 
 
-
+/*
 -- select * from tumor_reg_visits;
 -- select count(*) from tumor_reg_visits;
 -- 65576
+*/
 
 /**
  * i2b2 style facts
  */
+create or replace temporary view tumor_reg_coded_facts as
+select patientIdNumber MRN, recordId encounter_ide
+     , concept_cd, naaccrId
+     , abstractedBy  -- ISSUE: use as provider_id?
+     , '@' provider_id
+     , start_date
+     , '@' modifier_cd
+     , 1 instance_num
+     , valtype_cd
+     , cast(null as string) tval_char
+     , cast(null as float) nval_num
+     , cast(null as string) valueflag_cd
+     , cast(null as string) units_cd
+     , start_date as end_date
+     , '@' location_cd
+     , dateCaseLastChanged as update_date
+from (
+select
+  cv.recordId,
+  cv.patientIdNumber,
+  cv.abstractedBy,
+  cv.dateCaseLastChanged,
+  concat('NAACCR|', ty.naaccrNum, ':', cv.code) as concept_cd,
+  ty.naaccrId,
+  ty.valtype_cd,
+  case
+  -- Use Date of Last Contact for Follow-up/Recurrence/Death
+  when ty.sectionid = 4
+  then cv.dateOfLastContact
+  -- Use Date of Diagnosis for everything else
+  else cv.DateOfDiagnosis
+  end as start_date
+from tumor_coded_value cv
+join (
+  -- ISSUE: LOINC mapping is ambiguous
+  select distinct sectionId, naaccrId, naaccrNum, valtype_cd
+  from tumor_item_type
+) ty on ty.naaccrId = cv.naaccrId
+/* TODO: figure out what's up with the 42 records with no Date of Diagnosis
+and the ones with no date of last contact */
+)
+where start_date is not null;
+
 create or replace view tumor_reg_facts as
 select MRN, encounter_ide
      , concept_cd, ItemName

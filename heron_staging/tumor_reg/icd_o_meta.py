@@ -1,8 +1,16 @@
 '''icd_o_meta -- load (aka stage) ICD-O MetaData
 
-Usage::
-  >>> print 'python', ' '.join(Mock.caps()['argv'])
-  python icd_o_meta.py ICD-O-2_CSV ICD-O-3_CSV-meta creds host1 1521 db1
+To load CSV files from two folders into db1:
+
+  >>> usage = 'icd_o_meta.py ICD-O-2_CSV ICD-O-3_CSV-meta creds host1 1521 db1'  # noqa
+
+  >>> io = MockIO()
+  >>> main(usage.split(), io.cwd(), io.create_engine)
+
+  >>> io._engine.execute('select * from who.topo').fetchall() # doctest: +NORMALIZE_WHITESPACE
+  [('C00', '3', 'LIP'),
+   ('C00.0', 'incl', 'Upper lip, NOS'),
+   ('C00.0', 'incl', 'skin of upper lip')]
 
 See `class:MetaFiles` for details about downloading the
 ICD-O-... files from WHO.
@@ -10,34 +18,23 @@ ICD-O-... files from WHO.
 See `class:NightHeron` for assumptions about the WHO schema and tables.
 '''
 
-import StringIO
+from io import StringIO
 import csv
 import logging
 
 from sqlalchemy import MetaData, Table
 
-import ocap_file
-
 log = logging.getLogger(__name__)
 
 
-def main(argv, argv_rd, mk_engine,
-         level=logging.INFO):
-    '''command-line interface; see also Mock() and _initial_caps().
-
-    Ignore SQLite warnings about VARCHAR2.
-    >>> from warnings import catch_warnings
-    >>> with catch_warnings(record=True):
-    ...     main(**Mock.caps())
-    '''
-    logging.basicConfig(level=level)
-
+def main(argv, cwd, create_engine):
     icd_o_2_dir, icd_o_3_dir, db_creds, host, ssh_port, sid = argv[1:7]
 
-    engine = mk_engine(3, db_creds, host, int(ssh_port), sid)
+    engine = create_engine(kumc_url(cwd / db_creds, host, int(ssh_port), sid))
+
     meta = MetaData()
 
-    f2, f3 = [cls(argv_rd(fn))
+    f2, f3 = [cls(cwd / fn)
               for (cls, fn) in [(ICDO2MetaFiles, icd_o_2_dir),
                                 (ICDO3MetaFiles, icd_o_3_dir)]]
     t2, t3 = [cls(engine, meta)
@@ -55,7 +52,7 @@ def load(src, dest, tname, fname, has_header=True):
 
 class MetaFiles(object):
     r'''Oncology MetaFiles from the World Health Organization `materials`__
-    __ http://www.who.int/classifications/icd/adaptations/oncology/en/index.html #noqa
+    __ http://www.who.int/classifications/icd/adaptations/oncology/en/index.html # noqa
 
     tested with:
     b088c4e4bd2d685c9dd04e3b3c14c98b ICD-O-3_CSV-metadata.zip
@@ -75,27 +72,16 @@ C00.0\tincl\tskin of upper lip
 
     def data(self, file_name, has_header, fieldnames,
              sample_size=1000):
-        r'''
-        >>> schema_line = MetaFiles.topo_sample.split('\n')[0]
-
-        >>> mf = MetaFiles(Mock([(MetaFiles.topo, MetaFiles.topo_sample)]))
-        >>> d = mf.data(MetaFiles.topo, has_header=True,
-        ...             fieldnames=schema_line.split())
-        >>> import pprint; pprint.pprint(d)
-        [{'Kode': 'C00', 'Lvl': '3', 'Title': 'LIP'},
-         {'Kode': 'C00.0', 'Lvl': 'incl', 'Title': 'Upper lip, NOS'},
-         {'Kode': 'C00.0', 'Lvl': 'incl', 'Title': 'skin of upper lip'}]
-        '''
-        filerd = self.__src.subRdFile(file_name)
-        sample = filerd.inChannel().read(sample_size)
+        filerd = self.__src / file_name
+        sample = filerd.open().read(sample_size)
         s = csv.Sniffer()
-        data = csv.DictReader(filerd.inChannel(),
+        data = csv.DictReader(filerd.open(),
                               fieldnames=fieldnames,
                               dialect=s.sniff(sample))
         if has_header:
-            data.next()
+            next(data)
 
-        return list(data)
+        return list(dict(r) for r in data)
 
 
 class ICDO2MetaFiles(MetaFiles):
@@ -182,76 +168,64 @@ class NightHeronICDO3(NightHeron):
 
 def kumc_url(db_creds, host, ssh_port,
              sid='KUMC'):
-    u, pw = db_creds.inChannel().read().split()
+    u, pw = db_creds.open().read().split()
     return 'oracle://%s:%s@%s:%d/%s' % (
         u, pw, host, ssh_port, sid)
 
 
-class Mock(object):
-    def __init__(self, items):
-        self._items = items
+class MockIO(object):
+    files = {
+        f'./{d}/{base}': content
+        for d, mf in [
+                ('ICD-O-2_CSV', ICDO2MetaFiles),
+                ('ICD-O-3_CSV-meta', ICDO3MetaFiles),
+        ]
+        for base, content in [
+            (mf.topo, mf.topo_sample),
+            (mf.morph, mf.sample)
+        ]
+    }
+    files.update({'./creds': 'u\np'})
 
-    def subRdFile(self, name):
-        text = [itxt for (n, itxt) in self._items
-                if n == name][0]
-        return ocap_file.Readable(n, None, None,
-                                  lambda n: StringIO.StringIO(text))
+    def __init__(self, files=None,
+                 path=None):
+        if files is None:
+            files = MockIO.files
+        self._files = files
+        self._path = path
+        self._engine = None
 
-    @classmethod
-    def dir_for(cls, mf):
-        return cls([(mf.topo, mf.topo_sample),
-                    (mf.morph, mf.sample)])
+    def cwd(self):
+        return MockIO(path='.')
 
-    @classmethod
-    def caps(cls):
-        files = [('ICD-O-2_CSV', Mock.dir_for(ICDO2MetaFiles)),
-                 ('ICD-O-3_CSV-meta', Mock.dir_for(ICDO3MetaFiles))]
+    def open(self):
+        return StringIO(self._files[self._path])
 
-        argv = ['icd_o_meta.py'] + [n for (n, _) in files] + [
-            'creds', 'host1', '1521', 'db1']
+    def __truediv__(self, other):
+        return self.pathjoin(other)
 
-        return dict(argv=argv[:],
-                    argv_rd=lambda n: dict(files)[n],
-                    mk_engine=cls.engine)
+    def pathjoin(self, other):
+        from posixpath import join
+        return MockIO(path=join(self._path or '.', other))
 
-    @classmethod
-    def engine(cls, ix, creds, host, port, sid):
-        import sqlalchemy
-        e = sqlalchemy.create_engine('sqlite://')
+    def create_engine(self, url):
+        from sqlalchemy import create_engine
+        e = create_engine('sqlite://')
         e.execute("attach database ':memory:' as 'WHO'")
         for cmd in NightHeron.schema.split(';'):
             e.execute(cmd)
+        self._engine = e
         return e
 
 
 if __name__ == '__main__':
-    def _initial_caps():
+    def _script_io():
+        from pathlib import Path
         from sys import argv
-        from os import path, listdir
         from sqlalchemy import create_engine
 
-        def open_rd_universal(path):
-            return file(path, 'rU')
+        logging.basicConfig(level=logging.INFO)
 
-        def rd(n):
-            return ocap_file.Readable(path.abspath(n),
-                                      path, listdir,
-                                      open_rd_universal)
+        main(argv, Path('.'), create_engine)
 
-        def arg_rd(arg):
-            if not arg in argv:
-                raise IOError('not a CLI arg: %s', arg)
-            return rd(arg)
-
-        def mk_engine(ix, cred_fn, host, port, sid):
-            if not argv[ix:ix + 4] == [cred_fn, host, str(port)]:
-                raise IOError('does not match CLI args: %s' % [
-                        ix, cred_fn, host, port, sid])
-            return create_engine(
-                kumc_url(rd(cred_fn), host, port, sid))
-
-        return dict(argv=argv[:],
-                    arg_rd=arg_rd,
-                    mk_engine=mk_engine)
-
-    main(**_initial_caps())
+    _script_io()

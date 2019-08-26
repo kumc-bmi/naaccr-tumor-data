@@ -4,16 +4,19 @@ clues from:
 https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 """
 
+from importlib import resources as res
 from contextlib import contextmanager
 import logging
 
 from luigi.contrib.spark import PySparkTask
 from py4j.java_gateway import JavaGateway, GatewayParameters
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, functions as func
 import luigi
 
+import tumor_reg_data as td
+import tumor_reg_ont as tr_ont
+import heron_load
 import param_val as pv
-from tumor_reg_ont import NAACCR_I2B2
 
 log = logging.getLogger(__name__)
 
@@ -89,19 +92,19 @@ class JDBCTableTarget(luigi.Target):
         self.query = query
         self._task = jdbc_task
 
-    def exists(self):
+    def exists(self) -> bool:
         with self._task.connection() as conn:
             try:
                 stmt = conn.createStatement()
                 rs = stmt.executeQuery(self.query)
-                return rs.next()  # at least one row
+                return not not rs.next()  # at least one row
             except Exception:
                 return False
 
 
 class NAACCR_Ontology1(SparkJDBCTask):
     design_id = pv.StrParam(
-        default='w/seer',
+        default='leafs',
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -138,8 +141,133 @@ class NAACCR_Ontology1(SparkJDBCTask):
           select "{self.task_id}" as task_id from (values('X'))
         ''')
 
-        ont = NAACCR_I2B2.ont_view_in(spark,
-                                      self.naaccr_ddict.resolve(),
-                                      self.seer_recode.resolve())
-        ont_upper = ont.toDF(*[n.upper() for n in ont.columns])
+        ont = tr_ont.NAACCR_I2B2.ont_view_in(
+            spark, self.naaccr_ddict.resolve(),
+            self.seer_recode.resolve())
+        ont_upper = tr_ont.toDF(*[n.upper() for n in ont.columns])
+
         self.jdbc_access(ont_upper.write, self.table_name, mode='overwrite')
+
+
+class NAACCR_FlatFile(luigi.Task):
+    naaccrRecordVersion = pv.IntParam(default=180)
+    dateCaseReportExported = pv.DateParam()
+    npiRegistryId = pv.StrParam()
+    flat_file = pv.PathParam(significant=False)
+
+    def complete(self):
+        if self.naaccrRecordVersion != 180:
+            raise NotImplementedError()
+
+        with self.flat_file.open() as records:
+            record0 = records.readline()
+
+        vOk = self._checkItem(record0, 'naaccrRecordVersion',
+                              str(self.naaccrRecordVersion))
+        regOk = self._checkItem(record0, 'npiRegistryId',
+                                self.npiRegistryId)
+        dtOk = self._checkItem(record0, 'dateCaseReportExported',
+                               self.dateCaseReportExported.strftime('%Y%m%d'))
+        return vOk and regOk and dtOk
+
+    @classmethod
+    def _checkItem(cls, record, naaccrId, expected):
+        '''
+        >>> npi = '12345678901'
+        >>> record0 = ' ' * 19 + npi
+        >>> NAACCR_FlatFile._checkItem(record0, 'npiRegistryId', npi)
+        True
+        >>> NAACCR_FlatFile._checkItem(record0, 'npiRegistryId', 'XXX')
+        False
+        '''
+        itemDef = tr_ont.NAACCR1.itemDef(naaccrId)
+        [startColumn, length] = [int(itemDef.attrib[it])
+                                 for it in ['startColumn', 'length']]
+        startColumn -= 1
+        actual = record[startColumn:startColumn + length]
+        if actual != expected:
+            log.warn('%s: expected %s [%s:%s] = {%s} but found {%s}',
+                     cls.__name__, naaccrId,
+                     startColumn - 1, startColumn + length,
+                     expected, actual)
+        return actual == expected
+
+    def run(self):
+        raise NotImplementedError('NAACCR flat file staging is manual.')
+
+
+class _NAACCR_JDBC(SparkJDBCTask):
+    table_name: str
+    dateCaseReportExported = pv.DateParam()
+    npiRegistryId = pv.StrParam()
+
+    def requires(self):
+        return [NAACCR_FlatFile(
+            dateCaseReportExported=self.dateCaseReportExported,
+            npiRegistryId=self.npiRegistryId)]
+
+    def output(self):
+        query = f"""
+          (select 1 from {self.table_name}
+           where task_id = '{self.task_id}')
+        """
+        return JDBCTableTarget(self, query)
+
+    def main(self, sparkContext, *_args):
+        spark = SparkSession(sparkContext)
+        [ff] = self.requires()
+        naaccr_text_lines = spark.read.text(str(ff.flat_file))
+
+        data = self._data(spark, naaccr_text_lines)
+        data = data.withColumn('task_id', func.lit(self.task_id))
+        data = data.toDF(*[n.upper() for n in data.columns])
+        self.jdbc_access(data.write, self.table_name, mode='overwrite')
+
+    def _data(self, spark, naaccr_text_lines):
+        raise NotImplementedError('subclass must implement')
+
+
+class NAACCR_Visits(_NAACCR_JDBC):
+    design_id = pv.StrParam('patient_num')
+    table_name = "NAACCR_TUMORS"
+    encounter_num_start = pv.IntParam(description='see client.cfg')
+
+    def _data(self, spark, naaccr_text_lines):
+        tumors = td.TumorKeys.with_tumor_id(
+            td.TumorKeys.pat_tmr(spark, naaccr_text_lines))
+        tumors = td.TumorKeys.with_rownum(
+            tumors, start=self.encounter_num_start)
+        return tumors
+
+
+class NAACCR_Patients(_NAACCR_JDBC):
+    design_id = pv.StrParam('refactor dimensions')
+    table_name = "NAACCR_PATIENTS"
+
+    def _data(self, spark, naaccr_text_lines):
+        patients = td.TumorKeys.patients(spark, naaccr_text_lines)
+        patients = patients.withColumn('patient_num',
+                                       func.lit(None).cast('int'))
+        return patients
+
+
+class NAACCR_Facts(_NAACCR_JDBC):
+    table_name = "NAACCR_OBSERVATIONS"
+
+    naaccr_ddict = pv.PathParam(significant=False)
+
+    coded_view = 'tumor_coded_value'  # in
+    naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
+    fact_view = 'tumor_reg_coded_facts'  # out
+
+    design_id = pv.StrParam('loinc map dups 3 (%d)' % len(naaccr_txform))
+
+    def _data(self, spark, naaccr_text_lines):
+        extract = td.naaccr_read_fwf(naaccr_text_lines, tr_ont.ddictDF(spark))
+        ty = tr_ont.NAACCR_I2B2.tumor_item_type(spark, self.naaccr_ddict)
+        obs = td.naaccr_coded_obs(extract, ty)
+        obs = td.TumorKeys.with_tumor_id(obs)
+        obs.createOrReplaceTempView(self.coded_view)
+        tr_ont.create_object(self.fact_view, self.naaccr_txform, spark)
+        data = spark.table(self.fact_view)
+        return data

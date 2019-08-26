@@ -116,6 +116,8 @@ DEBUG: Checking if NAACCR_Ontology1(design_id=upper, naaccr_version=18, naaccr_c
 ```
 
 
+See `client.cfg` for more details on luigi usage.
+
 ---
 
 ### TODO: Coded concepts

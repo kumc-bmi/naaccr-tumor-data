@@ -1,5 +1,6 @@
 naaccr_ddict/?c=*
 *~
+,*
 .ipynb_checkpoints
 *.db
 derby.log
@@ -8,3 +9,8 @@ metastore_db
 vendor/
 __pycache__
 .mypy_cache/
+
+# TODO: license?
+naaccr_ddict/data_descriptor.csv
+naaccr_ddict/item_description.csv
+naaccr_ddict/record_layout.csv
