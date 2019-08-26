@@ -574,7 +574,7 @@ IO_TESTING and (strange_dates(_extract)
 
 
 # %% [markdown]
-# ## Unique key columns
+# ## Patients, Tumors, Unique key columns
 #
 #  - `patientSystemIdHosp` - "This provides a stable identifier to
 #    link back to all reported tumors for a patient. It also serves as
@@ -635,12 +635,24 @@ class TumorKeys:
     @classmethod
     def pat_tmr(cls, spark: SparkSession_T,
                 naaccr_text_lines: DataFrame) -> DataFrame:
+        return cls._pick_cols(spark, naaccr_text_lines,
+                              cls.tmr_attrs + cls.pat_attrs + cls.report_attrs)
+
+    @classmethod
+    def patients(cls, spark: SparkSession_T,
+                 naaccr_text_lines: DataFrame) -> DataFrame:
+        pat = cls._pick_cols(spark, naaccr_text_lines,
+                             cls.pat_ids + cls.pat_attrs + cls.report_ids + cls.report_attrs)
+        return pat.distinct()
+
+    @classmethod
+    def _pick_cols(cls, spark: SparkSession_T,
+                   naaccr_text_lines: DataFrame,
+                   cols: List[str]) -> DataFrame:
         dd = ddictDF(spark)
         pat_tmr = naaccr_read_fwf(
             naaccr_text_lines,
-            dd.where(dd.naaccrId.isin(
-                cls.tmr_attrs + cls.pat_attrs + cls.report_attrs)))
-        # pat_tmr.createOrReplaceTempView('pat_tmr')
+            dd.where(dd.naaccrId.isin(cols)))
         pat_tmr = naaccr_dates(pat_tmr,
                                [c for c in pat_tmr.columns
                                 if c.startswith('date')])
@@ -666,10 +678,14 @@ class TumorKeys:
 if IO_TESTING:
     _pat_tmr = TumorKeys.with_tumor_id(
         TumorKeys.pat_tmr(_spark, _naaccr_text_lines))
-IO_TESTING and _pat_tmr
+    _patients = TumorKeys.patients(_spark, _naaccr_text_lines)
+IO_TESTING and (_pat_tmr, _patients)
 
 # %%
 IO_TESTING and _pat_tmr.limit(15).toPandas()
+
+# %%
+IO_TESTING and _patients.limit(10).toPandas()
 
 
 # %% [markdown]

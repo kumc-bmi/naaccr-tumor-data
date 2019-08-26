@@ -9,11 +9,12 @@ import logging
 
 from luigi.contrib.spark import PySparkTask
 from py4j.java_gateway import JavaGateway, GatewayParameters
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, functions as func
 import luigi
 
 import param_val as pv
 from tumor_reg_ont import NAACCR1, NAACCR_I2B2
+from tumor_reg_data import TumorKeys
 
 log = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ class NAACCR_FlatFile(luigi.Task):
     naaccrRecordVersion = pv.IntParam(default=180)
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
-    flat_file = pv.PathParam()
+    flat_file = pv.PathParam(significant=False)
 
     def complete(self):
         if self.naaccrRecordVersion != 180:
@@ -185,5 +186,33 @@ class NAACCR_FlatFile(luigi.Task):
         raise NotImplementedError('NAACCR flat file staging is manual.')
 
 
-class NAACCR_Patients(luigi.Task):
-    pass
+class NAACCR_Patients(SparkJDBCTask):
+    design_id = pv.StrParam('patient_num')
+    table_name = "NAACCR_PATIENTS"
+    dateCaseReportExported = pv.DateParam()
+    npiRegistryId = pv.StrParam()
+
+    def requires(self):
+        return [NAACCR_FlatFile(
+            dateCaseReportExported=self.dateCaseReportExported,
+            npiRegistryId=self.npiRegistryId)]
+
+    def output(self):
+        query = f"""
+          (select 1 from {self.table_name}
+           where task_id = '{self.task_id}'
+           and row_number() over (patientIdNumber) = 1
+          )
+        """
+        return JDBCTableTarget(self, query)
+
+    def main(self, sparkContext, *_args):
+        spark = SparkSession(sparkContext)
+        [ff] = self.requires()
+        naaccr_text_lines = spark.read.text(str(ff.flat_file))
+        patients = TumorKeys.patients(spark, naaccr_text_lines)
+        patients = patients.withColumn('task_id', func.lit(self.task_id))
+        patients = patients.withColumn('patient_num',
+                                       func.lit(None).cast('int'))
+        pat_upper = patients.toDF(*[n.upper() for n in patients.columns])
+        self.jdbc_access(pat_upper.write, self.table_name, mode='overwrite')
