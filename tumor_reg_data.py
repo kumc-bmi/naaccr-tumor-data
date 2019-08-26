@@ -21,7 +21,7 @@ from importlib import resources as res
 from pathlib import Path as Path_T
 from pprint import pformat
 from sys import stderr
-from typing import Callable, Dict, Iterator, List
+from typing import Callable, ContextManager, Dict, Iterator, List
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import logging
@@ -51,7 +51,7 @@ import bc_qa
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
-from tumor_reg_ont import create_object, DataDictionary
+from tumor_reg_ont import create_object, ScrapedChapters
 import heron_load
 
 
@@ -123,17 +123,17 @@ if IO_TESTING:
 # ## `naaccr-xml` Data Dictionary
 
 # %%
-from tumor_reg_ont import XSD, NAACCR1, ddictDF, NAACCR_I2B2
-
+from tumor_reg_ont import XSD, NAACCR1, LOINC_NAACCR, ddictDF, NAACCR_I2B2
 
 if IO_TESTING:
     ddictDF(_spark).createOrReplaceTempView('ndd180')
 IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
 
 # %%
-_spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
-_ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict')
-_ont.limit(5).toPandas()
+if IO_TESTING:
+    _spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
+    _ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict')
+IO_TESTING and _ont.limit(5).toPandas()
 
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
@@ -295,7 +295,7 @@ def coded_items(tumor_item_type: DataFrame) -> DataFrame:
     return tumor_item_type.where("valtype_cd = '@'")
 
 
-IO_TESTING and (coded_items(tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
+IO_TESTING and (coded_items(NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
                 .toPandas().tail())
 
 # %%
@@ -361,7 +361,7 @@ group by valtype_cd
 if IO_TESTING:
     LOINC_NAACCR.answers_in(_spark)
 
-_spark.table('loinc_naaccr_answers').where('code_value = 380').limit(5).toPandas()
+IO_TESTING and _spark.table('loinc_naaccr_answers').where('code_value = 380').limit(5).toPandas()
 
 # %% [markdown]
 # #### Werth Code Values
@@ -372,11 +372,27 @@ if IO_TESTING:
     _spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
 IO_TESTING and _spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
 
+
 # %% [markdown]
 # ## NAACCR XML Data
 
 # %%
-from tumor_reg_ont import eltSchema
+class NAACCR2:
+    s100x = XML.parse(GzipFile(fileobj=res.open_binary(  # type: ignore # typeshed/issues/2580  # noqa
+        naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
+
+    @classmethod
+    def s100t(cls) -> ContextManager[Path_T]:
+        """
+        TODO: check in results of converting from XML sample
+        using `java -jar ~/opt/naaccr-xml-utility-6.2/lib/naaccr-xml-utility.jar`  # noqa
+        """
+        return res.path(
+            naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.txt')
+
+
+# %%
+from tumor_reg_ont import eltSchema, xmlDF, eltDict
 
 
 def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
@@ -495,7 +511,7 @@ def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
 
     TODO: remove limitation to coded items
     """
-    cols = coded_items(tumor_item_type(spark, cache)).toPandas()
+    cols = coded_items(NAACCR_I2B2.tumor_item_type(spark, cache)).toPandas()
     cols = cols[cols.sectionId == cancerID]
     colnames = cols.naaccrId.values.tolist()
     # TODO: test data for morphTypebehavIcdO2 etc.
@@ -695,7 +711,7 @@ def naaccr_coded_obs(records: DataFrame, ty: DataFrame) -> DataFrame:
 
 if IO_TESTING:
     _coded = naaccr_coded_obs(_extract.sample(True, 0.02),
-                              tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
+                              NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
     _coded = TumorKeys.with_tumor_id(_coded)
 
     _coded.createOrReplaceTempView('tumor_coded_value')
@@ -721,8 +737,6 @@ def naaccr_coded_obs2(spark: SparkSession_T, items: DataFrame,
                  .join(items, items[rownum] == key_rows[rownum])
                  .drop(items[rownum]))
     coded_obs = (coded_obs
-                 # ISSUE: naaccrId vs. xmlId
-                 .withColumnRenamed('naaccrId', 'xmlId')
                  .withColumnRenamed('rownum', 'recordId')
                  # ISSUE: test data for these? make them optiona?
                  .withColumn('abstractedBy', func.lit('@@'))
@@ -735,7 +749,7 @@ if IO_TESTING:
                                            tumorDF(_spark, NAACCR1.s100x))
 
 IO_TESTING and _tumor_coded_value.limit(15).toPandas().set_index(
-    ['recordId', 'xmlId'])
+    ['recordId', 'naaccrId'])
 
 # %%
 naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')

@@ -14,7 +14,7 @@ select itemnbr from naacr.extract_eav where 1=0;
 select name from seer_site_terms@deid where 1=0;
 
 -- check for metadata tables
-select naaccrId from ndd180 where dep = 'naaccr-dictionary-180.xml'
+select naaccrId from ndd180 where dep = 'naaccr-dictionary-180.xml';
 select section from record_layout where dep = 'naaccr_ddict/record_layout.csv';
 select source from item_description where dep = 'naaccr_ddict/item_description.csv';
 select loinc_num from loinc_naaccr where dep = 'loinc_naaccr.csv'
@@ -396,7 +396,7 @@ where ne."Accession Number--Hosp" is not null;
  */
 create or replace temporary view tumor_reg_coded_facts as
 select patientIdNumber MRN, recordId encounter_ide
-     , concept_cd, xmlId
+     , concept_cd, naaccrId
      , abstractedBy  -- ISSUE: use as provider_id?
      , '@' provider_id
      , start_date
@@ -416,8 +416,8 @@ select
   cv.patientIdNumber,
   cv.abstractedBy,
   cv.dateCaseLastChanged,
-  concat(ty.concept_cd, cv.code) as concept_cd,
-  ty.xmlId,
+  concat('NAACCR|', ty.naaccrNum, ':', cv.code) as concept_cd,
+  ty.naaccrId,
   ty.valtype_cd,
   case
   -- Use Date of Last Contact for Follow-up/Recurrence/Death
@@ -427,7 +427,7 @@ select
   else cv.DateOfDiagnosis
   end as start_date
 from tumor_coded_value cv
-join tumor_item_type ty on ty.xmlId = cv.xmlId
+join tumor_item_type ty on ty.naaccrId = cv.naaccrId
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis
 and the ones with no date of last contact */
 )

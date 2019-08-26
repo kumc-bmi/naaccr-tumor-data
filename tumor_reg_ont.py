@@ -1,4 +1,3 @@
-from gzip import GzipFile
 # ISSUE: new in 3.7; use importlib_resources to allow older python?
 # https://stackoverflow.com/questions/6028000/how-to-read-a-static-file-from-inside-a-python-package
 from importlib import resources as res
@@ -93,18 +92,6 @@ class NAACCR1:
 
     data_xsd = XML.parse(res.open_text(
         naaccr_xml_xsd, 'naaccr_data_1.3.xsd'))
-
-    s100x = XML.parse(GzipFile(fileobj=res.open_binary(  # type: ignore # typeshed/issues/2580  # noqa
-        naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
-
-    @classmethod
-    def s100t(cls) -> ContextManager[Path_T]:
-        """
-        TODO: check in results of converting from XML sample
-        using `java -jar ~/opt/naaccr-xml-utility-6.2/lib/naaccr-xml-utility.jar`  # noqa
-        """
-        return res.path(
-            naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.txt')
 
     item_xsd = XSD.the(
         data_xsd.getroot(),
