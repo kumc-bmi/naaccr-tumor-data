@@ -11,6 +11,7 @@ Exploratory design is done using pyspark and jupyter notebook.
   - jupyter notebooks are great for exploration, visualization
   - Spark / Jupyter integration is a bit klunky: restarts...
   - sqldeveloper features I miss: selecting and running a subquery
+    - see SQL IDE below
 
 ---
 
@@ -219,3 +220,25 @@ Then run `pyspark` to launch a jupyter notebook web server.
 
 Notebooks start with `spark` bound to a spark context. By default, a
 derby `metastore_db` is created in the current working directory.
+
+
+## SQL IDE: Oracle Sql Developer with Hive JDBC
+
+
+https://www.cloudera.com/downloads/connectors/hive/jdbc/2-5-15.html
+https://community.cloudera.com/t5/Community-Articles/Connect-Oracle-SQL-Developer-to-Hive/ta-p/244491
+
+
+### open source SQL IDE? sql-squirrel?
+
+I hoped IntelliJ IDEA might provide nice support, but it's only in the
+Ultimate edition; I might as well use Oracle's tool, which I'm
+familiar with, if I'm not going to use an open source IDE.
+https://www.jetbrains.com/help/idea/relational-databases.html
+
+I looked at sql-squirrel and such... it might work, but it's less mature.
+http://squirrel-sql.sourceforge.net/
+https://cwiki.apache.org/confluence/display/Hive/HiveServer2+Clients
+https://search.maven.org/artifact/org.apache.hive/hive-jdbc/3.1.1/jar
+standalone
+
