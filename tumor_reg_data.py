@@ -289,6 +289,17 @@ group by naaccrId, length
 having count(distinct valtype_cd) > 1
 ''').toPandas()
 
+# %% [markdown]
+# **ISSUE: LOINC mapping is ambiguous!**
+
+# %%
+IO_TESTING and _spark.sql('''
+select naaccrId, count(distinct valtype_cd), collect_list(valtype_cd), collect_list(loinc_num)
+from tumor_item_type
+group by naaccrId
+having count(*) > 1
+''').toPandas()
+
 
 # %%
 def coded_items(tumor_item_type: DataFrame) -> DataFrame:
@@ -713,6 +724,7 @@ def melt(df: DataFrame,
 
 # %%
 def naaccr_coded_obs(records: DataFrame, ty: DataFrame) -> DataFrame:
+    ty = ty.select('naaccrId', 'valtype_cd').distinct()  # ISSUE: loinc mapping is ambiguous
     value_vars = [row.naaccrId for row in
                   ty.where(ty.valtype_cd == '@').collect()]
     # TODO: test data for morphTypebehavIcdO2 etc.

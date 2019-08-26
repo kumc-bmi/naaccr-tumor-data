@@ -427,7 +427,11 @@ select
   else cv.DateOfDiagnosis
   end as start_date
 from tumor_coded_value cv
-join tumor_item_type ty on ty.naaccrId = cv.naaccrId
+join (
+  -- ISSUE: LOINC mapping is ambiguous
+  select distinct sectionId, naaccrId, naaccrNum, valtype_cd
+  from tumor_item_type
+) ty on ty.naaccrId = cv.naaccrId
 /* TODO: figure out what's up with the 42 records with no Date of Diagnosis
 and the ones with no date of last contact */
 )
