@@ -68,6 +68,14 @@ In production, we use luigi `PySparkTask`.
 
 ---
 
+## Troubleshooting: Dev UX :-/
+
+  - python/java bridge (py4j) spits out huge java stack traces
+  - luigi re-tries 5x on error
+  - SQL syntax error easily gets lost
+
+---
+
 ## QA with doctest and mypy
 
   - ETL code is often hard to unit test: mocking a DB is expensive

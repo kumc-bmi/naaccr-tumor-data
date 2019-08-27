@@ -6,6 +6,7 @@ https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 
 from importlib import resources as res
 from contextlib import contextmanager
+from typing import Iterator, Optional as Opt, Tuple
 import logging
 
 from luigi.contrib.spark import PySparkTask
@@ -13,20 +14,52 @@ from py4j.java_gateway import JavaGateway, GatewayParameters
 from pyspark.sql import SparkSession, functions as func
 import luigi
 
-import tumor_reg_data as td
-import tumor_reg_ont as tr_ont
+from sql_script import SqlScript
 import heron_load
 import param_val as pv
+import tumor_reg_data as td
+import tumor_reg_ont as tr_ont
 
 log = logging.getLogger(__name__)
 
 
-class SparkJDBCTask(PySparkTask):
-    """Support for JDBC access from spark tasks
-    """
-    driver_memory = '2g'
-    executor_memory = '3g'
+class Connection:
+    # type stubs
+    def createStatement():
+        pass
 
+    def prepareStatement(sql: str):
+        pass
+
+
+class TheJVM:
+    # Ugh... global mutable state
+    __it = None
+    __classpath = None
+
+    @classmethod
+    @contextmanager
+    def borrow(cls, classpath):
+        if cls.__it is None:
+            if cls.__classpath is None:
+                cls.__classpath = classpath
+            else:
+                assert cls.__classpath == classpath
+            cls.__it = cls.__gateway(classpath)
+        yield cls.__it
+
+    @classmethod
+    def __gateway(cls, classpath):
+        from py4j.java_gateway import launch_gateway  # ISSUE: ambient
+
+        port = launch_gateway(die_on_exit=True, classpath=classpath)
+        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port))
+        jvm = gw.jvm
+        jvm = JavaGateway(gateway_parameters=GatewayParameters(port=port)).jvm
+        return jvm
+
+
+class JDBCTask(luigi.Task):
     db_url = pv.StrParam(description='see client.cfg', significant=False)
     driver = pv.StrParam(default="oracle.jdbc.OracleDriver", significant=False)
     user = pv.StrParam(description='see client.cfg', significant=False)
@@ -34,15 +67,53 @@ class SparkJDBCTask(PySparkTask):
                           significant=False)
 
     @property
+    def classpath(self) -> str:
+        raise NotImplementedError('subclass must implement')
+
+    @property
     def __password(self):
         from os import environ  # ISSUE: ambient
         return environ[self.passkey]
+
+    @contextmanager
+    def connection(self):
+        with TheJVM.borrow(self.classpath) as jvm:
+            jvm.java.lang.Class.forName(self.driver)
+            conn = jvm.java.sql.DriverManager.getConnection(
+                self.db_url, self.user, self.__password)
+            try:
+                yield conn
+            finally:
+                conn.close()
+
+    @contextmanager
+    def connect_via_spark(self, spark):
+        # ISSUE: dead code?
+        jvm = spark._jvm
+        jvm.java.lang.Class.forName(self.driver)
+        conn = jvm.java.sql.DriverManager.getConnection(
+            self.db_url, self.user, self.__password)
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+
+class SparkJDBCTask(PySparkTask, JDBCTask):
+    """Support for JDBC access from spark tasks
+    """
+    driver_memory = '2g'
+    executor_memory = '3g'
 
     def output(self):
         raise NotImplementedError
 
     def main(self, sparkContext, *_args):
         raise NotImplementedError
+
+    @property
+    def classpath(self):
+        return ':'.join(self.jars)
 
     def jdbc_access(self, io, table_name: str,
                     **kw_args):
@@ -52,23 +123,6 @@ class SparkJDBCTask(PySparkTask):
                            "password": self.__password,
                            "driver": self.driver,
                        }, **kw_args)
-
-    @contextmanager
-    def connection(self):
-        from py4j.java_gateway import launch_gateway  # ISSUE: ambient
-
-        port = launch_gateway(die_on_exit=True, classpath=':'.join(self.jars))
-        gw = JavaGateway(gateway_parameters=GatewayParameters(port=port))
-        jvm = gw.jvm
-        jvm = JavaGateway(gateway_parameters=GatewayParameters(port=port)).jvm
-        jvm.java.lang.Class.forName(self.driver)
-        conn = jvm.java.sql.DriverManager.getConnection(
-            self.db_url, self.user, self.__password)
-        try:
-            yield conn
-        finally:
-            conn.close()
-            gw.shutdown()
 
 
 class HelloNAACCR(SparkJDBCTask):
@@ -271,3 +325,173 @@ class NAACCR_Facts(_NAACCR_JDBC):
         tr_ont.create_object(self.fact_view, self.naaccr_txform, spark)
         data = spark.table(self.fact_view)
         return data
+
+
+class UploadTask(JDBCTask):
+    '''A task with an associated `upload_status` record.
+    '''
+    schema = pv.StrParam(description='@@TODO: see client.cfg')
+
+    @property
+    def source_cd(self) -> str:
+        raise NotImplementedError('subclass must implement')
+
+    @property
+    def label(self) -> str:
+        raise NotImplementedError('subclass must implement')
+
+    def run_upload(self, spark, conn, upload_id):
+        raise NotImplementedError('subclass must implement')
+
+    @property
+    def transform_name(self) -> str:
+        return self.task_id
+
+    def output(self) -> luigi.Target:
+        return self._upload_target()
+
+    def _upload_target(self) -> 'UploadTarget':
+        return UploadTarget(self, self.schema, self.source_cd)
+
+    def run(self):
+        upload = self._upload_target()
+        with upload.job(label=self.label,
+                        user_id=self.user) as conn_id:
+            conn, upload_id = conn_id
+            self.run_upload(conn, upload_id)
+
+
+class UploadTarget(luigi.Target):
+    def __init__(self, jdbc_task, schema, source_cd) -> None:
+        self._task = jdbc_task
+        self.schema = schema
+        self.source_cd = source_cd
+        self.transform_name = jdbc_task.task_id
+
+    @property
+    def nextval_q(self):
+        # Portability not: Oracle-only
+        return f'''
+          select {self.schema}.sq_uploadstatus_uploadid.nextval as value
+          from dual
+        '''
+
+    def __repr__(self) -> str:
+        return '%s(transform_name=%s)' % (
+            self.__class__.__name__, self.transform_name)
+
+    def exists(self) -> bool:
+        q = f'''
+        select max(upload_id) as upload_id
+        from {self.schema}.upload_status
+        where transform_name = ?
+        and load_status = 'OK'
+        '''
+        with self._task.connection() as conn:
+            stmt = conn.prepareStatement(q)
+            stmt.setString(1, self.transform_name)
+            log.info('@@executeQuery: %s', q)
+            rs = stmt.executeQuery()
+            if not rs.next():
+                return False
+            upload_id = _fix_null(rs.getInt('upload_id'), rs.wasNull())
+        return upload_id is not None
+
+    @contextmanager
+    def job(self, label: str, user_id: str) -> Iterator[
+            Tuple[Connection, int]]:
+        with self._task.connection() as conn:
+            upload_id = self.insert(conn, label, user_id)
+
+            try:
+                yield conn, upload_id
+            except Exception as problem:
+                try:
+                    self.update(upload_id, 'FAILED', str(problem)[:1024])
+                except Exception:
+                    pass
+                raise problem
+            else:
+                self.update(upload_id, 'OK', None)
+
+    def insert(self, conn, label: str, user_id: str) -> int:
+        '''
+        :param label: a label for related facts for audit purposes
+        :param user_id: an indication of who uploaded the related facts
+        '''
+        stmt = conn.createStatement()
+        rs = stmt.executeQuery(self.nextval_q)
+        if not rs.next():
+            raise IOError('no next upload_id')
+        upload_id = rs.getInt('value')  # type: int
+
+        stmt = conn.prepareStatement(f'''
+          insert into {self.schema}.upload_status (
+            upload_id, upload_label, user_id,
+            source_cd, transform_name, load_date)
+          values(?, ?, ?, ?, ?, current_timestamp)
+        ''')
+        stmt.setInt(1, upload_id)
+        stmt.setString(2, label)
+        stmt.setString(3, user_id)
+        stmt.setString(4, self.source_cd)
+        stmt.setString(5, self.transform_name)
+        rs = stmt.execute()
+        return upload_id
+
+    def update(self, conn, upload_id: int, load_status: str,
+               message: Opt[str]):
+        stmt = conn.prepareStatement('''
+          update {self.schema}.upload_status
+          set end_date=current_timestamp,
+              load_status = ?,
+              message = ?
+          where upload_id = ?
+        ''')
+        stmt.setString(1, load_status)
+        stmt.setString(2, message)
+        stmt.setInt(3, upload_id)
+        return stmt.executeUpdate()
+
+
+def _fix_null(it, was_null):
+    return None if was_null else it
+
+
+class NAACCR_Load(UploadTask):
+    '''Map and load NAACCR patients, tumors / visits, and facts.
+    '''
+    dateCaseReportExported = pv.DateParam()
+    npiRegistryId = pv.StrParam()
+    source_cd = pv.StrParam(default='tumor_registry@kumed.com')
+    jdbc_driver_jar = pv.StrParam(significant=False)
+
+    script_name = 'naaccr_facts_load.sql'
+    script = res.read_text(heron_load, script_name)
+
+    @property
+    def label(self) -> str:
+        return self.script_name
+
+    @property
+    def classpath(self) -> str:
+        return self.jdbc_driver_jar
+
+    def requires(self):
+        return [
+            cls(db_url=self.db_url,
+                user=self.user,
+                passkey=self.passkey,
+                dateCaseReportExported=self.dateCaseReportExported,
+                npiRegistryId=self.npiRegistryId)
+            for cls in [NAACCR_Patients, NAACCR_Visits, NAACCR_Facts]
+        ]
+
+    def run_upload(self, conn, upload_id):
+        for sql in SqlScript.ea_stmt(self.script):
+            stmt = conn.prepareStatement(sql)
+            try:
+                stmt.execute()
+            except Exception as ex:
+                import pdb; pdb.set_trace()
+                raise NotImplementedError('bind parameters, etc.')
