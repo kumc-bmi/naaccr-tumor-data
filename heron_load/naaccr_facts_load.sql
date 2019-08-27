@@ -26,7 +26,11 @@ set trpat.patient_num =
        and ltrim(pmap.patient_ide, '0') = ltrim(trpat.patientIdNumber, '0'))
 ;
 
-create unique index naaccr_patients_pk on naaccr_patients (patientIdNumber); -- issue: what if it's already there? idempotent?
+whenever sqlerror continue;
+drop index naaccr_patients_pk;
+whenever sqlerror exit;
+
+create unique index naaccr_patients_pk on naaccr_patients (patientIdNumber);
 
 -- ISSUE: where to put this check?
 select case when count(*) = 0 then 1 else 0 end complete
@@ -35,7 +39,9 @@ where patient_num is null
 ;
 commit;
 
-
+whenever sqlerror continue;
+drop index naaccr_tumors_pk;
+whenever sqlerror exit;
 create unique index naaccr_tumors_pk on naaccr_tumors (recordId);
 
 delete from NightHeronData.encounter_mapping
@@ -70,8 +76,6 @@ from naaccr_observations
 group by ENCOUNTER_ide, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD, INSTANCE_NUM
 having count(*) > 1;
 */
-
-drop table observation_fact_&&upload_id;
 
 create table observation_fact_&&upload_id as
 select * from nightherondata.observation_fact where 1 = 0;

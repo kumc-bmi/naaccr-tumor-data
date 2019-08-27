@@ -14,13 +14,15 @@ from importlib import resources as res
 from contextlib import contextmanager
 from typing import Iterator, Optional as Opt, Tuple
 import logging
+import datetime as dt
 
 from luigi.contrib.spark import PySparkTask
 from py4j.java_gateway import JavaGateway, GatewayParameters
 from pyspark.sql import SparkSession, functions as func
 import luigi
 
-from sql_script import SqlScript
+from sql_script import SQL, Environment, Params
+from sql_script import SqlScript, SqlScriptError, to_qmark
 import heron_load
 import param_val as pv
 import tumor_reg_data as td
@@ -64,6 +66,17 @@ class TheJVM:
         jvm = JavaGateway(gateway_parameters=GatewayParameters(port=port)).jvm
         return jvm
 
+    @classmethod
+    def sql_timestsamp(cls, pydt):
+        with cls.borrow(cls.__classpath) as jvm:
+            return jvm.java.sql.Timestamp(int(pydt.timestamp() * 1000))
+
+    @classmethod
+    def sql_date(cls, pyd):
+        pydt = dt.datetime.combine(pyd, dt.datetime.min.time())
+        with cls.borrow(cls.__classpath) as jvm:
+            return jvm.java.sql.Date(int(pydt.timestamp() * 1000))
+
 
 class JDBCTask(luigi.Task):
     db_url = pv.StrParam(description='see client.cfg', significant=False)
@@ -91,6 +104,76 @@ class JDBCTask(luigi.Task):
                 yield conn
             finally:
                 conn.close()
+
+    def run_script(self,
+                   conn: Connection,
+                   fname: str,
+                   sql_code: str,
+                   variables: Opt[Environment] = None,
+                   script_params: Opt[Params] = None) -> None:
+        '''Run script inside a LoggedConnection event.
+
+        @param run_vars: variables to define for this run
+        @param script_params: parameters to bind for this run
+
+        To see how a script can ignore errors, see :mod:`script_lib`.
+        '''
+        ignore_error = False
+        run_params = dict(script_params or {}, task_id=self.task_id)
+
+        for line, _comment, statement in SqlScript.each_statement(
+                sql_code, variables):
+            try:
+                ignore_error = self.execute_statement(
+                    conn, fname, line, statement, run_params,
+                    ignore_error)
+            except Exception as exc:
+                err = SqlScriptError(exc, fname, line,
+                                     statement, '@@TODO: connection label')
+                if ignore_error:
+                    log.warning('%(event)s: %(error)s',
+                                dict(event='ignore', error=err))
+                else:
+                    raise err from None
+
+    @classmethod
+    def execute_statement(cls, conn: Connection, fname: str, line: int,
+                          statement: SQL, params: Params,
+                          ignore_error: bool) -> bool:
+        '''Log and execute one statement.
+        '''
+        sqlerror = SqlScript.sqlerror(statement)
+        if sqlerror is not None:
+            return sqlerror
+        with cls.prepared(conn, statement, params) as stmt:
+            stmt.execute()
+        return ignore_error
+
+    @classmethod
+    @contextmanager
+    def prepared(cls, conn, sql, params):
+        sqlq, values = to_qmark(sql, params)
+        print(f'@@prepared: {sql} + {params} = {sqlq} + {values}')
+        stmt = conn.prepareStatement(sqlq)
+        for ix0, value in enumerate(values):
+            ix1 = ix0 + 1
+            if value is None:
+                VARCHAR = 12
+                stmt.setNull(ix1, VARCHAR)
+            if isinstance(value, int):
+                stmt.setInt(ix1, value)
+            elif isinstance(value, str):
+                stmt.setString(ix1, value)
+            elif isinstance(value, dt.date):
+                dv = TheJVM.sql_date(value)
+                stmt.setDate(ix1, dv)
+            elif isinstance(value, dt.datetime):
+                tv = TheJVM.sql_timestamp(value)
+                stmt.setTimestamp(ix1, tv)
+        try:
+            yield stmt
+        finally:
+            stmt.close()
 
 
 class SparkJDBCTask(PySparkTask, JDBCTask):
@@ -402,17 +485,16 @@ class UploadTarget(luigi.Target):
         q = f'''
         select max(upload_id) as upload_id
         from {self.schema}.upload_status
-        where transform_name = ?
+        where transform_name = :tn
         and load_status = 'OK'
         '''
         with self._task.connection() as conn:
-            stmt = conn.prepareStatement(q)
-            stmt.setString(1, self.transform_name)
-            log.info('@@executeQuery: %s', q)
-            rs = stmt.executeQuery()
-            if not rs.next():
-                return False
-            upload_id = _fix_null(rs.getInt('upload_id'), rs)
+            with JDBCTask.prepared(conn, q,
+                                   dict(tn=self.transform_name)) as stmt:
+                rs = stmt.executeQuery()
+                if not rs.next():
+                    return False
+                upload_id = _fix_null(rs.getInt('upload_id'), rs)
         return upload_id is not None
 
     @contextmanager
@@ -425,12 +507,12 @@ class UploadTarget(luigi.Target):
                 yield conn, upload_id
             except Exception as problem:
                 try:
-                    self.update(upload_id, 'FAILED', str(problem)[:1024])
+                    self.update(conn, upload_id, 'FAILED', str(problem)[:1024])
                 except Exception:
                     pass
                 raise problem
             else:
-                self.update(upload_id, 'OK', None)
+                self.update(conn, upload_id, 'OK', None)
 
     def insert(self, conn, label: str, user_id: str) -> int:
         '''
@@ -443,42 +525,45 @@ class UploadTarget(luigi.Target):
             raise IOError('no next upload_id')
         upload_id = rs.getInt('value')  # type: int
 
-        stmt = conn.prepareStatement(f'''
+        with JDBCTask.prepared(conn, f'''
           insert into {self.schema}.upload_status (
             upload_id, upload_label, user_id,
             source_cd, transform_name, load_date)
-          values(?, ?, ?, ?, ?, current_timestamp)
-        ''')
-        stmt.setInt(1, upload_id)
-        stmt.setString(2, label)
-        stmt.setString(3, user_id)
-        stmt.setString(4, self.source_cd)
-        stmt.setString(5, self.transform_name)
-        rs = stmt.execute()
+          values(:upload_id, :label, :user_id,
+                 :src, :tn, current_timestamp)
+        ''', dict(upload_id=upload_id,
+                  label=label,
+                  user_id=user_id,
+                  src=self.source_cd,
+                  tn=self.transform_name)) as stmt:
+            rs = stmt.execute()
         return upload_id
 
     def update(self, conn, upload_id: int, load_status: str,
                message: Opt[str]):
-        stmt = conn.prepareStatement('''
+        with JDBCTask.prepared(conn, f'''
           update {self.schema}.upload_status
           set end_date=current_timestamp,
-              load_status = ?,
-              message = ?
-          where upload_id = ?
-        ''')
-        stmt.setString(1, load_status)
-        stmt.setString(2, message)
-        stmt.setInt(3, upload_id)
-        return stmt.executeUpdate()
+              load_status = :status,
+              message = :message
+          where upload_id = :id
+        ''', dict(status=load_status,
+                  message=message,
+                  id=upload_id)) as stmt:
+            return stmt.executeUpdate()
 
 
 def _fix_null(it, rs):
+    # JDBC API for nulls is weird.
     return None if rs.wasNull() else it
 
 
 class NAACCR_Load(UploadTask):
     '''Map and load NAACCR patients, tumors / visits, and facts.
     '''
+    patient_ide_source = pv.StrParam(default='SMS@kumed.com')
+    encounter_ide_source = pv.StrParam(default='tumor_registry@kumed.com')
+    project_id = pv.StrParam(default='BlueHeron')
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
@@ -496,7 +581,11 @@ class NAACCR_Load(UploadTask):
         return self.jdbc_driver_jar
 
     def requires(self):
-        return [
+        ff = NAACCR_FlatFile(
+            dateCaseReportExported=self.dateCaseReportExported,
+            npiRegistryId=self.npiRegistryId)
+
+        return [ff] + [
             cls(db_url=self.db_url,
                 user=self.user,
                 passkey=self.passkey,
@@ -506,10 +595,15 @@ class NAACCR_Load(UploadTask):
         ]
 
     def run_upload(self, conn, upload_id):
-        for sql in SqlScript.ea_stmt(self.script):
-            stmt = conn.prepareStatement(sql)
-            try:
-                stmt.execute()
-            except Exception as ex:
-                import pdb; pdb.set_trace()
-                raise NotImplementedError('bind parameters, etc.')
+        [ff] = self.requires()[:1]
+        self.run_script(
+            conn, self.script_name, self.script,
+            variables=dict(upload_id=upload_id,
+                           task_id=self.task_id),
+            script_params=dict(upload_id=upload_id,
+                               project_id=self.project_id,
+                               task_id=self.task_id,
+                               source_cd=self.source_cd,
+                               download_date=ff.dateCaseReportExported,
+                               patient_ide_source=self.patient_ide_source,
+                               encounter_ide_source=self.encounter_ide_source))
