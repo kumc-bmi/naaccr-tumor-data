@@ -1,5 +1,11 @@
 """tumor_reg_tasks -- NAACCR Tumor Registry ETL Tasks
 
+Main tasks are:
+  - NAACCR_Ontology1 based on tumor_reg_ont module,
+    naaaccr_concepts_load.sql
+  - NAACCR_Load based on tumor_reg_data notebook/module
+    and naaccr_facts_load.sql
+
 clues from:
 https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 """
@@ -85,18 +91,6 @@ class JDBCTask(luigi.Task):
                 yield conn
             finally:
                 conn.close()
-
-    @contextmanager
-    def connect_via_spark(self, spark):
-        # ISSUE: dead code?
-        jvm = spark._jvm
-        jvm.java.lang.Class.forName(self.driver)
-        conn = jvm.java.sql.DriverManager.getConnection(
-            self.db_url, self.user, self.__password)
-        try:
-            yield conn
-        finally:
-            conn.close()
 
 
 class SparkJDBCTask(PySparkTask, JDBCTask):
@@ -203,15 +197,34 @@ class NAACCR_Ontology1(SparkJDBCTask):
         self.jdbc_access(ont_upper.write, self.table_name, mode='overwrite')
 
 
-class NAACCR_FlatFile(luigi.Task):
+class ManualTask(luigi.Task):
+    """We can check that manual tasks are complete,
+    though we can't run them.
+    """
+    def run(self):
+        raise NotImplementedError(f'{self.task_name} is manual.')
+
+
+class NAACCR_FlatFile(ManualTask):
+    """A NAACCR flat file is determined by the registry, export date,
+    and version.
+    """
     naaccrRecordVersion = pv.IntParam(default=180)
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     flat_file = pv.PathParam(significant=False)
 
-    def complete(self):
+    def check_version_param(self):
+        """Only version 18 (180) is currently supported.
+        """
         if self.naaccrRecordVersion != 180:
             raise NotImplementedError()
+
+    def complete(self):
+        """Check the first record, assuming all the others have
+        the same export date and registry NPI.
+        """
+        self.check_version_param()
 
         with self.flat_file.open() as records:
             record0 = records.readline()
@@ -246,11 +259,12 @@ class NAACCR_FlatFile(luigi.Task):
                      expected, actual)
         return actual == expected
 
-    def run(self):
-        raise NotImplementedError('NAACCR flat file staging is manual.')
-
 
 class _NAACCR_JDBC(SparkJDBCTask):
+    """Load data from a NAACCR flat file into a table via JDBC.
+
+    Use a `task_id` column to manage freshness.
+    """
     table_name: str
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
@@ -282,6 +296,8 @@ class _NAACCR_JDBC(SparkJDBCTask):
 
 
 class NAACCR_Visits(_NAACCR_JDBC):
+    """Make a per-tumor table for use in encounter_mapping etc.
+    """
     design_id = pv.StrParam('patient_num')
     table_name = "NAACCR_TUMORS"
     encounter_num_start = pv.IntParam(description='see client.cfg')
@@ -295,6 +311,8 @@ class NAACCR_Visits(_NAACCR_JDBC):
 
 
 class NAACCR_Patients(_NAACCR_JDBC):
+    """Make a per-patient table for use in patient_mapping etc.
+    """
     design_id = pv.StrParam('refactor dimensions')
     table_name = "NAACCR_PATIENTS"
 
@@ -394,7 +412,7 @@ class UploadTarget(luigi.Target):
             rs = stmt.executeQuery()
             if not rs.next():
                 return False
-            upload_id = _fix_null(rs.getInt('upload_id'), rs.wasNull())
+            upload_id = _fix_null(rs.getInt('upload_id'), rs)
         return upload_id is not None
 
     @contextmanager
@@ -454,8 +472,8 @@ class UploadTarget(luigi.Target):
         return stmt.executeUpdate()
 
 
-def _fix_null(it, was_null):
-    return None if was_null else it
+def _fix_null(it, rs):
+    return None if rs.wasNull() else it
 
 
 class NAACCR_Load(UploadTask):
