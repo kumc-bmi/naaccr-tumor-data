@@ -11,3 +11,7 @@ dependencies:
   - pyspark==2.4.3
   - pandas==0.24.2
   - luigi
+  - pip
+  - pip:
+      - eliot
+

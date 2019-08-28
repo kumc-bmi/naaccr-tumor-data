@@ -13,3 +13,5 @@ dependencies:
   - pip
   - pip:
       - pyspark-stubs
+      - eliot
+      - eliot-tree

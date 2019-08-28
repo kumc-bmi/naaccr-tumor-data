@@ -10,15 +10,18 @@ clues from:
 https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 """
 
-from importlib import resources as res
 from contextlib import contextmanager
+from functools import wraps
+from importlib import resources as res
 from typing import Iterator, Optional as Opt, Tuple
-import logging
 import datetime as dt
+import logging
 
+from eliot.stdlib import EliotHandler
 from luigi.contrib.spark import PySparkTask
 from py4j.java_gateway import JavaGateway, GatewayParameters
 from pyspark.sql import SparkSession, functions as func
+import eliot as el
 import luigi
 
 from sql_script import SQL, Environment, Params
@@ -28,7 +31,13 @@ import param_val as pv
 import tumor_reg_data as td
 import tumor_reg_ont as tr_ont
 
+# Add Eliot Handler to root Logger.
+logging.getLogger().addHandler(EliotHandler())
+# and to luigi
+logging.getLogger('luigi').addHandler(EliotHandler())
+logging.getLogger('luigi-interface').addHandler(EliotHandler())
 log = logging.getLogger(__name__)
+el.to_file(open('log/eliot.log', 'ab'))  # ISSUE: ambient
 
 
 class Connection:
@@ -54,7 +63,8 @@ class TheJVM:
             else:
                 assert cls.__classpath == classpath
             cls.__it = cls.__gateway(classpath)
-        yield cls.__it
+        with el.start_action(action_type='JVM'):
+            yield cls.__it
 
     @classmethod
     def __gateway(cls, classpath):
@@ -78,6 +88,19 @@ class TheJVM:
             return jvm.java.sql.Date(int(pydt.timestamp() * 1000))
 
 
+def with_task_logging(f):
+    @wraps(f)
+    def call_in_action(self, *args, **kwds):
+        with el.start_task(action_type=f'{self.task_family}.{f.__name__}',
+                           task_id=self.task_id,
+                           **self.to_str_params(only_significant=True,
+                                                only_public=True)) as ctx:
+            result = f(self, *args, **kwds)
+            ctx.add_success_fields(result=result)
+            return result
+    return call_in_action
+
+
 class JDBCTask(luigi.Task):
     db_url = pv.StrParam(description='see client.cfg', significant=False)
     driver = pv.StrParam(default="oracle.jdbc.OracleDriver", significant=False)
@@ -95,16 +118,22 @@ class JDBCTask(luigi.Task):
         return environ[self.passkey]
 
     @contextmanager
-    def connection(self):
-        with TheJVM.borrow(self.classpath) as jvm:
-            jvm.java.lang.Class.forName(self.driver)
-            conn = jvm.java.sql.DriverManager.getConnection(
-                self.db_url, self.user, self.__password)
-            try:
-                yield conn
-            finally:
-                conn.close()
+    def connection(self, action_type):
+        with el.start_action(action_type=action_type,
+                             url=self.db_url,
+                             driver=self.driver,
+                             user=self.user):
+            with TheJVM.borrow(self.classpath) as jvm:
+                jvm.java.lang.Class.forName(self.driver)
+                conn = jvm.java.sql.DriverManager.getConnection(
+                    self.db_url, self.user, self.__password)
+                try:
+                    yield conn
+                finally:
+                    conn.close()
 
+    # ISSUE: dates are not JSON serializable, so log_call doesn't grok.
+    @el.log_call(include_args=['fname', 'variables'])
     def run_script(self,
                    conn: Connection,
                    fname: str,
@@ -137,6 +166,7 @@ class JDBCTask(luigi.Task):
                     raise err from None
 
     @classmethod
+    @el.log_call(include_args=['fname', 'line', 'ignore_error'])
     def execute_statement(cls, conn: Connection, fname: str, line: int,
                           statement: SQL, params: Params,
                           ignore_error: bool) -> bool:
@@ -153,7 +183,6 @@ class JDBCTask(luigi.Task):
     @contextmanager
     def prepared(cls, conn, sql, params):
         sqlq, values = to_qmark(sql, params)
-        print(f'@@prepared: {sql} + {params} = {sqlq} + {values}')
         stmt = conn.prepareStatement(sqlq)
         for ix0, value in enumerate(values):
             ix1 = ix0 + 1
@@ -171,9 +200,18 @@ class JDBCTask(luigi.Task):
                 tv = TheJVM.sql_timestamp(value)
                 stmt.setTimestamp(ix1, tv)
         try:
-            yield stmt
+            with el.start_action(action_type='prepared statement',
+                                 sql=sql.strip(), sqlq=sqlq.strip(),
+                                 params=', '.join(params.keys()),
+                                 values=_json_ok(values)):
+                yield stmt
         finally:
             stmt.close()
+
+
+def _json_ok(values):
+    return [v if isinstance(v, (str, int)) else str(v)
+            for v in values]
 
 
 class SparkJDBCTask(PySparkTask, JDBCTask):
@@ -224,7 +262,8 @@ class JDBCTableTarget(luigi.Target):
         self._task = jdbc_task
 
     def exists(self) -> bool:
-        with self._task.connection() as conn:
+        with self._task.connection(
+                f'{self.__class__.__name__}.exists') as conn:
             try:
                 stmt = conn.createStatement()
                 rs = stmt.executeQuery(self.query)
@@ -255,6 +294,10 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
     table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
 
+    @with_task_logging
+    def complete(self):
+        return self.output().exists()
+
     def output(self):
         query = f"""
           (select 1 from {self.table_name}
@@ -263,6 +306,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         """
         return JDBCTableTarget(self, query)
 
+    @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
         spark = SparkSession(sparkContext)
 
@@ -284,6 +328,7 @@ class ManualTask(luigi.Task):
     """We can check that manual tasks are complete,
     though we can't run them.
     """
+    @with_task_logging
     def run(self):
         raise NotImplementedError(f'{self.task_name} is manual.')
 
@@ -303,6 +348,7 @@ class NAACCR_FlatFile(ManualTask):
         if self.naaccrRecordVersion != 180:
             raise NotImplementedError()
 
+    @with_task_logging
     def complete(self):
         """Check the first record, assuming all the others have
         the same export date and registry NPI.
@@ -357,6 +403,10 @@ class _NAACCR_JDBC(SparkJDBCTask):
             dateCaseReportExported=self.dateCaseReportExported,
             npiRegistryId=self.npiRegistryId)]
 
+    @with_task_logging
+    def complete(self):
+        return self.output().exists()
+
     def output(self):
         query = f"""
           (select 1 from {self.table_name}
@@ -364,6 +414,7 @@ class _NAACCR_JDBC(SparkJDBCTask):
         """
         return JDBCTableTarget(self, query)
 
+    @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
         spark = SparkSession(sparkContext)
         [ff] = self.requires()
@@ -448,12 +499,17 @@ class UploadTask(JDBCTask):
     def transform_name(self) -> str:
         return self.task_id
 
+    @with_task_logging
+    def complete(self):
+        return self.output().exists()
+
     def output(self) -> luigi.Target:
         return self._upload_target()
 
     def _upload_target(self) -> 'UploadTarget':
         return UploadTarget(self, self.schema, self.source_cd)
 
+    @with_task_logging
     def run(self):
         upload = self._upload_target()
         with upload.job(label=self.label,
@@ -481,6 +537,7 @@ class UploadTarget(luigi.Target):
         return '%s(transform_name=%s)' % (
             self.__class__.__name__, self.transform_name)
 
+    @el.log_call
     def exists(self) -> bool:
         q = f'''
         select max(upload_id) as upload_id
@@ -488,7 +545,8 @@ class UploadTarget(luigi.Target):
         where transform_name = :tn
         and load_status = 'OK'
         '''
-        with self._task.connection() as conn:
+        with self._task.connection(
+                f'{self.__class__.__name__}.exists') as conn:
             with JDBCTask.prepared(conn, q,
                                    dict(tn=self.transform_name)) as stmt:
                 rs = stmt.executeQuery()
@@ -500,7 +558,8 @@ class UploadTarget(luigi.Target):
     @contextmanager
     def job(self, label: str, user_id: str) -> Iterator[
             Tuple[Connection, int]]:
-        with self._task.connection() as conn:
+        with self._task.connection(
+                f'{self.__class__.__name__}.job({label})') as conn:
             upload_id = self.insert(conn, label, user_id)
 
             try:
@@ -567,6 +626,7 @@ class NAACCR_Load(UploadTask):
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
+    z_design_id = pv.StrParam('logging 7')
     jdbc_driver_jar = pv.StrParam(significant=False)
 
     script_name = 'naaccr_facts_load.sql'
@@ -607,3 +667,11 @@ class NAACCR_Load(UploadTask):
                                download_date=ff.dateCaseReportExported,
                                patient_ide_source=self.patient_ide_source,
                                encounter_ide_source=self.encounter_ide_source))
+
+
+if __name__ == '__main__':
+    def _script_io():
+        with el.start_task(action_type='luigi.build'):
+            luigi.build([NAACCR_Load()], local_scheduler=True)
+
+    _script_io()
