@@ -1,17 +1,18 @@
 /** naaccr_txform -- transform NAACCR data to fit i2b2 star schema
 
-Copyright (c) 2012-2015 University of Kansas Medical Center
-part of the HERON* open source codebase; see NOTICE file for license details.
-* http://informatics.kumc.edu/work/wiki/HERON
+Copyright (c) 2012-2019 University of Kansas Medical Center
+see LICENSE file for license details.
+
 
 */
 
--- test that we're in the KUMC sid with the NAACCR data
--- note mis-spelling of schema name: naacr
-select "Accession Number--Hosp" from naacr.extract where 1=0;
-select itemnbr from naacr.extract_eav where 1=0;
--- check for curated data
-select name from seer_site_terms@deid where 1=0;
+/*** NOTE: transition in progress
+
+This script isn't currently run top-to bottom; rather,
+individual create ... statements are picked out and run
+separately.
+
+ ***/
 
 -- check for metadata tables
 select naaccrId from ndd180 where dep = 'naaccr-dictionary-180.xml';
@@ -21,36 +22,9 @@ select loinc_num from loinc_naaccr where dep = 'loinc_naaccr.csv'
 select type from field_info where dep = 'naaccr_r_raw/field_info.csv'
 select scheme from field_code_scheme where dep = 'naaccr_r_raw/field_code_scheme.csv'
 
-alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI';
 
-whenever sqlerror continue;
---Inside "continue" clause in case index is not there
-drop index naacr.patient_id_idx;
-drop index naacr.case_idx;
-
-alter table naacr.extract add (case_index integer);  -- in case old naaccr_extract.sql was used
-
-whenever sqlerror exit;
-
-create index naacr.patient_id_idx on naacr.extract (
-  "Patient ID Number");
-
-create unique index naacr.case_idx on naacr.extract (
-  case_index);
-
-
-/* Item names are unique, right? */
-select case when count(*) = 0 then 1 else 0 end as test_item_name_uniqueness
-from (
-select count(*), "ItemName"
-from naacr.t_item ni
-group by "ItemName"
-having count(*) > 1
-);
-
-
-/* Race analysis/sanity check: How many of each?
- odd: no codecrp for 16, 17 */
+/* IDEA: Race analysis/sanity check: How many of each?
+ odd: no codecrp for 16, 17
 select count(*), ne."Race 1", nc.codedcrp
 from naacr.extract ne
 join naacr.t_code nc
@@ -61,9 +35,9 @@ where ni."ItemName" = 'Race 1'
 group by ne."Race 1", nc.codedcrp
 order by 1 desc
 ;
+ */
 
-
-/* Grade: how many of each kind? */
+/* IDEA: Grade: how many of each kind?
 select count(*), ne."Grade", codedcrp
 from naacr.extract ne
 left join (
@@ -76,19 +50,19 @@ on ne."Grade" = nc.codenbr
 group by ne."Grade", codedcrp
 order by 1 desc
 ;
-
+*/
 
 /********
  * "the big flat approach"
 
-TODO: ISSUE: There are lots of codes for lack of information, e.g.
+IDEA: There are lots of codes for lack of information, e.g.
   - Grade/differentiation unknown, not stated, or not applicable
   - No further race documented
   - Unknown whether Spanish or not
   - Insurance status unknown
 Do we want to record these as facts?
 
--- tricky: Cause of Death. ICD7-10 codes.
+POSTPONED: Cause of Death. ICD7-10 codes.
 
  */
 
@@ -490,15 +464,3 @@ and the ones with no date of last contact */
 and ne."Accession Number--Hosp" is not null)
 where start_date is not null;
 
--- eyeball it:
--- select * from tumor_reg_facts order by encounter_ide desc, start_date desc;
-
-
-/* count facts by scheme
-
-select count(*), scheme from(
-select substr(f.concept_cd, 1, instr(f.concept_cd, ':')) scheme
-from tumor_reg_facts f)
-group by scheme
-order by 1 desc;
-*/
