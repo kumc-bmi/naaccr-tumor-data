@@ -802,6 +802,61 @@ if IO_TESTING:
 # TODO: check for nulls in update_date, start_date, end_date, etc.
 IO_TESTING and _tumor_reg_coded_facts.limit(5).toPandas()
 
+# %%
+if IO_TESTING:
+    _ty = NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict')
+    _ty.cache()
+
+
+# %%
+def stack_obs(records, ty,
+              known_valtype_cd=['@', 'D', 'N', 'Ni', 'T'],
+              key_cols=TumorKeys.key4 + TumorKeys.dtcols):
+    ty = ty.select('naaccrNum', 'naaccrId', 'valtype_cd')
+    ty = ty.where(ty.valtype_cd.isin(known_valtype_cd))
+    value_vars = [row.naaccrId for row in ty.collect()]
+    obs = melt(records, key_cols, value_vars, var_name='naaccrId', value_name='raw_value')
+    obs = obs.where("trim(raw_value) != ''")
+    obs = obs.join(ty, ty.naaccrId == obs.naaccrId).drop(ty.naaccrId)
+    return obs
+
+
+if IO_TESTING:
+    _raw_obs = stack_obs(_extract, _ty)
+IO_TESTING and _raw_obs.limit(10).toPandas()
+
+
+# %%
+def typed_obs(raw, spark,
+              raw_name='naaccr_obs_raw'):
+    raw.createOrReplaceTempView(raw_name)
+    typed = spark.sql('''
+    select raw.*
+         , case when valtype_cd in ('Ni', 'Ti')
+           then true
+           else false
+           end as identified_only
+         , case when valtype_cd = '@'
+           then raw_value
+           end as code_value
+         , case
+           when valtype_cd in ('N', 'Ni')
+           then cast(raw_value as float)
+           end as nval_num
+         , case
+           when valtype_cd = 'D'
+           then to_date(substring(concat(raw_value, '0101'), 1, 8),
+                        'yyyyMMdd')
+           end as date_value
+         , case when valtype_cd in ('T', 'Ti')
+           then raw_value
+           end as text_value
+    from naaccr_obs_raw raw
+    ''')
+    return naaccr_dates(typed, TumorKeys.dtcols)
+
+typed_obs(_raw_obs, _spark).where("valtype_cd != '@'").limit(40).toPandas()
+
 # %% [markdown]
 # ## Oracle DB Access
 
