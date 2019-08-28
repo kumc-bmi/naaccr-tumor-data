@@ -408,7 +408,7 @@ select c_hlevel, path, concept_name, concept_cd, c_visualattributes from item_co
 union all
 select c_hlevel, path, concept_name, concept_cd, c_visualattributes from code_concepts
 union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from seer_site_terms
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from seer_terms
 ;
 
 

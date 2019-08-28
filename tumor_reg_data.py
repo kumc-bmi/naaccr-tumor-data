@@ -132,7 +132,7 @@ IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
 # %%
 if IO_TESTING:
     _spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
-    _ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict')
+    _ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict', _cwd / ',seer_site_recode.txt')  ## TODO: seer recode
 IO_TESTING and _ont.limit(5).toPandas()
 
 # %% [markdown]
@@ -149,7 +149,7 @@ from ndd180 as idef
 
 # %%
 if IO_TESTING:
-    DataDictionary.make_in(_spark, _cwd / 'naaccr_ddict')
+    ScrapedChapters.make_in(_spark, _cwd / 'naaccr_ddict')
 
 IO_TESTING and _spark.sql('''
 select yr_retired, count(*)
@@ -223,6 +223,8 @@ where ln.code_value = 390
 # ### Try Werth PADoH curation
 
 # %%
+from tumor_reg_ont import NAACCR_R
+
 if IO_TESTING:
     NAACCR_R.field_info_in(_spark)
 IO_TESTING and _spark.table('field_info').limit(5).toPandas()
@@ -330,7 +332,7 @@ IO_TESTING and ty_hl.head()
 
 # %%
 if IO_TESTING:
-    ty2 = tumor_item_type(_spark, _cwd / 'naaccr_ddict')
+    ty2 = NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict')
     print(ty2.distinct().count())
 IO_TESTING and ty2.limit(5).toPandas()
 
@@ -434,14 +436,14 @@ def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
     return data.drop('naaccrNum')
 
 
-IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
+IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
                 .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
 
 # %% [markdown]
 # What columns are covered by the 100 tumor sample?
 
 # %%
-IO_TESTING and (tumorDF(_spark, NAACCR1.s100x)
+IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
                 .select('naaccrId').distinct().sort('naaccrId')
                 .toPandas().naaccrId.values)
 
@@ -459,7 +461,7 @@ def naaccr_pivot(ddict: DataFrame, skinny: DataFrame, key_cols: List[str],
 
 
 IO_TESTING and (naaccr_pivot(ddictDF(_spark),
-                             tumorDF(_spark, NAACCR1.s100x),
+                             tumorDF(_spark, NAACCR2.s100x),
                              ['rownum'])
                 .limit(3).toPandas())
 
@@ -468,7 +470,7 @@ IO_TESTING and (naaccr_pivot(ddictDF(_spark),
 
 # %%
 if IO_TESTING:
-    with NAACCR1.s100t() as _tr_file:
+    with NAACCR2.s100t() as _tr_file:
         log.info('tr_file: %s', _tr_file)
         _naaccr_text_lines = _spark.read.text(str(_tr_file))
 else:
@@ -784,7 +786,7 @@ def naaccr_coded_obs2(spark: SparkSession_T, items: DataFrame,
 
 if IO_TESTING:
     _tumor_coded_value = naaccr_coded_obs2(_spark,
-                                           tumorDF(_spark, NAACCR1.s100x))
+                                           tumorDF(_spark, NAACCR2.s100x))
 
 IO_TESTING and _tumor_coded_value.limit(15).toPandas().set_index(
     ['recordId', 'naaccrId'])
@@ -1077,7 +1079,7 @@ if IO_TESTING:
 
     ###
 
-    ndd = DataDictionary.make_in(_spark, _cwd / 'naaccr_ddict')
+    ndd = ScrapedChapters.make_in(_spark, _cwd / 'naaccr_ddict')
     _test_data_coded = naaccr_read_fwf(_spark.read.text('test_data/,test_data.flat.txt'), ndd.record_layout)
     _test_data_coded.limit(5).toPandas()
 
