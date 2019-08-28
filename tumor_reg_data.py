@@ -805,7 +805,11 @@ IO_TESTING and _tumor_reg_coded_facts.limit(5).toPandas()
 # %%
 if IO_TESTING:
     _ty = NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict')
+    _ty.toPandas().set_index('naaccrNum').to_csv('heron_load/tumor_item_type.csv')
+    _ty = _spark.read.csv('heron_load/tumor_item_type.csv',
+                          header=True, inferSchema=True)
     _ty.cache()
+_ty.limit(5).toPandas()
 
 
 # %% [markdown]
