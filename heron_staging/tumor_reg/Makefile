@@ -34,7 +34,7 @@ seer_recode_terms.csv seer_recode.sql: seer_recode.py ,seer_site_recode.txt
 	$(PYTHON) seer_recode.py ,seer_site_recode.txt seer_recode_terms.csv seer_recode.sql
 
 ,seer_site_recode.txt:
-	$(CURL) --output "$@" http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
+	$(CURL) --output "$@" https://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
 
 ## CS Site-Specific Factors
 
