@@ -105,12 +105,12 @@ insert /*+ append*/ into observation_fact_&&upload_id
   , sourcesystem_cd
   )
 select
+    -- use sub-select to be sure cardinality doesn't change
     (select encounter_num
      from naaccr_tumors t
-     where t.recordId = tf.encounter_ide) as encounter_num
-    -- use sub-select to be sure cardinality doesn't change
+     where t.recordId = tf.recordId) as encounter_num
   , (select patient_num from naaccr_patients pat
-     where pat.patientIdNumber = tf.mrn) as patient_num,
+     where pat.patientIdNumber = tf.patientIdNumber) as patient_num,
   tf.concept_cd,
   tf.provider_id,
   tf.start_date,

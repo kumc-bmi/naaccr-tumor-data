@@ -290,52 +290,37 @@ left join tumor_item_type ty
   on ty.itemnbr = rx.itemnbr
 ;
 
-/* This is the main big flat view. */
-     -- TODO: for long lists of numeric codes, find metadata
-     -- and chunking strategy
-     -- TODO: consider normalizing complication 1, complication 2, ...
-create or replace view tumor_item_value as
-select case_index
-     , ns.sectionid
-     , ne.ItemNbr
-     , ni.valtype_cd
-     , case
-         when valtype_cd like 'T%' then value
-         when valtype_cd like 'D%'
-          and regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
-         then
-           substr(value, 1, 4) || '-' || substr(value, 5, 2) || '-' || substr(value, 7, 2)
-         else null
-       end tval_char
-     , case
-         when valtype_cd like 'N%' then to_number(ne.value)
-         else null
-       end nval_num
-     , case when valtype_cd like 'D%' 
-            then coalesce( to_date_noex(value, 'YYYYMMDD')
-                         , to_date_noex(value, 'MMDDYYYY')
-                         , to_date_noex(value, 'YYYYMM')
-                         , to_date_noex(value, 'YYYY'))
-            else null end as start_date
-     , 'NAACCR|' || ne.itemnbr || ':' || (
-         case when ni.valtype_cd like '@%' then value
-         else null end) as concept_cd
-     , case when ni.valtype_cd like '@%' then value
-       else null end as codenbr
-     , ns.section
-     , ni.ItemName
-     , ni.itemid
-from naacr.extract_eav ne
-join tumor_item_type ni
-  on ne.itemnbr = ni.ItemNbr
-join section ns on ns.sectionid = to_number(ni.SectionID)
-where ne.value is not null
-and ni.valtype_cd is not null
-;
-/* eyeball it:
+/* IDEA: consider normalizing complication 1, complication 2, ... */
 
-select * from tumor_item_value tiv
-where "Accession Number--Hosp" like '%555';
+/* This is the main big flat view. */
+
+create or replace temporary view tumor_item_value as
+select raw.*
+     , case when valtype_cd in ('Ni', 'Ti')
+       then true
+       else false
+       end as identified_only
+     , case when valtype_cd = '@'
+       then raw_value
+       end as code_value
+     , case
+       when valtype_cd in ('N', 'Ni')
+       then cast(raw_value as float)
+       end as numeric_value
+     , case
+       when valtype_cd = 'D'
+       then to_date(substring(concat(raw_value, '0101'), 1, 8),
+                    'yyyyMMdd')
+       end as date_value
+     , case when valtype_cd in ('T', 'Ti')
+       then raw_value
+       end as text_value
+from naaccr_obs_raw raw
+;
+
+
+/**
+IDEA: quality check:
 
 How many different concept codes are there, excluding comorbidities?
 
@@ -349,118 +334,69 @@ and concept_cd not like 'NAACCR|31%';
 
 
 /**
- * i2b2 style visit info
- */
-create or replace view tumor_reg_visits as
-select ne.case_index
-       as encounter_ide
-     , ne."Patient ID Number" as MRN
-from naacr.extract ne
-where ne."Accession Number--Hosp" is not null;
-
-
-/*
--- select * from tumor_reg_visits;
--- select count(*) from tumor_reg_visits;
--- 65576
-*/
-
-/**
  * i2b2 style facts
  */
-create or replace temporary view tumor_reg_coded_facts as
-select patientIdNumber MRN, recordId encounter_ide
-     , concept_cd, naaccrId
-     , abstractedBy  -- ISSUE: use as provider_id?
-     , '@' provider_id
-     , start_date
-     , '@' modifier_cd
-     , 1 instance_num
-     , valtype_cd
-     , cast(null as string) tval_char
-     , cast(null as float) nval_num
-     , cast(null as string) valueflag_cd
-     , cast(null as string) units_cd
-     , start_date as end_date
-     , '@' location_cd
-     , dateCaseLastChanged as update_date
-from (
-select
-  cv.recordId,
-  cv.patientIdNumber,
-  cv.abstractedBy,
-  cv.dateCaseLastChanged,
-  concat('NAACCR|', ty.naaccrNum, ':', cv.code) as concept_cd,
-  ty.naaccrId,
-  ty.valtype_cd,
-  case
-  -- Use Date of Last Contact for Follow-up/Recurrence/Death
-  when ty.sectionid = 4
-  then cv.dateOfLastContact
-  -- Use Date of Diagnosis for everything else
-  else cv.DateOfDiagnosis
-  end as start_date
-from tumor_coded_value cv
-join (
-  -- ISSUE: LOINC mapping is ambiguous
-  select distinct sectionId, naaccrId, naaccrNum, valtype_cd
-  from tumor_item_type
-) ty on ty.naaccrId = cv.naaccrId
-/* TODO: figure out what's up with the 42 records with no Date of Diagnosis
-and the ones with no date of last contact */
-)
-where start_date is not null;
 
-create or replace view tumor_reg_facts as
-select MRN, encounter_ide
-     , concept_cd, ItemName
-     , '@' provider_id
+create or replace temporary view tumor_reg_facts as
+with obs_w_section as (
+  select tiv.*, rl.length as field_length, s.sectionId
+  from tumor_item_value tiv
+  join record_layout rl on rl.xmlId = tiv.naaccrId
+  join section s on s.section = rl.section
+),
+
+obs_detail as (
+  select case when valtype_cd = '@'
+         then concat('NAACCR|', naaccrNum, ':', code_value)
+         else concat('NAACCR|', naaccrNum, ':')
+         end as concept_cd
+       , case
+         -- Use Date of Last Contact for Follow-up/Recurrence/Death
+         when sectionId = 4 then dateOfLastContact
+         -- Use Date of Diagnosis for everything else
+         else dateOfDiagnosis
+         end as start_date
+       , case
+         -- POSTPONED: Ti de-identification
+         when valtype_cd = 'T' then text_value
+         when valtype_cd = 'D' then
+           date_format(date_value,
+                       case
+                       when field_length = 14 then 'yyyy-MM-dd HH:mm:ss'
+                       else 'yyyy-MM-dd'
+                       end)
+         when valtype_cd = 'N' then 'E'  -- Equal for lab-style comparisons
+         end as tval_char
+       , case
+         -- POSTPONED: Ni de-identification
+         when valtype_cd = 'N'
+         then numeric_value
+         end as nval_num
+       , coalesce(dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis)
+         as update_date
+       , obs.*
+  from obs_w_section obs
+)
+
+select recordId         -- becomes patient_num via patient_mapping
+     , patientIdNumber  -- pending encounter_num via encounter_mapping
+     , naaccrId         -- for QA
+     -- remaining column names are per i2b2 observation_fact
+     , concept_cd
+     , '@' provider_id  -- IDEA: use abstractedBy?
      , start_date
      , '@' modifier_cd
      , 1 instance_num
      , valtype_cd
      , tval_char
      , nval_num
-     , null as valueflag_cd
-     , null as units_cd
+     , cast(null as string) valueflag_cd
+     , cast(null as string) units_cd
      , start_date as end_date
      , '@' location_cd
-     , to_date(null) as update_date
-from (
-select
-  ne."Patient ID Number" as MRN,
-  ne.case_index as encounter_ide,
-  av.concept_cd,
-  av.ItemName,
-  av.valtype_cd, av.nval_num, av.tval_char,
-  case
-  when av.start_date is not null then av.start_date
-  -- Use Date of Last Contact for Follow-up/Recurrence/Death
-  when av.sectionid = 4
-  then coalesce( to_date_noex(ne."Date of Last Contact", 'YYYYMMDD')
-               , to_date_noex(ne."Date of Last Contact", 'MMDDYYYY')
-               , to_date_noex(ne."Date of Last Contact", 'YYYYMM')
-               , to_date_noex(ne."Date of Last Contact", 'YYYY'))
-  -- Use Date of Diagnosis for everything else
-  else coalesce( to_date_noex(ne."Date of Diagnosis", 'YYYYMMDD')
-               , to_date_noex(ne."Date of Diagnosis", 'MMDDYYYY')
-               , to_date_noex(ne."Date of Diagnosis", 'YYYYMM')
-               , to_date_noex(ne."Date of Diagnosis", 'YYYY'))
-  end as start_date
-from naacr.extract ne
-join (
-select tiv.case_index
-     , tiv.start_date
-     , tiv.concept_cd
-     , tiv.valtype_cd, tiv.nval_num, tiv.tval_char
-     , tiv.ItemName
-     , tiv.SectionId
-from tumor_item_value tiv
-
-) av
- on ne.case_index = av.case_index
-/* TODO: figure out what's up with the 42 records with no Date of Diagnosis
-and the ones with no date of last contact */
-and ne."Accession Number--Hosp" is not null)
+     , update_date
+from obs_detail
 where start_date is not null;
 
+/* TODO: figure out what's up with the 42 records with no Date of Diagnosis
+and the ones with no date of last contact */

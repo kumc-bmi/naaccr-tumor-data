@@ -678,6 +678,7 @@ class TumorKeys:
                                           'dateCaseCompleted'],
                       # keep recordId length consistent
                       extra_default: Opt[sq.Column] = None) -> DataFrame:
+        # ISSUE: performance: add encounter_num column here?
         if extra_default is None:
             extra_default = func.lit('0000-00-00')
         id_col = func.concat(data.patientSystemIdHosp,
@@ -809,7 +810,7 @@ if IO_TESTING:
     _ty = _spark.read.csv('heron_load/tumor_item_type.csv',
                           header=True, inferSchema=True)
     _ty.cache()
-_ty.limit(5).toPandas()
+IO_TESTING and _ty.limit(5).toPandas()
 
 
 # %% [markdown]
@@ -829,8 +830,24 @@ def stack_obs(records, ty,
 
 
 if IO_TESTING:
-    _raw_obs = stack_obs(_extract, _ty)
+    _raw_obs = TumorKeys.with_tumor_id(naaccr_dates(stack_obs(_extract, _ty), TumorKeys.dtcols))
+    _raw_obs.createOrReplaceTempView('naaccr_obs_raw')
 IO_TESTING and _raw_obs.limit(10).toPandas()
+
+# %%
+if IO_TESTING:
+    create_object('tumor_item_value', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
+IO_TESTING and _spark.table('tumor_item_value').limit(10).toPandas()
+
+# %%
+if IO_TESTING:
+    create_object('tumor_reg_facts', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
+IO_TESTING and _spark.table('tumor_reg_facts').limit(10).toPandas()
+
+# %%
+if IO_TESTING:
+    create_object('tumor_reg_facts', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
+IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(20).toPandas()
 
 
 # %%
@@ -862,7 +879,7 @@ def typed_obs(raw, spark,
     ''')
     return naaccr_dates(typed, TumorKeys.dtcols)
 
-typed_obs(_raw_obs, _spark).where("valtype_cd != '@'").limit(40).toPandas()
+IO_TESTING and typed_obs(_raw_obs, _spark).where("valtype_cd != '@'").limit(40).toPandas()
 
 # %% [markdown]
 # ## Oracle DB Access
@@ -894,7 +911,7 @@ if IO_TESTING:
 # %%
 class Account:
     def __init__(self, user: str, password: str,
-                 url: str = 'jdbc:oracle:thin:@localhost:1521:nheronA1',
+                 url: str = 'jdbc:oracle:thin:@localhost:8621:KUMC',
                  driver: str = "oracle.jdbc.OracleDriver") -> None:
         self.url = url
         self.__properties = {"user": user,
@@ -917,11 +934,21 @@ if IO_TESTING:
 
 IO_TESTING and _cdw.rd(_spark.read, "global_name").toPandas()
 
+
 # %% [markdown]
 #
 #   - **ISSUE**: column name capitalization: `concept_cd` vs.
 #     `CONCEPT_CD`, `dateOfDiagnosis` vs. `DATEOFDIAGNOSIS`
 #     vs. `DATE_OF_DIAGNOSIS`.
+
+# %%
+def case_fold(df):
+    """Fold column names to upper-case, following (Oracle) SQL norms.
+
+    See also: upper_snake_case in pcornet_cdm
+    """
+    return df.toDF(*[n.upper() for n in df.columns])
+
 
 # %%
 if IO_TESTING:
