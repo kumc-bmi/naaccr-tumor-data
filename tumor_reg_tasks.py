@@ -32,13 +32,17 @@ import param_val as pv
 import tumor_reg_data as td
 import tumor_reg_ont as tr_ont
 
-# Add Eliot Handler to root Logger.
-logging.getLogger().addHandler(EliotHandler())
-# and to luigi
-logging.getLogger('luigi').addHandler(EliotHandler())
-logging.getLogger('luigi-interface').addHandler(EliotHandler())
 log = logging.getLogger(__name__)
-el.to_file(open('log/eliot.log', 'ab'))  # ISSUE: ambient
+
+
+def _configure_logging(dest='log/eliot.log'):
+    root = logging.getLogger()  # ISSUE: ambient
+    # Add Eliot Handler to root Logger.
+    root.addHandler(EliotHandler())
+    # and to luigi
+    logging.getLogger('luigi').addHandler(EliotHandler())
+    logging.getLogger('luigi-interface').addHandler(EliotHandler())
+    el.to_file(open(dest, 'ab'))  # ISSUE: ambient
 
 
 class Connection:
@@ -680,6 +684,8 @@ class NAACCR_Load(UploadTask):
 
 if __name__ == '__main__':
     def _script_io():
+        _configure_logging()
+
         with el.start_task(action_type='luigi.build'):
             luigi.build([NAACCR_Load()], local_scheduler=True)
 
