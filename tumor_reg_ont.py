@@ -303,6 +303,12 @@ class NAACCR_I2B2(object):
     ]
 
     @classmethod
+    def tumor_item_type_static(cls) -> ContextManager[Path_T]:
+        #@@ISSUE: figure out why spark.createDataFrame(pd.read_csv())
+        #complains about string + double here.
+        return res.path(heron_load, 'tumor_item_type.csv')
+
+    @classmethod
     def ont_view_in(cls, spark: SparkSession_T,
                     ddict: Path_T, recode: Path_T) -> DataFrame:
         cls.tumor_item_type(spark, ddict)

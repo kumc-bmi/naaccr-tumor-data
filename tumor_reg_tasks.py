@@ -235,6 +235,11 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
     def classpath(self):
         return ':'.join(self.jars)
 
+    @property
+    def __password(self):
+        from os import environ  # ISSUE: ambient
+        return environ[self.passkey]
+
     def jdbc_access(self, io, table_name: str,
                     **kw_args):
         return io.jdbc(self.db_url, table_name,
@@ -469,19 +474,31 @@ class NAACCR_Facts(_NAACCR_JDBC):
 
     naaccr_ddict = pv.PathParam(significant=False)
 
-    coded_view = 'tumor_coded_value'  # in
+    raw_view = 'naaccr_obs_raw'  # in
     naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
-    fact_view = 'tumor_reg_coded_facts'  # out
+    item_view = 'tumor_item_value'
+    fact_view = 'tumor_reg_facts'  # out
 
-    design_id = pv.StrParam('loinc map dups 3 (%d)' % len(naaccr_txform))
+    design_id = pv.StrParam('date, num, ... (%d)' % len(naaccr_txform))
 
     def _data(self, spark, naaccr_text_lines):
         extract = td.naaccr_read_fwf(naaccr_text_lines, tr_ont.ddictDF(spark))
-        ty = tr_ont.NAACCR_I2B2.tumor_item_type(spark, self.naaccr_ddict)
-        obs = td.naaccr_coded_obs(extract, ty)
-        obs = td.TumorKeys.with_tumor_id(obs)
-        obs.createOrReplaceTempView(self.coded_view)
-        tr_ont.create_object(self.fact_view, self.naaccr_txform, spark)
+        tr_ont.ScrapedChapters.make_in(spark, self.naaccr_ddict) #@@record_layout -> static
+        with tr_ont.NAACCR_I2B2.tumor_item_type_static() as ty_path:
+            ty = tr_ont.csv_view(spark, ty_path,
+                                 'tumor_item_type')  #@@refactor MAGIC
+
+        raw_obs = td.TumorKeys.with_tumor_id(td.naaccr_dates(
+            td.stack_obs(extract, ty),
+            td.TumorKeys.dtcols))
+        raw_obs.createOrReplaceTempView(self.raw_view)
+
+        tr_ont.create_object(
+            self.item_view, self.naaccr_txform, spark)
+
+        tr_ont.create_object(
+            self.fact_view, self.naaccr_txform, spark)
+
         data = spark.table(self.fact_view)
         return data
 
@@ -641,7 +658,7 @@ class NAACCR_Load(UploadTask):
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
-    z_design_id = pv.StrParam('msg param sort')
+    z_design_id = pv.StrParam('all obs')
     jdbc_driver_jar = pv.StrParam(significant=False)
 
     script_name = 'naaccr_facts_load.sql'
