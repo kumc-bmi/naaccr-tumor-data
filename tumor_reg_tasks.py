@@ -426,6 +426,8 @@ class _NAACCR_JDBC(SparkJDBCTask):
         naaccr_text_lines = spark.read.text(str(ff.flat_file))
 
         data = self._data(spark, naaccr_text_lines)
+        # ISSUE: task_id is kinda long; how about just task_hash?
+        # luigi_task_hash?
         data = data.withColumn('task_id', func.lit(self.task_id))
         data = data.toDF(*[n.upper() for n in data.columns])
         self.jdbc_access(data.write, self.table_name, mode='overwrite')

@@ -85,6 +85,10 @@ cite:
      fail completely when they fail.
    - luigi tasks **preserve partial results**
 
+
+**IDEA:** move more pyspark logic to User-Defined Functions (UDFs) and
+          drive more of the work from .sql scripts.
+
 ---
 
 ## Example: NAACCR Ontology for i2b2

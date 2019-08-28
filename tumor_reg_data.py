@@ -808,6 +808,9 @@ if IO_TESTING:
     _ty.cache()
 
 
+# %% [markdown]
+# **ISSUE**: performance: whenever we change cardinality, consider persisting the data. e.g. stack_obs
+
 # %%
 def stack_obs(records, ty,
               known_valtype_cd=['@', 'D', 'N', 'Ni', 'T'],

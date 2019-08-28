@@ -317,6 +317,14 @@ class NAACCR_I2B2(object):
     @classmethod
     def tumor_item_type(cls, spark: SparkSession_T,
                         scraped: Path_T) -> DataFrame:
+        # TODO: since the scraped info is also available in the layout
+        #       project under an open source license, change this
+        #       to a design-time artifact.
+        #       Store in CSV format and use
+        #       https://www.w3.org/TR/tabular-data-primer/#datatypes
+        #       to specify column types.
+        # ref https://github.com/imsweb/naaccr-xml/issues/156
+        # https://github.com/imsweb/layout/blob/master/src/main/resources/layout/fixed/naaccr/naaccr-18-layout.xml
         ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
         LOINC_NAACCR.measure_in(spark)
         LOINC_NAACCR.answers_in(spark)
