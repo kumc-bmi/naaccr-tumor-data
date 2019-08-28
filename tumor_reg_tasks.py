@@ -15,6 +15,7 @@ from functools import wraps
 from importlib import resources as res
 from typing import Iterator, Optional as Opt, Tuple
 import datetime as dt
+import json
 import logging
 
 from eliot.stdlib import EliotHandler
@@ -587,24 +588,32 @@ class UploadTarget(luigi.Target):
         with JDBCTask.prepared(conn, f'''
           insert into {self.schema}.upload_status (
             upload_id, upload_label, user_id,
-            source_cd, transform_name, load_date)
+            source_cd, message, transform_name, load_date)
           values(:upload_id, :label, :user_id,
-                 :src, :tn, current_timestamp)
+                 :src, :params, :tn, current_timestamp)
         ''', dict(upload_id=upload_id,
                   label=label,
                   user_id=user_id,
                   src=self.source_cd,
+                  params=json.dumps(
+                      self._task.to_str_params(only_significant=True,
+                                               only_public=True),
+                      indent=2)[:4000],
                   tn=self.transform_name)) as stmt:
             rs = stmt.execute()
         return upload_id
 
     def update(self, conn, upload_id: int, load_status: str,
                message: Opt[str]):
+        '''
+        @param message: use '' to erase
+        '''
+        set_msg = ', message = :message ' if message else ''
         with JDBCTask.prepared(conn, f'''
           update {self.schema}.upload_status
           set end_date=current_timestamp,
-              load_status = :status,
-              message = :message
+              load_status = :status
+              {set_msg}
           where upload_id = :id
         ''', dict(status=load_status,
                   message=message,
@@ -626,7 +635,7 @@ class NAACCR_Load(UploadTask):
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
-    z_design_id = pv.StrParam('logging 7')
+    z_design_id = pv.StrParam('msg param sort')
     jdbc_driver_jar = pv.StrParam(significant=False)
 
     script_name = 'naaccr_facts_load.sql'
