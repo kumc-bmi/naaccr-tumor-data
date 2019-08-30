@@ -51,7 +51,7 @@ import bc_qa
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
-from tumor_reg_ont import create_object, ScrapedChapters
+from tumor_reg_ont import create_object
 import heron_load
 
 

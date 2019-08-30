@@ -3,7 +3,7 @@
 from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
-    Callable, ContextManager, Dict, Iterable, Iterator, List, Optional as Opt
+    Callable, ContextManager, Dict, Iterator, List, Optional as Opt
 )
 from xml.etree import ElementTree as XML
 
@@ -22,6 +22,94 @@ import loinc_naaccr  # included with permission
 # https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/
 import naaccr_xml_res
 import naaccr_xml_xsd
+import naaccr_layout
+
+
+def _int_fields(record, fields):
+    return {k: int(v) if k in fields else v
+            for k, v in record.items()}
+
+
+class NAACCR_Layout:
+    """NAACCR Record Layout XML assets.
+
+    ack: https://github.com/imsweb/layout
+    56eaf0c on Jul 26
+    ref https://github.com/imsweb/naaccr-xml/issues/156
+    https://github.com/imsweb/layout/blob/master/src/main/resources/layout/fixed/naaccr/naaccr-18-layout.xml
+
+    IDEA: specify column types for CSV data with
+          https://www.w3.org/TR/tabular-data-primer/#datatypes
+
+    >>> NAACCR_Layout.fields[:3]
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [{'name': 'recordType', 'start': 1, 'end': 1, ..., 'length': 1},
+     {'name': 'registryType', 'start': 2, ..., 'section': 'Record ID', ...},
+     {'name': 'naaccrRecordVersion', ... 'naaccr-item-num': 50, ...}]
+
+    >>> for info in list(NAACCR_Layout.fields_source())[:3]:
+    ...     print(info)
+    (1512, 'phase2RadiationExternalBeamTech', 'CoC')
+    (21, 'patientSystemIdHosp', 'NAACCR')
+    (2425, 'npiInstReferredTo', 'CMS')
+    """
+    layout_180 = XML.parse(res.open_text(
+        naaccr_layout, 'naaccr-18-layout.xml'))
+
+    # top-level (non-overlapping) fields, skipping reserved
+    fields_raw = [_int_fields(f.attrib, ['start', 'end', 'naaccr-item-num'])
+                  for f in layout_180.findall('./field')
+                  if not f.attrib['name'].startswith('reserved')]
+
+    # include length
+    fields = [dict(f, length=f['end'] + 1 - f['start'])
+              for f in fields_raw]
+
+    @classmethod
+    def _fields_doc(cls) -> ContextManager[Path_T]:
+        return res.path(naaccr_layout, 'doc')
+
+    @classmethod
+    def fields_source(cls):
+        for info in cls.fields_doc():
+            yield (int(info['Item #']), info['xmlId'],
+                   info.get('Source of Standard'))
+
+    @classmethod
+    def fields_doc(cls,
+                   subdir='naaccr18'):
+        with cls._fields_doc() as doc_dir:
+            for field_path in (doc_dir / subdir).glob('*.html'):
+                doc = cls.field_doc(field_path)
+                if doc:
+                    yield doc
+
+    @classmethod
+    def field_doc(cls, path):
+        doc = _parse_html_fragment(path)
+        naaccr_xml = doc.find('./strong')
+        if naaccr_xml is None:
+            return None
+        naaccr_xml = naaccr_xml.tail[2:].strip()  # </strong>: ...
+        [parentElement, xmlId] = naaccr_xml.split('.')
+        summary_table = doc.find(
+            './table[@class="naaccr-summary-table naaccr-borders"]')
+        [hd, detail] = summary_table.findall('tr')
+        summary = dict(zip([th.text for th in hd.findall('th')],
+                           [td.text for td in detail.findall('td')]))
+        return dict(summary,
+                    parentElement=parentElement,
+                    xmlId=xmlId)
+
+
+def _parse_html_fragment(path):
+    markup = path.open().read()
+    markup = '''
+    <!DOCTYPE html [
+    <!ENTITY nbsp "&#160;" >
+    ]>
+    <html>''' + markup + '</html>'
+    return XML.fromstring(markup)
 
 
 class XSD:
@@ -140,11 +228,30 @@ def xmlDF(spark: SparkSession_T, schema: ty.StructType,
           doc: XML.ElementTree, path: str, ns: Dict[str, str],
           eltRecords: Opt[RecordMaker] = None,
           simpleContent: bool = False) -> DataFrame:
+    data = xmlRecords(schema, doc, path, ns, eltRecords, simpleContent)
+    return spark.createDataFrame(data, schema)  # type: ignore
+
+
+def xmlRecords(schema: ty.StructType,
+               doc: XML.ElementTree, path: str, ns: Dict[str, str],
+               eltRecords: Opt[RecordMaker] = None,
+               simpleContent: bool = False) -> Iterator[Dict]:
+    """
+    >>> schema = eltSchema(XSD.the(NAACCR1.ItemDef, '*'))
+    >>> ea = xmlRecords(doc=NAACCR1.ndd180, schema=schema,
+    ...                 path='./n:ItemDefs/n:ItemDef',
+    ...                 ns=NAACCR1.ns)
+    >>> list(ea)[:3]
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [{'naaccrId': 'recordType', 'naaccrNum': 10, ...},
+     {'naaccrId': 'registryType', 'naaccrNum': 30, ...},
+     {'naaccrId': 'naaccrRecordVersion', 'naaccrNum': 50, ...}]
+    """
     getRecords = eltRecords or eltDict
     data = (record
             for elt in doc.iterfind(path, ns)
             for record in getRecords(elt, schema, simpleContent))
-    return spark.createDataFrame(data, schema)  # type: ignore
+    return data
 
 
 def eltDict(elt: XML.Element, schema: ty.StructType,
@@ -165,33 +272,6 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
                  doc=NAACCR1.ndd180,
                  path='./n:ItemDefs/n:ItemDef',
                  ns=NAACCR1.ns)
-
-
-class ScrapedChapters(object):
-    # TODO: get license to redistribute section info etc.
-    # so that we can turn scraped into a design-time constant.
-    # See https://github.com/imsweb/naaccr-xml/issues/156
-
-    filenames = [
-        'record_layout.csv',
-        'data_descriptor.csv',
-        'item_description.csv',
-        'section.csv',
-    ]
-
-    def __init__(self, dfs4: Iterable[DataFrame]) -> None:
-        [
-            self.record_layout,
-            self.data_descriptor,
-            self.item_description,
-            self.section,
-        ] = dfs4
-
-    @classmethod
-    def make_in(cls, spark: SparkSession_T, data: Path_T) -> 'ScrapedChapters':
-        # avoid I/O in constructor
-        return cls([csv_view(spark, data / name)
-                    for name in cls.filenames])
 
 
 class LOINC_NAACCR:
@@ -302,6 +382,9 @@ class NAACCR_I2B2(object):
         'naaccr_ontology',
     ]
 
+    per_section = pd.read_csv(res.open_text(
+        heron_load, 'section.csv'))
+
     @classmethod
     def tumor_item_type_static(cls) -> ContextManager[Path_T]:
         #@@ISSUE: figure out why spark.createDataFrame(pd.read_csv())
@@ -309,9 +392,8 @@ class NAACCR_I2B2(object):
         return res.path(heron_load, 'tumor_item_type.csv')
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T,
-                    ddict: Path_T, recode: Path_T) -> DataFrame:
-        cls.tumor_item_type(spark, ddict)
+    def ont_view_in(cls, spark: SparkSession_T, recode: Path_T) -> DataFrame:
+        cls.tumor_item_type(spark)
         NAACCR_R.code_labels_in(spark)
         cls.seer_terms_in(spark, recode)
 
@@ -321,20 +403,23 @@ class NAACCR_I2B2(object):
         return spark.table(cls.concept_views[-1])
 
     @classmethod
-    def tumor_item_type(cls, spark: SparkSession_T,
-                        scraped: Path_T) -> DataFrame:
-        # TODO: since the scraped info is also available in the layout
-        #       project under an open source license, change this
-        #       to a design-time artifact.
-        #       Store in CSV format and use
-        #       https://www.w3.org/TR/tabular-data-primer/#datatypes
-        #       to specify column types.
-        # ref https://github.com/imsweb/naaccr-xml/issues/156
-        # https://github.com/imsweb/layout/blob/master/src/main/resources/layout/fixed/naaccr/naaccr-18-layout.xml
+    def tumor_item_type(cls, spark: SparkSession_T) -> DataFrame:
         ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
         LOINC_NAACCR.measure_in(spark)
         LOINC_NAACCR.answers_in(spark)
-        ScrapedChapters.make_in(spark, scraped)
+
+        sec = spark.createDataFrame(cls.per_section)
+        rl = (spark.createDataFrame(NAACCR_Layout.fields)
+              .withColumnRenamed('naaccr-item-num', 'item'))
+        desc = spark.createDataFrame([dict(item=item, source=source)
+                                      for (item, _, source)
+                                      in NAACCR_Layout.fields_source()])
+        for name, data in [
+                ('record_layout', rl),
+                ('item_description', desc),
+                ('section', sec),
+        ]:
+            data.createOrReplaceTempView(name)
 
         NAACCR_R.field_info_in(spark)
 

@@ -284,7 +284,7 @@ class JDBCTableTarget(luigi.Target):
 
 class NAACCR_Ontology1(SparkJDBCTask):
     design_id = pv.StrParam(
-        default='leafs',
+        default='static layout',
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -292,12 +292,6 @@ class NAACCR_Ontology1(SparkJDBCTask):
         '''.strip(),
     )
     naaccr_version = pv.IntParam(default=18)
-    naaccr_ddict = pv.PathParam(significant=False, description='''
-      scraped from http://datadictionary.naaccr.org/default.aspx?c=10
-      Content-Length: 3078052
-      ISSUE: changes to the data dictionary are significant, though
-             changes to the path are not. hm. checksum? cache abstraction?
-    '''.strip())
     seer_recode = pv.PathParam(significant=False, description='''
       cache of http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
     ''')
@@ -327,11 +321,10 @@ class NAACCR_Ontology1(SparkJDBCTask):
         ''')
 
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.naaccr_ddict.resolve(),
-            self.seer_recode.resolve())
-        ont_upper = tr_ont.toDF(*[n.upper() for n in ont.columns])
+            spark, self.seer_recode.resolve())
 
-        self.jdbc_access(ont_upper.write, self.table_name, mode='overwrite')
+        self.jdbc_access(td.case_fold(ont).write, self.table_name,
+                         mode='overwrite')
 
 
 class ManualTask(luigi.Task):
