@@ -1,0 +1,891 @@
+item,name,format,allow_value,length,note
+10,Record Type,,"I, C, A, U, M, L",1,
+20,Patient ID Number,"Right justified, zero filled",,8,
+21,Patient System ID-Hosp,"Right justified, zero filled",,8,
+30,Registry Type,,1-3,1,
+35,FIN Coding System,,,,Retired
+37,Reserved 00,,,14,
+40,Registry ID,"Right justified, zero filled",10-digit number. Reference to EDITS table REGID.DBF in Appendix B,10,
+45,NPI--Registry ID,,"10-digit NPI code (9-digit integer plus 1 check digit), blank",10,
+50,NAACCR Record Version,,"120, 121, 122, 130, 140, 150, 160, 180",3,Revised
+60,Tumor Record Number,"Right justified, zero filled",01-99,2,
+70,Addr at DX--City,"Mixed case letters, special characters only as allowed by USPS, embedded spaces allowed, left justified, blank filled",City name or UNKNOWN,50,
+80,Addr at DX--State,Upper case,"Refer to EDITS table STATE.DBF in Appendix B; CD, US, XX, YY, ZZ",2,
+81,State at DX Geocode 1970/80/90,,"01-95, Blank",2,New
+82,State at DX Geocode 2000,,"01-95, Blank",2,New
+83,State at DX Geocode 2010,,"01-95, Blank",2,New
+84,State at DX Geocode 2020,,"01-95, Blank",2,New
+89,County at DX Analysis,,"001-997, 998, 999",3,New
+90,County at DX Reported,"Right justified, zero filled",001-999,3,Revised
+94,County at DX Geocode 1970/80/90,,000-999,3,Revised
+95,County at DX Geocode2000,,001-999,3,Revised
+96,County at DX Geocode2010,,000-999,3,Revised
+97,County at DX Geocode2020,,001-999,3,Revised
+100,Addr at DX--Postal Code,"Numbers or upper case letters. No special characters or embedded spaces allowed. Left justified, blank filled","5-digit or 9-digit U.S. ZIP codes; 6-character Canadian postal codes; valid postal codes from other countries, 888888888, 999999999, 88888+4 blanks (U.S.), 99999+4 blanks (U.S.), 999999+3 blanks (Canada)",9,
+102,Addr at DX--Country,Upper case,"International Standards Organization (ISO) 3166-1 Country Three Character Codes and custom codes: ZZN, ZZC, ZZS, ZZP, ZZE, ZZF, ZZA, ZZX, ZZU, XNI, XCB, XEN, XSC, XGR, XSL, CSK, YUG, XUM, XNF, XSD, XWF, XSF, XEF, XIF, XET, XAP, XIS, XCR, XOR, XSE, XMS, XCH, XML, XMC, XPL",3,
+110,Census Tract 1970/80/90,"Right justified, zero filled","Valid FIPS Codes: 000100-999998, 000000, 999999, Blank",6,Revised
+120,Census Cod Sys 1970/80/90,,"0-3, blank",1,
+125,Census Tract 2020,"Right justified, zero filled","Census Tract Codes 000100-999998, 000000, 999999, Blank",6,New
+130,Census Tract 2000,"Right justified, zero filled","Valid FIPS Codes: 000100-999998, 000000, 999999, blank",6,Revised
+135,Census Tract 2010,"Right justified, zero filled","Census Tract Codes 000100-999998, 000000, 999999, blank",6,
+140,Census Tract Cod Sys--Alt,,,,Retired
+145,Census Tr Poverty Indictr,,"1-4, 9",1,
+150,Marital Status at DX,,"1-6, 9",1,
+160,Race 1,"Right justified, zero filled","01-08, 10-17, 20-22, 25-28, 30-32, 96-99",2,
+161,Race 2,"Right justified, zero filled","01-08, 10-17, 20-22, 25-28, 30-32, 88, 96-99, blank",2,
+162,Race 3,"Right justified, zero filled","01-08, 10-17, 20-22, 25-28, 30-32, 88, 96-99, blank",2,
+163,Race 4,"Right justified, zero filled","01-08, 10-17, 20-22, 25-28, 30-32, 88, 96-99, blank",2,
+164,Race 5,"Right justified, zero filled","01-08, 10-17, 20-22, 25-28, 30-32, 88, 96-99, blank",2,
+170,Race Coding Sys--Current,,"1-7, 9",1,
+180,Race Coding Sys--Original,,"1-7, 9",1,
+190,Spanish/Hispanic Origin,,"0-8, 9",1,
+191,NHIA Derived Hisp Origin,,"0-8, blank",1,
+192,IHS Link,,"0, 1, blank",1,
+193,Race--NAPIIA(derived API),"Right justified, zero filled","01-08, 10-17, 20-22, 25-28, 30-32, 96, 99, blank",2,
+200,Computed Ethnicity,,"0-7, blank",1,
+210,Computed Ethnicity Source,,"0-9, blank",1,
+220,Sex,,"1-6, 9",1,
+230,Age at Diagnosis,"Right justified, zero filled","000-120, 999",3,
+240,Date of Birth,YYYYMMDD,Valid date,8,
+241,Date of Birth Flag,,"10-20, blank",2,
+250,Birthplace,"Right justified, zero filled",Reference to EDITS table BPLACE.DBF in Appendix B,3,
+252,Birthplace--State,Upper case,"USPS abbreviations and CanadaPost abbreviations; also a few local codes to capture legacy definitions, including unknowns, consistent with the codes allowable for Addr at Dx--State [80].",2,
+254,Birthplace--Country,Upper case,"International Standards Organization (ISO) 3166-1 Country Three Character Codes; custom codes:ZZN, ZZC, ZZS, ZZP, ZZE, ZZF, ZZA, ZZX, ZZU, XNI, XCB, XEN, XSC, XGR, XSL, CSK, YUG, XUM, XNF, XSD, XWF, XSF, XEF, XIF, XET, XAP, XIS, XCR, XOR, XSE, XMS, XCH, XML, XMC, XPL. See Appendix B for complete list of country names and corresponding three character alpha codes.",3,
+260,Religion,,,,Retired
+270,Census Occ Code 1970-2000,"Right justified, zero filled",Reference Industry and Occupation Coding for Death Certificates,3,
+272,Census Ind Code 2010 CDC,"Right justified, zero filled","Valid 4 digit numbers, Blank",4,
+280,Census Ind Code 1970-2000,"Right justified, zero filled",Reference Industry and Occupation Coding for Death Certificates,3,
+282,Census Occ Code 2010 CDC,"Right justified, zero filled","Valid 4-digit numbers, Blank",4,
+290,Occupation Source,,"0-3, 7-9, blank",1,
+300,Industry Source,,"0-3, 7-9, blank",1,
+310,Text--Usual Occupation,Free text,Neither carriage return nor line feed characters allowed,100,
+320,Text--Usual Industry,Free text,Neither carriage return nor line feed characters allowed,100,
+330,Census Occ/Ind Sys 70-00,,"1-5, 7, 9, blank",1,
+339,RUCA 2000,,"1, 2, 9",1,New
+340,Tobacco History,,,,Retired
+341,RUCA 2010,,"1, 2, 9",1,New
+345,URIC 2000,,"1-4, 9",1,New
+346,URIC 2010,,"1-4, 9",1,New
+350,Alcohol History,,,,Retired
+351,GeoLocationID - 1970/80/90,,,12,New
+352,GeoLocationID - 2000,,,12,New
+353,GeoLocationID - 2010,,,12,New
+354,GeoLocationID - 2020,,,12,New
+360,Family History of Cancer,,,,Retired
+361,Census Block Group 2020,,"0-9, Blank",1,New
+362,Census Block Group 2000,,"0-9, blank",1,
+363,Census Block Group 2010,,"0-9, blank",1,
+364,Census Tr Cert 1970/80/90,,"1-6, 9, blank",1,
+365,Census Tr Certainty 2000,,"1-6, 9, blank",1,
+366,GIS Coordinate Quality,"Right justified, zero filled","00-12, 98, 99, blank",2,
+367,Census Tr Certainty 2010,,"1-6, 9, blank",1,
+368,Census Block Grp 1970/80/90,,"0-9, blank",1,Revised
+369,Census Tract Certainty 2020,,"1-6, 9, Blank",1,New
+370,Reserved 01,,,16,Revised
+380,Sequence Number--Central,"Right justified, zero filled","00-59, 60-87, 88, 98, 99",2,
+390,Date of Diagnosis,YYYYMMDD,Valid date,8,
+391,Date of Diagnosis Flag,,"10-20, blank",2,
+400,Primary Site,"C followed by 3 digits, no special characters, no embedded blanks",Refer to ICD-O-3 (decimals are dropped),4,
+410,Laterality,,"0-5, 9",1,
+419,Morph--Type&Behav ICD-O-2,,Reference to ICD-0-2,5,
+420,Histology (92-00) ICD-O-2,,"8000-9989, Refer to ICD-0-2",4,
+430,Behavior (92-00) ICD-O-2,,"0-3, Refer to ICD-0-2",1,
+439,Date of Mult Tumors Flag,,"10-20, blank",2,
+440,Grade,,1-9,1,
+441,Grade Path Value,,"1-4, blank",1,
+442,Ambiguous Terminology DX,,"0-2, 9",1,
+443,Date Conclusive DX,YYYYMMDD,Valid date,8,
+444,Mult Tum Rpt as One Prim,"Right justified, zero filled","00, 10-12, 20, 30-32, 40, 80, 88, 99",2,
+445,Date of Mult Tumors,YYYYMMDD,Valid date,8,
+446,Multiplicity Counter,"Right justified, zero filled","00-89, 99, blank",2,
+447,Number of Tumors/Hist,,,,Retired
+448,Date Conclusive DX Flag,,"10-20, blank",2,
+449,Grade Path System,,"2-4, blank",1,
+450,Site Coding Sys--Current,,"1-6, 9",1,
+460,Site Coding Sys--Original,,"1-6, 9",1,
+470,Morph Coding Sys--Current,,"1-9, A",1,Revised
+480,Morph Coding Sys--Originl,,"1-9, A",1,Revised
+490,Diagnostic Confirmation,,1-9,1,
+500,Type of Reporting Source,,1-8,1,
+501,Casefinding Source,,"10, 20-30, 40, 50, 60, 70, 75, 80, 85, 90, 95, 99",2,
+510,Screening Date,,,,Retired
+520,Screening Result,,,,Retired
+521,Morph--Type&Behav ICD-O-3,,Refer to ICD-O-3,5,
+522,Histologic Type ICD-O-3,,"8000-9989, Refer to ICD-O-3",4,
+523,Behavior Code ICD-O-3,,"0-3, Refer to ICD-O-3",1,
+530,Reserved 02,,,50,
+538,Reporting Hospital FAN,,,,Retired
+540,Reporting Facility,"Right justified, zero filled",10-digit number,10,
+545,NPI--Reporting Facility,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+550,Accession Number--Hosp,,9-digit number,9,
+560,Sequence Number--Hospital,"Right justified, zero filled","00-59, 60-87, 88, 99",2,
+570,Abstracted By,No special characters,Letters and numbers,3,
+580,Date of 1st Contact,YYYYMMDD,Valid dates,8,
+581,Date of 1st Contact Flag,,"10-20, blank",2,
+590,Date of Inpt Adm,YYYYMMDD,Valid dates,8,
+591,Date of Inpt Adm Flag,,"10-20, blank",2,
+600,Date of Inpt Disch,YYYYMMDD,Valid dates,8,
+601,Date of Inpt Disch Flag,,"10-20, blank",2,
+605,Inpatient Status,,"0,1,9, blank",1,
+610,Class of Case,"Right justified, zero filled","00, 10-14, 20-22, 30-38, 40-43, 49, 99",2,
+620,Year First Seen This CA,,,,Retired
+630,Primary Payer at DX,"Right justified, zero filled","01, 02, 10, 20, 21, 31, 35, 60-68, 99",2,
+640,Inpatient/Outpt Status,,,,Retired
+650,Presentation at CA Conf,,,,Retired
+660,Date of CA Conference,,,,Retired
+665,RX Hosp--ASA Class,,,,Retired
+668,RX Hosp--Surg App 2010,,"0-5, 9",1,
+670,RX Hosp--Surg Prim Site,"Right justified, zero filled","00, 10-80, 90, 98, 99 (site-specific)",2,
+672,RX Hosp--Scope Reg LN Sur,,"0-7, 9",1,
+674,RX Hosp--Surg Oth Reg/Dis,,"0-5, 9",1,
+676,RX Hosp--Reg LN Removed,"Right justified, zero filled","00-90, 95-99",2,
+678,RX Hosp--Surg Timing,,,,Retired
+680,Reserved 03,,,100,
+682,Date Regional Lymph Node Dissection,YYYYMMDD,Valid dates,8,New
+683,Date Regional Lymph Node Dissection Flag,,"10-12, Blank",2,New
+690,RX Hosp--Radiation,,"0-5, 9",1,
+700,RX Hosp--Chemo,"Right justified, zero filled","00-03, 82, 85-88, 99",2,
+710,RX Hosp--Hormone,"Right justified, zero filled","00, 01, 82, 85-88, 99",2,
+720,RX Hosp--BRM,"Right justified, zero filled","00, 01, 82, 85-88, 99",2,
+730,RX Hosp--Other,,"0-3, 6-9",1,
+740,RX Hosp--DX/Stg Proc,"Right justified, zero filled","00-07, 09",2,
+742,RX Hosp--Screen/BX Proc1,,,,Retired
+743,RX Hosp--Screen/BX Proc2,,,,Retired
+744,RX Hosp--Screen/BX Proc3,,,,Retired
+745,RX Hosp--Screen/BX Proc4,,,,Retired
+746,RX Hosp--Surg Site 98-02,"Right justified, zero filled","00, 10-90, 99 (site-specific), blank",2,
+747,RX Hosp--Scope Reg 98-02,,"0-9 (site-specific), blank",1,
+748,RX Hosp--Surg Oth 98-02,,"0-9 (site-specific), blank",1,
+750,Reserved 04,,,50,Revised
+752,Tumor Size Clinical,,"000-990, 998, 999",3,
+754,Tumor Size Pathologic,,"000-990, 998, 999",3,
+756,Tumor Size Summary,,"000-990, 998, 999",3,
+759,SEER Summary Stage 2000,,"0-5, 7, 8, 9",1,
+760,SEER Summary Stage 1977,,"0-5, 7, 8, 9",1,
+762,Derived Summary Stage 2018,,"0-4, 7-9",1,Revised
+764,Summary Stage 2018,,"0-4, 7-9",1,Revised
+770,Loc/Reg/Distant Stage,,,,Retired
+772,EOD Primary Tumor,,"Valid schema-specific codes; also 000, 800, 999",3,Revised
+774,EOD Regional Nodes,,"Valid schema-specific codes; also 000, 800, 888, 999",3,Revised
+776,EOD Mets,,"Valid schema-specific codes; also 00, 88, 99",2,Revised
+779,Extent of Disease 10-Dig,,,12,
+780,EOD--Tumor Size,"Right justified, zero filled",See respective source references,3,
+785,Derived EOD 2018 T,,,15,New
+790,EOD--Extension,"Right justified, zero filled",Reference SEER Extent of Disease manual,2,
+795,Derived EOD 2018 M,,,15,New
+800,EOD--Extension Prost Path,"Right justified, zero filled",Reference SEER Extent of Disease manual,2,
+810,EOD--Lymph Node Involv,,Reference SEER Extent of Disease manual,1,
+815,Derived EOD 2018 N,,,15,New
+818,Derived EOD 2018 Stage Group,,,15,New
+820,Regional Nodes Positive,"Right justified, zero filled","00-90, 95, 97-99",2,
+830,Regional Nodes Examined,"Right justified, zero filled","00-90, 95-99",2,
+832,Date of Sentinel Lymph Node Biopsy,YYYYMMDD,Valid dates,8,New
+833,Date of Sentinel Lymph Node Biopsy Flag,,"10-12, Blank",2,New
+834,Sentinel Lymph Nodes Examined,"Right justified, zero filled","00-90, 95, 98, 99",2,New
+835,Sentinel Lymph Nodes Positive,"Right justified, zero filled","00-90, 95, 97-99",2,New
+840,EOD--Old 13 Digit,Numeric and special characters,,13,
+850,EOD--Old 2 Digit,"Numeric plus special characters ""&"" and ""dash"" (""-"")",,2,
+860,EOD--Old 4 Digit,,,4,
+870,Coding System for EOD,,"0-4, Blank",1,
+880,TNM Path T,"Upper case, alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS manual; also 88, blank",4,
+890,TNM Path N,"Upper case, alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS manual; also 88, blank",4,
+900,TNM Path M,"Upper case, alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",4,
+910,TNM Path Stage Group,"Upper case, alphanumeric. Convert AJCC Roman numerals to Arabic numerals.  Left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, 99",4,
+920,TNM Path Descriptor,,"0-6, 9, blank",1,Revised
+930,TNM Path Staged By,,"00, 10-15, 20, 30, 40, 50, 60, 88, 99 ",2,
+940,TNM Clin T,"Upper case, alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",4,
+950,TNM Clin N,"Upper case, alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",4,
+960,TNM Clin M,"Upper case, alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",4,
+970,TNM Clin Stage Group,"Upper case, alphanumeric. Convert AJCC Roman numerals to Arabic numerals. Left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, 99",4,
+980,TNM Clin Descriptor,,"0-3, 5, 9, blank",1,Revised
+990,TNM Clin Staged By,,"00, 10-15, 20, 30, 40, 50, 60, 88, 99 ",2,
+995,AJCC ID,,,4,New
+1000,TNM Other T,,,,Retired
+1001,AJCC TNM Clin T,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1002,AJCC TNM Clin N,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1003,AJCC TNM Clin M,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1004,AJCC TNM Clin Stage Group,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, 99",15,New
+1010,TNM Other N,,,,Retired
+1011,AJCC TNM Path T,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1012,AJCC TNM Path N,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1013,AJCC TNM Path M,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1014,AJCC TNM Path Stage Group,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, 99",15,New
+1020,TNM Other M,,,,Retired
+1021,AJCC TNM Post Therapy T,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1022,AJCC TNM Post Therapy N,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1023,AJCC TNM Post Therapy M,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, Blank",15,New
+1024,AJCC TNM Post Therapy Stage Group,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also 88, 99",15,New
+1030,TNM Other Stage Group,,,,Retired
+1031,AJCC TNM Clin T Suffix,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also (m), (s), blank",4,New
+1032,AJCC TNM Path T Suffix,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also (m), (s), Blank",4,New
+1033,AJCC TNM Post Therapy T Suffix,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also (m),(s), Blank",4,New
+1034,AJCC TNM Clin N Suffix,Left justified,"See the AJCC Cancer Staging Manual for valid codes; also (sn), (f), Blank",4,New
+1035,AJCC TNM Path N Suffix,Left justifed,"(sn), (f), Blank",4,New
+1036,AJCC TNM Post Therapy N Suffix,Left justified,"(sn), (f), Blank",4,New
+1040,TNM Other Staged By,,,,Retired
+1050,TNM Other Descriptor,,,,Retired
+1060,TNM Edition Number,"Right justified, zero filled","00-07, 88, 99",2,
+1070,Other Staging System,,,,Retired
+1080,Date of 1st Positive BX,,,,Retired
+1090,Site of Distant Met 1,,,,Retired
+1100,Site of Distant Met 2,,,,Retired
+1110,Site of Distant Met 3,,,,Retired
+1112,Mets at DX-Bone,,"0, 1, 8, 9",1,
+1113,Mets at DX-Brain,,"0, 1, 8, 9",1,
+1114,Mets at Dx-Distant LN,,"0, 1, 8, 9",1,
+1115,Mets at DX-Liver,,"0, 1, 8, 9",1,
+1116,Mets at DX-Lung,,"0, 1, 8, 9",1,
+1117,Mets at DX-Other,,"0, 1, 2, 8, 9",1,Revised
+1120,Pediatric Stage,Alphanumeric,Refer to ROADS Manual,2,
+1130,Pediatric Staging System,"Right justified, zero filled","00-15, 88, 97, 99",2,
+1140,Pediatric Staged By,,0-9,1,
+1150,Tumor Marker 1,,"0-6, 8, 9",1,
+1160,Tumor Marker 2,,"0-6, 8, 9",1,
+1170,Tumor Marker 3,,"0-6, 8, 9",1,
+1180,Reserved 05,,,98,Revised
+1182,Lymphovascular Invasion,,"0-4,8,9",1,Revised
+1190,Reserved 06,,,100,
+1200,RX Date Surgery,YYYYMMDD,Valid dates,8,
+1201,RX Date Surgery Flag,,"10-20, blank",2,
+1210,RX Date Radiation,YYYYMMDD,Valid dates,8,
+1211,RX Date Radiation Flag,,"10-20, blank",2,
+1220,RX Date Chemo,YYYYMMDD,Valid dates,8,
+1221,RX Date Chemo Flag,,"10-20, blank",2,
+1230,RX Date Hormone,YYYYMMDD,Valid dates,8,
+1231,RX Date Hormone Flag,,"10-20, blank",2,
+1240,RX Date BRM,YYYYMMDD,Valid dates,8,
+1241,RX Date BRM Flag,,"10-20, blank",2,
+1250,RX Date Other,YYYYMMDD,Valid dates,8,
+1251,RX Date Other Flag,,"10-12, 15, blank",2,
+1260,Date Initial RX SEER,YYYYMMDD,Valid dates,8,
+1261,Date Initial RX SEER Flag,,"10-20, blank",2,
+1270,Date 1st Crs RX CoC,YYYYMMDD,Valid dates,8,
+1271,Date 1st Crs RX CoC Flag,,"10-20, blank",2,
+1280,RX Date DX/Stg Proc,YYYYMMDD,Valid dates,8,
+1281,RX Date DX/Stg Proc Flag,,"10-20, blank",2,
+1285,RX Summ--Treatment Status,,"0-2, 9",1,
+1290,RX Summ--Surg Prim Site,"Right justified, zero filled","00, 10-80, 90, 98, 99 (site-specific)",2,
+1292,RX Summ--Scope Reg LN Sur,,"0-7, 9",1,
+1294,RX Summ--Surg Oth Reg/Dis,,"0-5, 9",1,
+1296,RX Summ--Reg LN Examined,"Right justified, zero filled","00-90, 95-99",2,
+1300,Reserved 07,,,50,Revised
+1310,RX Summ--Surgical Approch,,0-9 (site-specific),1,
+1320,RX Summ--Surgical Margins,,"0-3, 7-9",1,
+1330,RX Summ--Reconstruct 1st,,0-9 (site-specific),1,
+1340,Reason for No Surgery,,"0-2, 5-9",1,
+1350,RX Summ--DX/Stg Proc,"Right justified, zero filled","00-07, 09",2,
+1360,RX Summ--Radiation,,0-9,1,
+1370,RX Summ--Rad to CNS,,"0, 1, 7-9",1,
+1380,RX Summ--Surg/Rad Seq,,"0, 2-7, 9",1,
+1390,RX Summ--Chemo,"Right justified, zero filled","00-03, 82, 85-88, 99",2,
+1400,RX Summ--Hormone,"Right justified, zero filled","00, 01, 82, 85-88, 99",2,
+1410,RX Summ--BRM,"Right justified, zero filled","00, 01, 82, 85-88, 99",2,
+1420,RX Summ--Other,,"0-3, 6-9",1,
+1430,Reason for No Radiation,,"0-2, 5-9",1,
+1440,Reason for No Chemo,,,,Retired
+1450,Reason for No Hormone,,,,Retired
+1460,RX Coding System--Current,"Right justified, zero filled","00-08, 99",2,Revised
+1470,Protocol Eligibility Stat,,,,Retired
+1480,Protocol Participation,,,,Retired
+1490,Referral to Support Serv,,,,Retired
+1500,First Course Calc Method,,,,Retired
+1501,Phase I Dose per Fraction,,00000-99999,5,New
+1502,Phase I Radiation External Beam Planning Tech,,"00-10, 88, 98, 99",2,New
+1503,Phase I Number of Fractions,"Right justified, zero filled",000-999,3,New
+1504,Phase I Radiation Primary Treatment Volume,,"00-07, 09-14, 20-26, 29-32, 39-42, 50-68, 70-73, 80-86, 88, 90-99",2,New
+1505,Phase I Radiation to Draining Lymph Nodes,,"00-08, 88, 99",2,New
+1506,Phase I Radiation Treatment Modality,,"00-16, 99",2,New
+1507,Phase I Total Dose,,"000000-999999, right justified, zero filled",6,New
+1510,Rad--Regional Dose: cGy,"Right justified, zero filled",00000-99999,5,
+1511,Phase II Dose per Fraction,,00000-99999,5,New
+1512,Phase II Radiation External Beam Planning Tech,,"00-10, 88, 98, 99",2,New
+1513,Phase II Number of Fractions,"Right justified, zero filled",000-999,3,New
+1514,Phase II Radiation Primary Treatment Volume,,"00-07, 09-14, 20-26, 29-32, 39-42, 50-68, 70-73, 80-86, 88, 90-99",2,New
+1515,Phase II Radiation to Draining Lymph Nodes,,"00-08, 88, 99",2,New
+1516,Phase II Radiation Treatment Modality,,"00-16, 99",2,New
+1517,Phase II Total Dose,"Right justified, zero filled",000000-999999,6,New
+1520,Rad--No of Treatment Vol,"Right justified, zero filled",000-999,3,
+1521,Phase III Dose per Fraction,,00000-99999,5,New
+1522,Phase III Radiation External Beam Planning Tech,,"00-10, 88, 98, 99",2,New
+1523,Phase III Number of Fractions,"Right-justified, zero-filled",000-999,3,New
+1524,Phase III Radiation Primary Treatment Volume,,"00-07, 09-14, 20-26, 29-32, 39-42, 50-68, 70-73, 80-86, 88, 90-96, 98-99",2,New
+1525,Phase III Radiation to Draining Lymph Nodes,,"00-08, 88, 99",2,New
+1526,Phase III Radiation Treatment Modality,,"00-16, 99",2,New
+1527,Phase III Total Dose,"right justified, zero filled",000000-999999,6,New
+1530,Rad--Elapsed RX Days,,,,Retired
+1531,Radiation Treatment Discontinued Early,,"00-07, 99",2,New
+1532,Number of Phases of Rad Treatment to this Volume,"right justified, zero-filled","00, 01, 02, 03, 04, 99 ",2,New
+1533,Total Dose,"right justified, zero filled",000000-999999,6,New
+1540,Rad--Treatment Volume,"Right justified, zero filled","00-41, 50, 60, 98, 99",2,
+1550,Rad--Location of RX,,"0-4, 8, 9",1,
+1560,Rad--Intent of Treatment,,,,Retired
+1570,Rad--Regional RX Modality,"Right justified, zero filled","00, 20-32, 40-43, 50-55, 60-62, 80, 85, 98, 99",2,
+1580,Rad--RX Completion Status,,,,Retired
+1590,Rad--Local Control Status,,,,Retired
+1600,Chemotherapy Field 1,,,,Retired
+1610,Chemotherapy Field 2,,,,Retired
+1620,Chemotherapy Field 3,,,,Retired
+1630,Chemotherapy Field 4,,,,Retired
+1639,RX Summ--Systemic/Sur Seq,,"0, 2-7, 9",1,
+1640,RX Summ--Surgery Type,"Right justified, zero filled",00-99 (site-specific),2,
+1642,RX Summ--Screen/BX Proc1,,,,Retired
+1643,RX Summ--Screen/BX Proc2,,,,Retired
+1644,RX Summ--Screen/BX Proc3,,,,Retired
+1645,RX Summ--Screen/BX Proc4,,,,Retired
+1646,RX Summ--Surg Site 98-02,"Right justified, zero filled","00, 10-90, 99 (site-specific), blank",2,
+1647,RX Summ--Scope Reg 98-02,,"0-9 (site-specific), blank",1,
+1648,RX Summ--Surg Oth 98-02,,"0-9 (site-specific), blank",1,
+1650,Reserved 08,,,50,Revised
+1660,Subsq RX 2nd Course Date,YYYYMMDD,Valid dates,8,
+1661,Subsq RX 2ndCrs Date Flag,,"10-20, blank",2,
+1670,Subsq RX 2nd Course Codes,,,11,
+1671,Subsq RX 2nd Course Surg,"Right justified, zero filled","00, 10-90, 99",2,
+1672,Subsq RX 2nd Course Rad,,"0-5, 9",1,
+1673,Subsq RX 2nd Course Chemo,,"0-3, 9",1,
+1674,Subsq RX 2nd Course Horm,,"0-3, 9",1,
+1675,Subsq RX 2nd Course BRM,,0-9,1,
+1676,Subsq RX 2nd Course Oth,,"0-3, 6-9",1,
+1677,Subsq RX 2nd--Scope LN SU,,0-9,1,
+1678,Subsq RX 2nd--Surg Oth,,0-9,1,
+1679,Subsq RX 2nd--Reg LN Rem,"Right justified, zero filled","00-90, 95-99",2,
+1680,Subsq RX 3rd Course Date,YYYYMMDD,Valid dates,8,
+1681,Subsq RX 3rdCrs Date Flag,,"10-20, blank",2,
+1690,Subsq RX 3rd Course Codes,,,11,
+1691,Subsq RX 3rd Course Surg,"Right justified, zero filled","00, 10-90, 99",2,
+1692,Subsq RX 3rd Course Rad,,"0-5, 9",1,
+1693,Subsq RX 3rd Course Chemo,,"0-3, 9",1,
+1694,Subsq RX 3rd Course Horm,,"0-3, 9",1,
+1695,Subsq RX 3rd Course BRM,,0-9,1,
+1696,Subsq RX 3rd Course Oth,,"0-3, 6-9",1,
+1697,Subsq RX 3rd--Scope LN Su,,0-9,1,
+1698,Subsq RX 3rd--Surg Oth,,0-9,1,
+1699,Subsq RX 3rd--Reg LN Rem,"Right justified, zero filled","00-90, 95-99",2,
+1700,Subsq RX 4th Course Date,YYYYMMDD,Valid dates,8,
+1701,Subsq RX 4thCrs Date Flag,,"10-20, blank",2,
+1710,Subsq RX 4th Course Codes,,,11,
+1711,Subsq RX 4th Course Surg,"Right justified, zero filled","00, 10-90, 99",2,
+1712,Subsq RX 4th Course Rad,,"0-5, 9",1,
+1713,Subsq RX 4th Course Chemo,,"0-3, 9",1,
+1714,Subsq RX 4th Course Horm,,"0-3, 9",1,
+1715,Subsq RX 4th Course BRM,,0-9,1,
+1716,Subsq RX 4th Course Oth,,"0-3, 6-9",1,
+1717,Subsq RX 4th--Scope LN Su,,0-9,1,
+1718,Subsq RX 4th--Surg Oth,,0-9,1,
+1719,Subsq RX 4th--Reg LN Rem,"Right justified, zero filled","00-90, 95-99",2,
+1720,Subsq RX 5th Course Date,,,,Retired
+1730,Subsq RX 5th Course Codes,,,,Retired
+1731,Subsq RX 5th Course Surg,,,,Retired
+1732,Subsq RX 5th Course Rad,,,,Retired
+1733,Subsq RX 5th Course Chemo,,,,Retired
+1734,Subsq RX 5th Course Horm,,,,Retired
+1735,Subsq RX 5th Course BRM,,,,Retired
+1736,Subsq RX 5th Course Oth,,,,Retired
+1737,Subsq RX 5th--Scope LN Su,,,,Retired
+1738,Subsq RX 5th--Surg Oth,,,,Retired
+1739,Subsq RX 5th--Reg LN Rem,,,,Retired
+1740,Reserved 09,,,50,Revised
+1741,Subsq RX--Reconstruct Del,,Site-specific,1,
+1750,Date of Last Contact,YYYYMMDD,Valid dates,8,
+1751,Date of Last Contact Flag,,"10-20, blank",2,
+1755,Date of Death--Canada,YYYYMMDD,Valid Dates,8,
+1756,Date of Death--CanadaFlag,,"10-20, blank",2,
+1760,Vital Status,,"0, 1",1,Revised
+1762,Vital Status Recode,,"0, 1",1,New
+1770,Cancer Status,,"1, 2, 9",1,
+1772,Date of Last Cancer (tumor) Status ,YYYYMMDD,Valid dates,8,New
+1773,Date of Last Cancer (tumor) Status Flag,,"12, Blank",2,New
+1775,Record Number Recode,,01-99,2,New
+1780,Quality of Survival,,"0-4, 8, 9",1,
+1782,Surv-Date Active Followup,YYYYMMDD,Valid Dates,8,
+1783,Surv-Flag Active Followup,,"0-3, 8,9, blank",1,
+1784,Surv-Mos Active Followup,"Right justified, zero filled","0000-9999, blank",4,
+1785,Surv-Date Presumed Alive,YYYYMMDD,Valid dates,8,
+1786,Surv-Flag Presumed Alive,,"0-3, 8,9, blank",1,
+1787,Surv-Mos Presumed Alive,"Right justified, zero filled","0000-9999, blank",4,
+1788,Surv-Date DX Recode,YYYYMMDD,Valid dates,8,
+1790,Follow-Up Source,,"0-5, 7-9",1,
+1791,Follow-up Source Central,"Right justified, zero filled","00-12, 29-35, 39-43, 48-51, 59-65, 98, 99",2,
+1800,Next Follow-Up Source,,"0-5, 8, 9",1,
+1810,Addr Current--City,"Mixed case letters, special characters only as allowed by USPS, embedded spaces allowed, left justified, blank filled",City name or UNKNOWN,50,
+1820,Addr Current--State,"See EDITS table STATE.DBF in Appendix B; CD, US, XX, YY, ZZ",,2,
+1830,Addr Current--Postal Code,"Numbers or upper case letters. No special characters or embedded spaces allowed. Left justified, blank filled.","5-digit or 9-digit U.S. ZIP codes; 6- character Canadian postal codes; valid postal codes from other countries, 888888888, 999999999, 88888+4 blanks (U.S.), 99999+4 blanks (U.S.), 999999+3 blanks (Canada)",9,
+1832,Addr Current--Country,Upper case,"International Standards Organization (ISO) 3166-1 Country Three Character Codes and custom codes: ZZN, ZZC, ZZS, ZZP, ZZE, ZZF, ZZA, ZZX, ZZU, XNI, XCB, XEN, XSC, XGR, XSL, CSK, YUG, XUM, XNF, XSD, XWF, XSF, XEF, XIF, XET, XAP, XIS, XCR, XOR, XSE, XMS, XCH, XML, XMC, XPL",3,
+1835,Reserved 10,,,100,Revised
+1840,County--Current,"Right justified, zero filled","See Appendix A for standard FIPS county codes.  See EDITS table BPLACE.DBF in Appendix B for geocodes used by CoC for non-U.S. residents.  Also 998, 999",3,
+1842,Follow-Up Contact--City,"Mixed case letters, special characters only as allowed by USPS, embedded spaces allowed, left justified, blank filled",City name or UNKNOWN,50,
+1844,Follow-Up Contact--State,Upper case,See EDITS table STATE.DBF in Appendix B,2,
+1846,Follow-Up Contact--Postal,"Numbers or upper case letters. No special characters or embedded spaces allowed. Left justified, blank filled","5-digit or 9-digit U.S. ZIP codes; 6- character Canadian postal codes; valid postal codes from other countries, 888888888, 999999999, 88888+4 blanks (U.S.), 99999+4 blanks (U.S.), 999999+3 blanks (Canada)",9,
+1847,FollowUp Contact--Country,Upper case,"Use the International Standards Organization (ISO) 3166-1 Country Three Character Codes, augmented by custom codes: ZZN, ZZC, ZZS, ZZP, ZZE, ZZF, ZZA, ZZX, ZZU, XNI, XCB, XEN, XSC, XGR, XSL, CSK, YUG, XUM, XNF, XSD, XWF, XSF, XEF, XIF, XET, XAP, XIS, XCR, XOR, XSE, XMS, XCH, XML, XMC, XPL. See Appendix B for complete list of country names and corresponding three character alpha codes.",3,
+1850,Unusual Follow-Up Method,,00-99,2,
+1860,Recurrence Date--1st,YYYYMMDD,Valid dates,8,
+1861,Recurrence Date--1st Flag,,"10-20, blank",2,
+1870,Recurrence Distant Sites,,,,Retired
+1871,Recurrence Distant Site 1,,,,Retired
+1872,Recurrence Distant Site 2,,,,Retired
+1873,Recurrence Distant Site 3,,,,Retired
+1880,Recurrence Type--1st,"Right justified, zero filled","00, 04, 06, 10, 13-17, 20-22, 25-27, 30, 36, 40, 46, 51-60, 62, 70, 88, 99",2,
+1890,Recurrence Type--1st--Oth,,,,Retired
+1900,Reserved 11,,,50,
+1910,Cause of Death,"4 digits (for ICD-7, 8, 9); for ICD-10,  upper case letter followed by 3 digits or upper case letter followed by 2 digits plus blank","Valid ICD-7, ICD-8, ICD-9, and ICD-10 codes; also 0000, 7777, 7797",4,
+1914,SEER Cause Specific COD,,"0, 1, 8, 9",1,New
+1915,SEER Other COD,,"0, 1, 8, 9",1,New
+1920,ICD Revision Number,,"0, 1, 7, 8, 9",1,
+1930,Autopsy,,"0-2, 9",1,
+1940,Place of Death,"Right justified, zero filled",Reference SEER Manual,3,
+1942,Place of Death--State,Upper case,"USPS or CanadaPost 2-character codes; CD, US, XX, YY, ZZ, Blank",2,
+1944,Place of Death--Country,Upper case,"International Standards Organization (ISO) 3166-1 Country Three Character Codes augmented by custom codes: ZZN, ZZC, ZZS, ZZP, ZZE, ZZF, ZZA, ZZX, ZZU, XNI, XCB, XEN, XSC, XGR, XSL, CSK, YUG, XUM, XNF, XSD, XWF, XSF, XEF, XIF, XET, XAP, XIS, XCR, XOR, XSE, XMS, XCH, XML, XMC, XPL, Blank. See Appendix B for complete list of country names and corresponding three character alpha codes.",3,
+1960,Site (73-91) ICD-O-1,"Four digits, first digit equals 1. Reference ICD-O-1 for valid entries",1400-1999,4,
+1970,Morph (73-91) ICD-O-1,,Reference ICD-O-1 for valid entries,6,
+1971,Histology (73-91) ICD-O-1,Reference ICD-O-1 for valid entries,8000-9970,4,
+1972,Behavior (73-91) ICD-O-1,,Reference ICD-O-1 for valid entries,1,
+1973,Grade (73-91) ICD-O-1,,Reference ICD-O-1 for valid entries,1,
+1980,ICD-O-2 Conversion Flag,,"0-6, blank",1,
+1981,Over-ride SS/NodesPos,,1 or blank,1,
+1982,Over-ride SS/TNM-N,,1 or blank,1,
+1983,Over-ride SS/TNM-M,,1 or blank,1,
+1984,Over-ride SS/DisMet1,,,,Retired
+1985,Over-ride Acsn/Class/Seq,,1 or blank,1,
+1986,Over-ride HospSeq/DxConf,,1 or blank,1,
+1987,Over-ride CoC-Site/Type,,1 or blank,1,
+1988,Over-ride HospSeq/Site,,1 or blank,1,
+1989,Over-ride Site/TNM-StgGrp,,1 or blank,1,
+1990,Over-ride Age/Site/Morph,,1-3 or blank,1,
+1992,Over-ride TNM Stage,,"1, Blank",1,New
+1993,Over-ride TNM Tis,,"1, Blank",1,New
+1994,Over-ride TNM 3,,"1, Blank",1,New
+2000,Over-ride SeqNo/DxConf,,1 or blank,1,
+2010,Over-ride Site/Lat/SeqNo,,1 or blank,1,
+2020,Over-ride Surg/DxConf,,1 or blank,1,
+2030,Over-ride Site/Type,,1 or blank,1,
+2040,Over-ride Histology,,1-3 or blank,1,
+2050,Over-ride Report Source,,1 or blank,1,
+2060,Over-ride Ill-define Site,,1 or blank,1,
+2070,"Over-ride Leuk, Lymphoma",,1 or blank,1,
+2071,Over-ride Site/Behavior,,1 or blank,1,
+2072,Over-ride Site/EOD/DX Dt,,1 or blank,1,
+2073,Over-ride Site/Lat/EOD,,1 or blank,1,
+2074,Over-ride Site/Lat/Morph,,1 or blank,1,
+2078,Over-ride Name/Sex,,"1, Blank",1,New
+2080,Reserved 13,,,250,Revised
+2081,CRC CHECKSUM,,Calculated or blank,10,
+2085,Date Case Initiated,YYYYMMDD,Valid date,8,
+2090,Date Case Completed,YYYYMMDD,Valid date,8,
+2092,Date Case Completed--CoC,YYYYMMDD,Valid date,8,
+2100,Date Case Last Changed,YYYYMMDD,Valid date,8,
+2110,Date Case Report Exported,YYYYMMDD,Valid date,8,
+2111,Date Case Report Received,YYYYMMDD,Valid date,8,
+2112,Date Case Report Loaded,YYYYMMDD,Valid date,8,
+2113,Date Tumor Record Availbl,YYYYMMDD,Valid date,8,
+2114,Future Use Timeliness 1,,,,Retired
+2115,Future Use Timeliness 2,,,,Retired
+2116,ICD-O-3 Conversion Flag,,"Blank, 0, 1, 3",1,
+2120,SEER Coding Sys--Current,,Alphanumeric,1,
+2130,SEER Coding Sys--Original,,Alphanumeric,1,
+2140,CoC Coding Sys--Current,"Right justified, zero filled","00-09, 99",2,Revised
+2150,CoC Coding Sys--Original,"Right justified, zero filled","00-09, 99",2,Revised
+2152,CoC Accredited Flag,,"0, 1, 2, Blank",1,New
+2155,RQRS NCDB Submission Flag,,"1, 2",1,New
+2160,Subsq Report for Primary,,,,Retired
+2161,Reserved 18,,,1,Retired
+2162,Reserved 19,,,1,Retired
+2163,Reserved 20,,,1,Retired
+2170,Vendor Name,,,10,
+2180,SEER Type of Follow-Up,,1-4,1,
+2190,SEER Record Number,"Right justified, zero filled",01-99,2,
+2200,Diagnostic Proc 73-87,,,2,
+2210,Reserved 14,,,2000,
+2220,State/Requestor Items,,,1000,
+2230,Name--Last,"Mixed case, left justified.Truncate name if nore than 40 characters long.","Spaces, hyphens and apostrophes are allowed. Do not use other punctuation.",40,
+2240,Name--First,"Mixed case, left justified. Truncate name if nore than 40 characters long.","Blanks, spaces, hyphens and apostrophes are allowed. Do not use other punctuation.",40,
+2250,Name--Middle,"Mixed case, left justified. Truncate name if nore than 40 characters long.","Blanks, spaces, hyphens and apostrophes are allowed. Do not use other punctuation.",40,
+2260,Name--Prefix,,,3,
+2270,Name--Suffix,,,3,
+2280,Name--Alias,Truncate name if nore than 40 characters long; this field may be updated if the name changes.,"Blanks, spaces, hyphens, apostrophes are allowed; do not use other punctuation.",40,
+2290,Name--Spouse/Parent,,,60,
+2300,Medical Record Number,"Right justified, space filled",Alphanumeric,11,
+2310,Military Record No Suffix,"Right justified, zero filled","01-20, 30-69, 98, 99, blank",2,
+2315,Medicare Beneficiary Identifier,,"Alphanumeric, Blank",11,New
+2320,Social Security Number,"9 digits, no dashes","001010001-899999999, 999999999. Invalid values in this range exist.",9,
+2330,Addr at DX--No & Street,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. Left justified, space filled",Valid address or UNKNOWN,60,
+2335,Addr at DX--Supplementl,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. Left justified, space filled",Valid address or blank,60,
+2350,Addr Current--No & Street,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. Left justified, space filled",Valid address or UNKNOWN,60,
+2352,Latitude,Right justified,"Numbers, decimal point, negative sign",10,
+2354,Longitude,Right justified,"Numbers, decimal point, negative sign",11,
+2355,Addr Current--Supplementl,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. Left justified, space filled",,60,
+2360,Telephone,10-digit number,Any 10-digit number,10,
+2370,DC State,,,,Retired
+2380,DC State File Number,,Any characters or blank,6,
+2390,Name--Maiden,Truncate name if nore than 40 characters long.,"Blanks, spaces, hyphens, apostrophes are allowed; do not use other punctuation",40,
+2392,Follow-Up Contact--No&St,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. Left justified, space filled",,60,
+2393,Follow-Up Contact--Suppl,"Mixed case, embedded spaces, punctuation limited to periods, slashes, hyphens, and pound signs. Left justified, space filled",,60,
+2394,Follow-Up Contact--Name,,,60,
+2400,Reserved 15,,,1,
+2410,Institution Referred From,Right justified and zero filled,10-digit number,10,
+2415,NPI--Inst Referred From,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2420,Institution Referred To,Right justified and zero filled,10-digit number,10,
+2425,NPI--Inst Referred To,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2430,Last Follow-Up Hospital,,,,Retired
+2440,Following Registry,Right justified and zero filled,10-digit number,10,
+2445,NPI--Following Registry,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2450,Reserved 16,,,12,Revised
+2460,Physician--Managing,Left justified,,8,
+2465,NPI--Physician--Managing,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2470,Physician--Follow-Up,Left justified,,8,
+2475,NPI--Physician--Follow-Up,,"10-digit NPI codes (9-digit NPI integer plus 1 check digit), blank",10,
+2480,Physician--Primary Surg,Left justified,,8,
+2485,NPI--Physician--Primary Surg,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2490,Physician 3,Left justified,,8,
+2495,NPI--Physician 3,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2500,Physician 4,Left justified,,8,
+2505,NPI--Physician 4,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+2508,EHR Reporting,,Free text,1000,New
+2510,Reserved 12,,,50,
+2520,Text--DX Proc--PE,Free text,Neither carriage return nor line feed characters allowed,1000,
+2530,Text--DX Proc--X-ray/Scan,Free text,Neither carriage return nor line feed characters allowed,1000,
+2540,Text--DX Proc--Scopes,Free text,Neither carriage return nor line feed characters allowed,1000,
+2550,Text--DX Proc--Lab Tests,Free text,Neither carriage return nor line feed characters allowed,1000,
+2560,Text--DX Proc--Op,Free text,Neither carriage return nor line feed characters allowed,1000,
+2570,Text--DX Proc--Path,Free text,Neither carriage return nor line feed characters allowed,1000,
+2580,Text--Primary Site Title,Free text,Neither carriage return nor line feed characters allowed,100,
+2590,Text--Histology Title,Free text,Neither carriage return nor line feed characters allowed,100,
+2600,Text--Staging,Free text,Neither carriage return nor line feed characters allowed,1000,
+2610,RX Text--Surgery,Free text,Neither carriage return nor line feed characters allowed,1000,
+2620,RX Text--Radiation (Beam),Free text,Neither carriage return nor line feed characters allowed,1000,
+2630,RX Text--Radiation Other,Free text,Neither carriage return nor line feed characters allowed,1000,
+2640,RX Text--Chemo,Free text,Neither carriage return nor line feed characters allowed,1000,
+2650,RX Text--Hormone,Free text,Neither carriage return nor line feed characters allowed,1000,
+2660,RX Text--BRM,Free text,Neither carriage return nor line feed characters allowed,1000,
+2670,RX Text--Other,Free text,Neither carriage return nor line feed characters allowed,1000,
+2680,Text--Remarks,Free text,Neither carriage return nor line feed characters allowed,1000,
+2690,Text--Place of Diagnosis,Free text,Neither carriage return nor line feed characters allowed,60,
+2700,Reserved 17,,,,Retired
+2730,CS PreRx Tumor Size,,,,Retired
+2735,CS PreRx Extension,,,,Retired
+2740,CS PreRx Tum Sz/Ext Eval,,,,Retired
+2750,CS PreRx Lymph Nodes,,,,Retired
+2755,CS PreRx Reg Nodes Eval,,,,Retired
+2760,CS PreRx Mets at DX,,,,Retired
+2765,CS PreRx Mets Eval,,,,Retired
+2770,CS PostRx Tumor Size,,,,Retired
+2775,CS PostRx Extension,,,,Retired
+2780,CS PostRx Lymph Nodes,,,,Retired
+2785,CS PostRx Mets at DX,,,,Retired
+2800,CS Tumor Size,"Right justified, zero filled",000-999 (site-specific),3,
+2810,CS Extension,"Right justified, zero filled",000-999 (site-specific),3,
+2820,CS Tumor Size/Ext Eval,,0-9 (site-specific),1,
+2830,CS Lymph Nodes,"Right justified, zero filled",000-999 (site-specific),3,
+2840,CS Lymph Nodes Eval,,0-9 (site-specific),1,
+2850,CS Mets at DX,"Right justified, zero filled",00-99 (site-specific),2,
+2851,CS Mets at Dx-Bone,,"0, 1, 8, 9",1,
+2852,CS Mets at Dx-Brain,,"0, 1, 8, 9",1,
+2853,CS Mets at Dx-Liver,,"0, 1, 8, 9",1,
+2854,CS Mets at Dx-Lung,,"0, 1, 8, 9",1,
+2860,CS Mets Eval,,0-9 (site-specific),1,
+2861,CS Site-Specific Factor 7,"Right justified, zero filled",000-999 (site-specific),3,
+2862,CS Site-Specific Factor 8,"Right justified, zero filled",000-999 (site-specific),3,
+2863,CS Site-Specific Factor 9,"Right justified, zero filled",000-999 (site-specific),3,
+2864,CS Site-Specific Factor10,"Right justified, zero filled",000-999 (site-specific),3,
+2865,CS Site-Specific Factor11,"Right justified, zero filled",000-999 (site-specific),3,
+2866,CS Site-Specific Factor12,"Right justified, zero filled",000-999 (site-specific),3,
+2867,CS Site-Specific Factor13,"Right justified, zero filled",000-999 (site-specific),3,
+2868,CS Site-Specific Factor14,"Right justified, zero filled",000-999 (site-specific),3,
+2869,CS Site-Specific Factor15,"Right justified, zero filled",000-999 (site-specific),3,
+2870,CS Site-Specific Factor16,"Right justified, zero filled",000-999 (site-specific),3,
+2871,CS Site-Specific Factor17,"Right justified, zero filled",000-999 (site-specific),3,
+2872,CS Site-Specific Factor18,"Right justified, zero filled",000-999 (site-specific),3,
+2873,CS Site-Specific Factor19,"Right justified, zero filled",000-999 (site-specific),3,
+2874,CS Site-Specific Factor20,"Right justified, zero filled",000-999 (site-specific),3,
+2875,CS Site-Specific Factor21,"Right justified, zero filled",000-999 (site-specific),3,
+2876,CS Site-Specific Factor22,"Right justified, zero filled",000-999 (site-specific),3,
+2877,CS Site-Specific Factor23,"Right justified, zero filled",000-999 (site-specific),3,
+2878,CS Site-Specific Factor24,"Right justified, zero filled",000-999 (site-specific),3,
+2879,CS Site-Specific Factor25,"Right justified, zero filled",000-999 (site-specific),3,
+2880,CS Site-Specific Factor 1,"Right justified, zero filled",000-999 (site-specific),3,
+2890,CS Site-Specific Factor 2,"Right justified, zero filled",000-999 (site-specific),3,
+2900,CS Site-Specific Factor 3,"Right justified, zero filled",000-999 (site-specific),3,
+2910,CS Site-Specific Factor 4,"Right justified, zero filled",000-999 (site-specific),3,
+2920,CS Site-Specific Factor 5,"Right justified, zero filled",000-999 (site-specific),3,
+2930,CS Site-Specific Factor 6,"Right justified, zero filled",000-999 (site-specific),3,
+2935,CS Version Input Original,6-digit number,Valid 6-digit CS version number,6,
+2936,CS Version Derived,6-digit number,Valid 6-digit CS version number,6,
+2937,CS Version Input Current,6-digit number,Valid 6-digit CS version number,6,
+2940,Derived AJCC-6 T,,"Site-specific (derived from Collaborative Stage fields), blank",2,
+2950,Derived AJCC-6 T Descript,,"c, p, a, y, N, and blank  (derived  from Collaborative Stage fields)",1,
+2960,Derived AJCC-6 N,,"Site-specific (derived from Collaborative Stage fields), blank",2,
+2970,Derived AJCC-6 N Descript,,"c, p, a, y, N, and blank (derived from Collaborative Stage fields)",1,
+2980,Derived AJCC-6 M,,"Site-specific (derived from Collaborative Stage fields), blank",2,
+2990,Derived AJCC-6 M Descript,,"c, p, a, y, N, and blank (derived from Collaborative Stage fields)",1,
+3000,Derived AJCC-6 Stage Grp,,Site-specific (derived from Collaborative Stage fields),2,
+3010,Derived SS1977,,"0-5, 7, 8, 9 (derived from Collaborative Stage fields)",1,
+3020,Derived SS2000,,"0-5, 7, 8, 9 (derived from Collaborative Stage fields)",1,
+3030,Derived AJCC--Flag,,"1, 2, blank",1,
+3040,Derived SS1977--Flag,,"1, 2, blank",1,
+3050,Derived SS2000--Flag,,"1, 2, blank",1,
+3100,Archive FIN,"Right justified, zero filled",10-digit number,10,
+3105,NPI--Archive FIN,,"10-digit NPI code (9-digit NPI integer plus 1 check digit), blank",10,
+3110,Comorbid/Complication 1,"Left justified, zero filled","00000, 00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049",5,
+3120,Comorbid/Complication 2,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3130,Comorbid/Complication 3,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3140,Comorbid/Complication 4,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3150,Comorbid/Complication 5,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3160,Comorbid/Complication 6,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3161,Comorbid/Complication 7,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3162,Comorbid/Complication 8,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3163,Comorbid/Complication 9,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3164,Comorbid/Complication 10,"Left justified, zero filled","00100-13980, 24000-99990, E8700-E8799, E9300-E9499, V0720-V0739, V1000-V1590, V2220-V2310, V2540, V4400-V4589, V5041-V5049, Blank",5,
+3165,ICD Revision Comorbid,,"0, 1, 9, blank",1,
+3170,RX Date Mst Defn Srg,YYYYMMDD,Valid dates,8,
+3171,RX Date Mst Defn Srg Flag,,"10-20, blank",2,
+3180,RX Date Surg Disch,YYYYMMDD,Valid dates,8,
+3181,RX Date Surg Disch Flag,,"10-20, blank",2,
+3190,Readm Same Hosp 30 Days,,"0-3, 9",1,
+3200,Rad--Boost RX Modality,"Right justified, zero filled","00, 20-32, 40-43, 50-55, 60-62, 98, 99",2,
+3210,Rad--Boost Dose cGy,"Right justified, zero filled",00000-99999,5,
+3220,RX Date Rad Ended,YYYYMMDD,Valid dates,8,
+3221,RX Date Rad Ended Flag,,"10-20, blank",2,
+3230,RX Date Systemic,YYYYMMDD,Valid dates,8,
+3231,RX Date Systemic Flag,,"10-20, blank",2,
+3250,RX Summ--Transplnt/Endocr,"Right justified, zero filled","00, 10-12, 20, 30, 40, 82, 85-88, 99",2,
+3260,Pain Assessment,,,,Retired
+3270,RX Summ--Palliative Proc,,"0-7, 9",1,
+3280,RX Hosp--Palliative Proc,,"0-7, 9",1,
+3300,RuralUrban Continuum 1993,"Right justified, zero filled","00-09, 98, 99, blank",2,
+3310,RuralUrban Continuum 2003,"Right justified, zero filled","01-09, 98, 99, blank",2,
+3312,RuralUrban Continuum 2013,,"00-09, 98, 99",2,
+3400,Derived AJCC-7 T,"Right justified, zero filled",000-999,3,
+3402,Derived AJCC-7 T Descript,,"c, p, a, y, N, blank",1,
+3410,Derived AJCC-7 N,"Right justified, zero filled",000-999,3,
+3412,Derived AJCC-7 N Descript,,"c, p, a, y, N, blank",1,
+3420,Derived AJCC-7 M,"Right justified, zero filled",000-999,3,
+3422,Derived AJCC-7 M Descript,,"c, p, a, y, N, blank",1,
+3430,Derived AJCC-7 Stage Grp,"Right justified, zero filled",000-999,3,
+3440,Derived PreRx-7 T,"Right justified, zero filled",000-999,3,
+3442,Derived PreRx-7 T Descrip,,"c, N, blank",1,
+3450,Derived PreRx-7 N,"Right justified, zero filled",000-999,3,
+3452,Derived PreRx-7 N Descrip,,"c, N, blank",1,
+3460,Derived PreRx-7 M,"Right justified, zero filled",000-999,3,
+3462,Derived PreRx-7 M Descrip,,"c, N, blank",1,
+3470,Derived PreRx-7 Stage Grp,"Right justified, zero filled",000-999,3,
+3480,Derived PostRx-7 T,"Right justified, zero filled",000-999,3,
+3482,Derived PostRx-7 N,"Right justified, zero filled",000-999,3,
+3490,Derived PostRx-7 M,"Right justified, zero filled",00-99,2,
+3492,Derived PostRx-7 Stge Grp,"Right justified, zero filled",000-999,3,
+3600,Derived Neoadjuv Rx Flag,,"0,1,9",1,
+3605,Derived SEER Path Stg Grp,"Upper-case alphanumeric, left justified","0, 0A, 0IS, 1,1A, 1A1, 1A2, 1B, 1B1, 1B2, 1C, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3B, 3C, 3C1, 3C2, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 88, 99, Blank",5,
+3610,Derived SEER Clin Stg Grp,"Upper-case alphanumeric, left justified","0, 0A, 0IS, 1,1A, 1A1, 1A2, 1B, 1B1, 1B2, 1C, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3B, 3C, 3C1, 3C2, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 88, 99, Blank",5,
+3614,Derived SEER Cmb Stg Grp,"Upper-case alphanumeric, Left justified","0, 0A, 0IS, 1,1A, 1A1, 1A2, 1B, 1B1, 1B2, 1C, 1S, 2, 2A, 2A1, 2A2, 2B, 2C, 3, 3A, 3B, 3C, 3C1, 3C2, 4, 4A, 4A1, 4A2, 4B, 4C, OC, 88, 99, Blank",5,
+3616,Derived SEER Combined T,"Upper-case alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",5,
+3618,Derived SEER Combined N,"Upper-case alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",5,
+3620,Derived SEER Combined M,"Upper-case alphanumeric, left justified, blank filled","See AJCC Cancer Staging Manual and FORDS Manual; also 88, blank",5,
+3622,Derived SEER Cmb T Src,,"1, 2, 3, 9",1,
+3624,Derived SEER Cmb N Src,,"1, 2, 3, 9",1,
+3626,Derived SEER Cmb M Src,,"1, 2, 3, 9",1,
+3645,NPCR Derived AJCC 8 TNM Clin Stg Grp,Left justified,"Codes published in the AJCC Cancer Staging Manual, 88, 99, Blank",15,New
+3646,NPCR Derived AJCC 8 TNM Path Stg Grp,Left justified,"Codes published in the AJCC Cancer Staging Manual, 88, 99, Blank",15,New
+3647,NPCR Derived AJCC 8 TNM Post Therapy Stg Grp,Left justified,"Codes published in the AJCC Cancer Staging Manual, 88, 99, Blank",15,New
+3650,NPCR Derived Clin Stg Grp,"Upper case, alphanumeric. Convert AJCC Roman numerals to Arabic numerals. Left justified, blank filled.","See the FORDS Manual for valid codes; also 88, 99 and blank",4,
+3655,NPCR Derived Path Stg Grp,"Upper case, alphanumeric. Convert AJCC Roman numerals to Arabic numerals. Left justified, blank filled.","See the FORDS Manual for valid codes; also 88, 99 and Blank",4,
+3700,SEER Site-Specific Fact 1,,"0-9, blank",1,
+3702,SEER Site-Specific Fact 2,,"0-9, blank",1,
+3704,SEER Site-Specific Fact 3,,"0-9, blank",1,
+3706,SEER Site-Specific Fact 4,,"0-9, blank",1,
+3708,SEER Site-Specific Fact 5,,"0-9, blank",1,
+3710,SEER Site-Specific Fact 6,,"0-9, blank",1,
+3720,NPCR Specific Field,,To be determined for each site where needed. NPCR provides appropriate detailed information as the need for this data collection arises.,75,
+3750,Over-ride CS 1,,"1, blank",1,
+3751,Over-ride CS 2,,"1, blank",1,
+3752,Over-ride CS 3,,"1, blank",1,
+3753,Over-ride CS 4,,"1, blank",1,
+3754,Over-ride CS 5,,"1, blank",1,
+3755,Over-ride CS 6,,"1, blank",1,
+3756,Over-ride CS 7,,"1, blank",1,
+3757,Over-ride CS 8,,"1, blank",1,
+3758,Over-ride CS 9,,"1, blank",1,
+3759,Over-ride CS 10,,"1, blank",1,
+3760,Over-ride CS 11,,"1, blank",1,
+3761,Over-ride CS 12,,"1, blank",1,
+3762,Over-ride CS 13,,"1, blank",1,
+3763,Over-ride CS 14,,"1, blank",1,
+3764,Over-ride CS 15,,"1, blank",1,
+3765,Over-ride CS 16,,"1, blank",1,
+3766,Over-ride CS 17,,"1, blank",1,
+3767,Over-ride CS 18,,"1, blank",1,
+3768,Over-ride CS 19,,"1, blank",1,
+3769,Over-ride CS 20,,"1, blank",1,
+3780,Secondary Diagnosis 1,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89    	",7,
+3782,Secondary Diagnosis 2,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3784,Secondary Diagnosis 3,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3786,Secondary Diagnosis 4,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3788,Secondary Diagnosis 5,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3790,Secondary Diagnosis 6,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3792,Secondary Diagnosis 7,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3794,Secondary Diagnosis 8,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3796,Secondary Diagnosis 9,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3798,Secondary Diagnosis 10,"Left justified, starting with a character, there will be a presumed decimal point between the third and fourth characters in the reported value ","A00.0 - B99.9, E00.0 - E89.89, G00.0 - P96.9, R00.0 - S99.929, T36.0 - T50.996, Y62.0 - Y84.9, Z14.0 - Z22.9, Z68.1 - Z68.54, Z80.0 - Z80.9, Z85.0 - Z86.03, Z86.1 - Z99.89",7,
+3800,Schema ID,,See the NAACCR Site-Specific Data Item webpage for codes,5,New
+3801,Chromosome 1p: Loss of Heterozygosity (LOH),,"0, 1, 6-9",1,New
+3802,Chromosome 19q: Loss of Heterozygosity (LOH),,"0, 1, 6-9",1,New
+3803,Adenoid Cystic Basaloid Pattern,Right justified,"0.0-100.0, XXX.5, XXX.8, XXX.9",5,New
+3804,Adenopathy,,"0, 1, 9",1,New
+3805,AFP Post-Orchiectomy Lab Value,Right justified,"0.0, 0.1-99999.9, XXXXX.1, XXXXX.7, XXXXX.8, XXXXX.9",7,New
+3806,AFP Post-Orchiectomy Range,,"0-4, 7-9",1,New
+3807,AFP Pre-Orchiectomy Lab Value,Right justified,"0.0, 0.1-99999.9, XXXXX.1, XXXXX.7, XXXXX.8, XXXXX.9",7,New
+3808,AFP Pre-Orchiectomy Range,,"0-4, 7-9",1,New
+3809,AFP Pretreatment Interpretation,,"0-2, 7-9",1,New
+3810,AFP Pretreatment Lab Value,Right justified,"0.0, 0.1-9999.9, XXXX.1, XXXX.2, XXXX.8, XXXX.9",6,New
+3811,Anemia,,"0, 1, 6, 7, 9",1,New
+3812,B symptoms,,"0, 1, 8, 9",1,New
+3813,Bilirubin Pretreatment Total Lab Value,Right justified,"0.0, 0.1-999.9, XXX.1, XXX.7, XXX.8, XXX.9",5,New
+3814,Bilirubin Pretreatment Unit of Measure,,"1, 2, 7-9",1,New
+3815,Bone Invasion,,"0, 1, 8, 9",1,New
+3816,Brain Molecular Markers,,"01-09, 85-88, 99",2,New
+3817,Breslow Tumor Thickness ,Right justified,"0.0, 0.1-99.9, XX.1, A.01-A9.9, AX.0, XX.8, XX.9",4,New
+3818,CA-125 Pretreatment Interpretation,,"0-2, 7-9",1,New
+3819,CEA Pretreatment Interpretation,,"0-3, 7-9",1,New
+3820,CEA Pretreatment Lab Value,Right justified,"0.0, 0.1-9999.9, XXXX.1, XXXX.7, XXXX.8, XXXX.9",6,New
+3821,Chromosome 3 Status,,"0-3, 7-9",1,New
+3822,Chromosome 8q Status,,"0, 1, 7-9",1,New
+3823,Circumferential Resection Margin (CRM),Right justified,"0.0, 0.1-99.9, XX.1, XX.2, XX.3, XX.4, XX.5, XX.6, XX.7, XX.8, XX.9",4,New
+3824,Creatinine Pretreatment Lab Value,Right justified,"00, 0.1-99.9, XX.1, XX.7, XX.8, XX.9",4,New
+3825,Creatinine Pretreatment Unit of Measure,,"1, 2, 7-9",1,New
+3826,Estrogen Receptor Percent Positive or Range ,,"000-100, R10, R20, R30, R40, R50, R60, R70, R80, R90, R99, XX8, XX9",3,New
+3827,Estrogen Receptor Summary,,"0, 1, 7, 9",1,New
+3828,Estrogen Receptor Total Allred Score ,,"00-08, X8, X9",2,New
+3829,Esophagus and EGJ Tumor Epicenter,,"0-2, 9",1,New
+3830,Extranodal Extension Clin (non-Head and Neck),,"0-2, 7-9",1,New
+3831,Extranodal Extension Head and Neck Clinical,,"0-2, 7-9",1,New
+3832,Extranodal Extension Head and Neck Pathological,,"0.0, 0.1-9.9, X.1, X.2, X.3, X.4, X.7, X.8, X.9",3,New
+3833,Extranodal Extension Path (non-Head and Neck),,"0, 1, 7-9",1,New
+3834,Extravascular Matrix Patterns ,,"0, 1, 8, 9",1,New
+3835,Fibrosis Score,,"0, 1, 7-9",1,New
+3836,FIGO Stage,,"01-11, 20-24, 30-42, 97-99",2,New
+3837,Gestational Trophoblastic Prognostic Scoring Index,,"00-25, X9",2,New
+3838,Gleason Patterns Clinical,,"11-15, 19, 21-25, 29, 31-35, 39, 41-45, 49, 51-55, 59, X6, X7, X8, X9 ",2,New
+3839,Gleason Patterns Pathological,,"11-15, 19, 21-25, 29, 31-35, 39, 41-45, 49, 51-55, 59, X6, X7, X8, X9 ",2,New
+3840,Gleason Score Clinical,,"02-10, X7, X8, X9",2,New
+3841,Gleason Score Pathological,,"02-10, X7, X8, X9",2,New
+3842,Gleason Tertiary Pattern,,"10, 20, 30, 40, 50, X7, X8, X9 ",2,New
+3843,Grade Clinical,,"1-5, 8, 9, A, B, C, D, E, L, H, M, S",1,New
+3844,Grade Pathological,,"1-5, 8, 9, A, B, C, D, E, L, H, M, S",1,New
+3845,Grade Post Therapy,,"1-5, 8, 9, A, B, C, D, E, L, H, M, S, Blank",1,New
+3846,hCG Post-Orchiectomy Lab Value,Right justified,"0.0, 0.1-99999.9, XXXXX.1, XXXXX.7, XXXXX.8, XXXXX.9",7,New
+3847,hCG Post-Orchiectomy Range,,"0-4, 7-9",1,New
+3848,hCG Pre-Orchiectomy Lab Value,Right justified,"0.0, 0.1-99999.9, XXXXX.1, XXXXX.8, XXXXX.9",7,New
+3849,hCG Pre-Orchiectomy Range,,"0-4, 7-9",1,New
+3850,HER2 IHC Summary ,,"0-4, 7-9",1,New
+3851,HER2 ISH Dual Probe Copy Number,Right justified,"0.0-99.9, XX.1, XX.7, XX.8, XX.9",4,New
+3852,HER2 ISH Dual Probe Ratio,Right justified,"0.0-99.9, XX.2, XX.3, XX.7, XX.8, XX.9",4,New
+3853,HER2 ISH Single Probe Copy Number,Right justifed,"0.0-99.9, XX.1, XX.7, XX.8, XX.9",4,New
+3854,HER2 ISH Summary,,"0, 2, 3, 7-9",1,New
+3855,HER2 Overall Summary ,,"0, 1, 7, 9",1,New
+3856,Heritable Trait,,"0, 1, 7, 9",1,New
+3857,High Risk Cytogenetics,,"0, 1, 7, 9",1,New
+3858,High Risk Histologic Features,,"0-6, 8, 9",1,New
+3859,HIV Status,,"0, 1, 7-9",1,New
+3860,International Normalized Ratio Prothrombin Time,,"0.0-9.9, X.1, X.7, X.8, X.9",3,New
+3861,Ipsilateral Adrenal Gland Involvement,,"0-4, 8, 9",1,New
+3862,JAK2,,"0-5, 7-9",1,New
+3863,Ki-67,Right justified,"0.0-100.0, XXX.7, XXX.8, XXX.9",5,New
+3864,Invasion Beyond Capsule,,"0-5, 8, 9",1,New
+3865,KIT Gene Immunohistochemistry ,,"0, 1, 7-9",1,New
+3866,KRAS,,"0-4, 7-9",1,New
+3867,LDH Post-Orchiectomy Range,,"0-4, 7-9",1,New
+3868,LDH Pre-Orchiectomy Range,,"0-4, 7-9",1,New
+3869,LDH Pretreatment Level,,"0, 1, 7, 9",1,New
+3870,LDH Upper Limits of Normal,,"001-999, XX8, XX9",3,New
+3871,LN Assessment Method Femoral-Inguinal,,"0-2, 7-9",1,New
+3872,LN Assessment Method Para-Aortic,,"0-2, 7-9",1,New
+3873,LN Assessment Method Pelvic,,"0-2, 7-9",1,New
+3874,LN Distant Assessment Method,,"0-2, 7-9",1,New
+3875,"LN Distant: Mediastinal, Scalene",,"0-3, 8, 9",1,New
+3876,LN Head and Neck Levels I-III,,0-9,1,New
+3877,LN Head and Neck Levels IV-V,,"0-3, 8, 9",1,New
+3878,LN Head and Neck Levels VI-VII,,"0-3, 8, 9",1,New
+3879,LN Head and Neck Other,,0-9,1,New
+3880,LN Isolated Tumor Cells (ITC),,"0, 1, 8, 9",1,New
+3881,LN Laterality,,"0-3, 8, 9",1,New
+3882,LN Positive Axillary Level I-II,,"00-99, X1, X5, X6, X8, X9",2,New
+3883,LN Size,Right justified,"0.0, 0.1-99.9, XX.1, XX.2, XX.3, XX.4, XX.5, XX.6, XX.7, XX.8, XX.9",4,New
+3884,"LN Status Femoral-Inguinal, Para-Aortic, Pelvic",,0-9,1,New
+3885,Lymphocytosis,,"0, 1, 6, 7, 9",1,New
+3886,Major Vein Involvement,,"0-4, 8, 9",1,New
+3887,Measured Basal Diameter,Right justified,"0.0-99.9, XX.0, XX.1, XX.2, XX.3, XX.4, XX.5, XX.6, XX.8, XX.9",4,New
+3888,Measured Thickness,Right justified,"0.0-99.9, XX.0, XX.1, XX.2, XX.3, XX.4, XX.5, XX.6, XX.8, XX.9",4,New
+3889,Methylation of O6-Methylguanine-Methyltransferase,,"0-3, 6-9",1,New
+3890,Microsatellite Instability (MSI),,"0-2, 8, 9",1,New
+3891,Microvascular Density ,,"00-99, X1, X2, X3, X4, X5, X7, X8, X9",2,New
+3892,Mitotic Count Uveal Melanoma,Right justified,"0.0, 0.1-99.9, XX.1, XX.2, XX.3, XX.4, XX.7, XX.8, XX.9",4,New
+3893,Mitotic Rate Melanoma,,"00-99, X1, X2, X3, X4, X7, X8, X9",2,New
+3894,Multigene Signature Method,,1-9,1,New
+3895,Multigene Signature Results,,"00-99, X1, X2, X3, X4, X7, X8, X9",2,New
+3896,NCCN International Prognostic Index (IPI),,"00-08, X1, X2, X3, X4, X8, X9",2,New
+3897,Number of Cores Examined,,"01-99, X1, X6, X7, X8, X9",2,New
+3898,Number of Cores Positive,,"00, 01-99, X1, X6, X7, X8, X9",2,New
+3899,Number of Examined Para-Aortic Nodes,,"00, 01-99, X1, X2, X6, X8, X9",2,New
+3900,Number of Examined Pelvic Nodes,,"00, 01-99, X1, X2, X6, X8, X9",2,New
+3901,Number of Positive Para-Aortic Nodes,,"00, 01-99, X1, X2, X6, X8, X9",2,New
+3902,Number of Positive Pelvic Nodes,,"00, 01-99, X1, X2, X6, X8, X9",2,New
+3903,Oncotype Dx Recurrence Score-DCIS,"Right justified, zero-filled","0-100, XX6, XX7, XX8, XX9",3,New
+3904,Oncotype Dx Recurrence Score-Invasive,"Right justified, zero-filled","0-100, XX4, XX5, XX6, XX7, XX9",3,New
+3905,Oncotype Dx Risk Level-DCIS,,"0-2, 6-9",1,New
+3906,Oncotype Dx Risk Level-Invasive,,"0-2, 6-9",1,New
+3907,Organomegaly,,"0, 1, 9",1,New
+3908,Percent Necrosis Post Neoadjuvant,Right justified,"0.0, 0.1-100.0, XXX.2, XXX.8, XXX.9",5,New
+3909,Perineural Invasion,,"0, 1, 8, 9",1,New
+3910,Peripheral Blood Involvement,,"0-7, 9",1,New
+3911,Peritoneal Cytology,,"0-3, 7-9",1,New
+3913,Pleural Effusion,,"0-4, 8, 9",1,New
+3914,Progesterone Receptor Percent Positive or Range,,"000, 001-100, R10, R20, R30, R40, R50, R60, R70, R80, R90, R99, XX8, XX9",3,New
+3915,Progesterone Receptor Summary,,"0, 1, 7, 9",1,New
+3916,Progesterone Receptor Total Allred Score,,"00-08, X8, X9",2,New
+3917,Primary Sclerosing Cholangitis ,,"0, 1, 8, 9",1,New
+3918,Profound Immune Suppression,,"0-6, 8, 9",1,New
+3919,Prostate Pathological Extension,,000-999,3,New
+3920,PSA (Prostatic Specific Antigen) Lab Value,Right justified,"0.1, 0.2-999.9, XXX.1, XXX.7, XXX.9",5,New
+3921,Residual Tumor Volume Post Cytoreduction ,,"00, 10, 20, 30, 40, 90, 91-93, 97-99",2,New
+3922,Response to Neoadjuvant Therapy,,"0-4, 8, 9",1,New
+3923,S Category Clinical,,"0-3, 9",1,New
+3924,S Category Pathological,,"0-3, 9",1,New
+3925,Sarcomatoid Features,,"000, 001-100, R01, R02, R03, R04, R05, XX6, XX7, XX8, XX9",3,New
+3926,Schema Discriminator 1,,,1,New
+3927,Schema Discriminator 2,,,1,New
+3928,Schema Discriminator 3,,,1,New
+3929,Separate Tumor Nodules,,"0-4, 7-9",1,New
+3930,Serum Albumin Pretreatment Level,,"0, 1, 7, 9",1,New
+3931,Serum Beta-2 Microglobulin Pretreatment Level,,"0-2, 7, 9",1,New
+3932,LDH Pretreatment Lab Value,Right justified,"0.0, 0.1-99999.9, XXXXX.1, XXXXX.7, XXXXX.8, XXXXX.9",7,New
+3933,Thrombocytopenia,,"0, 1, 6, 7, 9",1,New
+3934,Tumor Deposits,,"00, 01-99, X1, X2, X8, X9",2,New
+3935,Tumor Growth Pattern,,"1-3, 8, 9",1,New
+3936,Ulceration,,"0, 1, 8, 9",1,New
+3937,Visceral and Parietal Pleural Invasion,,"0-4, 6, 8, 9",1,New
+7010,Path Reporting Fac ID 1,"Left justified, alphanumeric",,25,
+7011,Path Reporting Fac ID 2,"Left justified, alphanumeric",,25,
+7012,Path Reporting Fac ID 3,"Left justified, alphanumeric",,25,
+7013,Path Reporting Fac ID 4,"Left justified, alphanumeric",,25,
+7014,Path Reporting Fac ID 5,"Left justified, alphanumeric",,25,
+7090,Path Report Number 1,"Left justified, alphanumeric",,20,
+7091,Path Report Number 2,"Left justified, alphanumeric",,20,
+7092,Path Report Number 3,"Left justified, alphanumeric",,20,
+7093,Path Report Number 4,"Left justified, alphanumeric",,20,
+7094,Path Report Number 5,"Left justified, alphanumeric",,20,
+7100,Path Order Phys Lic No 1,"Left justified, alphanumeric, no embedded blanks",,20,
+7101,Path Order Phys Lic No 2,"Left justified, alphanumeric, no embedded blanks",,20,
+7102,Path Order Phys Lic No 3,"Left justified, alphanumeric, no embedded blanks",,20,
+7103,Path Order Phys Lic No 4,"left justified, alphanumeric, no embedded blanks",,20,
+7104,Path Order Phys Lic No 5,"left justified, alphanumeric, no embedded blanks",,20,
+7190,Path Ordering Fac No 1,"Left justified, alphanumeric",blank,25,
+7191,Path Ordering Fac No 2,"Left justified, alphanumeric",blank,25,
+7192,Path Ordering Fac No 3,"Left justified, alphanumeric",blank,25,
+7193,Path Ordering Fac No 4,"Left justified, alphanumeric",blank,25,
+7194,Path Ordering Fac No 5,"Left justified, alphanumeric",blank,25,
+7320,Path Date Spec Collect 1,YYYYMMDDhhmmss,Valid dates,14,
+7321,Path Date Spec Collect 2,YYYYMMDDhhmmss,Valid dates,14,
+7322,Path Date Spec Collect 3,YYYYMMDDhhmmss,Valid dates,14,
+7323,Path Date Spec Collect 4,YYYYMMDDhhmmss,Valid dates,14,
+7324,Path Date Spec Collect 5,YYYYMMDDhhmmss,Valid dates,14,
+7480,Path Report Type 1,"Right justified, zero filled","01-11, 98, 99",2,
+7481,Path Report Type 2,"Right justified, zero filled","01-11, 98, 99",2,
+7482,Path Report Type 3,"Right justified, zero filled","01-11, 98, 99",2,
+7483,Path Report Type 4,"Right justified, zero filled","01-11, 98, 99",2,
+7484,Path Report Type 5,"Right justified, zero filled","01-11, 98, 99",2,
