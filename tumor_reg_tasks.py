@@ -362,6 +362,8 @@ class NAACCR_FlatFile(ManualTask):
         with self.flat_file.open() as records:
             record0 = records.readline()
             qty = 1 + sum(1 for _ in records.readlines())
+        log.info('record qty: %d (> %d? %s)', qty,
+                 self.record_qty_min, qty >= self.record_qty_min)
 
         vOk = self._checkItem(record0, 'naaccrRecordVersion',
                               str(self.naaccrRecordVersion))
