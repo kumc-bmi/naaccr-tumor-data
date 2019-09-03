@@ -1,5 +1,3 @@
-# ISSUE: new in 3.7; use importlib_resources to allow older python?
-# https://stackoverflow.com/questions/6028000/how-to-read-a-static-file-from-inside-a-python-package
 from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
@@ -17,9 +15,6 @@ from heron_staging.tumor_reg import seer_recode
 from sql_script import SqlScript
 import heron_load
 import loinc_naaccr  # included with permission
-# ISSUE: naaccr_xml stuff is currently symlink'd to a git clone;
-# naaccr_xml_res corresponds to
-# https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/
 import naaccr_xml_res
 import naaccr_xml_xsd
 import naaccr_layout
@@ -275,13 +270,15 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
 
 
 class LOINC_NAACCR:
-    measure = pd.read_csv(res.open_text(loinc_naaccr, 'loinc_naaccr.csv'))
+    measure = pd.read_csv(res.open_text(
+        loinc_naaccr, 'loinc_naaccr.csv'))
     measure = measure.where(measure.notnull(), None)
     measure_cols = ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']
     measure_struct = ty.StructType([
         ty.StructField(n, ty.StringType()) for n in measure_cols])
 
-    answer = pd.read_csv('relma/loinc_naaccr_answer.csv')
+    answer = pd.read_csv(res.open_text(
+        loinc_naaccr, 'loinc_naaccr_answer.csv'))
     answer = answer.where(answer.notnull(), None)
     answer_struct = ty.StructType([
         ty.StructField(n.lower(),

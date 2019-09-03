@@ -35,11 +35,6 @@ from pyspark.sql.dataframe import DataFrame
 from pyspark import sql as sq
 import pandas as pd  # type: ignore
 
-# %% [markdown]
-#  - **ISSUE**: naaccr_xml stuff is currently symlink'd to a git
-#    clone; `naaccr_xml_res` corresponds to
-#    https://github.com/imsweb/naaccr-xml/blob/master/src/main/resources/
-
 # %%
 # 3rd party: naaccr-xml
 import naaccr_xml_res  # ISSUE: symlink noted above
