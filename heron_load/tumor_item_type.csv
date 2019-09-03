@@ -141,7 +141,7 @@ naaccrNum,sectionId,section,naaccrId,length,source,loinc_num,scale_typ,AnswerLis
 2150,3,Edit Overrides/Conversion History/System Admin,cocCodingSysOriginal,2,CoC,22014-5,Nom,LL179-3,cocCodingSysOriginal,@,
 2152,3,Edit Overrides/Conversion History/System Admin,cocAccreditedFlag,1,NPCR,,Nom,,cocAccreditedFlag,@,
 2155,3,Edit Overrides/Conversion History/System Admin,rqrsNcdbSubmissionFlag,1,CoC,,Nom,,rqrsNcdbSubmissionFlag,@,
-2170,3,Edit Overrides/Conversion History/System Admin,vendorName,10,NAACCR,,Nom,,,@,
+2170,3,Edit Overrides/Conversion History/System Admin,vendorName,10,NAACCR,,Nom,,,T,
 2180,3,Edit Overrides/Conversion History/System Admin,seerTypeOfFollowUp,1,SEER,22015-2,Nom,LL181-9,seerTypeOfFollowUp,@,
 2190,3,Edit Overrides/Conversion History/System Admin,seerRecordNumber,2,SEER,22016-0,Ord,LL182-7,,@,
 2200,3,Edit Overrides/Conversion History/System Admin,diagnosticProc7387,2,SEER,,?,,,?,
@@ -238,8 +238,8 @@ naaccrNum,sectionId,section,naaccrId,length,source,loinc_num,scale_typ,AnswerLis
 20,9,Record ID,patientIdNumber,8,Reporting Registry,,Nom,,,Ti,patientIdNumber
 21,9,Record ID,patientSystemIdHosp,8,NAACCR,42022-4,Nom,,,Ti,patientIdNumber
 30,9,Record ID,registryType,1,NAACCR,21828-9,Nom,LL201-5,registryType,@,
-40,9,Record ID,registryId,10,NAACCR,21829-7,Nom,,,@,
-45,9,Record ID,npiRegistryId,10,CMS,,Nom,,,@,
+40,9,Record ID,registryId,10,NAACCR,21829-7,Nom,,,T,
+45,9,Record ID,npiRegistryId,10,CMS,,Nom,,,T,
 50,9,Record ID,naaccrRecordVersion,3,NAACCR,21830-5,Nom,LL219-7,naaccrRecordVersion,@,
 60,9,Record ID,tumorRecordNumber,2,NAACCR,21831-3,Nom,,,@,
 682,11,Stage/Prognostic Factors,dateRegionalLNDissection,8,NAACCR,,Qn,,,D,
