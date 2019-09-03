@@ -269,17 +269,22 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
                  ns=NAACCR1.ns)
 
 
+def _fixna(df):
+    """
+    avoid string + double errors from spark.createDataFrame(pd.read_csv())
+    """
+    return df.where(df.notnull(), None)
+
+
 class LOINC_NAACCR:
-    measure = pd.read_csv(res.open_text(
-        loinc_naaccr, 'loinc_naaccr.csv'))
-    measure = measure.where(measure.notnull(), None)
+    measure = _fixna(pd.read_csv(res.open_text(
+        loinc_naaccr, 'loinc_naaccr.csv')))
     measure_cols = ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']
     measure_struct = ty.StructType([
         ty.StructField(n, ty.StringType()) for n in measure_cols])
 
-    answer = pd.read_csv(res.open_text(
-        loinc_naaccr, 'loinc_naaccr_answer.csv'))
-    answer = answer.where(answer.notnull(), None)
+    answer = _fixna(pd.read_csv(res.open_text(
+        loinc_naaccr, 'loinc_naaccr_answer.csv')))
     answer_struct = ty.StructType([
         ty.StructField(n.lower(),
                        ty.IntegerType() if n.lower() == 'sequence_no'
@@ -358,9 +363,13 @@ class NAACCR_R:
 
 
 class NAACCR_I2B2(object):
+    tumor_item_type = _fixna(pd.read_csv(res.open_text(
+        heron_load, 'tumor_item_type.csv')))
+
     txform_script = res.read_text(heron_load, 'naaccr_txform.sql')
     # script inputs:
     v18_dict_view_name = 'ndd180'
+    layout_view_name = 'record_layout'
     measure_view_name = 'loinc_naaccr'
     answer_view_name = 'loinc_naaccr_answers'
     r_field_info = 'field_info'
@@ -369,8 +378,6 @@ class NAACCR_I2B2(object):
     # outputs
     per_item_view = 'tumor_item_type'
 
-    # ISSUE: ocap exception for "linking" design-time resources.
-    # https://importlib-resources.readthedocs.io/en/latest/migration.html#pkg-resources-resource-string
     concept_script = res.read_text(heron_load, 'naaccr_concepts_load.sql')
     # script outputs
     concept_views = [
@@ -383,16 +390,24 @@ class NAACCR_I2B2(object):
         heron_load, 'section.csv'))
 
     @classmethod
-    def tumor_item_type_static(cls) -> ContextManager[Path_T]:
-        #@@ISSUE: figure out why spark.createDataFrame(pd.read_csv())
-        #complains about string + double here.
-        return res.path(heron_load, 'tumor_item_type.csv')
-
-    @classmethod
     def ont_view_in(cls, spark: SparkSession_T, recode: Path_T) -> DataFrame:
-        cls.tumor_item_type(spark)
+        item_ty = spark.createDataFrame(cls.tumor_item_type)
+        item_ty.createOrReplaceTempView(cls.per_item_view)
+
         NAACCR_R.code_labels_in(spark)
-        cls.seer_terms_in(spark, recode)
+        LOINC_NAACCR.answers_in(spark)
+
+        rl = (spark.createDataFrame(NAACCR_Layout.fields)
+              # pls. excuse MAGIC strings; see naaccr_txform.sql
+              .withColumnRenamed('naaccr-item-num', 'item'))
+        sec = spark.createDataFrame(cls.per_section)
+        for name, data in [
+                (cls.layout_view_name, rl),
+                ('section', sec),
+        ]:
+            data.createOrReplaceTempView(name)
+
+        cls.seer_terms_in(spark, recode)  # ISSUE: layer seer terms
 
         for view in cls.concept_views:
             create_object(view, cls.concept_script, spark)
@@ -400,7 +415,7 @@ class NAACCR_I2B2(object):
         return spark.table(cls.concept_views[-1])
 
     @classmethod
-    def tumor_item_type(cls, spark: SparkSession_T) -> DataFrame:
+    def tumor_item_type_mix(cls, spark: SparkSession_T) -> DataFrame:
         ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
         LOINC_NAACCR.measure_in(spark)
         LOINC_NAACCR.answers_in(spark)

@@ -15,13 +15,9 @@ separately.
  ***/
 
 -- check for metadata tables
-select naaccrId from ndd180 where dep = 'naaccr-dictionary-180.xml';
-select section from record_layout where dep = 'naaccr_ddict/record_layout.csv';
-select source from item_description where dep = 'naaccr_ddict/item_description.csv';
-select loinc_num from loinc_naaccr where dep = 'loinc_naaccr.csv'
-select type from field_info where dep = 'naaccr_r_raw/field_info.csv'
-select scheme from field_code_scheme where dep = 'naaccr_r_raw/field_code_scheme.csv'
-
+select naaccrId from ndd180 where 'dep' = 'naaccr-dictionary-180.xml';
+select section from record_layout where 'dep' = 'naaccr_layout/naaccr-18-layout.xml';
+select sectionId from section where 'dep' = 'section.csv'
 
 /* IDEA: Race analysis/sanity check: How many of each?
  odd: no codecrp for 16, 17

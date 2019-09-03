@@ -283,8 +283,8 @@ class JDBCTableTarget(luigi.Target):
 
 
 class NAACCR_Ontology1(SparkJDBCTask):
-    design_id = pv.StrParam(
-        default='static layout',
+    z_design_id = pv.StrParam(
+        default='static valtype_cd',
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
