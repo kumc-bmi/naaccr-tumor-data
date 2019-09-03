@@ -548,7 +548,9 @@ def naaccr_dates(df: DataFrame, date_cols: List[str],
     for dtcol in date_cols:
         strcol = dtcol + '_'
         df = df.withColumnRenamed(dtcol, strcol)
-        dt = func.to_date(df[strcol], 'yyyyMMdd')
+        dt = func.substring(func.concat(func.trim(df[strcol]), func.lit('0101')), 1, 8)
+        # df = df.withColumn(dtcol + '_str', dt)
+        dt = func.to_date(dt, 'yyyyMMdd')
         df = df.withColumn(dtcol, dt)
     if not keep:
         df = df.select(cast(Union[sq.Column, str], orig_cols))
