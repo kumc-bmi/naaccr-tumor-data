@@ -12,28 +12,12 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 
 /* check that the LOINC answers, scraped chapters, and R labels loaded */
 select answer_code from loinc_naaccr_answers where dep = 'loinc_naaccr_answers.csv';
-select 1 from data_descriptor where 1 = 0;
-select 1 from record_layout where 1 = 0;
 select 1 from section where 1 = 0;
 select label from code_labels where dep = 'code-labels';
+select valtype_cd from tumor_item_type where dep = 'naaccr_txform.sql';
 
 /* oh for bind parameters... */
 select task_id from current_task where 1=0;
-
-/* Check that we're running in the identified repository. */
-select * from NightHeronData.observation_fact where 1=0;
-
-/* Check for NAACCR extract table (in KUMC database).
-oops... typo in schema name. keep it that way?
-*/
-select * from naacr.extract where 1=0;
-
-/* check that transformation views are in place */
-select valtype_cd from tumor_item_type where dep = 'naaccr_txform.sql';
-select * from tumor_item_value tiv where 1=0;
-
-/* check that metadata_init.sql was run to create the ontology table. */
-select c_name from BlueHeronMetadata.NAACCR_ONTOLOGY@deid where 1=0;
 
 -- check that WHO materials are staged
 select * from who.topo where 1=0;
@@ -349,7 +333,7 @@ select distinct 4 as c_hlevel
        end as*/ 'LA' as c_visualattributes
 from naaccr_code_values v
 join item_concepts ic on ic.naaccrNum = v.naaccrNum
-),
+)
 
 -- TODO: where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
 
@@ -382,7 +366,17 @@ where tr.itemnbr in (419, 521)
 */
 
 
-seer_terms as (
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from root
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from section_concepts
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from item_concepts
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from code_concepts
+;
+
+create or replace temporary view naaccr_ont_aux_seer as
+with seer_terms as (
 select 2 as c_hlevel
      , 'SEER Site\\' as path
      , 'SEER Site Summary' as concept_name
@@ -400,17 +394,11 @@ select 3 + hlevel as c_hlevel
      , visualattributes as c_visualattributes
 from seer_site_terms
 )
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from root
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from section_concepts
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from item_concepts
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from code_concepts
+
+select * from naaccr_ont_aux
 union all
 select c_hlevel, path, concept_name, concept_cd, c_visualattributes from seer_terms
 ;
-
 
 create or replace temporary view naaccr_ontology as
 select i2b2_root.c_hlevel + terms.c_hlevel as c_hlevel

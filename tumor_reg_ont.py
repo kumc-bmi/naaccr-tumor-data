@@ -4,6 +4,7 @@ from typing import (
     Callable, ContextManager, Dict, Iterator, List, Optional as Opt
 )
 from xml.etree import ElementTree as XML
+import logging
 
 from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import types as ty
@@ -18,6 +19,8 @@ import naaccr_layout
 import naaccr_r_raw
 import naaccr_xml_res
 import naaccr_xml_xsd
+
+log = logging.getLogger(__name__)
 
 
 def _int_fields(record, fields):
@@ -380,37 +383,42 @@ class NAACCR_I2B2(object):
 
     concept_script = res.read_text(heron_load, 'naaccr_concepts_load.sql')
     # script outputs
+    aux_view = 'naaccr_ont_aux'
     concept_views = [
         'naaccr_code_values',
-        'naaccr_ont_aux',
+        aux_view,
         'naaccr_ontology',
     ]
+    seer_aux_view = 'naaccr_ont_aux_seer'
 
     per_section = pd.read_csv(res.open_text(
         heron_load, 'section.csv'))
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T, recode: Path_T) -> DataFrame:
+    def ont_view_in(cls, spark: SparkSession_T,
+                    recode: Opt[Path_T] = None) -> DataFrame:
+        # Assign i2b2 valtype_cd to each NAACCR item.
         item_ty = spark.createDataFrame(cls.tumor_item_type)
         item_ty.createOrReplaceTempView(cls.per_item_view)
 
+        # Labels for coded values
         NAACCR_R.code_labels_in(spark)
         LOINC_NAACCR.answers_in(spark)
 
-        rl = (spark.createDataFrame(NAACCR_Layout.fields)
-              # pls. excuse MAGIC strings; see naaccr_txform.sql
-              .withColumnRenamed('naaccr-item-num', 'item'))
         sec = spark.createDataFrame(cls.per_section)
-        for name, data in [
-                (cls.layout_view_name, rl),
-                ('section', sec),
-        ]:
-            data.createOrReplaceTempView(name)
-
-        cls.seer_terms_in(spark, recode)  # ISSUE: layer seer terms
+        sec.createOrReplaceTempView('section')
 
         for view in cls.concept_views:
             create_object(view, cls.concept_script, spark)
+
+        if recode:
+            cls.seer_terms_in(spark, recode)
+            create_object(cls.seer_aux_view, cls.concept_script, spark)
+            # replace aux view
+            aux = spark.table(cls.seer_aux_view)
+            aux.createOrReplaceTempView(cls.aux_view)
+        else:
+            log.warn('skipping SEER Recode terms')
 
         return spark.table(cls.concept_views[-1])
 

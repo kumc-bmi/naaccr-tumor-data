@@ -292,7 +292,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         '''.strip(),
     )
     naaccr_version = pv.IntParam(default=18)
-    seer_recode = pv.PathParam(significant=False, description='''
+    seer_recode = pv.PathParam(default=None, description='''
       cache of http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
     ''')
 
@@ -321,7 +321,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         ''')
 
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.seer_recode.resolve())
+            spark, self.seer_recode and self.seer_recode.resolve())
 
         self.jdbc_access(td.case_fold(ont).write, self.table_name,
                          mode='overwrite')
