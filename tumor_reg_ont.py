@@ -8,16 +8,16 @@ from xml.etree import ElementTree as XML
 from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import types as ty
 from pyspark.sql.dataframe import DataFrame
-import naaccr_r_raw
 import pandas as pd  # type: ignore
 
 from heron_staging.tumor_reg import seer_recode
 from sql_script import SqlScript
 import heron_load
 import loinc_naaccr  # included with permission
+import naaccr_layout
+import naaccr_r_raw
 import naaccr_xml_res
 import naaccr_xml_xsd
-import naaccr_layout
 
 
 def _int_fields(record, fields):
