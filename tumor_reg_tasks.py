@@ -333,7 +333,7 @@ class ManualTask(luigi.Task):
     """
     @with_task_logging
     def run(self):
-        raise NotImplementedError(f'{self.task_name} is manual.')
+        raise NotImplementedError(f'{self.get_task_family()} is manual.')
 
 
 class NAACCR_FlatFile(ManualTask):
