@@ -306,14 +306,62 @@ def coded_items(tumor_item_type: DataFrame) -> DataFrame:
 IO_TESTING and (coded_items(NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
                 .toPandas().tail())
 
+
 # %%
-if IO_TESTING:
-    (_spark.table('tumor_item_type')
+def _save_mix(spark):
+    (spark.table('tumor_item_type')
      .toPandas()
      .sort_values(['sectionId', 'naaccrNum'])
      .set_index('naaccrNum')
      .to_csv('tumor_item_type.csv')
     )
+
+
+# %%
+def csv_meta(dtypes, path,
+             context='http://www.w3.org/ns/csvw'):
+    # ISSUE: dead code? obsolete in favor of _fixna()?
+    def xlate(dty):
+        if dty.kind == 'i':
+            return 'number'
+        elif dty.kind == 'O':
+            return 'string'
+        raise NotImplementedError(dty.kind)
+
+    cols = [
+        { "titles": name,
+          "datatype": xlate(dty) }
+        for name, dty in dtypes.items()
+    ]
+    return { "@context": context,
+             "url": path,
+             "tableSchema": {
+                 "columns": cols
+             }}
+
+#@@ csv_meta(x.dtypes, 'tumor_item_type.csv')
+
+
+# %%
+def csv_spark_schema(columns):
+    """
+    Note: limited to exactly 1 titles per column
+    IDEA: expand to boolean
+    IDEA: nullable / required
+    """
+    def oops(what):
+        raise NotImplementedError(what)
+    fields = [
+        ty.StructField(
+            name=col['titles'],
+            dataType=ty.IntegerType() if col['datatype'] == 'number'
+            else ty.StringType() if col['datatype'] == 'string'
+            else oops(col))
+        for col in columns]
+    return ty.StructType(fields)
+
+#@@ csv_spark_schema(csv_meta(x.dtypes, 'tumor_item_type.csv')['tableSchema']['columns'])
+
 
 # %% [markdown]
 # ### Compare with `tumor_item_type` from heron_load (TODO?)
