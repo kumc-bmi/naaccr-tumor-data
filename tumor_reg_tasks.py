@@ -344,6 +344,7 @@ class NAACCR_FlatFile(ManualTask):
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     flat_file = pv.PathParam(significant=False)
+    record_qty_min = pv.IntParam(significant=False, default=1)
 
     def check_version_param(self):
         """Only version 18 (180) is currently supported.
@@ -360,6 +361,7 @@ class NAACCR_FlatFile(ManualTask):
 
         with self.flat_file.open() as records:
             record0 = records.readline()
+            qty = 1 + sum(1 for _ in records.readlines())
 
         vOk = self._checkItem(record0, 'naaccrRecordVersion',
                               str(self.naaccrRecordVersion))
@@ -367,7 +369,8 @@ class NAACCR_FlatFile(ManualTask):
                                 self.npiRegistryId)
         dtOk = self._checkItem(record0, 'dateCaseReportExported',
                                self.dateCaseReportExported.strftime('%Y%m%d'))
-        return vOk and regOk and dtOk
+
+        return vOk and regOk and dtOk and qty >= self.record_qty_min
 
     @classmethod
     def _checkItem(cls, record, naaccrId, expected):
