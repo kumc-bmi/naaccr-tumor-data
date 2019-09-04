@@ -695,7 +695,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
-    z_design_id = pv.StrParam('deid, compress')
+    z_design_id = pv.StrParam('deid, compress; cast timestamp')
 
     script_name = 'naaccr_facts_load.sql'
     script_deid_name = 'i2b2_facts_deid.sql'
@@ -733,6 +733,7 @@ class NAACCR_Load(UploadTask):
         ff = parts['NAACCR_FlatFile']
         pat = parts['NAACCR_Patients']
 
+        # ISSUE: split these into separate tasks?
         for name, script in [
                 (self.script_name, self.script),
                 (self.script_deid_name, self.script_deid)]:

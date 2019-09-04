@@ -34,7 +34,7 @@ select f.patient_num, f.encounter_num
   , f.location_cd, f.observation_blob, f.confidence_num
   , f.update_date + pdim.date_shift as update_date
   , f.download_date
-  , to_date(current_timestamp) as import_date
+  , cast(current_timestamp as date) as import_date
   , f.sourcesystem_cd, f.upload_id
 from observation_fact_&&upload_id f
   join NightHeronData.patient_dimension pdim
