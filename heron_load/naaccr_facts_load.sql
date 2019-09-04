@@ -160,8 +160,17 @@ having count(*) > 1;
 
 /** Summary stats.
 
-Report how many rows are dropped when joining on patient_ide and encounter_id.
-Subsumes check for null :part (#789).
+Report how many rows are dropped when joining on patient_ide.
 */
-select count(distinct patient_num) as pat_qty, count(distinct encounter_num) visit_qty, count(*) as obs_qty
-from observation_fact_&&upload_id;
+update NightHeronData.upload_status
+set no_of_record = (select count(*) from naaccr_observations),
+    loaded_record = (select count(*) from observation_fact_&&upload_id)
+where upload_id = :upload_id
+;
+commit;
+
+
+select 1 complete from
+observation_fact_&&upload_id
+where rownum = 1
+;

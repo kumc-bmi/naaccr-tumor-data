@@ -706,9 +706,9 @@ class NAACCR_Load(UploadTask):
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
-    z_design_id = pv.StrParam('all obs; all patients')
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
+    z_design_id = pv.StrParam('summary stats')
 
     script_name = 'naaccr_facts_load.sql'
     script = res.read_text(heron_load, script_name)
