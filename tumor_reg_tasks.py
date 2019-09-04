@@ -48,8 +48,8 @@ def _configure_logging(dest):
 def quiet_logs(sc):
     # ack: FDS Aug 2015 https://stackoverflow.com/a/32208445
     logger = sc._jvm.org.apache.log4j
-    logger.LogManager.getLogger("org"). setLevel(logger.Level.ERROR)
-    logger.LogManager.getLogger("akka").setLevel(logger.Level.ERROR)
+    logger.LogManager.getLogger("org"). setLevel(logger.Level.WARN)
+    logger.LogManager.getLogger("akka").setLevel(logger.Level.WARN)
 
 
 class Connection:
@@ -326,7 +326,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
     @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
-        # quiet_logs(sparkContext)
+        quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
 
         # oh for bind variables...
@@ -441,7 +441,7 @@ class _NAACCR_JDBC(SparkJDBCTask):
 
     @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
-        # quiet_logs(sparkContext)
+        quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
         ff = self.requires()['NAACCR_FlatFile']
         naaccr_text_lines = spark.read.text(str(ff.flat_file))
