@@ -397,16 +397,11 @@ class NAACCR_I2B2(object):
     @classmethod
     def ont_view_in(cls, spark: SparkSession_T,
                     recode: Opt[Path_T] = None) -> DataFrame:
-        # Assign i2b2 valtype_cd to each NAACCR item.
-        item_ty = spark.createDataFrame(cls.tumor_item_type)
-        item_ty.createOrReplaceTempView(cls.per_item_view)
+        cls.item_views_in(spark)
 
         # Labels for coded values
         NAACCR_R.code_labels_in(spark)
         LOINC_NAACCR.answers_in(spark)
-
-        sec = spark.createDataFrame(cls.per_section)
-        sec.createOrReplaceTempView('section')
 
         for view in cls.concept_views:
             create_object(view, cls.concept_script, spark)
@@ -421,6 +416,20 @@ class NAACCR_I2B2(object):
             log.warn('skipping SEER Recode terms')
 
         return spark.table(cls.concept_views[-1])
+
+    @classmethod
+    def item_views_in(cls, spark):
+        # Assign i2b2 valtype_cd to each NAACCR item.
+        item_ty = spark.createDataFrame(cls.tumor_item_type)
+        item_ty.createOrReplaceTempView(cls.per_item_view)
+
+        sec = spark.createDataFrame(cls.per_section)
+        sec.createOrReplaceTempView('section')
+
+        rl = spark.createDataFrame(NAACCR_Layout.fields)
+        rl.createOrReplaceTempView(cls.layout_view_name)
+
+        return item_ty
 
     @classmethod
     def tumor_item_type_mix(cls, spark: SparkSession_T) -> DataFrame:

@@ -173,6 +173,7 @@ select raw.*
        end as numeric_value
      , case
        when valtype_cd = 'D'
+       -- TODO: length 14 datetime
        then to_date(substring(concat(raw_value, '0101'), 1, 8),
                     'yyyyMMdd')
        end as date_value
@@ -205,7 +206,7 @@ create or replace temporary view tumor_reg_facts as
 with obs_w_section as (
   select tiv.*, rl.length as field_length, s.sectionId
   from tumor_item_value tiv
-  join record_layout rl on rl.xmlId = tiv.naaccrId
+  join record_layout rl on rl.name = tiv.naaccrId
   join section s on s.section = rl.section
 ),
 

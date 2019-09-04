@@ -486,17 +486,15 @@ class NAACCR_Facts(_NAACCR_JDBC):
     item_view = 'tumor_item_value'
     fact_view = 'tumor_reg_facts'  # out
 
-    design_id = pv.StrParam('date, num, ... (%d)' % len(naaccr_txform))
+    z_design_id = pv.StrParam('de-dup 1646; (%d)' % len(naaccr_txform))
 
     def _data(self, spark, naaccr_text_lines):
         extract = td.naaccr_read_fwf(naaccr_text_lines, tr_ont.ddictDF(spark))
-        tr_ont.ScrapedChapters.make_in(spark, self.naaccr_ddict) #@@record_layout -> static
-        with tr_ont.NAACCR_I2B2.tumor_item_type_static() as ty_path:
-            ty = tr_ont.csv_view(spark, ty_path,
-                                 'tumor_item_type')  #@@refactor MAGIC
+
+        item_ty = tr_ont.NAACCR_I2B2.item_views_in(spark)
 
         raw_obs = td.TumorKeys.with_tumor_id(td.naaccr_dates(
-            td.stack_obs(extract, ty),
+            td.stack_obs(extract, item_ty),
             td.TumorKeys.dtcols))
         raw_obs.createOrReplaceTempView(self.raw_view)
 
