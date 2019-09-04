@@ -20,7 +20,26 @@ whenever sqlerror continue;
 drop index naaccr_patients_pk;
 whenever sqlerror exit;
 
-create unique index naaccr_patients_pk on naaccr_patients (patientIdNumber);
+/* check for dups from Spark SQL:
+alter session set current_schema = ...;
+select patientIdNumber, patient_num, count(*)
+from naaccr_patients
+group by patientIdNumber, patient_num
+having count(*) > 1;
+
+select * from naaccr_patients where patientIdNumber in (
+  select patientIdNumber
+  from naaccr_patients
+  group by patientIdNumber
+  having count(*) > 1
+) order by patientidnumber;
+*/
+
+
+/* ISSUE: patientIdNumber with different birthday, sex */
+/* ISSUE: patientSystemIdHosp is not unique */
+/* ISSUE: accessionNumberHosp is not unique */
+create index naaccr_patients_pk on naaccr_patients (patientIdNumber);
 
 -- ISSUE: where to put this check?
 select case when count(*) = 0 then 1 else 0 end complete
@@ -99,7 +118,7 @@ select
     (select encounter_num
      from naaccr_tumors t
      where t.recordId = tf.recordId) as encounter_num
-  , (select patient_num from naaccr_patients pat
+  , (select min(patient_num) from naaccr_patients pat
      where pat.patientIdNumber = tf.patientIdNumber) as patient_num,
   tf.concept_cd,
   tf.provider_id,
