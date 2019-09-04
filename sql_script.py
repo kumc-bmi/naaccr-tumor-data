@@ -64,7 +64,7 @@ class SqlScriptError(IOError):
     def __init__(self, exc: Exception, fname: str, line: int, statement: SQL,
                  conn_label: str) -> None:
         message = '%s <%s>\n%s:%s:\n'
-        args = [exc, conn_label, fname, line]
+        args = [repr(exc), conn_label, fname, line]
         message += '%s'
         args += [statement]
 
@@ -182,12 +182,10 @@ def to_qmark(sql, params):
     >>> to_qmark('select x, :id where id=:id', dict(id=23, x=2))
     ('select x, ? where id=?', [23, 23])
 
-    References to missing params raises KeyError:
+    References to undefined parameters are left alone:
 
-    >>> to_qmark('select x where id=:i', dict(id=23))
-    Traceback (most recent call last):
-      ...
-    KeyError: 'i'
+    >>> to_qmark("select to_char(dt, 'hh:mm') from dual", dict(id=23))
+    ("select to_char(dt, 'hh:mm') from dual", [])
 
     Limitation: bind params in strings, comments are goofy:
 
@@ -198,9 +196,13 @@ def to_qmark(sql, params):
     out = ''
     done = 0
     for ref in re.finditer(fr':(\w+)\b', sql):
+        out += sql[done:ref.start()]
         n = ref.group(1)
-        values.append(params[n])
-        out += sql[done:ref.start()] + '?'
+        if n in params:
+            values.append(params[n])
+            out += '?'
+        else:
+            out += ref.group(0)
         done = ref.end()
     out += sql[done:]
     return out, values

@@ -512,23 +512,10 @@ class NAACCR_Facts(_NAACCR_JDBC):
     z_design_id = pv.StrParam('de-dup 1646; (%d)' % len(naaccr_txform))
 
     def _data(self, spark, naaccr_text_lines):
-        extract = td.naaccr_read_fwf(naaccr_text_lines, tr_ont.ddictDF(spark))
-
-        item_ty = tr_ont.NAACCR_I2B2.item_views_in(spark)
-
-        raw_obs = td.TumorKeys.with_tumor_id(td.naaccr_dates(
-            td.stack_obs(extract, item_ty),
-            td.TumorKeys.dtcols))
-        raw_obs.createOrReplaceTempView(self.raw_view)
-
-        tr_ont.create_object(
-            self.item_view, self.naaccr_txform, spark)
-
-        tr_ont.create_object(
-            self.fact_view, self.naaccr_txform, spark)
-
-        data = spark.table(self.fact_view)
-        return data
+        return td.naaccr_observations(spark, naaccr_text_lines,
+                                      raw_view=self.raw_view,
+                                      item_view=self.item_view,
+                                      fact_view=self.fact_view)
 
 
 class UploadTask(JDBCTask):
@@ -708,10 +695,12 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
-    z_design_id = pv.StrParam('summary stats')
+    z_design_id = pv.StrParam('deid, compress')
 
     script_name = 'naaccr_facts_load.sql'
+    script_deid_name = 'i2b2_facts_deid.sql'
     script = res.read_text(heron_load, script_name)
+    script_deid = res.read_text(heron_load, script_deid_name)
 
     @property
     def label(self) -> str:
@@ -744,17 +733,21 @@ class NAACCR_Load(UploadTask):
         ff = parts['NAACCR_FlatFile']
         pat = parts['NAACCR_Patients']
 
-        self.run_script(
-            conn, self.script_name, self.script,
-            variables=dict(upload_id=upload_id,
-                           task_id=self.task_id),
-            script_params=dict(upload_id=upload_id,
-                               project_id=self.project_id,
-                               task_id=self.task_id,
-                               source_cd=self.source_cd,
-                               download_date=ff.dateCaseReportExported,
-                               patient_ide_source=pat.patient_ide_source,
-                               encounter_ide_source=self.encounter_ide_source))
+        for name, script in [
+                (self.script_name, self.script),
+                (self.script_deid_name, self.script_deid)]:
+            self.run_script(
+                conn, name, script,
+                variables=dict(upload_id=upload_id,
+                               task_id=self.task_id),
+                script_params=dict(
+                    upload_id=upload_id,
+                    project_id=self.project_id,
+                    task_id=self.task_id,
+                    source_cd=self.source_cd,
+                    download_date=ff.dateCaseReportExported,
+                    patient_ide_source=pat.patient_ide_source,
+                    encounter_ide_source=self.encounter_ide_source))
 
 
 if __name__ == '__main__':

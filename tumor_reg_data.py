@@ -745,13 +745,19 @@ class TumorKeys:
         return tumors
 
     @classmethod
-    def with_patient_num(cls, df, spark, cdw,
-                         schema,
+    def export_patient_ids(cls, df, spark, cdw, schema,
+                           tmp_table='NAACCR_PMAP',
+                           id_col='patientIdNumber'):
+        log.info('writing %s to %s', id_col, tmp_table)
+        cdw.wr(df.select(id_col).distinct().write, tmp_table, mode='overwrite')
+
+    @classmethod
+    def with_patient_num(cls, df, spark, cdw, schema,
                          source,  # assumed injection-safe
                          tmp_table='NAACCR_PMAP',
                          id_col='patientIdNumber'):
-        log.info('writing %s to %s', id_col, tmp_table)
-        cdw.wr(df.select(id_col).distinct().write, tmp_table, mode='overwrite')
+        cls.export_patient_ids(df, spark, cdw, schema,
+                               id_col=id_col, tmp_table=tmp_table)
         q = f'''(
             select ea."{id_col}", pmap.PATIENT_NUM
             from {tmp_table} ea
@@ -773,7 +779,10 @@ if IO_TESTING:
 IO_TESTING and (_pat_tmr, _patients)
 
 # %%
-IO_TESTING and TumorKeys.with_patient_num(_patients, _spark, _cdw, 'NIGHTHERONDATA', 'SMS@kumed.com').limit(5).toPandas()
+if IO_TESTING:
+    _patients_mapped = TumorKeys.with_patient_num(_patients, _spark, _cdw, 'NIGHTHERONDATA', 'SMS@kumed.com')
+
+IO_TESTING and _patients_mapped.limit(5).toPandas()
 
 # %%
 IO_TESTING and _pat_tmr.limit(15).toPandas()
@@ -862,37 +871,35 @@ if IO_TESTING:
     create_object('tumor_reg_facts', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
 IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(20).toPandas()
 
-
 # %%
-def typed_obs(raw, spark,
-              raw_name='naaccr_obs_raw'):
-    raw.createOrReplaceTempView(raw_name)
-    typed = spark.sql('''
-    select raw.*
-         , case when valtype_cd in ('Ni', 'Ti')
-           then true
-           else false
-           end as identified_only
-         , case when valtype_cd = '@'
-           then raw_value
-           end as code_value
-         , case
-           when valtype_cd in ('N', 'Ni')
-           then cast(raw_value as float)
-           end as nval_num
-         , case
-           when valtype_cd = 'D'
-           then to_date(substring(concat(raw_value, '0101'), 1, 8),
-                        'yyyyMMdd')
-           end as date_value
-         , case when valtype_cd in ('T', 'Ti')
-           then raw_value
-           end as text_value
-    from naaccr_obs_raw raw
-    ''')
-    return naaccr_dates(typed, TumorKeys.dtcols)
+naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
 
-IO_TESTING and typed_obs(_raw_obs, _spark).where("valtype_cd != '@'").limit(40).toPandas()
+def naaccr_observations(spark, naaccr_text_lines,
+                        raw_view='naaccr_obs_raw',
+                        item_view='tumor_item_value',
+                        fact_view='tumor_reg_facts'):
+    dd = ddictDF(spark)
+    extract = naaccr_read_fwf(naaccr_text_lines, dd)
+
+    item_ty = NAACCR_I2B2.item_views_in(spark)
+
+    raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
+        stack_obs(extract, item_ty),
+        TumorKeys.dtcols))
+    raw_obs.createOrReplaceTempView(raw_view)
+
+    create_object(
+        item_view, naaccr_txform, spark)
+
+    create_object(
+        fact_view, naaccr_txform, spark)
+
+    data = spark.table(fact_view)
+    return data
+
+if IO_TESTING:
+    _obs = naaccr_observations(_spark, _naaccr_text_lines)
+IO_TESTING and _obs.limit(5).toPandas()
 
 # %% [markdown]
 # ## Oracle DB Access
@@ -924,7 +931,7 @@ if IO_TESTING:
 # %%
 class Account:
     def __init__(self, user: str, password: str,
-                 url: str = 'jdbc:oracle:thin:@localhost:8621:KUMC',
+                 url: str = 'jdbc:oracle:thin:@localhost:8621:nheronB2',
                  driver: str = "oracle.jdbc.OracleDriver") -> None:
         self.url = url
         db = url.split(':')[-1]

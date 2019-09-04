@@ -14,6 +14,7 @@ ISSUE: parameterize nightherondata schema?
 /* check dependencies */
 select patientIdNumber from naaccr_patients where 'dep' = 'tumor_reg_tasks.NAACCR_Patients';
 select encounter_num from naaccr_tumors where 'dep' = 'tumor_reg_tasks.NAACCR_Visits';
+select patient_num from nightherondata.observation_fact where 'dep' = 'create_datamart';
 
 
 whenever sqlerror continue;
@@ -86,7 +87,7 @@ group by ENCOUNTER_ide, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD, INSTAN
 having count(*) > 1;
 */
 
-create table observation_fact_&&upload_id as
+create table observation_fact_&&upload_id compress as
 select * from nightherondata.observation_fact where 1 = 0;
 
 insert /*+ append*/ into observation_fact_&&upload_id
