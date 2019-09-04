@@ -743,12 +743,36 @@ class TumorKeys:
             func.row_number().over(Window.orderBy(key_col)))
         return tumors
 
+    @classmethod
+    def with_patient_num(cls, df, spark, cdw,
+                         schema,
+                         source,  # assumed injection-safe
+                         tmp_table='NAACCR_PMAP',
+                         id_col='patientIdNumber'):
+        log.info('writing %s to %s', id_col, tmp_table)
+        cdw.wr(df.select(id_col).distinct().write, tmp_table, mode='overwrite')
+        q = f'''(
+            select ea."{id_col}", pmap.PATIENT_NUM
+            from {tmp_table} ea
+            join {schema}.PATIENT_MAPPING pmap
+            on pmap.patient_ide_source = '{source}'
+            and ltrim(pmap.patient_ide, '0') = ltrim(ea."{id_col}", '0')
+        )'''
+        src_map = cdw.rd(spark.read, q)
+        out = df.join(src_map, df[id_col] == src_map[id_col])
+        out = out.drop(src_map[id_col])
+        out = out.withColumnRenamed('PATIENT_NUM', 'patient_num')
+        return out
+
 # pat_tmr.cache()
 if IO_TESTING:
     _pat_tmr = TumorKeys.with_rownum(TumorKeys.with_tumor_id(
         TumorKeys.pat_tmr(_spark, _naaccr_text_lines)))
     _patients = TumorKeys.patients(_spark, _naaccr_text_lines)
 IO_TESTING and (_pat_tmr, _patients)
+
+# %%
+IO_TESTING and TumorKeys.with_patient_num(_patients, _spark, _cdw, 'NIGHTHERONDATA', 'SMS@kumed.com').limit(5).toPandas()
 
 # %%
 IO_TESTING and _pat_tmr.limit(15).toPandas()
@@ -956,12 +980,17 @@ if IO_TESTING:
 # %%
 class Account:
     def __init__(self, user: str, password: str,
-                 url: str = 'jdbc:oracle:thin:@localhost:8621:KUMC',
+                 url: str = 'jdbc:oracle:thin:@localhost:8621:nheronB2',
                  driver: str = "oracle.jdbc.OracleDriver") -> None:
         self.url = url
+        db = url.split(':')[-1]
+        self.label = f'{self.__class__.__name__}({user}@{db})'
         self.__properties = {"user": user,
                              "password": password,
                              "driver": driver}
+
+    def __repr__(self):
+        return self.label
 
     def rd(self, io: sq.DataFrameReader, table: str) -> DataFrame:
         return io.jdbc(self.url, table,

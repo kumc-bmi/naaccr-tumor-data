@@ -15,16 +15,6 @@ ISSUE: parameterize nightherondata schema?
 select patientIdNumber from naaccr_patients where 'dep' = 'tumor_reg_tasks.NAACCR_Patients';
 select encounter_num from naaccr_tumors where 'dep' = 'tumor_reg_tasks.NAACCR_Visits';
 
-/* Map patients using patientIdNumber */
-update naaccr_patients trpat
-set trpat.patient_num = null;
-update naaccr_patients trpat
-set trpat.patient_num =
-    (select pmap.patient_num
-     from nightherondata.patient_mapping pmap
-     where pmap.patient_ide_source = :patient_ide_source
-       and ltrim(pmap.patient_ide, '0') = ltrim(trpat.patientIdNumber, '0'))
-;
 
 whenever sqlerror continue;
 drop index naaccr_patients_pk;

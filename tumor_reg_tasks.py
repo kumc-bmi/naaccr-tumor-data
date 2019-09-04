@@ -35,14 +35,14 @@ import tumor_reg_ont as tr_ont
 log = logging.getLogger(__name__)
 
 
-def _configure_logging(dest='log/eliot.log'):
+def _configure_logging(dest):
     root = logging.getLogger()  # ISSUE: ambient
     # Add Eliot Handler to root Logger.
     root.addHandler(EliotHandler())
     # and to luigi
     logging.getLogger('luigi').addHandler(EliotHandler())
     logging.getLogger('luigi-interface').addHandler(EliotHandler())
-    el.to_file(open(dest, 'ab'))  # ISSUE: ambient
+    el.to_file(dest.open(mode='ab'))
 
 
 def quiet_logs(sc):
@@ -169,8 +169,10 @@ class JDBCTask(luigi.Task):
                     conn, fname, line, statement, run_params,
                     ignore_error)
             except Exception as exc:
+                # ISSUE: connection label should show sid etc.
                 err = SqlScriptError(exc, fname, line,
-                                     statement, '@@TODO: connection label')
+                                     statement,
+                                     self.task_id)
                 if ignore_error:
                     log.warning('%(event)s: %(error)s',
                                 dict(event='ignore', error=err))
@@ -249,12 +251,17 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
 
     def jdbc_access(self, io, table_name: str,
                     **kw_args):
+        # ISSUE: should be obsolete in favor of Account()
         return io.jdbc(self.db_url, table_name,
                        properties={
                            "user": self.user,
                            "password": self.__password,
                            "driver": self.driver,
                        }, **kw_args)
+
+    def account(self):
+        return td.Account(self.user, self.__password,
+                          self.db_url, self.driver)
 
 
 class HelloNAACCR(SparkJDBCTask):
@@ -415,9 +422,11 @@ class _NAACCR_JDBC(SparkJDBCTask):
     npiRegistryId = pv.StrParam()
 
     def requires(self):
-        return [NAACCR_FlatFile(
-            dateCaseReportExported=self.dateCaseReportExported,
-            npiRegistryId=self.npiRegistryId)]
+        return {
+            'NAACCR_FlatFile': NAACCR_FlatFile(
+                dateCaseReportExported=self.dateCaseReportExported,
+                npiRegistryId=self.npiRegistryId)
+        }
 
     @with_task_logging
     def complete(self):
@@ -434,7 +443,7 @@ class _NAACCR_JDBC(SparkJDBCTask):
     def main(self, sparkContext, *_args):
         quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
-        [ff] = self.requires()
+        ff = self.requires()['NAACCR_FlatFile']
         naaccr_text_lines = spark.read.text(str(ff.flat_file))
 
         data = self._data(spark, naaccr_text_lines)
@@ -466,13 +475,27 @@ class NAACCR_Visits(_NAACCR_JDBC):
 class NAACCR_Patients(_NAACCR_JDBC):
     """Make a per-patient table for use in patient_mapping etc.
     """
-    design_id = pv.StrParam('refactor dimensions')
+    patient_ide_source = pv.StrParam(default='SMS@kumed.com')
+    schema = pv.StrParam(default='NIGHTHERONDATA')
+    z_design_id = pv.StrParam('move patient_mapping to spark side')
     table_name = "NAACCR_PATIENTS"
+
+    def requires(self):
+        return dict(_NAACCR_JDBC.requires(self),
+                    HERON_Patient_Mapping=HERON_Patient_Mapping(
+                        patient_ide_source=self.patient_ide_source,
+                        schema=self.schema,
+                        db_url=self.db_url,
+                        classpath=self.classpath,
+                        driver=self.driver,
+                        user=self.user,
+                        passkey=self.passkey))
 
     def _data(self, spark, naaccr_text_lines):
         patients = td.TumorKeys.patients(spark, naaccr_text_lines)
-        patients = patients.withColumn('patient_num',
-                                       func.lit(None).cast('int'))
+        cdw = self.account()
+        patients = td.TumorKeys.with_patient_num(
+            patients, spark, cdw, self.schema, self.patient_ide_source)
         return patients
 
 
@@ -552,7 +575,7 @@ class UploadTarget(luigi.Target):
         self._task = jdbc_task
         self.schema = schema
         self.source_cd = source_cd
-        self.transform_name = jdbc_task.task_id
+        self.transform_name = jdbc_task.transform_name
 
     @property
     def nextval_q(self):
@@ -654,10 +677,30 @@ def _fix_null(it, rs):
     return None if rs.wasNull() else it
 
 
+class HERON_Patient_Mapping(UploadTask):
+    patient_ide_source = pv.StrParam()
+    # ISSUE: task id should depend on HERON release, too
+    classpath = pv.StrParam(significant=False)
+
+    @property
+    def transform_name(self) -> str:
+        return 'load_epic_dimensions'
+
+    @property
+    def source_cd(self) -> str:
+        return self.patient_ide_source
+
+    @property
+    def label(self) -> str:
+        raise NotImplementedError(self)
+
+    def run(self):
+        raise NotImplementedError('load_epic_dimensions is a paver task')
+
+
 class NAACCR_Load(UploadTask):
     '''Map and load NAACCR patients, tumors / visits, and facts.
     '''
-    patient_ide_source = pv.StrParam(default='SMS@kumed.com')
     encounter_ide_source = pv.StrParam(default='tumor_registry@kumed.com')
     project_id = pv.StrParam(default='BlueHeron')
     dateCaseReportExported = pv.DateParam()
@@ -665,6 +708,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
     z_design_id = pv.StrParam('all obs')
     jdbc_driver_jar = pv.StrParam(significant=False)
+    log_dest = pv.PathParam(significant=False)
 
     script_name = 'naaccr_facts_load.sql'
     script = res.read_text(heron_load, script_name)
@@ -678,21 +722,28 @@ class NAACCR_Load(UploadTask):
         return self.jdbc_driver_jar
 
     def requires(self):
+        _configure_logging(self.log_dest)
+
         ff = NAACCR_FlatFile(
             dateCaseReportExported=self.dateCaseReportExported,
             npiRegistryId=self.npiRegistryId)
 
-        return [ff] + [
-            cls(db_url=self.db_url,
+        parts = {
+            cls.__name__: cls(
+                db_url=self.db_url,
                 user=self.user,
                 passkey=self.passkey,
                 dateCaseReportExported=self.dateCaseReportExported,
                 npiRegistryId=self.npiRegistryId)
             for cls in [NAACCR_Patients, NAACCR_Visits, NAACCR_Facts]
-        ]
+            }
+        return dict(parts, NAACCR_FlatFile=ff)
 
     def run_upload(self, conn, upload_id):
-        [ff] = self.requires()[:1]
+        parts = self.requires()
+        ff = parts['NAACCR_FlatFile']
+        pat = parts['NAACCR_Patients']
+
         self.run_script(
             conn, self.script_name, self.script,
             variables=dict(upload_id=upload_id,
@@ -702,13 +753,15 @@ class NAACCR_Load(UploadTask):
                                task_id=self.task_id,
                                source_cd=self.source_cd,
                                download_date=ff.dateCaseReportExported,
-                               patient_ide_source=self.patient_ide_source,
+                               patient_ide_source=pat.patient_ide_source,
                                encounter_ide_source=self.encounter_ide_source))
 
 
 if __name__ == '__main__':
     def _script_io():
-        _configure_logging()
+        from pathlib import Path
+
+        _configure_logging(Path('log/eliot.log'))
 
         with el.start_task(action_type='luigi.build'):
             luigi.build([NAACCR_Load()], local_scheduler=True)
