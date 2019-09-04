@@ -669,7 +669,8 @@ IO_TESTING and dups(_extract.select('sequenceNumberCentral',
 
 # %%
 class TumorKeys:
-    pat_ids = ['patientSystemIdHosp', 'patientIdNumber', 'accessionNumberHosp']
+    # issue: accessionNumberHosp is not unique
+    pat_ids = ['patientSystemIdHosp', 'patientIdNumber']
     pat_attrs = pat_ids + ['dateOfBirth', 'dateOfLastContact',
                            'sex', 'vitalStatus']
     tmr_ids = ['tumorRecordNumber']
@@ -980,7 +981,7 @@ if IO_TESTING:
 # %%
 class Account:
     def __init__(self, user: str, password: str,
-                 url: str = 'jdbc:oracle:thin:@localhost:8621:nheronB2',
+                 url: str = 'jdbc:oracle:thin:@localhost:8621:KUMC',
                  driver: str = "oracle.jdbc.OracleDriver") -> None:
         self.url = url
         db = url.split(':')[-1]

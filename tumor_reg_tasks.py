@@ -477,7 +477,7 @@ class NAACCR_Patients(_NAACCR_JDBC):
     """
     patient_ide_source = pv.StrParam(default='SMS@kumed.com')
     schema = pv.StrParam(default='NIGHTHERONDATA')
-    z_design_id = pv.StrParam('move patient_mapping to spark side')
+    z_design_id = pv.StrParam('skip accession')
     table_name = "NAACCR_PATIENTS"
 
     def requires(self):
