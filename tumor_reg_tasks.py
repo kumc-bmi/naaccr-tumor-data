@@ -45,6 +45,13 @@ def _configure_logging(dest='log/eliot.log'):
     el.to_file(open(dest, 'ab'))  # ISSUE: ambient
 
 
+def quiet_logs(sc):
+    # ack: FDS Aug 2015 https://stackoverflow.com/a/32208445
+    logger = sc._jvm.org.apache.log4j
+    logger.LogManager.getLogger("org"). setLevel(logger.Level.ERROR)
+    logger.LogManager.getLogger("akka").setLevel(logger.Level.ERROR)
+
+
 class Connection:
     # type stubs
     def createStatement():
@@ -312,6 +319,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
     @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
+        quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
 
         # oh for bind variables...
@@ -424,6 +432,7 @@ class _NAACCR_JDBC(SparkJDBCTask):
 
     @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
+        quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
         [ff] = self.requires()
         naaccr_text_lines = spark.read.text(str(ff.flat_file))
