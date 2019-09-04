@@ -326,7 +326,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
     @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
-        quiet_logs(sparkContext)
+        # quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
 
         # oh for bind variables...
@@ -441,7 +441,7 @@ class _NAACCR_JDBC(SparkJDBCTask):
 
     @el.log_call(include_args=None)
     def main(self, sparkContext, *_args):
-        quiet_logs(sparkContext)
+        # quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
         ff = self.requires()['NAACCR_FlatFile']
         naaccr_text_lines = spark.read.text(str(ff.flat_file))
