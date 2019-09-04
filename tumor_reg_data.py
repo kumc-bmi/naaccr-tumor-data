@@ -783,7 +783,7 @@ IO_TESTING and _patients.limit(10).toPandas()
 
 
 # %% [markdown]
-# ## Coded observations
+# ##  Observations
 
 # %%
 def melt(df: DataFrame,
@@ -804,63 +804,6 @@ def melt(df: DataFrame,
         func.col("_vars_and_vals")[x].alias(x) for x in [var_name, value_name]]
     return _tmp.select(*cols)
 
-
-# %%
-def naaccr_coded_obs(records: DataFrame, ty: DataFrame) -> DataFrame:
-    ty = ty.select('naaccrId', 'valtype_cd').distinct()  # ISSUE: loinc mapping is ambiguous
-    value_vars = [row.naaccrId for row in
-                  ty.where(ty.valtype_cd == '@').collect()]
-    # TODO: test data for morphTypebehavIcdO2 etc.
-    value_vars = [naaccrId for naaccrId in value_vars if naaccrId in records.columns]
-
-    dated = naaccr_dates(records, TumorKeys.dtcols)
-    df = melt(dated,
-              TumorKeys.key4 + TumorKeys.dtcols,
-              value_vars, var_name='naaccrId', value_name='code')
-    return df.where(func.trim(df.code) > '')
-
-
-if IO_TESTING:
-    _coded = naaccr_coded_obs(_extract.sample(True, 0.02),
-                              NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
-    _coded = TumorKeys.with_tumor_id(_coded)
-
-    _coded.createOrReplaceTempView('tumor_coded_value')
-# coded.explain()
-IO_TESTING and _coded.limit(10).toPandas().set_index(['recordId', 'naaccrId'])
-
-
-# %%
-def naaccr_coded_obs2(spark: SparkSession_T, items: DataFrame,
-                      rownum: str = 'rownum',
-                      naaccrId: str = 'naaccrId') -> DataFrame:
-    # TODO: test data for dateCaseCompleted, dateCaseLastChanged,
-    #       patientSystemIdHosp? abstractedBy?
-    # TODO: or: test that patientIdNumber, tumorRecordNumber is unique?
-    key_items = items.where(
-        items[naaccrId].isin(TumorKeys.key4 + TumorKeys.dtcols))
-    # return key_items
-    key_rows = naaccr_pivot(ddictDF(spark), key_items, [rownum])
-    # TODO: test data for dateCaseCompleted?
-    key_rows = naaccr_dates(key_rows, [c for c in TumorKeys.dtcols
-                                       if c in key_rows.columns])
-    coded_obs = (key_rows
-                 .join(items, items[rownum] == key_rows[rownum])
-                 .drop(items[rownum]))
-    coded_obs = (coded_obs
-                 .withColumnRenamed('rownum', 'recordId')
-                 # ISSUE: test data for these? make them optiona?
-                 .withColumn('abstractedBy', func.lit('@@'))
-                 .withColumn('dateCaseLastChanged', func.lit('@@')))
-    return coded_obs.withColumnRenamed('value', 'code')
-
-
-if IO_TESTING:
-    _tumor_coded_value = naaccr_coded_obs2(_spark,
-                                           tumorDF(_spark, NAACCR2.s100x))
-
-IO_TESTING and _tumor_coded_value.limit(15).toPandas().set_index(
-    ['recordId', 'naaccrId'])
 
 # %%
 naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
