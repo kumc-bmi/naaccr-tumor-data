@@ -124,15 +124,17 @@ See `client.cfg` for more details on luigi usage.
 
 ---
 
-### TODO: Coded concepts
+### Coded concepts
 
 Metadata for coded values is also work in progress.
 
   - HERON ETL was based on a NAACCR v12 MS Access DB that no longer seems to be
     maintained / published.
-  - exploring LOINC answer lists (from v11 and v12)
-  - well curated code-labels: [naaccr][PADOH] NAACCR reader in R by
-    N. Werth of PA Dept. of Health
+  - currently using a mix of:
+    - LOINC answer lists (from v11 and v12)
+    - well curated code-labels: [naaccr][PADOH] NAACCR reader in R by
+      N. Werth of PA Dept. of Health
+  - hope to incorporate codes from [imsweb/layout](https://github.com/imsweb/layout)
 
 ---
 
@@ -147,6 +149,7 @@ Metadata for coded values is also work in progress.
  - XML replaces flat file in 2020 (*IOU citation*)
  - Reading XML with Spark is straightforward
  - NAACCR XML WG meets alternate Fridays 11amET (e.g. Aug 2)
+ - [imsweb/layout](https://github.com/imsweb/layout) has sections, codes, etc.
 
 ---
 
