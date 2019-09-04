@@ -64,7 +64,7 @@ class SqlScriptError(IOError):
     def __init__(self, exc: Exception, fname: str, line: int, statement: SQL,
                  conn_label: str) -> None:
         message = '%s <%s>\n%s:%s:\n'
-        args = [repr(exc), conn_label, fname, line]
+        args = [exc, conn_label, fname, line]
         message += '%s'
         args += [statement]
 
