@@ -544,9 +544,10 @@ end
 as recode
 from per_tumor
 )
-select patientIdNumber
-     , recordId
-     , concat('SEER_SITE:', recode) concept_cd, '@' item_name
+select recordId
+     , patientIdNumber
+     , '@' naaccrId
+     , concat('SEER_SITE:', recode) concept_cd
      , '@' provider_id
      , start_date
      , '@' modifier_cd

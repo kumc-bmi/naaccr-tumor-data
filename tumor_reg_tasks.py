@@ -502,8 +502,9 @@ class NAACCR_Patients(_NAACCR_JDBC):
 class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
-    z_design_id = pv.StrParam('with seer; (%d)' % len(
-        td.ItemObs.naaccr_txform))
+    z_design_id = pv.StrParam('with seer; (%s, %s)' % (
+        hash(td.ItemObs.naaccr_txform),
+        hash(td.SEER_Recode.script)))
 
     def _data(self, spark, naaccr_text_lines):
         dd = tr_ont.ddictDF(spark)
@@ -690,7 +691,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
-    z_design_id = pv.StrParam('with SEER recode.')
+    z_design_id = pv.StrParam('with SEER recode union fix.')
 
     script_name = 'naaccr_facts_load.sql'
     script_deid_name = 'i2b2_facts_deid.sql'
