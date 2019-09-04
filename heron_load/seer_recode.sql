@@ -17,11 +17,18 @@ by way of seer_recode.py
 -- note mis-spelling of schema name: naacr
 select "Accession Number--Hosp" from naacr.extract where 1=0;
 
-create or replace view seer_recode_aux as
-select MRN
-     , ne.case_index
-     , start_date
-     , ne.site, ne.histology,
+create or replace temporary view seer_recode_facts as
+with per_tumor as (
+select primarySite as site, histologicTypeIcdO3 as histology
+  -- ISSUE: histologyIcdO2, histologyIcdO1
+     , patientIdNumber
+     , dateOfDiagnosis start_date
+     , coalesce(dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis) update_date
+     , recordId
+from naaccr_extract_id
+),
+with_recode as (
+select per_tumor.*,
 case
 /* Lip */ when (site between 'C000' and 'C009')
   and  not (histology between '9050' and '9055'
@@ -535,38 +542,24 @@ case
 end
 
 as recode
-from
- (select ne."Patient ID Number" as MRN
-       , ne.case_index
-       , ne."Primary Site" as site
-       , substr(ne."Morph--Type&Behav ICD-O-3", 1, 4) histology
-       , coalesce( to_date_noex(ne."Date of Diagnosis", 'YYYYMMDD')
-                 , to_date_noex(ne."Date of Diagnosis", 'MMDDYYYY')
-                 , to_date_noex(ne."Date of Diagnosis", 'YYYYMM')
-                 , to_date_noex(ne."Date of Diagnosis", 'YYYY')) as start_date
-  from naacr.extract ne
-  where ne."Date of Diagnosis" is not null
-    and ne."Accession Number--Hosp" is not null) ne
-where start_date is not null;
-
-
-create or replace view seer_recode_facts as
-select MRN
-     , ne.case_index as encounter_ide
-     , 'SEER_SITE:' || recode concept_cd, '@' item_name
+from per_tumor
+)
+select patientIdNumber
+     , recordId
+     , concat('SEER_SITE:', recode) concept_cd, '@' item_name
      , '@' provider_id
      , start_date
      , '@' modifier_cd
      , 1 instance_num
      , '@' as valtype_cd
      , '@' as tval_char
-     , to_number(null) as nval_num
+     , cast(null as float) as nval_num
      , null as valueflag_cd
      , null as units_cd
      , start_date as end_date
      , '@' location_cd
-     , to_date(null) as update_date
-from seer_recode_aux ne;
+     , update_date
+from with_recode ne;
 
 
 create or replace view cs_site_factor_facts as

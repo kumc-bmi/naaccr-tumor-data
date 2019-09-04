@@ -502,20 +502,15 @@ class NAACCR_Patients(_NAACCR_JDBC):
 class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
-    naaccr_ddict = pv.PathParam(significant=False)
-
-    raw_view = 'naaccr_obs_raw'  # in
-    naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
-    item_view = 'tumor_item_value'
-    fact_view = 'tumor_reg_facts'  # out
-
-    z_design_id = pv.StrParam('de-dup 1646; (%d)' % len(naaccr_txform))
+    z_design_id = pv.StrParam('with seer; (%d)' % len(
+        td.ItemObs.naaccr_txform))
 
     def _data(self, spark, naaccr_text_lines):
-        return td.naaccr_observations(spark, naaccr_text_lines,
-                                      raw_view=self.raw_view,
-                                      item_view=self.item_view,
-                                      fact_view=self.fact_view)
+        dd = tr_ont.ddictDF(spark)
+        extract = td.naaccr_read_fwf(naaccr_text_lines, dd)
+        item = td.ItemObs.make(spark, extract)
+        seer = td.SEER_Recode.make(spark, extract)
+        return item.union(seer)
 
 
 class UploadTask(JDBCTask):
@@ -695,7 +690,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
-    z_design_id = pv.StrParam('deid, compress; cast timestamp')
+    z_design_id = pv.StrParam('with SEER recode.')
 
     script_name = 'naaccr_facts_load.sql'
     script_deid_name = 'i2b2_facts_deid.sql'

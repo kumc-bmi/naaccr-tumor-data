@@ -127,7 +127,8 @@ IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
 # %%
 if IO_TESTING:
     _spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
-    _ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict', _cwd / ',seer_site_recode.txt')  ## TODO: seer recode
+    _ont = NAACCR_I2B2.ont_view_in(_spark)  ## TODO: seer recode
+    # _ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict', _cwd / ',seer_site_recode.txt')  ## TODO: seer recode
 IO_TESTING and _ont.limit(5).toPandas()
 
 # %% [markdown]
@@ -143,10 +144,7 @@ from ndd180 as idef
 # Add year implemented, retired from chapter 10...
 
 # %%
-if IO_TESTING:
-    ScrapedChapters.make_in(_spark, _cwd / 'naaccr_ddict')
-
-IO_TESTING and _spark.sql('''
+False and _spark.sql('''
 select yr_retired, count(*)
 from item_description idesc
 where xmlId is null
@@ -160,7 +158,7 @@ order by yr_retired
 # Well, that's what [the spec](http://datadictionary.naaccr.org/default.aspx?c=10) says.
 
 # %%
-IO_TESTING and _spark.sql('''
+False and _spark.sql('''
 select *
 from item_description idesc
 where yr_impl = '366'
@@ -187,12 +185,12 @@ LOINC_NAACCR.measure.groupby('SCALE_TYP')[['COMPONENT']].count()
 if IO_TESTING:
     LOINC_NAACCR.measure_in(_spark)
 
-IO_TESTING and  _spark.sql('''
+False and  _spark.sql('''
 with check as (
 select idesc.yr_impl, idesc.yr_retired
      , case when ln.code_value is null then 0 else 1 end as has_loinc
 from ndd180 v18
-left join item_description idesc on idesc.item = v18.naaccrNum
+left join record_layout rl on rl.`naaccr-item-num` = v18.naaccrNum
 left join loinc_naaccr ln on ln.code_value = v18.naaccrNum
 )
 select yr_impl, yr_retired, has_loinc, count(*) from check
@@ -246,10 +244,10 @@ order by has_r
 
 # %%
 IO_TESTING and _spark.sql('''
-select rl.section, type, nd.length, count(*), collect_list(rl.item), collect_list(naaccrId)
+select rl.section, type, nd.length, count(*), collect_list(rl.`naaccr-item-num`), collect_list(naaccrId)
 from ndd180 nd
 left join field_info f on f.item = nd.naaccrNum
-left join record_layout rl on rl.item = nd.naaccrNum
+left join record_layout rl on rl.`naaccr-item-num` = nd.naaccrNum
 group by section, type, nd.length
 order by section, type, nd.length
 ''').toPandas()
@@ -258,12 +256,8 @@ order by section, type, nd.length
 # ### Mix naaccr-xml, LOINC, and Werth
 
 # %%
-import importlib
-import tumor_reg_ont
-importlib.reload(tumor_reg_ont)
-
-# %%
-IO_TESTING and tumor_reg_ont.NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict').limit(5).toPandas()
+if IO_TESTING:
+    _spark.createDataFrame(NAACCR_I2B2.tumor_item_type).createOrReplaceTempView('tumor_item_type')
 
 # %% [markdown]
 # #### Any missing?
@@ -296,15 +290,6 @@ from tumor_item_type
 group by naaccrId
 having count(*) > 1
 ''').toPandas()
-
-
-# %%
-def coded_items(tumor_item_type: DataFrame) -> DataFrame:
-    return tumor_item_type.where("valtype_cd = '@'")
-
-
-IO_TESTING and (coded_items(NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict'))
-                .toPandas().tail())
 
 
 # %%
@@ -541,7 +526,7 @@ def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
     """
     @param flat_file: as from spark.read.text()
                       typically with .value
-    @param itemDefs: see ddictDF
+    @param itemDefs: see ddictDF. ISSUE: should just use static CSV data now.
     """
     fields = [
         func.substring(flat_file[value_col],
@@ -575,13 +560,13 @@ def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
     return tumors.sample(False, portion).select(colnames)
 
 
-if IO_TESTING:
+if False and IO_TESTING:
     _cancer_id = cancerIdSample(_spark, _cwd / 'naaccr_ddict', _extract)
 
-IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
+False and IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
 
 # %%
-IO_TESTING and _cancer_id.toPandas().describe()
+False and IO_TESTING and _cancer_id.toPandas().describe()
 
 
 # %% [markdown]
@@ -779,12 +764,6 @@ if IO_TESTING:
 IO_TESTING and (_pat_tmr, _patients)
 
 # %%
-if IO_TESTING:
-    _patients_mapped = TumorKeys.with_patient_num(_patients, _spark, _cdw, 'NIGHTHERONDATA', 'SMS@kumed.com')
-
-IO_TESTING and _patients_mapped.limit(5).toPandas()
-
-# %%
 IO_TESTING and _pat_tmr.limit(15).toPandas()
 
 # %%
@@ -815,20 +794,7 @@ def melt(df: DataFrame,
 
 
 # %%
-naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
 if IO_TESTING:
-    _tumor_coded_value.createOrReplaceTempView('tumor_coded_value')  # ISSUE: CLOBBER!
-    create_object('tumor_reg_coded_facts', naaccr_txform, _spark)
-    _tumor_reg_coded_facts = _spark.table('tumor_reg_coded_facts')
-    _tumor_reg_coded_facts.printSchema()
-
-# TODO: check for nulls in update_date, start_date, end_date, etc.
-IO_TESTING and _tumor_reg_coded_facts.limit(5).toPandas()
-
-# %%
-if IO_TESTING:
-    _ty = NAACCR_I2B2.tumor_item_type(_spark, _cwd / 'naaccr_ddict')
-    _ty.toPandas().set_index('naaccrNum').to_csv('heron_load/tumor_item_type.csv')
     _ty = _spark.read.csv('heron_load/tumor_item_type.csv',
                           header=True, inferSchema=True)
     _ty.cache()
@@ -871,35 +837,54 @@ if IO_TESTING:
     create_object('tumor_reg_facts', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
 IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(20).toPandas()
 
+
 # %%
-naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
+class ItemObs:
+    naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
+    raw_view = 'naaccr_obs_raw'
+    item_view = 'tumor_item_value'
+    fact_view = 'tumor_reg_facts'
 
-def naaccr_observations(spark, naaccr_text_lines,
-                        raw_view='naaccr_obs_raw',
-                        item_view='tumor_item_value',
-                        fact_view='tumor_reg_facts'):
-    dd = ddictDF(spark)
-    extract = naaccr_read_fwf(naaccr_text_lines, dd)
+    @classmethod
+    def make(cls, spark, extract):
+        item_ty = NAACCR_I2B2.item_views_in(spark)
 
-    item_ty = NAACCR_I2B2.item_views_in(spark)
+        raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
+            stack_obs(extract, item_ty),
+            TumorKeys.dtcols))
+        raw_obs.createOrReplaceTempView(cls.raw_view)
 
-    raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
-        stack_obs(extract, item_ty),
-        TumorKeys.dtcols))
-    raw_obs.createOrReplaceTempView(raw_view)
+        create_object(cls.item_view, cls.naaccr_txform, spark)
+        create_object(cls.fact_view, cls.naaccr_txform, spark)
 
-    create_object(
-        item_view, naaccr_txform, spark)
-
-    create_object(
-        fact_view, naaccr_txform, spark)
-
-    data = spark.table(fact_view)
-    return data
+        data = spark.table(cls.fact_view)
+        return data
 
 if IO_TESTING:
-    _obs = naaccr_observations(_spark, _naaccr_text_lines)
+    _obs = ItemObs.make(_spark, _extract)
 IO_TESTING and _obs.limit(5).toPandas()
+
+
+# %% [markdown]
+# ## SEER Site Recode
+
+# %%
+class SEER_Recode:
+    script = res.read_text(heron_load, 'seer_recode.sql')
+    extract_view = 'naaccr_extract_id'
+    fact_view = 'seer_recode_facts'
+
+    @classmethod
+    def make(cls, spark, extract):
+        extract_id = TumorKeys.with_tumor_id(
+            naaccr_dates(extract, TumorKeys.dtcols))
+        extract_id.createOrReplaceTempView(cls.extract_view)
+
+        create_object(cls.fact_view, cls.script, spark)
+
+        return spark.table(cls.fact_view)
+
+IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
 
 # %% [markdown]
 # ## Oracle DB Access
@@ -979,6 +964,12 @@ def case_fold(df):
 if IO_TESTING:
     _cdw.wr(_tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
              mode='overwrite')
+
+# %%
+if IO_TESTING:
+    _patients_mapped = TumorKeys.with_patient_num(_patients, _spark, _cdw, 'NIGHTHERONDATA', 'SMS@kumed.com')
+
+IO_TESTING and _patients_mapped.limit(5).toPandas()
 
 
 # %% [markdown]

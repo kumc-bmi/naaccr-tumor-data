@@ -137,8 +137,6 @@ select * from (
 from (select * from naaccr_observations
 /* TODO
       union all
-      select * from seer_recode_facts
-      union all
       select * from cs_site_factor_facts*/) tf
 ) where patient_num is not null
 ;
