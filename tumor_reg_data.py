@@ -760,7 +760,7 @@ class TumorKeys:
             and ltrim(pmap.patient_ide, '0') = ltrim(ea."{id_col}", '0')
         )'''
         src_map = cdw.rd(spark.read, q)
-        out = df.join(src_map, df[id_col] == src_map[id_col])
+        out = df.join(src_map, df[id_col] == src_map[id_col], how='left')
         out = out.drop(src_map[id_col])
         out = out.withColumnRenamed('PATIENT_NUM', 'patient_num')
         return out

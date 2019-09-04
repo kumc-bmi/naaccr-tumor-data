@@ -113,7 +113,8 @@ insert /*+ append*/ into observation_fact_&&upload_id
   , download_date
   , sourcesystem_cd
   )
-select
+select * from (
+  select
     -- use sub-select to be sure cardinality doesn't change
     (select encounter_num
      from naaccr_tumors t
@@ -138,6 +139,7 @@ from (select * from naaccr_observations
       select * from seer_recode_facts
       union all
       select * from cs_site_factor_facts*/) tf
+) where patient_num is not null
 ;
 
 commit;

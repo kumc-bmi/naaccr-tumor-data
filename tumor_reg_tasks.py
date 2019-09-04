@@ -477,7 +477,7 @@ class NAACCR_Patients(_NAACCR_JDBC):
     """
     patient_ide_source = pv.StrParam(default='SMS@kumed.com')
     schema = pv.StrParam(default='NIGHTHERONDATA')
-    z_design_id = pv.StrParam('skip accession')
+    z_design_id = pv.StrParam('keep unmapped patients')
     table_name = "NAACCR_PATIENTS"
 
     def requires(self):
@@ -706,7 +706,7 @@ class NAACCR_Load(UploadTask):
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
-    z_design_id = pv.StrParam('all obs')
+    z_design_id = pv.StrParam('all obs; all patients')
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
 
