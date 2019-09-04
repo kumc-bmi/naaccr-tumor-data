@@ -652,7 +652,6 @@ naaccrNum,sectionId,section,naaccrId,naaccrName,length,source,loinc_num,scale_ty
 1639,15,Treatment-1st Course,rxSummSystemicSurSeq,RX Summ--Systemic/Sur Seq,1,CoC,42039-8,Nom,,rxSummSystemicSurSeq,@,
 1640,15,Treatment-1st Course,rxSummSurgeryType,RX Summ--Surgery Type,2,SEER,21968-3,Nom,,,@,
 1646,15,Treatment-1st Course,rxSummSurgSite9802,RX Summ--Surg Site 98-02,2,SEER/CoC,42040-6,Nom,LL124-9,,@,
-1646,15,Treatment-1st Course,rxSummSurgSite9802,RX Summ--Surg Site 98-02,2,SEER/CoC,39807-3,Nom,LL124-9,,@,
 1647,15,Treatment-1st Course,rxSummScopeReg9802,RX Summ--Scope Reg 98-02,1,SEER/CoC,42041-4,Nom,,,@,
 1648,15,Treatment-1st Course,rxSummSurgOth9802,RX Summ--Surg Oth 98-02,1,SEER/CoC,42042-2,Nom,,,@,
 3170,15,Treatment-1st Course,rxDateMostDefinSurg,RX Date Mst Defn Srg,8,CoC,39808-1,Qn,,,D,
