@@ -502,7 +502,7 @@ class NAACCR_Patients(_NAACCR_JDBC):
 class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
-    z_design_id = pv.StrParam('with seer; (%s, %s)' % (
+    z_design_id = pv.StrParam('with seer, ssf; (%s, %s)' % (
         hash(td.ItemObs.naaccr_txform),
         hash(td.SEER_Recode.script)))
 
@@ -511,7 +511,8 @@ class NAACCR_Facts(_NAACCR_JDBC):
         extract = td.naaccr_read_fwf(naaccr_text_lines, dd)
         item = td.ItemObs.make(spark, extract)
         seer = td.SEER_Recode.make(spark, extract)
-        return item.union(seer)
+        ssf = td.SiteSpecificFactors.make(spark, extract)
+        return item.union(seer).union(ssf)
 
 
 class UploadTask(JDBCTask):
@@ -684,14 +685,20 @@ class HERON_Patient_Mapping(UploadTask):
 class NAACCR_Load(UploadTask):
     '''Map and load NAACCR patients, tumors / visits, and facts.
     '''
-    encounter_ide_source = pv.StrParam(default='tumor_registry@kumed.com')
-    project_id = pv.StrParam(default='BlueHeron')
+    # flat file attributes
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
+
+    # encounter mapping
+    encounter_ide_source = pv.StrParam(default='tumor_registry@kumed.com')
+    project_id = pv.StrParam(default='BlueHeron')
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
+
+    # ISSUE: task_id should depend on dest schema / owner.
+    z_design_id = pv.StrParam('with SEER, ssf')
+
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
-    z_design_id = pv.StrParam('with SEER recode union fix.')
 
     script_name = 'naaccr_facts_load.sql'
     script_deid_name = 'i2b2_facts_deid.sql'

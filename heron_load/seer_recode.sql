@@ -11,18 +11,15 @@ by way of seer_recode.py
   http://informatics.kumc.edu/work/browser/tumor_reg/seer_recode.py
  */
 
-create or replace temporary view seer_recode_facts as
+create or replace temporary view seer_recode_aux as
 with per_tumor as (
 select primarySite as site, histologicTypeIcdO3 as histology
   -- ISSUE: histologyIcdO2, histologyIcdO1
-     , patientIdNumber
-     , dateOfDiagnosis start_date
-     , coalesce(dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis) update_date
-     , recordId
-from naaccr_extract_id
-),
-with_recode as (
-select per_tumor.*,
+     , ne.*
+from naaccr_extract_id ne
+)
+
+select
 case
 /* Lip */ when (site between 'C000' and 'C009')
   and  not (histology between '9050' and '9055'
@@ -532,12 +529,24 @@ case
    or histology = '9140'
    or histology between '9590' and '9992') then '37000'
 
-/* Invalid */ else '99999'
 end
 
 as recode
+, per_tumor.*
 from per_tumor
+;
+
+
+create or replace temporary view seer_recode_facts as
+with per_tumor as (
+select recordId
+     , patientIdNumber
+     , recode
+     , dateOfDiagnosis start_date
+     , coalesce(dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis) update_date
+from seer_recode_aux
 )
+
 select recordId
      , patientIdNumber
      , '@' naaccrId
@@ -554,37 +563,42 @@ select recordId
      , start_date as end_date
      , '@' location_cd
      , update_date
-from with_recode ne
+from per_tumor ne
 where start_date is not null
 ;
 
 
-create or replace view cs_site_factor_facts as
-with ssf_item as (
-  select min(itemnbr) lo, max(itemnbr) hi
-  from tumor_item_type
-  where itemname like 'CS Site-Specific Factor%'
+create or replace temporary view cs_site_factor_facts as
+with per_obs as (
+select recordId
+     , patientIdNumber
+     , recode
+     , naaccrId
+     , raw_value
+     , dateOfDiagnosis start_date
+     , coalesce(dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis) update_date
+from cs_obs_raw
 )
-select sra.mrn
-     , sra.case_index
-     , 'CS' || sra.recode || '|' ||
-       substr(ssf.itemname, length('CS Site-Specific Factor 1')) ||
-       ':' || ssf.codenbr concept_cd, '@' item_name
+select recordId
+     , patientIdNumber
+     , '@' naaccrId
+     , concat('CS', sra.recode, '|',
+              substr(sra.naaccrId, length('csSiteSpecificFactor1')),
+              ':', sra.raw_value) concept_cd
      , '@' provider_id
      , sra.start_date
      , '@' modifier_cd  -- hmm... modifier for synthesized info?
      , 1 instance_num
      , '@' valtype_cd
-     , null tval_char
-     , to_number(null) nval_num
-     , null as valueflag_cd
-     , null as units_cd
+     , cast(null as string) as tval_char
+     , cast(null as float) as nval_num
+     , cast(null as string) as valueflag_cd
+     , cast(null as string) as units_cd
      , sra.start_date as end_date
      , '@' location_cd
-     , to_date(null) as update_date
-from tumor_item_value ssf
-join seer_recode_aux sra on sra.case_index = ssf.case_index
-join ssf_item on itemnbr between ssf_item.lo and ssf_item.hi
+     , update_date
+from per_obs sra
+where start_date is not null
 ;
 
 

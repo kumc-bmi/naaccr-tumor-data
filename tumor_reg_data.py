@@ -873,18 +873,68 @@ class SEER_Recode:
     script = res.read_text(heron_load, 'seer_recode.sql')
     extract_view = 'naaccr_extract_id'
     fact_view = 'seer_recode_facts'
+    aux_view = 'seer_recode_aux'
 
     @classmethod
     def make(cls, spark, extract):
-        extract_id = TumorKeys.with_tumor_id(
-            naaccr_dates(extract, TumorKeys.dtcols))
-        extract_id.createOrReplaceTempView(cls.extract_view)
-
+        cls.make_aux(spark, extract)
         create_object(cls.fact_view, cls.script, spark)
 
         return spark.table(cls.fact_view)
 
+    @classmethod
+    def make_aux(cls, spark, extract):
+        extract_id = TumorKeys.with_tumor_id(
+            naaccr_dates(extract, TumorKeys.dtcols))
+        extract_id.createOrReplaceTempView(cls.extract_view)
+
+        create_object(cls.aux_view, cls.script, spark)
+        return spark.table(cls.aux_view)
+
 IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
+
+# %%
+IO_TESTING and SEER_Recode.make_aux(_spark, _extract).limit(5).toPandas()
+
+# %%
+from pyspark.sql import Row
+
+class SiteSpecificFactors:
+    raw_view = 'cs_obs_raw'
+    fact_view = 'cs_site_factor_facts'
+    script = SEER_Recode.script
+    script = res.read_text(heron_load, 'seer_recode.sql') #@@
+
+    items = [it for it in NAACCR1.items_180()
+             if it['naaccrName'].startswith('CS Site-Specific Factor')]
+
+    @classmethod
+    def valtypes(cls):
+        factor_nums = [d['naaccrNum'] for d in cls.items]
+        item_ty = NAACCR_I2B2.tumor_item_type[['naaccrNum', 'naaccrId', 'valtype_cd']]
+        item_ty = item_ty[item_ty.naaccrNum.isin(factor_nums)]
+        return item_ty
+
+    @classmethod
+    def make(cls, spark, extract):
+        ty_df = spark.createDataFrame(cls.valtypes())
+
+        with_recode = SEER_Recode.make_aux(spark, extract)
+        raw_obs = stack_obs(with_recode, ty_df,
+                            key_cols=TumorKeys.key4 + TumorKeys.dtcols + ['recordId', 'recode'])
+        raw_obs.createOrReplaceTempView(cls.raw_view)
+
+        create_object(cls.fact_view, cls.script, spark)
+
+        data = spark.table(cls.fact_view)
+        return data
+
+
+if IO_TESTING:
+    _ssf_facts = SiteSpecificFactors.make(_spark, _extract)
+    assert _obs.columns == _ssf_facts.columns
+
+IO_TESTING and _ssf_facts.limit(7).toPandas()
 
 # %% [markdown]
 # ## Oracle DB Access

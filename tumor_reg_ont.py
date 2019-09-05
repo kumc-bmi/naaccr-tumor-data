@@ -23,6 +23,55 @@ import naaccr_xml_xsd
 log = logging.getLogger(__name__)
 
 
+class XSD:
+    uri = 'http://www.w3.org/2001/XMLSchema'
+    ns = {'xsd': uri}
+
+    @classmethod
+    def the(cls, elt: XML.Element, path: str,
+            ns: Dict[str, str] = ns) -> XML.Element:
+        """Get _the_ match for an XPath expression on an Element.
+
+        The XML.Element.find() method may return None, but when
+        we're dealing with static data that we know matches,
+        we can refine the type by asserting that there's a match.
+
+        """
+        found = elt.find(path, ns)
+        assert found, (elt, path)
+        return found
+
+    types = {
+        'xsd:integer': int,
+        'xsd:boolean': bool,
+    }
+
+    @classmethod
+    def decoder(cls, field_type):
+        """
+        >>> decode = XSD.decoder({
+        ...     'naaccrId': 'xsd:ID',
+        ...     'naaccrNum': 'xsd:integer',
+        ...     'naaccrName': 'xsd:string',
+        ...     'allowUnlimitedText': 'xsd:boolean',
+        ... })
+        >>> decode({
+        ...     'naaccrId': 'recordType',
+        ...     'naaccrNum': '10',
+        ...     'naaccrName': 'RT',
+        ... })
+        {'naaccrId': 'recordType', 'naaccrNum': 10, 'naaccrName': 'RT'}
+        """
+        def decode(record_raw):
+            return {
+                k: f(v)
+                for (k, v) in record_raw.items()
+                for f in [cls.types.get(field_type.get(k),
+                                        lambda x: x)]
+            }
+        return decode
+
+
 def _int_fields(record, fields):
     return {k: int(v) if k in fields else v
             for k, v in record.items()}
@@ -110,25 +159,6 @@ def _parse_html_fragment(path):
     return XML.fromstring(markup)
 
 
-class XSD:
-    uri = 'http://www.w3.org/2001/XMLSchema'
-    ns = {'xsd': uri}
-
-    @classmethod
-    def the(cls, elt: XML.Element, path: str,
-            ns: Dict[str, str] = ns) -> XML.Element:
-        """Get _the_ match for an XPath expression on an Element.
-
-        The XML.Element.find() method may return None, but when
-        we're dealing with static data that we know matches,
-        we can refine the type by asserting that there's a match.
-
-        """
-        found = elt.find(path, ns)
-        assert found, (elt, path)
-        return found
-
-
 class NAACCR1:
     """NAACCR XML assets
 
@@ -169,6 +199,15 @@ class NAACCR1:
         <xs:attribute name="recordTypes" type="xsd:string" use="optional" />
       </xs:complexType>
     </xs:element>
+
+    >>> list(NAACCR1.items_180())[:3]
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [{'naaccrId': 'recordType', 'naaccrNum': 10,
+      'naaccrName': 'Record Type',
+      'startColumn': 1, 'length': 1, 'recordTypes': 'A,M,C,I',
+      'parentXmlElement': 'NaaccrData'},
+     {'naaccrId': 'registryType', 'naaccrNum': 30, ...},
+     {'naaccrId': 'naaccrRecordVersion', 'naaccrNum': 50, ...}]
     """
     dd13_xsd = XML.parse(res.open_text(
         naaccr_xml_xsd, 'naaccr_dictionary_1.3.xsd'))
@@ -198,6 +237,19 @@ class NAACCR1:
         defPath = f'./n:ItemDefs/n:ItemDef[@naaccrId="{naaccrId}"]'
         return ndd.find(defPath, cls.ns)
 
+    @classmethod
+    def items_180(cls):
+        xsd_ty = XSD.the(cls.ItemDef, '*')
+        decls = xsd_ty.findall('xsd:attribute', XSD.ns)
+        to_type = {
+            d.attrib['name']: d.attrib['type']
+            for d in decls
+        }
+        decoder = XSD.decoder(to_type)
+
+        defs = cls.ndd180.iterfind('./n:ItemDefs/n:ItemDef', cls.ns)
+        return (decoder(elt.attrib) for elt in defs)
+
 
 def eltSchema(xsd_complex_type: XML.Element,
               simpleContent: bool = False) -> ty.StructType:
@@ -217,6 +269,9 @@ def eltSchema(xsd_complex_type: XML.Element,
         fields = fields + [ty.StructField('value', ty.StringType(), False)]
     return ty.StructType(fields)
 
+
+RawRecordMaker = Callable[[XML.Element, bool],
+                          Iterator[Dict[str, str]]]
 
 RecordMaker = Callable[[XML.Element, ty.StructType, bool],
                        Iterator[Dict[str, object]]]
@@ -254,6 +309,7 @@ def xmlRecords(schema: ty.StructType,
 
 def eltDict(elt: XML.Element, schema: ty.StructType,
             simpleContent: bool = False) -> Iterator[Dict[str, object]]:
+    # ISSUE: schema should be replace by function decode(k, v)
     out = {k: int(v) if isinstance(schema[k].dataType, ty.IntegerType)
            else bool(v) if isinstance(schema[k].dataType, ty.BooleanType)
            else v
