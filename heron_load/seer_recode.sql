@@ -1,8 +1,6 @@
 /** seer_recode -- recode primary site, histology into SEER site summary
 
-Copyright (c) 2012-2013 University of Kansas Medical Center
-part of the HERON* open source codebase; see NOTICE file for license details.
-* http://informatics.kumc.edu/work/wiki/HERON
+Copyright (c) 2012-2019 University of Kansas Medical Center
 
 Largely derived from:
   SEER Site Recode ICD-O-3 (1/27/2003) Definition 
@@ -12,10 +10,6 @@ by way of seer_recode.py
 
   http://informatics.kumc.edu/work/browser/tumor_reg/seer_recode.py
  */
-
--- test that we're in the KUMC sid with the NAACCR data
--- note mis-spelling of schema name: naacr
-select "Accession Number--Hosp" from naacr.extract where 1=0;
 
 create or replace temporary view seer_recode_facts as
 with per_tumor as (
