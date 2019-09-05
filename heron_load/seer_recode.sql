@@ -560,7 +560,9 @@ select recordId
      , start_date as end_date
      , '@' location_cd
      , update_date
-from with_recode ne;
+from with_recode ne
+where start_date is not null
+;
 
 
 create or replace view cs_site_factor_facts as
