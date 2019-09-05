@@ -565,6 +565,7 @@ select recordId
      , update_date
 from per_tumor ne
 where start_date is not null
+and recode is not null
 ;
 
 
@@ -599,6 +600,8 @@ select recordId
      , update_date
 from per_obs sra
 where start_date is not null
+and recode is not null
+and trim(sra.raw_value) > ''
 ;
 
 
