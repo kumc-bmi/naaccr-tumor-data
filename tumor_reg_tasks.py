@@ -502,9 +502,10 @@ class NAACCR_Patients(_NAACCR_JDBC):
 class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
-    z_design_id = pv.StrParam('with seer, ssf; (%s, %s)' % (
-        hash(td.ItemObs.naaccr_txform),
-        hash(td.SEER_Recode.script)))
+    z_design_id = pv.StrParam('with seer, ssf; (%s)' % hash(
+        (td.ItemObs.naaccr_txform,
+         td.SEER_Recode.script,
+         td.SiteSpecificFactors.script)))
 
     def _data(self, spark, naaccr_text_lines):
         dd = tr_ont.ddictDF(spark)
@@ -512,6 +513,7 @@ class NAACCR_Facts(_NAACCR_JDBC):
         item = td.ItemObs.make(spark, extract)
         seer = td.SEER_Recode.make(spark, extract)
         ssf = td.SiteSpecificFactors.make(spark, extract)
+        # ISSUE: make these separate tables?
         return item.union(seer).union(ssf)
 
 
@@ -695,7 +697,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
 
     # ISSUE: task_id should depend on dest schema / owner.
-    z_design_id = pv.StrParam('with SEER, ssf; non null')
+    z_design_id = pv.StrParam('with SEER, ssf names')
 
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)

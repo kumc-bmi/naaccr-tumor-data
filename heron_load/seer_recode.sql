@@ -569,42 +569,6 @@ and recode is not null
 ;
 
 
-create or replace temporary view cs_site_factor_facts as
-with per_obs as (
-select recordId
-     , patientIdNumber
-     , recode
-     , naaccrId
-     , raw_value
-     , dateOfDiagnosis start_date
-     , coalesce(dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis) update_date
-from cs_obs_raw
-)
-select recordId
-     , patientIdNumber
-     , '@' naaccrId
-     , concat('CS', sra.recode, '|',
-              substr(sra.naaccrId, length('csSiteSpecificFactor1')),
-              ':', sra.raw_value) concept_cd
-     , '@' provider_id
-     , sra.start_date
-     , '@' modifier_cd  -- hmm... modifier for synthesized info?
-     , 1 instance_num
-     , '@' valtype_cd
-     , cast(null as string) as tval_char
-     , cast(null as float) as nval_num
-     , cast(null as string) as valueflag_cd
-     , cast(null as string) as units_cd
-     , sra.start_date as end_date
-     , '@' location_cd
-     , update_date
-from per_obs sra
-where start_date is not null
-and recode is not null
-and trim(sra.raw_value) > ''
-;
-
-
 /*
 select count(*), concept_cd
 from seer_recode_facts

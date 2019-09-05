@@ -524,9 +524,10 @@ class NAACCR_I2B2(object):
         return df
 
 
-def create_object(name: str, script: str, spark: SparkSession_T) -> None:
+def create_object(name: str, script: str, spark: SparkSession_T) -> DataFrame:
     ddl = SqlScript.find_ddl(name, script)
     spark.sql(ddl)
+    return spark.table(name)
 
 
 def csv_view(spark: SparkSession_T, path: Path_T,

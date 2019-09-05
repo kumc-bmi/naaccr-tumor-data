@@ -845,6 +845,8 @@ class ItemObs:
     item_view = 'tumor_item_value'
     fact_view = 'tumor_reg_facts'
 
+    extract_id_view = 'naaccr_extract_id'
+
     @classmethod
     def make(cls, spark, extract):
         item_ty = NAACCR_I2B2.item_views_in(spark)
@@ -860,9 +862,19 @@ class ItemObs:
         data = spark.table(cls.fact_view)
         return data
 
+    @classmethod
+    def make_extract_id(cls, spark, extract):
+        extract_id = TumorKeys.with_tumor_id(
+            naaccr_dates(extract, TumorKeys.dtcols))
+        extract_id.createOrReplaceTempView(cls.extract_id_view)
+        return spark.table(cls.extract_id_view)
+
 if IO_TESTING:
     _obs = ItemObs.make(_spark, _extract)
 IO_TESTING and _obs.limit(5).toPandas()
+
+# %%
+IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 
 
 # %% [markdown]
@@ -871,39 +883,32 @@ IO_TESTING and _obs.limit(5).toPandas()
 # %%
 class SEER_Recode:
     script = res.read_text(heron_load, 'seer_recode.sql')
-    extract_view = 'naaccr_extract_id'
     fact_view = 'seer_recode_facts'
     aux_view = 'seer_recode_aux'
 
     @classmethod
     def make(cls, spark, extract):
-        cls.make_aux(spark, extract)
-        create_object(cls.fact_view, cls.script, spark)
-
-        return spark.table(cls.fact_view)
-
-    @classmethod
-    def make_aux(cls, spark, extract):
-        extract_id = TumorKeys.with_tumor_id(
-            naaccr_dates(extract, TumorKeys.dtcols))
-        extract_id.createOrReplaceTempView(cls.extract_view)
-
+        extract_id = ItemObs.make_extract_id(spark, extract)
         create_object(cls.aux_view, cls.script, spark)
-        return spark.table(cls.aux_view)
+
+        create_object(cls.fact_view, cls.script, spark)
+        return spark.table(cls.fact_view)
 
 IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
 
 # %%
-IO_TESTING and SEER_Recode.make_aux(_spark, _extract).limit(5).toPandas()
+import importlib
+import tumor_reg_ont
+importlib.reload(tumor_reg_ont)
+from tumor_reg_ont import create_object
+
 
 # %%
-from pyspark.sql import Row
-
 class SiteSpecificFactors:
+    tumor_schema_view = 'tumor_cs_schema'
     raw_view = 'cs_obs_raw'
     fact_view = 'cs_site_factor_facts'
-    script = SEER_Recode.script
-    script = res.read_text(heron_load, 'seer_recode.sql') #@@
+    script = res.read_text(heron_load, 'csschema.sql')
 
     items = [it for it in NAACCR1.items_180()
              if it['naaccrName'].startswith('CS Site-Specific Factor')]
@@ -917,17 +922,19 @@ class SiteSpecificFactors:
 
     @classmethod
     def make(cls, spark, extract):
+        with_schema = cls.make_tumor_schema(spark, extract)
         ty_df = spark.createDataFrame(cls.valtypes())
 
-        with_recode = SEER_Recode.make_aux(spark, extract)
-        raw_obs = stack_obs(with_recode, ty_df,
-                            key_cols=TumorKeys.key4 + TumorKeys.dtcols + ['recordId', 'recode'])
+        raw_obs = stack_obs(with_schema, ty_df,
+                            key_cols=TumorKeys.key4 + TumorKeys.dtcols + ['recordId', 'cs_schema_name'])
         raw_obs.createOrReplaceTempView(cls.raw_view)
 
-        create_object(cls.fact_view, cls.script, spark)
+        return create_object(cls.fact_view, cls.script, spark)
 
-        data = spark.table(cls.fact_view)
-        return data
+    @classmethod
+    def make_tumor_schema(cls, spark, extract):
+        x = ItemObs.make_extract_id(spark, extract)
+        return create_object(cls.tumor_schema_view, cls.script, spark)
 
 
 if IO_TESTING:
