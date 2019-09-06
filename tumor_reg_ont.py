@@ -425,6 +425,11 @@ class NAACCR_I2B2(object):
     tumor_item_type = _fixna(pd.read_csv(res.open_text(
         heron_load, 'tumor_item_type.csv')))
 
+    tx_script = SqlScript(
+        'naaccr_txform.sql',
+        res.read_text(heron_load, 'naaccr_txform.sql'),
+        {})
+
     txform_script = res.read_text(heron_load, 'naaccr_txform.sql')
     # script inputs:
     v18_dict_view_name = 'ndd180'
@@ -437,18 +442,18 @@ class NAACCR_I2B2(object):
     # outputs
     per_item_view = 'tumor_item_type'
 
-    concept_script = res.read_text(heron_load, 'naaccr_concepts_load.sql')
-    # script outputs
-    aux_view = 'naaccr_ont_aux'
-    concept_views = [
-        'naaccr_code_values',
-        aux_view,
-        'naaccr_ontology',
-    ]
-    seer_aux_view = 'naaccr_ont_aux_seer'
-
     per_section = pd.read_csv(res.open_text(
         heron_load, 'section.csv'))
+
+    ont_script = SqlScript(
+        'naaccr_concepts_load.sql',
+        res.read_text(heron_load, 'naaccr_concepts_load.sql'),
+        [
+            ('naaccr_code_values', ['tumor_item_type', 'code_labels']),
+            ('naaccr_ont_aux', ['section', 'tumor_item_type']),
+            ('naaccr_ont_aux_seer', ['seer_site_terms']),
+            ('naaccr_ontology', []),
+        ])
 
     @classmethod
     def ont_view_in(cls, spark: SparkSession_T,
@@ -456,22 +461,27 @@ class NAACCR_I2B2(object):
         cls.item_views_in(spark)
 
         # Labels for coded values
-        NAACCR_R.code_labels_in(spark)
         LOINC_NAACCR.answers_in(spark)
 
-        for view in cls.concept_views:
-            create_object(view, cls.concept_script, spark)
-
         if recode:
-            cls.seer_terms_in(spark, recode)
-            create_object(cls.seer_aux_view, cls.concept_script, spark)
-            # replace aux view
-            aux = spark.table(cls.seer_aux_view)
-            aux.createOrReplaceTempView(cls.aux_view)
+            seer_site_terms = cls.seer_terms(spark, recode)
         else:
             log.warn('skipping SEER Recode terms')
+            seer_site_terms = spark.sql('''
+              select 1 hlevel, 'p' path, 'n' name, 'x' basecode,
+                'v' visualattributes
+              where 1 = 0
+            ''')
 
-        return spark.table(cls.concept_views[-1])
+        to_df = spark.createDataFrame
+        views = create_objects(spark, cls.ont_script,
+                               section=to_df(cls.per_section),
+                               tumor_item_type=to_df(cls.tumor_item_type),
+                               code_labels=to_df(NAACCR_R.code_labels()),
+                               seer_site_terms=seer_site_terms)
+
+        name, _, _ = cls.ont_script.objects[-1]
+        return views[name]
 
     @classmethod
     def item_views_in(cls, spark):
@@ -487,6 +497,14 @@ class NAACCR_I2B2(object):
 
         return item_ty
 
+    @classmethod
+    def seer_terms(cls, spark: SparkSession_T, recode: Path_T) -> DataFrame:
+        rules = seer_recode.Rule.from_lines(recode.open())  # ISSUE: -> static
+        terms = seer_recode.Rule.as_terms(rules)
+        return spark.createDataFrame(terms)
+
+
+class NAACCR_I2B2_Mix(object):
     @classmethod
     def tumor_item_type_mix(cls, spark: SparkSession_T) -> DataFrame:
         ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
@@ -514,20 +532,40 @@ class NAACCR_I2B2(object):
         spark.catalog.cacheTable(cls.per_item_view)
         return spark.table(cls.per_item_view)
 
-    @classmethod
-    def seer_terms_in(cls, spark: SparkSession_T, recode: Path_T,
-                      name: str = 'seer_site_terms') -> DataFrame:
-        rules = seer_recode.Rule.from_lines(recode.open())
-        terms = seer_recode.Rule.as_terms(rules)
-        df = spark.createDataFrame(terms)
-        df.createOrReplaceTempView(name)
-        return df
 
+def create_objects(spark, script: SqlScript,
+                   **kwargs: Dict[str, DataFrame]):
+    """Run SQL create ... statements given DFs for input views.
 
-def create_object(name: str, script: str, spark: SparkSession_T) -> DataFrame:
-    ddl = SqlScript.find_ddl(name, script)
-    spark.sql(ddl)
-    return spark.table(name)
+    >>> spark = MockCTX()
+    >>> create_objects(spark, NAACCR_I2B2.ont_script,
+    ...     section=MockDF(spark, 'section'),
+    ...     code_labels=MockDF(spark, 'code_labels'),
+    ...     seer_site_terms=MockDF(spark, 'site_terms'),
+    ...     tumor_item_type=MockDF(spark, 'ty'))
+    ... # doctest: +NORMALIZE_WHITESPACE
+    {'naaccr_code_values': MockDF(naaccr_code_values),
+     'naaccr_ont_aux': MockDF(naaccr_ont_aux),
+     'naaccr_ont_aux_seer': MockDF(naaccr_ont_aux_seer),
+     'naaccr_ontology': MockDF(naaccr_ontology)}
+    """
+    # IDEA: use a contextmanager for temp views
+    for key, df in kwargs.items():
+        df = kwargs[key]
+        log.info('%s: %s = %s', script.name, key, df)
+        df.createOrReplaceTempView(key)  # ISSUE: don't replace?
+    provided = set(kwargs.keys())
+    out = {}
+    for name, ddl, inputs in script.objects:
+        missing = set(inputs) - provided
+        if missing:
+            raise TypeError(missing)
+        log.info('%s: create %s', script.name, name)
+        spark.sql(ddl)
+        df = spark.table(name)
+        df.createOrReplaceTempView(name)  # ISSUE: don't replace?
+        out[name] = df
+    return out
 
 
 def csv_view(spark: SparkSession_T, path: Path_T,
@@ -537,3 +575,30 @@ def csv_view(spark: SparkSession_T, path: Path_T,
                         inferSchema=True, mode='FAILFAST')
     df.createOrReplaceTempView(name or path.stem)
     return df
+
+
+class MockCTX:
+    def __init__(self):
+        self._tables = {}
+
+    def __setitem__(self, k, v):
+        self._tables[k] = v
+
+    def table(self, k):
+        return self._tables[k]
+
+    def sql(self, code):
+        _c, _o, _r, _t, _v, name, _ = code.split(None, 6)
+        self._tables[name] = MockDF(self, name)
+
+
+class MockDF:
+    def __init__(self, ctx, label):
+        self.__ctx = ctx
+        self.label = label
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.label})'
+
+    def createOrReplaceTempView(self, name: str):
+        self.__ctx[name] = self

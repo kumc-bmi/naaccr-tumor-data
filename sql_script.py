@@ -13,6 +13,19 @@ StatementInContext = Tuple[Line, Comment, SQL]
 
 
 class SqlScript(object):
+    def __init__(self, name: str, code: SQL,
+                 object_info: List[Tuple[str, List[str]]]):
+        """
+        @param object_info: list of view names created in the code
+               along with names of views they depend on.
+               See also: tumor_reg_ont.create_objects.
+        """
+        self.name = name
+        self.code = code
+        self.objects = [
+            (name, self.find_ddl(name, code), inputs)
+            for name, inputs in object_info
+        ]
 
     @classmethod
     def find_ddl(cls, name: str, script: str) -> str:

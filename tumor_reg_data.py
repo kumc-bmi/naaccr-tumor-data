@@ -46,7 +46,7 @@ import bc_qa
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
-from tumor_reg_ont import create_object
+from tumor_reg_ont import create_objects
 import heron_load
 
 
@@ -895,12 +895,6 @@ class SEER_Recode:
         return spark.table(cls.fact_view)
 
 IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
-
-# %%
-import importlib
-import tumor_reg_ont
-importlib.reload(tumor_reg_ont)
-from tumor_reg_ont import create_object
 
 
 # %%
