@@ -13,17 +13,10 @@ StatementInContext = Tuple[Line, Comment, SQL]
 
 
 class SqlScript(object):
-    # inspired by https://github.com/honza/anosql
-    # see also heron_load/db_util.py
-    @classmethod
-    def ea_stmt(cls, txt: str) -> List[str]:
-        txt = re.sub(r'/\*(\*[^/]|[^\*])*\*/', '', txt)  # ISSUE: line numbers
-        return [stmt.strip()
-                for stmt in txt.split(';\n')]
 
     @classmethod
     def find_ddl(cls, name: str, script: str) -> str:
-        for stmt in cls.ea_stmt(script):
+        for _l, _c, stmt in cls.each_statement(script):
             if stmt.startswith('create '):
                 if name in stmt.split('\n')[0].split():
                     return stmt
@@ -33,6 +26,7 @@ class SqlScript(object):
     def each_statement(cls, sql: str,
                        variables: Opt[Environment] = None,
                        skip_unbound: bool = False) -> Iterable[StatementInContext]:
+        # idea: use statement namese lik https://github.com/honza/anosql
         for line, comment, statement in iter_statement(sql):
             try:
                 ss = substitute(statement, variables)
