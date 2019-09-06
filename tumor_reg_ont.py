@@ -1,11 +1,14 @@
 from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
-    Callable, ContextManager, Dict, Iterator, List, Optional as Opt
+    Callable, ContextManager, Dict, Iterator, List, Optional as Opt,
+    Tuple, Union,
+    cast,
 )
 from xml.etree import ElementTree as XML
 import logging
 
+from mypy_extensions import TypedDict
 from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import types as ty
 from pyspark.sql.dataframe import DataFrame
@@ -38,16 +41,16 @@ class XSD:
 
         """
         found = elt.find(path, ns)
-        assert found, (elt, path)
+        assert found is not None, (elt, path)
         return found
 
-    types = {
+    types: Dict[str, Callable[[str], Union[int, bool]]] = {
         'xsd:integer': int,
         'xsd:boolean': bool,
     }
 
     @classmethod
-    def decoder(cls, field_type):
+    def decoder(cls, field_type: Dict[str, str]) -> Callable[[Dict[str, str]], Dict[str, object]]:
         """
         >>> decode = XSD.decoder({
         ...     'naaccrId': 'xsd:ID',
@@ -62,19 +65,50 @@ class XSD:
         ... })
         {'naaccrId': 'recordType', 'naaccrNum': 10, 'naaccrName': 'RT'}
         """
-        def decode(record_raw):
+        def decode(record_raw: Dict[str, str]) -> Dict[str, object]:
             return {
                 k: f(v)
                 for (k, v) in record_raw.items()
-                for f in [cls.types.get(field_type.get(k),
+                for f in [cls.types.get(field_type.get(k, ''),
                                         lambda x: x)]
             }
         return decode
 
 
-def _int_fields(record, fields):
-    return {k: int(v) if k in fields else v
-            for k, v in record.items()}
+Field0 = TypedDict('Field0', {
+    'name': str,
+    'start': int, 'end': int,
+    'naaccr-item-num': int,
+    'section': str,
+})
+
+
+def to_field0(attr: Dict[str, str]) -> Field0:
+    return {
+        'name': attr['name'],
+        'start': int(attr['start']), 'end': int(attr['end']),
+        'naaccr-item-num': int(attr['naaccr-item-num']),
+        'section': attr['section'],
+    }
+
+
+Field = TypedDict('Field', {
+    'name': str,
+    'start': int, 'end': int,
+    'length': int,
+    'naaccr-item-num': int,
+    'section': str,
+})
+
+
+def to_field(f: Field0) -> Field:
+    return {
+        'name': f['name'],
+        'start': f['start'], 'end': f['end'],
+        'length': f['end'] + 1 - f['start'],
+        'naaccr-item-num': f['naaccr-item-num'],
+        'section': f['section'],
+    }
 
 
 class NAACCR_Layout:
@@ -104,20 +138,19 @@ class NAACCR_Layout:
         naaccr_layout, 'naaccr-18-layout.xml'))
 
     # top-level (non-overlapping) fields, skipping reserved
-    fields_raw = [_int_fields(f.attrib, ['start', 'end', 'naaccr-item-num'])
+    fields_raw = [to_field0(f.attrib)
                   for f in layout_180.findall('./field')
                   if not f.attrib['name'].startswith('reserved')]
 
     # include length
-    fields = [dict(f, length=f['end'] + 1 - f['start'])
-              for f in fields_raw]
+    fields = [to_field(f) for f in fields_raw]
 
     @classmethod
     def _fields_doc(cls) -> ContextManager[Path_T]:
         return res.path(naaccr_layout, 'doc')
 
     @classmethod
-    def fields_source(cls):
+    def fields_source(cls) -> Iterator[Tuple[int, str, Opt[str]]]:
         for info in cls.fields_doc():
             if info['xmlId'].startswith('reserved'):
                 continue
@@ -126,7 +159,7 @@ class NAACCR_Layout:
 
     @classmethod
     def fields_doc(cls,
-                   subdir='naaccr18'):
+                   subdir: str = 'naaccr18') -> Iterator[Dict[str, str]]:
         with cls._fields_doc() as doc_dir:
             for field_path in sorted((doc_dir / subdir).glob('*.html')):
                 doc = cls.field_doc(field_path)
@@ -134,24 +167,24 @@ class NAACCR_Layout:
                     yield doc
 
     @classmethod
-    def field_doc(cls, path):
+    def field_doc(cls, path: Path_T) -> Opt[Dict[str, str]]:
         doc = _parse_html_fragment(path)
-        naaccr_xml = doc.find('./strong')
-        if naaccr_xml is None:
+        naaccr_xml_elt = doc.find('./strong')
+        if naaccr_xml_elt is None:
             return None
-        naaccr_xml = naaccr_xml.tail[2:].strip()  # </strong>: ...
+        naaccr_xml = (naaccr_xml_elt.tail or '')[2:].strip()  # </strong>: ...
         [parentElement, xmlId] = naaccr_xml.split('.')
-        summary_table = doc.find(
-            './table[@class="naaccr-summary-table naaccr-borders"]')
+        summary_table = XSD.the(
+            doc, './table[@class="naaccr-summary-table naaccr-borders"]', {})
         [hd, detail] = summary_table.findall('tr')
-        summary = dict(zip([th.text for th in hd.findall('th')],
-                           [td.text for td in detail.findall('td')]))
+        summary = dict(zip([cast(str, th.text) for th in hd.findall('th')],
+                           [cast(str, td.text) for td in detail.findall('td')]))
         return dict(summary,
                     parentElement=parentElement,
                     xmlId=xmlId)
 
 
-def _parse_html_fragment(path):
+def _parse_html_fragment(path: Path_T) -> XML.Element:
     markup = path.open().read()
     markup = '''
     <!DOCTYPE html [
@@ -230,17 +263,17 @@ class NAACCR1:
     ns = {'n': uri}
 
     @classmethod
-    def itemDef(cls, naaccrId):
+    def itemDef(cls, naaccrId: str) -> XML.Element:
         """
         >>> NAACCR1.itemDef('npiRegistryId').attrib['startColumn']
         '20'
         """
         ndd = cls.ndd180.getroot()
         defPath = f'./n:ItemDefs/n:ItemDef[@naaccrId="{naaccrId}"]'
-        return ndd.find(defPath, cls.ns)
+        return XSD.the(ndd, defPath, cls.ns)
 
     @classmethod
-    def items_180(cls):
+    def items_180(cls) -> Iterator[Dict[str, object]]:
         xsd_ty = XSD.the(cls.ItemDef, '*')
         decls = xsd_ty.findall('xsd:attribute', XSD.ns)
         to_type = {
@@ -290,7 +323,7 @@ def xmlDF(spark: SparkSession_T, schema: ty.StructType,
 def xmlRecords(schema: ty.StructType,
                doc: XML.ElementTree, path: str, ns: Dict[str, str],
                eltRecords: Opt[RecordMaker] = None,
-               simpleContent: bool = False) -> Iterator[Dict]:
+               simpleContent: bool = False) -> Iterator[Dict[str, object]]:
     """
     >>> schema = eltSchema(XSD.the(NAACCR1.ItemDef, '*'))
     >>> ea = xmlRecords(doc=NAACCR1.ndd180, schema=schema,
@@ -330,7 +363,7 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
                  ns=NAACCR1.ns)
 
 
-def _fixna(df):
+def _fixna(df: pd.DataFrame) -> pd.DataFrame:
     """
     avoid string + double errors from spark.createDataFrame(pd.read_csv())
     """
@@ -389,14 +422,9 @@ class NAACCR_R:
     @classmethod
     def field_info_in(cls, spark: SparkSession_T) -> None:
         info = spark.createDataFrame(cls.field_info)
-        info.createOrReplaceTempView(NAACCR_I2B2.r_field_info)
+        info.createOrReplaceTempView(NAACCR_I2B2_Mix.r_field_info)
         to_scheme = spark.createDataFrame(cls.field_code_scheme)
-        to_scheme.createOrReplaceTempView(NAACCR_I2B2.r_code_scheme)
-
-    @classmethod
-    def code_labels_in(cls, spark: SparkSession_T) -> None:
-        cl = spark.createDataFrame(NAACCR_R.code_labels())
-        cl.createOrReplaceTempView(NAACCR_I2B2.r_code_labels)
+        to_scheme.createOrReplaceTempView(NAACCR_I2B2_Mix.r_code_scheme)
 
     @classmethod
     def code_labels(cls,
@@ -430,18 +458,11 @@ class NAACCR_I2B2(object):
     tx_script = SqlScript(
         'naaccr_txform.sql',
         res.read_text(heron_load, 'naaccr_txform.sql'),
-        {})
+        [])
 
-    txform_script = res.read_text(heron_load, 'naaccr_txform.sql')
-    # script inputs:
-    v18_dict_view_name = 'ndd180'
     layout_view_name = 'record_layout'
     measure_view_name = 'loinc_naaccr'
     answer_view_name = 'loinc_naaccr_answers'
-    r_field_info = 'field_info'
-    r_code_scheme = 'field_code_scheme'
-    r_code_labels = 'code_labels'
-    # outputs
     per_item_view = 'tumor_item_type'
 
     per_section = pd.read_csv(res.open_text(
@@ -451,7 +472,7 @@ class NAACCR_I2B2(object):
         'naaccr_concepts_load.sql',
         res.read_text(heron_load, 'naaccr_concepts_load.sql'),
         [
-            ('naaccr_code_values', ['tumor_item_type', 'code_labels']),
+            ('naaccr_code_values', [per_item_view, 'code_labels']),
             ('naaccr_ont_aux', ['section', 'tumor_item_type']),
             ('naaccr_ont_aux_seer', ['seer_site_terms']),
             ('naaccr_ontology', []),
@@ -486,7 +507,7 @@ class NAACCR_I2B2(object):
         return views[name]
 
     @classmethod
-    def item_views_in(cls, spark):
+    def item_views_in(cls, spark: SparkSession_T) -> DataFrame:
         # Assign i2b2 valtype_cd to each NAACCR item.
         item_ty = spark.createDataFrame(cls.tumor_item_type)
         item_ty.createOrReplaceTempView(cls.per_item_view)
@@ -506,7 +527,18 @@ class NAACCR_I2B2(object):
         return spark.createDataFrame(terms)
 
 
-class NAACCR_I2B2_Mix(object):
+class NAACCR_I2B2_Mix(NAACCR_I2B2):
+    # ISSUE: this code is out of date; it's only needed when upstream
+    # standards change.
+
+    txform_script = res.read_text(heron_load, 'naaccr_txform.sql')
+    # script inputs:
+    v18_dict_view_name = 'ndd180'
+    r_field_info = 'field_info'
+    r_code_scheme = 'field_code_scheme'
+    r_code_labels = 'code_labels'
+    # outputs
+
     @classmethod
     def tumor_item_type_mix(cls, spark: SparkSession_T) -> DataFrame:
         ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
@@ -528,15 +560,15 @@ class NAACCR_I2B2_Mix(object):
 
         NAACCR_R.field_info_in(spark)
 
-        create_object(cls.per_item_view,
-                      cls.txform_script,
-                      spark)
+        # create_object(cls.per_item_view,
+        #               cls.txform_script,
+        #               spark)
         spark.catalog.cacheTable(cls.per_item_view)
         return spark.table(cls.per_item_view)
 
 
-def create_objects(spark, script: SqlScript,
-                   **kwargs: Dict[str, DataFrame]):
+def create_objects(spark: SparkSession_T, script: SqlScript,
+                   **kwargs: DataFrame) -> Dict[str, DataFrame]:
     """Run SQL create ... statements given DFs for input views.
 
     >>> spark = MockCTX()
@@ -579,28 +611,30 @@ def csv_view(spark: SparkSession_T, path: Path_T,
     return df
 
 
-class MockCTX:
-    def __init__(self):
-        self._tables = {}
+class MockCTX(SparkSession_T):
+    def __init__(self) -> None:
+        self._tables = {}  # type: Dict[str, DataFrame]
 
-    def __setitem__(self, k, v):
+    def __setitem__(self, k: str, v: DataFrame) -> None:
         self._tables[k] = v
 
-    def table(self, k):
+    def table(self, k: str) -> DataFrame:
         return self._tables[k]
 
-    def sql(self, code):
+    def sql(self, code: str) -> DataFrame:
         _c, _o, _r, _t, _v, name, _ = code.split(None, 6)
-        self._tables[name] = MockDF(self, name)
+        df = MockDF(self, name)
+        self._tables[name] = df
+        return df
 
 
-class MockDF:
-    def __init__(self, ctx, label):
+class MockDF(DataFrame):
+    def __init__(self, ctx: MockCTX, label: str) -> None:
         self.__ctx = ctx
         self.label = label
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.label})'
 
-    def createOrReplaceTempView(self, name: str):
+    def createOrReplaceTempView(self, name: str) -> None:
         self.__ctx[name] = self

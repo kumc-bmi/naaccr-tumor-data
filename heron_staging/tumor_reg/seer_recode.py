@@ -49,7 +49,7 @@ def main(arg_rd: ArgIO, arg_wr: ArgIO) -> None:
         rules = Rule.from_lines(page)
 
     with arg_wr(2) as termf:
-        write_csv(termf, Term._fields, Rule.as_terms(rules))
+        write_csv(termf, list(Term._fields), Rule.as_terms(rules))
 
     with arg_wr(3) as rulef:
         rulef.write('case\n' + '\n'.join(

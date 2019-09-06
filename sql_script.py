@@ -1,4 +1,3 @@
-from pathlib import Path as Path_T  # for type only
 from typing import Dict, Iterable, List, Optional as Opt, Text, Tuple, Union
 import re
 from datetime import datetime
@@ -6,7 +5,8 @@ from datetime import datetime
 Name = Text
 SQL = Text
 Environment = Dict[Name, Text]
-Params = Dict[str, Union[str, int, datetime]]
+BindValue = Union[str, int, datetime]
+Params = Dict[str, BindValue]
 Line = int
 Comment = Text
 StatementInContext = Tuple[Line, Comment, SQL]
@@ -170,7 +170,7 @@ def param_names(s: SQL) -> List[Name]:
             for expr in re.findall(r':\w+', s)]
 
 
-def to_qmark(sql, params):
+def to_qmark(sql: SQL, params: Params) -> Tuple[SQL, List[BindValue]]:
     """Convert bind params to qmark style.
 
     Named params are replaced by ? and the
