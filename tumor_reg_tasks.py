@@ -592,6 +592,9 @@ class UploadTarget(luigi.Target):
                 if not rs.next():
                     return False
                 upload_id = _fix_null(rs.getInt('upload_id'), rs)
+                if upload_id is not None:
+                    log.info('UploadTarget(%s) exists: %d',
+                             self.transform_name, upload_id)
         return upload_id is not None
 
     @contextmanager
