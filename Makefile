@@ -22,5 +22,5 @@ tumor_reg_data_run.html: tumor_reg_data_run.ipynb
 tumor_reg_data_run.ipynb: tumor_reg_data.ipynb
 	PYSPARK_DRIVER_PYTHON=python spark-submit run_nb.py $< $@
 
-tumor_reg_data.ipynb tumor_reg_data.py:
-	jupytext --sync tumor_reg_data.ipynb
+tumor_reg_data.ipynb: tumor_reg_data.py
+	jupytext --to notebook $<
