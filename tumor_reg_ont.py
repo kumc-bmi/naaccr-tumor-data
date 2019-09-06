@@ -96,9 +96,9 @@ class NAACCR_Layout:
 
     >>> for info in list(NAACCR_Layout.fields_source())[:3]:
     ...     print(info)
-    (1512, 'phase2RadiationExternalBeamTech', 'CoC')
-    (21, 'patientSystemIdHosp', 'NAACCR')
-    (2425, 'npiInstReferredTo', 'CMS')
+    (570, 'abstractedBy', 'CoC')
+    (550, 'accessionNumberHosp', 'CoC')
+    (70, 'addrAtDxCity', 'CoC')
     """
     layout_180 = XML.parse(res.open_text(
         naaccr_layout, 'naaccr-18-layout.xml'))
@@ -119,6 +119,8 @@ class NAACCR_Layout:
     @classmethod
     def fields_source(cls):
         for info in cls.fields_doc():
+            if info['xmlId'].startswith('reserved'):
+                continue
             yield (int(info['Item #']), info['xmlId'],
                    info.get('Source of Standard'))
 
@@ -126,7 +128,7 @@ class NAACCR_Layout:
     def fields_doc(cls,
                    subdir='naaccr18'):
         with cls._fields_doc() as doc_dir:
-            for field_path in (doc_dir / subdir).glob('*.html'):
+            for field_path in sorted((doc_dir / subdir).glob('*.html')):
                 doc = cls.field_doc(field_path)
                 if doc:
                     yield doc
