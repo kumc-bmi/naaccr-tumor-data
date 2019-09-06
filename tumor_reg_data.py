@@ -745,8 +745,8 @@ class ItemObs:
             spark, cls.script,
             naaccr_obs_raw=raw_obs,
             # ISSUE: refactor item_views_in
-            record_layout=_spark.createDataFrame(NAACCR_Layout.fields),
-            section=_spark.createDataFrame(NAACCR_I2B2.per_section))
+            record_layout=spark.createDataFrame(NAACCR_Layout.fields),
+            section=spark.createDataFrame(NAACCR_I2B2.per_section))
 
         return list(views.values())[-1]
 
