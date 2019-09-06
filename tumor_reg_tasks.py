@@ -392,7 +392,7 @@ class NAACCR_FlatFile(ManualTask):
     @classmethod
     def _checkItem(cls, record, naaccrId, expected):
         '''
-        >>> npi = '12345678901'
+        >>> npi = '1234567890'
         >>> record0 = ' ' * 19 + npi
         >>> NAACCR_FlatFile._checkItem(record0, 'npiRegistryId', npi)
         True
@@ -503,9 +503,10 @@ class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
     z_design_id = pv.StrParam('with seer, ssf; (%s)' % hash(
-        (td.ItemObs.naaccr_txform,
+        (td.ItemObs.script,
          td.SEER_Recode.script,
-         td.SiteSpecificFactors.script)))
+         td.SiteSpecificFactors.script1,
+         td.SiteSpecificFactors.script2)))
 
     def _data(self, spark, naaccr_text_lines):
         dd = tr_ont.ddictDF(spark)

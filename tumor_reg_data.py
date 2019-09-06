@@ -46,7 +46,8 @@ import bc_qa
 # %%
 # this project
 #from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
-from tumor_reg_ont import create_objects
+from sql_script import SqlScript
+from tumor_reg_ont import NAACCR_Layout, create_objects
 import heron_load
 
 
@@ -178,7 +179,7 @@ order by section, type, nd.length
 ''').toPandas()
 
 # %% [markdown]
-# ### Mix naaccr-xml, LOINC, and Werth
+# ### Mixednaaccr-xml, LOINC, and Werth
 
 # %%
 if IO_TESTING:
@@ -702,26 +703,33 @@ IO_TESTING and _raw_obs.limit(10).toPandas()
 
 # %%
 if IO_TESTING:
-    create_object('tumor_item_value', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
+    _script1 = SqlScript('naaccr_txform.sql',
+                             res.read_text(heron_load, 'naaccr_txform.sql'),
+                             [('tumor_item_value', ['naaccr_obs_raw'])])
+    create_objects(_spark, _script1, naaccr_obs_raw=_raw_obs)
 IO_TESTING and _spark.table('tumor_item_value').limit(10).toPandas()
 
 # %%
 if IO_TESTING:
-    create_object('tumor_reg_facts', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
+    _script1 = SqlScript('naaccr_txform.sql',
+                             res.read_text(heron_load, 'naaccr_txform.sql'),
+                             [('tumor_reg_facts', ['record_layout', 'section'])])
+    create_objects(_spark, _script1,
+                   record_layout=_spark.createDataFrame(NAACCR_Layout.fields),
+                   section=_spark.createDataFrame(NAACCR_I2B2.per_section))
 IO_TESTING and _spark.table('tumor_reg_facts').limit(10).toPandas()
 
 # %%
-if IO_TESTING:
-    create_object('tumor_reg_facts', res.read_text(heron_load, 'naaccr_txform.sql'), _spark)
-IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(20).toPandas()
+IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(5).toPandas()
 
 
 # %%
 class ItemObs:
-    naaccr_txform = res.read_text(heron_load, 'naaccr_txform.sql')
-    raw_view = 'naaccr_obs_raw'
-    item_view = 'tumor_item_value'
-    fact_view = 'tumor_reg_facts'
+    script = SqlScript('naaccr_txform.sql',
+                       res.read_text(heron_load, 'naaccr_txform.sql'),
+                       [('tumor_item_value', ['naaccr_obs_raw']),
+                        ('tumor_reg_facts', ['record_layout', 'section']),
+                       ])
 
     extract_id_view = 'naaccr_extract_id'
 
@@ -732,13 +740,15 @@ class ItemObs:
         raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
             stack_obs(extract, item_ty),
             TumorKeys.dtcols))
-        raw_obs.createOrReplaceTempView(cls.raw_view)
 
-        create_object(cls.item_view, cls.naaccr_txform, spark)
-        create_object(cls.fact_view, cls.naaccr_txform, spark)
+        views = create_objects(
+            spark, cls.script,
+            naaccr_obs_raw=raw_obs,
+            # ISSUE: refactor item_views_in
+            record_layout=_spark.createDataFrame(NAACCR_Layout.fields),
+            section=_spark.createDataFrame(NAACCR_I2B2.per_section))
 
-        data = spark.table(cls.fact_view)
-        return data
+        return list(views.values())[-1]
 
     @classmethod
     def make_extract_id(cls, spark, extract):
@@ -760,27 +770,28 @@ IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 
 # %%
 class SEER_Recode:
-    script = res.read_text(heron_load, 'seer_recode.sql')
-    fact_view = 'seer_recode_facts'
-    aux_view = 'seer_recode_aux'
+    script = SqlScript('seer_recode.sql',
+                       res.read_text(heron_load, 'seer_recode.sql'),
+                       [('seer_recode_aux', ['naaccr_extract_id']),
+                        ('seer_recode_facts', [])])
 
     @classmethod
     def make(cls, spark, extract):
         extract_id = ItemObs.make_extract_id(spark, extract)
-        create_object(cls.aux_view, cls.script, spark)
-
-        create_object(cls.fact_view, cls.script, spark)
-        return spark.table(cls.fact_view)
+        views = create_objects(spark, cls.script,
+                               naaccr_extract_id=extract_id)
+        return list(views.values())[-1]
 
 IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
 
 
 # %%
 class SiteSpecificFactors:
-    tumor_schema_view = 'tumor_cs_schema'
-    raw_view = 'cs_obs_raw'
-    fact_view = 'cs_site_factor_facts'
-    script = res.read_text(heron_load, 'csschema.sql')
+    sql = res.read_text(heron_load, 'csschema.sql')
+    script1 = SqlScript('csschema.sql', sql,
+                        [('tumor_cs_schema', ['naaccr_extract_id'])])
+    script2 = SqlScript('csschema.sql', sql,
+                        [('cs_site_factor_facts', ['cs_obs_raw'])])
 
     items = [it for it in NAACCR1.items_180()
              if it['naaccrName'].startswith('CS Site-Specific Factor')]
@@ -799,14 +810,16 @@ class SiteSpecificFactors:
 
         raw_obs = stack_obs(with_schema, ty_df,
                             key_cols=TumorKeys.key4 + TumorKeys.dtcols + ['recordId', 'cs_schema_name'])
-        raw_obs.createOrReplaceTempView(cls.raw_view)
 
-        return create_object(cls.fact_view, cls.script, spark)
+        views = create_objects(spark, cls.script2,
+                               cs_obs_raw=raw_obs)
+        return list(views.values())[-1]
 
     @classmethod
     def make_tumor_schema(cls, spark, extract):
-        x = ItemObs.make_extract_id(spark, extract)
-        return create_object(cls.tumor_schema_view, cls.script, spark)
+        views = create_objects(spark, cls.script1,
+                               naaccr_extract_id=ItemObs.make_extract_id(spark, extract))
+        return list(views.values())[-1]
 
 
 if IO_TESTING:
@@ -839,7 +852,7 @@ if IO_TESTING:
         password = getpass(name)
         environ[name] = password
 
-    _set_pw()
+    # _set_pw()
 
 
 # %%
@@ -868,10 +881,11 @@ class Account:
                 mode=mode)
 
 
-if IO_TESTING:
+DB_TESTING = IO_TESTING and 'ID CDW' in _environ
+if DB_TESTING:
     _cdw = Account(_environ['LOGNAME'], _environ['ID CDW'])
 
-IO_TESTING and _cdw.rd(_spark.read, "global_name").toPandas()
+DB_TESTING and _cdw.rd(_spark.read, "global_name").toPandas()
 
 
 # %% [markdown]
@@ -890,15 +904,15 @@ def case_fold(df):
 
 
 # %%
-if IO_TESTING:
+if DB_TESTING:
     _cdw.wr(_tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
              mode='overwrite')
 
 # %%
-if IO_TESTING:
+if DB_TESTING:
     _patients_mapped = TumorKeys.with_patient_num(_patients, _spark, _cdw, 'NIGHTHERONDATA', 'SMS@kumed.com')
 
-IO_TESTING and _patients_mapped.limit(5).toPandas()
+DB_TESTING and _patients_mapped.limit(5).toPandas()
 
 
 # %% [markdown]
@@ -958,20 +972,19 @@ IO_TESTING and (
 def bc_var_facts(coded_facts: DataFrame, ddict: DataFrame) -> DataFrame:
     return coded_facts.join(
         ddict.select('naaccrId'),
-        coded_facts.xmlId == ddict.naaccrId,
+        coded_facts.naaccrId == ddict.naaccrId,
     ).drop(ddict.naaccrId)
 
 
 def data_summary(spark: SparkSession_T, obs: DataFrame) -> DataFrame:
     obs.createOrReplaceTempView('summary_input')  # ISSUE: CLOBBER!
     return spark.sql('''
-    select xmlId as variable
-           -- ISSUE: rename MRN back to patientIdNumber?
-         , count(distinct MRN) as pat_qty
-         , count(distinct encounter_ide) as enc_qty
+    select naaccrId as variable
+         , count(distinct patientIdNumber) as pat_qty
+         , count(distinct recordId) as enc_qty
          , count(*) as fact_qty
     from summary_input
-    group by xmlId
+    group by naaccrId
     order by 2 desc, 3 desc, 4 desc
     ''')
 
@@ -989,19 +1002,19 @@ def bc_var_summary(spark: SparkSession_T,
 
 
 IO_TESTING and bc_var_summary(
-    _spark, _tumor_reg_coded_facts, _bc_ddict).where(
+    _spark, _obs, _bc_ddict).where(
         'fact_qty is null').toPandas()
 
 # %%
 IO_TESTING and bc_var_summary(
-    _spark, _tumor_reg_coded_facts, _bc_ddict).where(
+    _spark, _obs, _bc_ddict).where(
         'fact_qty is not null').toPandas()
 
 # %% [markdown]
 # **TODO**: date observations; treating `dateOfDiagnosis` as a coded observation leads to `concept_cd = 'NAACCR|390:20080627'`
 
 # %%
-IO_TESTING and  _tumor_reg_coded_facts.where("xmlId == 'dateOfDiagnosis'").limit(5).toPandas()
+IO_TESTING and _obs.where("naaccrId == 'dateOfDiagnosis'").limit(5).toPandas()
 
 
 # %% [markdown]
@@ -1009,16 +1022,14 @@ IO_TESTING and  _tumor_reg_coded_facts.where("xmlId == 'dateOfDiagnosis'").limit
 
 # %%
 def pivot_obs_by_enc(skinny_obs: DataFrame,
-                     pivot_on: str = 'xmlId',  # cheating... not really in i2b2 observation_fact
+                     pivot_on: str = 'naaccrId',  # cheating... not really in i2b2 observation_fact
                      # TODO: nval_num etc. for value cols?
                      value_col: str = 'concept_cd',
-                     key_cols: List[str] = ['encounter_ide', 'MRN']) -> DataFrame:
+                     key_cols: List[str] = ['recordId', 'patientIdNumber']) -> DataFrame:
     groups = skinny_obs.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
     wide = groups.pivot(pivot_on).agg(func.first(value_col))
     return wide
 
-IO_TESTING and pivot_obs_by_enc(_tumor_reg_coded_facts.where(
-    _tumor_reg_coded_facts.xmlId.isin(['dateOfDiagnosis', 'primarySite', 'sex', 'dateOfBirth'])
-)).limit(5).toPandas().set_index(['encounter_ide', 'MRN'])
-
-
+IO_TESTING and pivot_obs_by_enc(_obs.where(
+    _obs.naaccrId.isin(['dateOfDiagnosis', 'primarySite', 'sex', 'dateOfBirth'])
+)).limit(5).toPandas().set_index(['recordId', 'patientIdNumber'])
