@@ -91,23 +91,13 @@ cite:
 
 ---
 
-## Example: NAACCR Ontology for i2b2
+## NAACCR Ontology for i2b2: Usage
 
-To scrape the NAACCR record layout and such:
-```
-$ (cd naaccr_ddict; python scrape.py)
-INFO:__main__:record_layout.csv: 802 items
-INFO:__main__:data_descriptor.csv: 890 items
-INFO:__main__:item_description.csv: 890 items
-```
 
-Then use `heron_load/naaccr_concepts_load.sql` from HERON ETL to build
-an i2b2 ontology. It was ported from Oracle SQL to Spark SQL for use
-in PySpark module `tumor_reg_ont.py`, which is used in
-the `tumor_reg_tasks.NAACCR_Ontology1` luigi task:
+The `NAACCR_Ontology1` task creates a `NAACCR_ONTOLOGY` table:
 
 ```
-$ luigi --module tumor_reg_tasks NAACCR_Ontology1 --naaccr-ddict=naaccr_ddict
+$ luigi --module tumor_reg_tasks NAACCR_Ontology1
 DEBUG: Checking if NAACCR_Ontology1(design_id=upper, naaccr_version=18, naaccr_ch10_bytes=3078052) is complete
 15:48:09 INFO: ...status   PENDING
 15:48:09 INFO: Running Worker with 1 processes
@@ -120,7 +110,11 @@ DEBUG: Checking if NAACCR_Ontology1(design_id=upper, naaccr_version=18, naaccr_c
 ```
 
 
-See `client.cfg` for more details on luigi usage.
+If you're interested in luigi usage, see `client.cfg` for details. If not, see:
+
+  - `tumor_reg_ont.py`
+  - `heron_load/tumor_item_value.csv`, and
+  - `heron_load/naaccr_concepts_load.sql`
 
 ---
 
@@ -185,6 +179,31 @@ We have yet to port / integrate the code from `heron_staging/tumor_reg` that get
 
 [omop1]: https://github.com/OHDSI/OncologyWG/wiki/ETL-Instructions-for-Mapping-NAACCR-Treatment-Data-into-the-OMOP-CDM
 
+
+---
+
+## `NAACCR_PATIENTS`, `NAACCR_TUMORS`, and `NAACCR_OBSERVATIONS`: Usage
+
+Using `tumor_reg_data.py`, the `NAACCR_Load` task turns a NAACCR v18
+flat file into tables for patients, tumors, and observations:
+
+```
+$ luigi --module tumor_reg_tasks NAACCR_Load
+...
+15:02:04 5890 INFO: Informed scheduler that task   NAACCR_Load_2019_08_20_tumor_registry_k_1306872023_225d26f0cd   has status   DONE
+```
+
+The tables are:
+
+   - `naaccr_patients`, `naaccr_tumors`, `naaccr_observations`
+   - `observation_fact_NNNN`, `observation_fact_deid_NNNN`
+      - where NNNN is an upload_id
+
+`naaccr_patients` and `observation_fact_NNNN` depend on an existing
+`patient_mapping` table.  `naaccr_tumors` uses a reserved range of
+`encounter_num`.
+
+_TODO: publish generated notebook; smooth out the level of detail here vs. there._
 
 ---
 
