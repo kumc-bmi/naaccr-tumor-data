@@ -30,11 +30,6 @@ class SqlScript(object):
         raise KeyError(name)
 
     @classmethod
-    def find_ddl_in(cls, name: str, path: Path_T) -> str:
-        script = path.open().read()
-        return cls.find_ddl(name, script)
-
-    @classmethod
     def each_statement(cls, sql: str,
                        variables: Opt[Environment] = None,
                        skip_unbound: bool = False) -> Iterable[StatementInContext]:
