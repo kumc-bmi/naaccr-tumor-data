@@ -1,11 +1,11 @@
 from typing import Dict, Iterable, List, Optional as Opt, Text, Tuple, Union
 import re
-from datetime import datetime
+import datetime as dt
 
 Name = Text
 SQL = Text
 Environment = Dict[Name, Text]
-BindValue = Union[str, int, datetime]
+BindValue = Union[None, str, int, dt.date, dt.datetime]
 Params = Dict[str, BindValue]
 Line = int
 Comment = Text
