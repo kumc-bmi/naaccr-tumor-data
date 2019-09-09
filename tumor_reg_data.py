@@ -220,16 +220,6 @@ having count(*) > 1
 
 
 # %%
-def _save_mix(spark):
-    (spark.table('tumor_item_type')
-     .toPandas()
-     .sort_values(['sectionId', 'naaccrNum'])
-     .set_index('naaccrNum')
-     .to_csv('tumor_item_type.csv')
-    )
-
-
-# %%
 def csv_meta(dtypes: Dict[str, np.dtype], path: str,
              context: str = 'http://www.w3.org/ns/csvw') -> Dict[str, object]:
     # ISSUE: dead code? obsolete in favor of _fixna()?
