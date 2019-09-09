@@ -21,7 +21,7 @@ from importlib import resources as res
 from pathlib import Path as Path_T
 from pprint import pformat
 from sys import stderr
-from typing import Callable, ContextManager, Dict, Iterator, List
+from typing import Callable, ContextManager, Dict, Iterator, List, NoReturn
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import logging
@@ -33,6 +33,7 @@ from pyspark.sql import SparkSession as SparkSession_T, Window
 from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
 from pyspark import sql as sq
+import numpy as np   # type: ignore
 import pandas as pd  # type: ignore
 
 # %%
@@ -229,10 +230,10 @@ def _save_mix(spark):
 
 
 # %%
-def csv_meta(dtypes, path,
-             context='http://www.w3.org/ns/csvw'):
+def csv_meta(dtypes: Dict[str, np.dtype], path: str,
+             context: str = 'http://www.w3.org/ns/csvw') -> Dict[str, object]:
     # ISSUE: dead code? obsolete in favor of _fixna()?
-    def xlate(dty):
+    def xlate(dty: np.dtype) -> str:
         if dty.kind == 'i':
             return 'number'
         elif dty.kind == 'O':
@@ -254,13 +255,13 @@ def csv_meta(dtypes, path,
 
 
 # %%
-def csv_spark_schema(columns):
+def csv_spark_schema(columns: List[Dict[str, str]]) -> ty.StructType:
     """
     Note: limited to exactly 1 titles per column
     IDEA: expand to boolean
     IDEA: nullable / required
     """
-    def oops(what):
+    def oops(what: object) -> NoReturn:
         raise NotImplementedError(what)
     fields = [
         ty.StructField(
@@ -350,7 +351,7 @@ IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
 # What columns are covered by the 100 tumor sample?
 
 # %%
-IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
+IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)  # type: ignore
                 .select('naaccrId').distinct().sort('naaccrId')
                 .toPandas().naaccrId.values)
 
@@ -429,9 +430,8 @@ def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
                    portion: float = 1.0, cancerID: int = 1) -> DataFrame:
     """Cancer Identification items from a sample
 
-    TODO: remove limitation to coded items
     """
-    cols = coded_items(NAACCR_I2B2.tumor_item_type(spark, cache)).toPandas()
+    cols = NAACCR_I2B2.tumor_item_type
     cols = cols[cols.sectionId == cancerID]
     colnames = cols.naaccrId.values.tolist()
     # TODO: test data for morphTypebehavIcdO2 etc.
@@ -566,7 +566,9 @@ class TumorKeys:
                  naaccr_text_lines: DataFrame) -> DataFrame:
         pat = cls._pick_cols(spark, naaccr_text_lines,
                              cls.pat_ids + cls.pat_attrs + cls.report_ids + cls.report_attrs)
-        return pat.distinct()
+        # distinct() wasn't fixed until the 3.x pre-release
+        # https://github.com/zero323/pyspark-stubs/pull/138 623b0c0330ef
+        return pat.distinct()  # type: ignore
 
     @classmethod
     def _pick_cols(cls, spark: SparkSession_T,
@@ -599,9 +601,9 @@ class TumorKeys:
 
     @classmethod
     def with_rownum(cls, tumors: DataFrame,
-                    start=1,
-                    new_col='encounter_num',
-                    key_col='recordId') -> DataFrame:
+                    start: int = 1,
+                    new_col: str = 'encounter_num',
+                    key_col: str = 'recordId') -> DataFrame:
         tumors = tumors.withColumn(
             new_col,
             func.lit(start) +
@@ -609,17 +611,20 @@ class TumorKeys:
         return tumors
 
     @classmethod
-    def export_patient_ids(cls, df, spark, cdw, schema,
-                           tmp_table='NAACCR_PMAP',
-                           id_col='patientIdNumber'):
+    def export_patient_ids(cls, df: DataFrame, spark: SparkSession_T,
+                           cdw: 'Account', schema: str,
+                           tmp_table: str = 'NAACCR_PMAP',
+                           id_col: str = 'patientIdNumber') -> None:
         log.info('writing %s to %s', id_col, tmp_table)
-        cdw.wr(df.select(id_col).distinct().write, tmp_table, mode='overwrite')
+        cdw.wr(df.select(id_col).distinct().write,  # type: ignore
+               tmp_table, mode='overwrite')
 
     @classmethod
-    def with_patient_num(cls, df, spark, cdw, schema,
-                         source,  # assumed injection-safe
-                         tmp_table='NAACCR_PMAP',
-                         id_col='patientIdNumber'):
+    def with_patient_num(cls, df: DataFrame, spark: SparkSession_T,
+                         cdw: 'Account', schema: str,
+                         source: str,  # assumed injection-safe
+                         tmp_table: str = 'NAACCR_PMAP',
+                         id_col: str = 'patientIdNumber') -> DataFrame:
         cls.export_patient_ids(df, spark, cdw, schema,
                                id_col=id_col, tmp_table=tmp_table)
         q = f'''(
@@ -684,9 +689,9 @@ IO_TESTING and _ty.limit(5).toPandas()
 # **ISSUE**: performance: whenever we change cardinality, consider persisting the data. e.g. stack_obs
 
 # %%
-def stack_obs(records, ty,
-              known_valtype_cd=['@', 'D', 'N', 'Ni', 'T'],
-              key_cols=TumorKeys.key4 + TumorKeys.dtcols):
+def stack_obs(records: DataFrame, ty: DataFrame,
+              known_valtype_cd: List[str] = ['@', 'D', 'N', 'Ni', 'T'],
+              key_cols: List[str] = TumorKeys.key4 + TumorKeys.dtcols) -> DataFrame:
     ty = ty.select('naaccrNum', 'naaccrId', 'valtype_cd')
     ty = ty.where(ty.valtype_cd.isin(known_valtype_cd))
     value_vars = [row.naaccrId for row in ty.collect()]
@@ -734,7 +739,7 @@ class ItemObs:
     extract_id_view = 'naaccr_extract_id'
 
     @classmethod
-    def make(cls, spark, extract):
+    def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
         item_ty = NAACCR_I2B2.item_views_in(spark)
 
         raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
@@ -751,7 +756,9 @@ class ItemObs:
         return list(views.values())[-1]
 
     @classmethod
-    def make_extract_id(cls, spark, extract):
+    def make_extract_id(cls,
+                        spark: SparkSession_T,
+                        extract: DataFrame) -> DataFrame:
         extract_id = TumorKeys.with_tumor_id(
             naaccr_dates(extract, TumorKeys.dtcols))
         extract_id.createOrReplaceTempView(cls.extract_id_view)
@@ -776,7 +783,7 @@ class SEER_Recode:
                         ('seer_recode_facts', [])])
 
     @classmethod
-    def make(cls, spark, extract):
+    def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
         extract_id = ItemObs.make_extract_id(spark, extract)
         views = create_objects(spark, cls.script,
                                naaccr_extract_id=extract_id)
@@ -797,14 +804,14 @@ class SiteSpecificFactors:
              if it['naaccrName'].startswith('CS Site-Specific Factor')]
 
     @classmethod
-    def valtypes(cls):
+    def valtypes(cls) -> pd.DataFrame:
         factor_nums = [d['naaccrNum'] for d in cls.items]
         item_ty = NAACCR_I2B2.tumor_item_type[['naaccrNum', 'naaccrId', 'valtype_cd']]
         item_ty = item_ty[item_ty.naaccrNum.isin(factor_nums)]
         return item_ty
 
     @classmethod
-    def make(cls, spark, extract):
+    def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
         with_schema = cls.make_tumor_schema(spark, extract)
         ty_df = spark.createDataFrame(cls.valtypes())
 
@@ -816,7 +823,9 @@ class SiteSpecificFactors:
         return list(views.values())[-1]
 
     @classmethod
-    def make_tumor_schema(cls, spark, extract):
+    def make_tumor_schema(cls,
+                          spark: SparkSession_T,
+                          extract: DataFrame) -> DataFrame:
         views = create_objects(spark, cls.script1,
                                naaccr_extract_id=ItemObs.make_extract_id(spark, extract))
         return list(views.values())[-1]
@@ -867,7 +876,7 @@ class Account:
                              "password": password,
                              "driver": driver}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.label
 
     def rd(self, io: sq.DataFrameReader, table: str) -> DataFrame:
@@ -895,18 +904,13 @@ DB_TESTING and _cdw.rd(_spark.read, "global_name").toPandas()
 #     vs. `DATE_OF_DIAGNOSIS`.
 
 # %%
-def case_fold(df):
+def case_fold(df: DataFrame) -> DataFrame:
     """Fold column names to upper-case, following (Oracle) SQL norms.
 
     See also: upper_snake_case in pcornet_cdm
     """
     return df.toDF(*[n.upper() for n in df.columns])
 
-
-# %%
-if DB_TESTING:
-    _cdw.wr(_tumor_reg_coded_facts.write, "TUMOR_REG_CODED_FACTS",
-             mode='overwrite')
 
 # %%
 if DB_TESTING:
