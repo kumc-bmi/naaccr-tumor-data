@@ -23,12 +23,12 @@ def _valueOf(example: _T, cls: Callable[..., _U]) -> Callable[..., _T]:
 
 class PathParameter(luigi.Parameter):
     @classmethod
-    def parse(self, x):
+    def parse(self, x: str) -> Path_T:
         from pathlib import Path  # ISSUE: ambient
         return Path(x)
 
     @classmethod
-    def serialize(self, x):
+    def serialize(self, x: Path_T) -> str:
         return str(x)
 
 
