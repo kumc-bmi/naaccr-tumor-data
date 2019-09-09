@@ -49,31 +49,6 @@ class XSD:
         'xsd:boolean': bool,
     }
 
-    @classmethod
-    def decoder(cls, field_type: Dict[str, str]) -> Callable[[Dict[str, str]], Dict[str, object]]:
-        """
-        >>> decode = XSD.decoder({
-        ...     'naaccrId': 'xsd:ID',
-        ...     'naaccrNum': 'xsd:integer',
-        ...     'naaccrName': 'xsd:string',
-        ...     'allowUnlimitedText': 'xsd:boolean',
-        ... })
-        >>> decode({
-        ...     'naaccrId': 'recordType',
-        ...     'naaccrNum': '10',
-        ...     'naaccrName': 'RT',
-        ... })
-        {'naaccrId': 'recordType', 'naaccrNum': 10, 'naaccrName': 'RT'}
-        """
-        def decode(record_raw: Dict[str, str]) -> Dict[str, object]:
-            return {
-                k: f(v)
-                for (k, v) in record_raw.items()
-                for f in [cls.types.get(field_type.get(k, ''),
-                                        lambda x: x)]
-            }
-        return decode
-
 
 Field0 = TypedDict('Field0', {
     'name': str,
@@ -194,6 +169,16 @@ def _parse_html_fragment(path: Path_T) -> XML.Element:
     return XML.fromstring(markup)
 
 
+ItemDef_T = TypedDict('ItemDef_T', {
+    'naaccrId': str,
+    'naaccrNum': int,
+    'naaccrName': str,
+    'startColumn': int,
+    'length': int,
+    'parentXmlElement': str,
+})
+
+
 class NAACCR1:
     """NAACCR XML assets
 
@@ -273,17 +258,19 @@ class NAACCR1:
         return XSD.the(ndd, defPath, cls.ns)
 
     @classmethod
-    def items_180(cls) -> Iterator[Dict[str, object]]:
-        xsd_ty = XSD.the(cls.ItemDef, '*')
-        decls = xsd_ty.findall('xsd:attribute', XSD.ns)
-        to_type = {
-            d.attrib['name']: d.attrib['type']
-            for d in decls
-        }
-        decoder = XSD.decoder(to_type)
+    def items_180(cls) -> Iterator[ItemDef_T]:
+        def decode(f: Dict[str, str]) -> ItemDef_T:
+            return {
+                'naaccrId': f['naaccrId'],
+                'naaccrNum': int(f['naaccrNum']),
+                'naaccrName': f['naaccrName'],
+                'startColumn': int(f['startColumn']),
+                'length': int(f['length']),
+                'parentXmlElement': f['parentXmlElement'],
+            }
 
         defs = cls.ndd180.iterfind('./n:ItemDefs/n:ItemDef', cls.ns)
-        return (decoder(elt.attrib) for elt in defs)
+        return (decode(elt.attrib) for elt in defs)
 
 
 def eltSchema(xsd_complex_type: XML.Element,
