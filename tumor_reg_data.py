@@ -241,14 +241,14 @@ def csv_meta(dtypes: Dict[str, np.dtype], path: str,
         raise NotImplementedError(dty.kind)
 
     cols = [
-        { "titles": name,
-          "datatype": xlate(dty) }
+        {"titles": name,
+         "datatype": xlate(dty)}
         for name, dty in dtypes.items()
     ]
-    return { "@context": context,
-             "url": path,
-             "tableSchema": {
-                 "columns": cols
+    return {"@context": context,
+            "url": path,
+            "tableSchema": {
+                "columns": cols
              }}
 
 #@@ csv_meta(x.dtypes, 'tumor_item_type.csv')
@@ -565,7 +565,8 @@ class TumorKeys:
     def patients(cls, spark: SparkSession_T,
                  naaccr_text_lines: DataFrame) -> DataFrame:
         pat = cls._pick_cols(spark, naaccr_text_lines,
-                             cls.pat_ids + cls.pat_attrs + cls.report_ids + cls.report_attrs)
+                             cls.pat_ids + cls.pat_attrs +
+                             cls.report_ids + cls.report_attrs)
         # distinct() wasn't fixed until the 3.x pre-release
         # https://github.com/zero323/pyspark-stubs/pull/138 623b0c0330ef
         return pat.distinct()  # type: ignore
