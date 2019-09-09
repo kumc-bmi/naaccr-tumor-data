@@ -99,8 +99,8 @@ class NAACCR_Layout:
 
     >>> NAACCR_Layout.fields[:3]
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    [{'name': 'recordType', 'start': 1, 'end': 1, ..., 'length': 1},
-     {'name': 'registryType', 'start': 2, ..., 'section': 'Record ID', ...},
+    [{'name': 'recordType', 'start': 1, 'end': 1, 'length': 1, ...},
+     {'name': 'registryType', 'start': 2, ..., 'section': 'Record ID'},
      {'name': 'naaccrRecordVersion', ... 'naaccr-item-num': 50, ...}]
 
     >>> for info in list(NAACCR_Layout.fields_source())[:3]:
@@ -173,9 +173,9 @@ ItemDef_T = TypedDict('ItemDef_T', {
     'naaccrId': str,
     'naaccrNum': int,
     'naaccrName': str,
+    'parentXmlElement': str,
     'startColumn': int,
     'length': int,
-    'parentXmlElement': str,
 })
 
 
@@ -224,7 +224,7 @@ class NAACCR1:
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     [{'naaccrId': 'recordType', 'naaccrNum': 10,
       'naaccrName': 'Record Type',
-      'startColumn': 1, 'length': 1, 'recordTypes': 'A,M,C,I',
+      'startColumn': 1, 'length': 1,
       'parentXmlElement': 'NaaccrData'},
      {'naaccrId': 'registryType', 'naaccrNum': 30, ...},
      {'naaccrId': 'naaccrRecordVersion', 'naaccrNum': 50, ...}]
