@@ -5,7 +5,7 @@ see also dmtoterms.rst in `pcornet-dm`__ for design notes and tests.
 __ https://bitbucket.org/gpcnetwork/pcornet-dm
 '''
 
-from collections import namedtuple
+from typing import List, NamedTuple, Optional as Opt, Tuple
 
 __author__ = 'Dan Connolly'
 __contact__ = 'http://informatics.kumc.edu/'
@@ -16,33 +16,36 @@ __docformat__ = "restructuredtext en"
 
 # Columns are taken from DDL for Table I2B2
 # in create_oracle_i2b2metadata_tables.sql
-Term = namedtuple('Term',
-                  ['c_hlevel',
-                   'c_fullname', 'c_basecode', 'c_name',
-                   'c_visualattributes',
-                   'm_applied_path', 'c_tooltip',
-                   'c_synonym_cd',
-                   'update_date', 'sourcesystem_cd',
+Term = NamedTuple('Term',
+                  [('c_hlevel', int),
+                   ('c_fullname', str), ('c_basecode', Opt[str]), ('c_name', str),
+                   ('c_visualattributes', str),
+                   ('m_applied_path', str), ('c_tooltip', Opt[bytes]),
+                   ('c_synonym_cd', str),
+                   ('update_date', Opt[str]), ('sourcesystem_cd', Opt[str]),
                    # Loading CLOBS from CSV doesn't seem to work.
                    # 'c_metadataxml',
-                   'c_dimcode', 'c_operator', 'c_columndatatype',
-                   'c_columnname', 'c_tablename', 'c_facttablecolumn'])
+                   ('c_dimcode', str), ('c_operator', str),
+                   ('c_columndatatype', str),
+                   ('c_columnname', str), ('c_tablename', str),
+                   ('c_facttablecolumn', str)])
 
 
 class I2B2MetaData(object):
     @classmethod
-    def term(cls, pfx, parts, name,
-             code=None, viz='CAE', applies_to=[], tooltip=None,
-             c_synonym_cd='N',
-             update_date=None,  # audit info can be added later
-             sourcesystem_cd=None,
-             c_metadataxml=None,
-             c_operator='like',
-             c_columndatatype='@',
-             c_columnname='concept_path',
-             c_tablename='concept_dimension',
-             c_facttablecolumn='concept_cd',
-             max_tooltip_len=850, encoding='utf-8'):
+    def term(cls, pfx: List[str], parts: List[str], name: str,
+             code: Opt[str] = None, viz: str = 'CAE',
+             applies_to: List[str] = [], tooltip: Opt[str] = None,
+             c_synonym_cd: str = 'N',
+             update_date: Opt[str] = None,  # audit info can be added later
+             sourcesystem_cd: Opt[str] = None,
+             c_metadataxml: Opt[str] = None,
+             c_operator: str = 'like',
+             c_columndatatype: str = '@',
+             c_columnname: str = 'concept_path',
+             c_tablename: str = 'concept_dimension',
+             c_facttablecolumn: str = 'concept_cd',
+             max_tooltip_len: int = 850, encoding: str = 'utf-8') -> Term:
         r'''Make metadata for an i2b2 term.
 
         :param pfx: Part of the fullname that doesn't contribute to
@@ -100,7 +103,7 @@ class I2B2MetaData(object):
         m_path = '\\'.join(applies_to + ['%']) if applies_to else '@'
 
         tooltip_enc = (tooltip or '')[:max_tooltip_len].encode(encoding)
-        tooltip_q = tooltip_enc.replace('"', "'")
+        tooltip_q = tooltip_enc.replace(b'"', b"'")
 
         return Term(
             hlevel, path,
@@ -112,12 +115,14 @@ class I2B2MetaData(object):
             c_tablename, c_facttablecolumn)
 
     @classmethod
-    def top_term(cls, root):
+    def top_term(cls, root: str) -> Term:
         return cls.term(parts=[], pfx=['', root], name=root)
 
     @classmethod
-    def folders(cls, pfx, path_parts, names, tooltips, vizs,
-                mapp=None):
+    def folders(cls, pfx: List[str], path_parts: List[List[str]],
+                names: List[str],
+                tooltips: List[Opt[str]], vizs: List[str],
+                mapp: Opt[List[List[str]]] = None) -> List[Term]:
         return [cls.term(pfx=pfx,
                          parts=parts,
                          applies_to=app,
@@ -129,8 +134,9 @@ class I2B2MetaData(object):
                        mapp or [[] for _ in path_parts])]
 
     @classmethod
-    def discrete_terms(cls, pfx,
-                       path_parts, codes, applies, names, vizs):
+    def discrete_terms(cls, pfx: List[str],
+                       path_parts: List[List[str]], codes: List[str],
+                       applies: List[List[str]], names: List[str], vizs: List[str]) -> List[Term]:
         return [
             cls.term(pfx=pfx,
                      parts=parts,
@@ -142,8 +148,11 @@ class I2B2MetaData(object):
             in zip(path_parts, codes, applies, names, vizs)]
 
     @classmethod
-    def scalars(cls, pfx, field_parts, codes,
-                names, value_info, vizs, tooltips):
+    def scalars(cls, pfx: List[str], field_parts: List[List[str]],
+                codes: List[str],
+                names: List[str], value_info: List[Tuple[str, str, str]],
+                vizs: List[str],
+                tooltips: List[str]) -> List[Term]:
         return [cls.term(pfx=pfx,
                          parts=parts, code=code, name=name,
                          c_columndatatype=ct,
@@ -156,10 +165,10 @@ class I2B2MetaData(object):
                 in zip(field_parts, codes, names, value_info, vizs, tooltips)]
 
     @classmethod
-    def metadataxml(cls, normalunits,
-                    datatype='Float', oktousevalues='Y',
+    def metadataxml(cls, normalunits: str,
+                    datatype: str = 'Float', oktousevalues: str = 'Y',
                     # arbitrary
-                    creation='01/26/2011 00:00:00'):
+                    creation: str = '01/26/2011 00:00:00') -> str:
         '''
         ref: `XML Specification for Descriptive Files of Values`__
 
