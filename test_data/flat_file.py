@@ -8,6 +8,7 @@ import pandas as pd  # type: ignore
 import numpy as np  # type: ignore
 
 
+# ISSUE: refactor overlap with tumor_reg_data
 def naaccr_read_fwf(flat_file: DataFrame, record_layout: DataFrame,
                     value_col: str = 'value',
                     exclude_pfx: str = 'reserved') -> DataFrame:

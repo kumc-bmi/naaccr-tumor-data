@@ -3,7 +3,9 @@ all: check_code run_notebook
 
 run_notebook: tumor_reg_data_run.html
 
-check_code:
+check_code: doctest lint static
+
+doctest:
 	# nosetests --with-doctest
 	# or tox?
 	python -m doctest tumor_reg_ont.py
@@ -11,10 +13,8 @@ check_code:
 	python -m doctest tumor_reg_tasks.py
 	python -m doctest sql_script.py
 
-check_code_todo: static lint
-
 lint:
-	pyflakes .
+	flake8 .
 
 static:
 	mypy --strict .

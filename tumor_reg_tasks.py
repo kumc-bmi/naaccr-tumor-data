@@ -225,8 +225,8 @@ class JDBCTask(luigi.Task):
                 else:
                     raise err from None
 
-    @el.log_call(include_args=['fname', 'line', 'ignore_error'])
     @classmethod
+    @el.log_call(include_args=['fname', 'line', 'ignore_error'])
     def execute_statement(cls, conn: Connection, fname: str, line: int,
                           statement: SQL, params: Params,
                           ignore_error: bool) -> bool:
@@ -778,7 +778,7 @@ class NAACCR_Load(UploadTask):
                 dateCaseReportExported=self.dateCaseReportExported,
                 npiRegistryId=self.npiRegistryId)
             for cls in [NAACCR_Patients, NAACCR_Visits, NAACCR_Facts]
-            }
+        }
         return dict(parts, NAACCR_FlatFile=ff)
 
     def _flat_file_task(self) -> NAACCR_FlatFile:
@@ -788,7 +788,6 @@ class NAACCR_Load(UploadTask):
         return cast(NAACCR_Patients, self.requires()['NAACCR_Patients'])
 
     def run_upload(self, conn: Connection, upload_id: int) -> None:
-        parts = self.requires()
         ff = self._flat_file_task()
         pat = self._patients_task()
 

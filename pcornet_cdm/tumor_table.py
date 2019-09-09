@@ -63,18 +63,19 @@ class DataDictionary(object):
     # TODO: constraints
 
     def fields(self, data_raw, ch10):
-        fields = pd.DataFrame({
-            'name': self.info.name_literal,
-            'xmlId': self.info.name,
-            'TABLE_NAME': self.table_name,
-            'FIELD_NAME': self.info.name.apply(upper_snake_case),
-            'RDBMS_DATA_TYPE': 'TODO',  # self.info.type,
-            'SAS_DATA_TYPE': 'TODO',  # self.info.type,
-            'DATA_FORMAT': self.info.type,
-            'REPLICATED_FIELD': 'NO',
-            'UNIT_OF_MEASURE': '',
-        },
-                              index=self.info.index)
+        fields = pd.DataFrame(
+            {
+                'name': self.info.name_literal,
+                'xmlId': self.info.name,
+                'TABLE_NAME': self.table_name,
+                'FIELD_NAME': self.info.name.apply(upper_snake_case),
+                'RDBMS_DATA_TYPE': 'TODO',  # self.info.type,
+                'SAS_DATA_TYPE': 'TODO',  # self.info.type,
+                'DATA_FORMAT': self.info.type,
+                'REPLICATED_FIELD': 'NO',
+                'UNIT_OF_MEASURE': '',
+            },
+            index=self.info.index)
         fields = fields[~fields.FIELD_NAME.str.startswith('RESERVED')]
         fields['FIELD_ORDER'] = range(1, len(fields) + 1)
 

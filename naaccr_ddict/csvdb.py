@@ -174,9 +174,10 @@ def load_table(dest, table, header, rows,
     stmt = """
       insert into "{table}" ({header})
       values ({placeholders})""".format(
-          table=table,
-          header=', '.join(f'"{col}"' for col in header),
-          placeholders=', '.join('?' for _ in header))
+        table=table,
+        header=', '.join(f'"{col}"' for col in header),
+        placeholders=', '.join('?' for _ in header)
+    )
     log.debug('%s', stmt)
     batch = []
 

@@ -19,9 +19,8 @@
 from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
-from pprint import pformat
 from sys import stderr
-from typing import Callable, ContextManager, Dict, Iterator, List, NoReturn
+from typing import ContextManager, Dict, Iterator, List, NoReturn
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import logging
@@ -38,17 +37,15 @@ import pandas as pd  # type: ignore
 
 # %%
 # 3rd party: naaccr-xml
-import naaccr_xml_res  # ISSUE: symlink noted above
 import naaccr_xml_samples
-import naaccr_xml_xsd
 
 import bc_qa
 
 # %%
 # this project
-#from test_data.flat_file import naaccr_read_fwf  # ISSUE: refactor
 from sql_script import SqlScript
-from tumor_reg_ont import NAACCR_Layout, create_objects
+from tumor_reg_ont import NAACCR1, NAACCR_Layout, LOINC_NAACCR, NAACCR_R, NAACCR_I2B2
+from tumor_reg_ont import create_objects, ddictDF, eltSchema, xmlDF, eltDict
 import heron_load
 
 
@@ -120,8 +117,6 @@ if IO_TESTING:
 # ## `naaccr-xml` Data Dictionary
 
 # %%
-from tumor_reg_ont import XSD, NAACCR1, LOINC_NAACCR, ddictDF, NAACCR_I2B2
-
 if IO_TESTING:
     ddictDF(_spark).createOrReplaceTempView('ndd180')
 IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
@@ -129,8 +124,7 @@ IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
 # %%
 if IO_TESTING:
     _spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
-    _ont = NAACCR_I2B2.ont_view_in(_spark)  ## TODO: seer recode
-    # _ont = NAACCR_I2B2.ont_view_in(_spark, _cwd / 'naaccr_ddict', _cwd / ',seer_site_recode.txt')  ## TODO: seer recode
+    _ont = NAACCR_I2B2.ont_view_in(_spark)  # TODO: seer recode in NAACCR_ONTOLOGY
 IO_TESTING and _ont.limit(5).toPandas()
 
 # %% [markdown]
@@ -143,8 +137,6 @@ from ndd180 as idef
 ''').limit(8).toPandas()
 
 # %%
-from tumor_reg_ont import NAACCR_R
-
 if IO_TESTING:
     NAACCR_R.field_info_in(_spark)
 IO_TESTING and _spark.table('field_info').limit(5).toPandas()
@@ -239,9 +231,7 @@ def csv_meta(dtypes: Dict[str, np.dtype], path: str,
             "url": path,
             "tableSchema": {
                 "columns": cols
-             }}
-
-#@@ csv_meta(x.dtypes, 'tumor_item_type.csv')
+            }}
 
 
 # %%
@@ -262,7 +252,7 @@ def csv_spark_schema(columns: List[Dict[str, str]]) -> ty.StructType:
         for col in columns]
     return ty.StructType(fields)
 
-#@@ csv_spark_schema(csv_meta(x.dtypes, 'tumor_item_type.csv')['tableSchema']['columns'])
+# IDEA: csv_spark_schema(csv_meta(x.dtypes, 'tumor_item_type.csv')['tableSchema']['columns'])
 
 
 # %% [markdown]
@@ -303,9 +293,6 @@ class NAACCR2:
 
 
 # %%
-from tumor_reg_ont import eltSchema, xmlDF, eltDict
-
-
 def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
     rownum = 0
     ns = {'n': 'http://naaccr.org/naaccrxml'}
@@ -631,6 +618,7 @@ class TumorKeys:
         out = out.withColumnRenamed('PATIENT_NUM', 'patient_num')
         return out
 
+
 # pat_tmr.cache()
 if IO_TESTING:
     _pat_tmr = TumorKeys.with_rownum(TumorKeys.with_tumor_id(
@@ -700,16 +688,16 @@ IO_TESTING and _raw_obs.limit(10).toPandas()
 # %%
 if IO_TESTING:
     _script1 = SqlScript('naaccr_txform.sql',
-                             res.read_text(heron_load, 'naaccr_txform.sql'),
-                             [('tumor_item_value', ['naaccr_obs_raw'])])
+                         res.read_text(heron_load, 'naaccr_txform.sql'),
+                         [('tumor_item_value', ['naaccr_obs_raw'])])
     create_objects(_spark, _script1, naaccr_obs_raw=_raw_obs)
 IO_TESTING and _spark.table('tumor_item_value').limit(10).toPandas()
 
 # %%
 if IO_TESTING:
     _script1 = SqlScript('naaccr_txform.sql',
-                             res.read_text(heron_load, 'naaccr_txform.sql'),
-                             [('tumor_reg_facts', ['record_layout', 'section'])])
+                         res.read_text(heron_load, 'naaccr_txform.sql'),
+                         [('tumor_reg_facts', ['record_layout', 'section'])])
     create_objects(_spark, _script1,
                    record_layout=_spark.createDataFrame(NAACCR_Layout.fields),
                    section=_spark.createDataFrame(NAACCR_I2B2.per_section))
@@ -723,8 +711,9 @@ IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(
 class ItemObs:
     script = SqlScript('naaccr_txform.sql',
                        res.read_text(heron_load, 'naaccr_txform.sql'),
-                       [('tumor_item_value', ['naaccr_obs_raw']),
-                        ('tumor_reg_facts', ['record_layout', 'section']),
+                       [
+                           ('tumor_item_value', ['naaccr_obs_raw']),
+                           ('tumor_reg_facts', ['record_layout', 'section']),
                        ])
 
     extract_id_view = 'naaccr_extract_id'
@@ -755,6 +744,7 @@ class ItemObs:
         extract_id.createOrReplaceTempView(cls.extract_id_view)
         return spark.table(cls.extract_id_view)
 
+
 if IO_TESTING:
     _obs = ItemObs.make(_spark, _extract)
 IO_TESTING and _obs.limit(5).toPandas()
@@ -779,6 +769,7 @@ class SEER_Recode:
         views = create_objects(spark, cls.script,
                                naaccr_extract_id=extract_id)
         return list(views.values())[-1]
+
 
 IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
 
@@ -930,7 +921,7 @@ def itemNumOfPath(bc_var: DataFrame,
                   item: str = 'item') -> DataFrame:
     digits = func.regexp_extract('concept_path',
                                  r'\\i2b2\\naaccr\\S:[^\\]+\\(\d+)', 1)
-    items = bc_var.select(digits.cast('int').alias(item))   #@@.dropna().distinct()
+    items = bc_var.select(digits.cast('int').alias(item))   # TODO: .dropna().distinct()
     return items.sort(item)
 
 
@@ -1005,9 +996,6 @@ IO_TESTING and bc_var_summary(
     _spark, _obs, _bc_ddict).where(
         'fact_qty is not null').toPandas()
 
-# %% [markdown]
-# **TODO**: date observations; treating `dateOfDiagnosis` as a coded observation leads to `concept_cd = 'NAACCR|390:20080627'`
-
 # %%
 IO_TESTING and _obs.where("naaccrId == 'dateOfDiagnosis'").limit(5).toPandas()
 
@@ -1024,6 +1012,7 @@ def pivot_obs_by_enc(skinny_obs: DataFrame,
     groups = skinny_obs.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
     wide = groups.pivot(pivot_on).agg(func.first(value_col))
     return wide
+
 
 IO_TESTING and pivot_obs_by_enc(_obs.where(
     _obs.naaccrId.isin(['dateOfDiagnosis', 'primarySite', 'sex', 'dateOfBirth'])
