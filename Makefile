@@ -17,10 +17,9 @@ lint:
 	pyflakes .
 
 static:
-	MYPYPATH=. mypy --strict --show-traceback heron_staging/tumor_reg/seer_recode.py
-	MYPYPATH=. mypy --strict --show-traceback tumor_reg_ont.py
+	mypy --strict .
+	# previous approaches
 	# mypy --strict --show-traceback .
-	# echo MYPYPATH=$(CONDA_PREFIX)/lib/python3.7 mypy --strict .
 	# MYPYPATH=.:$(CONDA_PREFIX)/lib/python3.7 mypy --strict .
 
 tumor_reg_data_run.html: tumor_reg_data_run.ipynb
