@@ -743,7 +743,23 @@ class HERON_Patient_Mapping(UploadTask):
         raise NotImplementedError('load_epic_dimensions is a paver task')
 
 
-class NAACCR_Load(UploadTask):
+class _RunScriptTask(UploadTask):
+    jdbc_driver_jar = pv.StrParam(significant=False)
+    log_dest = pv.PathParam(significant=False)
+
+    script_name: str
+
+    @property
+    def classpath(self) -> str:
+        # ISSUE: refactor overlap with NAACCR_Load
+        return self.jdbc_driver_jar
+
+    @property
+    def label(self) -> str:
+        return self.script_name
+
+
+class NAACCR_Load(_RunScriptTask):
     '''Map and load NAACCR patients, tumors / visits, and facts.
     '''
     # flat file attributes
@@ -758,17 +774,10 @@ class NAACCR_Load(UploadTask):
     # ISSUE: task_id should depend on dest schema / owner.
     z_design_id = pv.StrParam(default='nested fields')
 
-    jdbc_driver_jar = pv.StrParam(significant=False)
-    log_dest = pv.PathParam(significant=False)
-
     script_name = 'naaccr_facts_load.sql'
     script_deid_name = 'i2b2_facts_deid.sql'
     script = res.read_text(heron_load, script_name)
     script_deid = res.read_text(heron_load, script_deid_name)
-
-    @property
-    def label(self) -> str:
-        return self.script_name
 
     @property
     def classpath(self) -> str:
@@ -818,6 +827,31 @@ class NAACCR_Load(UploadTask):
                     download_date=ff.dateCaseReportExported,
                     patient_ide_source=pat.patient_ide_source,
                     encounter_ide_source=self.encounter_ide_source))
+
+
+class MigrateUpload(_RunScriptTask):
+    upload_id = pv.IntParam()
+    workspace_star = pv.StrParam(default='HERON_ETL_1')
+    parallel_degree = pv.IntParam(default=24,
+                                  significant=False)
+
+    script_name = 'migrate_fact_upload.sql'
+    script = res.read_text(heron_load, script_name)
+
+    @property
+    def source_cd(self) -> str:
+        return self.workspace_star
+
+    def run_upload(self, conn: Connection, upload_id: int) -> None:
+        self.run_script(conn, self.script_name, self.script,
+                        variables=self.variables)
+
+    @property
+    def variables(self) -> Environment:
+        return dict(I2B2STAR=self.schema,
+                    workspace_star=self.workspace_star,
+                    parallel_degree=str(self.parallel_degree),
+                    upload_id=str(self.upload_id))
 
 
 if __name__ == '__main__':
