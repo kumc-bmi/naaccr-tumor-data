@@ -206,7 +206,7 @@ create or replace temporary view tumor_reg_facts as
 with obs_w_section as (
   select tiv.*, rl.length as field_length, s.sectionId
   from tumor_item_value tiv
-  join record_layout rl on rl.name = tiv.naaccrId
+  join record_layout rl on rl.`naaccr-item-num` = tiv.naaccrNum
   join section s on s.section = rl.section
 ),
 

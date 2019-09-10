@@ -51,7 +51,7 @@ class XSD:
 
 
 Field0 = TypedDict('Field0', {
-    'name': str,
+    'short-label': str,
     'start': int, 'end': int,
     'naaccr-item-num': int,
     'section': str,
@@ -60,7 +60,7 @@ Field0 = TypedDict('Field0', {
 
 def to_field0(attr: Dict[str, str]) -> Field0:
     return {
-        'name': attr['name'],
+        'short-label': attr['short-label'],
         'start': int(attr['start']), 'end': int(attr['end']),
         'naaccr-item-num': int(attr['naaccr-item-num']),
         'section': attr['section'],
@@ -68,7 +68,7 @@ def to_field0(attr: Dict[str, str]) -> Field0:
 
 
 Field = TypedDict('Field', {
-    'name': str,
+    'short-label': str,
     'start': int, 'end': int,
     'length': int,
     'naaccr-item-num': int,
@@ -78,7 +78,7 @@ Field = TypedDict('Field', {
 
 def to_field(f: Field0) -> Field:
     return {
-        'name': f['name'],
+        'short-label': f['short-label'],
         'start': f['start'], 'end': f['end'],
         'length': f['end'] + 1 - f['start'],
         'naaccr-item-num': f['naaccr-item-num'],
@@ -99,9 +99,9 @@ class NAACCR_Layout:
 
     >>> NAACCR_Layout.fields[:3]
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    [{'name': 'recordType', 'start': 1, 'end': 1, 'length': 1, ...},
-     {'name': 'registryType', 'start': 2, ..., 'section': 'Record ID'},
-     {'name': 'naaccrRecordVersion', ... 'naaccr-item-num': 50, ...}]
+    [{'short-label': 'Rec Type', 'start': 1, 'end': 1, 'length': 1, ...},
+     {'short-label': 'Reg Type', 'start': 2, ..., 'section': 'Record ID'},
+     {'short-label': 'NAACCR Rec Ver', ... 'naaccr-item-num': 50, ...}]
 
     >>> for info in list(NAACCR_Layout.fields_source())[:3]:
     ...     print(info)

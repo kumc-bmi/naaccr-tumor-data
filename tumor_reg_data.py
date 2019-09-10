@@ -749,6 +749,20 @@ if IO_TESTING:
     _obs = ItemObs.make(_spark, _extract)
 IO_TESTING and _obs.limit(5).toPandas()
 
+# %% [markdown]
+# #### dateOfBirth regression test
+#
+# I originally thought the field (item) names used in
+# [imsweb/layout](https://github.com/imsweb/layout/) and
+# [imsweb/naaccr-xml](https://github.com/imsweb/naaccr-xml/)
+# were supposed to correspond. But they don't. As a result,
+# all date of birth (item 240) data was lost.
+#
+# See also [imsweb/layout/issues/72](https://github.com/imsweb/layout/issues/72).
+
+# %%
+IO_TESTING and _obs.where("concept_cd = 'NAACCR|240:'").limit(10).toPandas()
+
 # %%
 IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 

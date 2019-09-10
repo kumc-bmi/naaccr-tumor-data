@@ -745,7 +745,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
 
     # ISSUE: task_id should depend on dest schema / owner.
-    z_design_id = pv.StrParam('with SEER, ssf names')
+    z_design_id = pv.StrParam(default='record_layout num join')
 
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
