@@ -11,7 +11,6 @@ https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 """
 
 from contextlib import contextmanager
-from functools import wraps
 from importlib import resources as res
 from pathlib import Path as Path_T
 from typing import Any, TypeVar, Union, cast, overload
@@ -146,17 +145,13 @@ TaskMethod = Callable[..., Any]
 M = TypeVar('M', bound=TaskMethod)
 
 
-def with_task_logging(f: M) -> M:
-    @wraps(f)
-    def call_in_action(self, *args, **kwds):  # type: ignore
-        with el.start_task(action_type=f'{self.task_family}.{f.__name__}',
-                           task_id=self.task_id,
-                           **self.to_str_params(only_significant=True,
-                                                only_public=True)) as ctx:
-            result = f(self, *args, **kwds)
-            ctx.add_success_fields(result=result)
-            return result
-    return cast(M, call_in_action)
+@contextmanager
+def task_action(task: luigi.Task, method: str) -> Iterator[el.Action]:
+    with el.start_task(action_type=f'{task.task_family}.{method}',
+                       task_id=task.task_id,
+                       **task.to_str_params(only_significant=True,
+                                            only_public=True)) as ctx:
+        yield ctx
 
 
 class JDBCTask(luigi.Task):
@@ -239,8 +234,8 @@ class JDBCTask(luigi.Task):
             stmt.execute()
         return ignore_error
 
-    @contextmanager
     @classmethod
+    @contextmanager
     def prepared(cls, conn: Connection,
                  sql: str, params: Params) -> Iterator[PreparedStatement]:
         sqlq, values = to_qmark(sql, params)
@@ -285,7 +280,11 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
         raise NotImplementedError
 
     def main(self, sparkContext: SparkContext_T, *_args: Any) -> None:
-        raise NotImplementedError
+        with task_action(self, 'main'):
+            self.main_action(sparkContext)
+
+    def main_action(self, sparkContext: SparkContext_T) -> None:
+        raise NotImplementedError('subclass must implement')
 
     @property
     def classpath(self) -> str:
@@ -310,7 +309,7 @@ class HelloNAACCR(SparkJDBCTask):
     def output(self) -> luigi.Target:
         return luigi.LocalTarget(self.save_path)
 
-    def main(self, sparkContext: SparkContext_T, *_args: Any) -> None:
+    def main_action(self, sparkContext: SparkContext_T) -> None:
         spark = SparkSession(sparkContext)
         upload_status = self.account().rd(
             spark.read, table=f'{self.schema}.upload_status')
@@ -349,9 +348,11 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
     table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
 
-    @with_task_logging
     def complete(self) -> bool:
-        return self.output().exists()
+        with task_action(self, 'complete') as ctx:
+            result = self.output().exists()
+            ctx.add_success_fields(result=result)
+            return result
 
     def output(self) -> JDBCTableTarget:
         query = f"""
@@ -361,8 +362,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         """
         return JDBCTableTarget(self, query)
 
-    @el.log_call(include_args=None)
-    def main(self, sparkContext: SparkContext_T, *_args: Any) -> None:
+    def main_action(self, sparkContext: SparkContext_T, *_args: Any) -> None:
         quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
 
@@ -383,9 +383,9 @@ class ManualTask(luigi.Task):
     """We can check that manual tasks are complete,
     though we can't run them.
     """
-    @with_task_logging
     def run(self) -> None:
-        raise NotImplementedError(f'{self.get_task_family()} is manual.')
+        with task_action(self, 'run'):
+            raise NotImplementedError(f'{self.get_task_family()} is manual.')
 
 
 class NAACCR_FlatFile(ManualTask):
@@ -404,8 +404,13 @@ class NAACCR_FlatFile(ManualTask):
         if self.naaccrRecordVersion != 180:
             raise NotImplementedError()
 
-    @with_task_logging
     def complete(self) -> bool:
+        with task_action(self, 'complete') as ctx:
+            result = self.complete_action()
+            ctx.add_success_fields(result=result)
+            return result
+
+    def complete_action(self) -> bool:
         """Check the first record, assuming all the others have
         the same export date and registry NPI.
         """
@@ -468,9 +473,11 @@ class _NAACCR_JDBC(SparkJDBCTask):
     def _flat_file_task(self) -> NAACCR_FlatFile:
         return cast(NAACCR_FlatFile, self.requires()['NAACCR_FlatFile'])
 
-    @with_task_logging
     def complete(self) -> bool:
-        return self.output().exists()
+        with task_action(self, 'complete') as ctx:
+            result = self.output().exists()
+            ctx.add_success_fields(result=result)
+            return result
 
     def output(self) -> luigi.Target:
         query = f"""
@@ -479,8 +486,7 @@ class _NAACCR_JDBC(SparkJDBCTask):
         """
         return JDBCTableTarget(self, query)
 
-    @el.log_call(include_args=None)
-    def main(self, sparkContext: SparkContext_T, *_args: Any) -> None:
+    def main_action(self, sparkContext: SparkContext_T) -> None:
         quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
         ff = self._flat_file_task()
@@ -581,9 +587,11 @@ class UploadTask(JDBCTask):
     def transform_name(self) -> str:
         return self.task_id
 
-    @with_task_logging
     def complete(self) -> bool:
-        return self.output().exists()
+        with task_action(self, 'complete') as ctx:
+            result = self.output().exists()
+            ctx.add_success_fields(result=result)
+            return result
 
     def output(self) -> luigi.Target:
         return self._upload_target()
@@ -591,8 +599,11 @@ class UploadTask(JDBCTask):
     def _upload_target(self) -> 'UploadTarget':
         return UploadTarget(self, self.schema, self.source_cd)
 
-    @with_task_logging
     def run(self) -> None:
+        with task_action(self, 'run'):
+            self.run_action()
+
+    def run_action(self) -> None:
         upload = self._upload_target()
         with upload.job(label=self.label,
                         user_id=self.user) as conn_id:
