@@ -55,15 +55,18 @@ Field0 = TypedDict('Field0', {
     'start': int, 'end': int,
     'naaccr-item-num': int,
     'section': str,
+    'grouped': bool,
 })
 
 
-def to_field0(attr: Dict[str, str]) -> Field0:
+def to_field0(elt: XML.Element) -> Field0:
+    attr = elt.attrib
     return {
         'short-label': attr['short-label'],
         'start': int(attr['start']), 'end': int(attr['end']),
         'naaccr-item-num': int(attr['naaccr-item-num']),
         'section': attr['section'],
+        'grouped': len(elt) > 0,
     }
 
 
@@ -73,6 +76,7 @@ Field = TypedDict('Field', {
     'length': int,
     'naaccr-item-num': int,
     'section': str,
+    'grouped': bool,
 })
 
 
@@ -83,6 +87,7 @@ def to_field(f: Field0) -> Field:
         'length': f['end'] + 1 - f['start'],
         'naaccr-item-num': f['naaccr-item-num'],
         'section': f['section'],
+        'grouped': f['grouped'],
     }
 
 
@@ -100,7 +105,7 @@ class NAACCR_Layout:
     >>> NAACCR_Layout.fields[:3]
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     [{'short-label': 'Rec Type', 'start': 1, 'end': 1, 'length': 1, ...},
-     {'short-label': 'Reg Type', 'start': 2, ..., 'section': 'Record ID'},
+     {'short-label': 'Reg Type', 'start': 2, ..., 'section': 'Record ID', ...},
      {'short-label': 'NAACCR Rec Ver', ... 'naaccr-item-num': 50, ...}]
 
     >>> for info in list(NAACCR_Layout.fields_source())[:3]:
@@ -108,14 +113,36 @@ class NAACCR_Layout:
     (570, 'abstractedBy', 'CoC')
     (550, 'accessionNumberHosp', 'CoC')
     (70, 'addrAtDxCity', 'CoC')
+
+
+    >>> def check_fkey(src, k, dest):
+    ...    range = set(dest)
+    ...    return [rec for rec in src if rec[k] not in range]
+
+    >>> check_fkey(NAACCR_Layout.fields, 'section', NAACCR_I2B2.per_section.section.values)
+    []
+
+    >>> check_fkey(NAACCR1.items_180(), 'naaccrNum',
+    ...            [f['naaccr-item-num'] for f in NAACCR_Layout.fields])
+    []
+
+    ISSUE: Note sure about these two oddballs...
+
+    >>> check_fkey([f for f in NAACCR_Layout.fields if not f['grouped']],
+    ...            'naaccr-item-num',  ## TODO
+    ...            [i['naaccrNum'] for i in NAACCR1.items_180()])
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [{'short-label': 'NPCR Spec Fld', ..., 'naaccr-item-num': 3720, ..., 'grouped': False},
+     {'short-label': 'State Req Item', ..., 'naaccr-item-num': 2220, ..., 'grouped': False}]
     """
     layout_180 = XML.parse(res.open_text(
         naaccr_layout, 'naaccr-18-layout.xml'))
 
     # top-level (non-overlapping) fields, skipping reserved
-    fields_raw = [to_field0(f.attrib)
-                  for f in layout_180.findall('./field')
-                  if not f.attrib['name'].startswith('reserved')]
+    fields_raw = [to_field0(f)
+                  for f in layout_180.findall('.//field')
+                  if f.attrib.get('naaccr-item-num') and
+                  not f.attrib['name'].startswith('reserved')]
 
     # include length
     fields = [to_field(f) for f in fields_raw]

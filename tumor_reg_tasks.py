@@ -550,7 +550,7 @@ class NAACCR_Patients(_NAACCR_JDBC):
 class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
-    z_design_id = pv.StrParam('with seer, ssf; (%s)' % hash(
+    z_design_id = pv.StrParam('nested fields (%s)' % hash(
         (td.ItemObs.script,
          td.SEER_Recode.script,
          td.SiteSpecificFactors.script1,
@@ -756,7 +756,7 @@ class NAACCR_Load(UploadTask):
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
 
     # ISSUE: task_id should depend on dest schema / owner.
-    z_design_id = pv.StrParam(default='record_layout num join')
+    z_design_id = pv.StrParam(default='nested fields')
 
     jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
