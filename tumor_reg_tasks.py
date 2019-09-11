@@ -10,6 +10,7 @@ clues from:
 https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
 """
 
+from abc import abstractmethod
 from contextlib import contextmanager
 from importlib import resources as res
 from pathlib import Path as Path_T
@@ -86,8 +87,8 @@ class PreparedStatement:
     @overload  # noqa # tell flake8 that redefinition is OK
     def executeQuery(self, sql: str) -> ResultSet: ...
 
-    def executeQuery(self, sql: Opt[str] = None) -> ResultSet:  # noqa
-        raise NotImplementedError
+    @abstractmethod  # noqa
+    def executeQuery(self, sql: Opt[str] = None) -> ResultSet: pass
 
 
 class Connection:
@@ -162,8 +163,8 @@ class JDBCTask(luigi.Task):
                           significant=False)
 
     @property
-    def classpath(self) -> str:
-        raise NotImplementedError('subclass must implement')
+    @abstractmethod
+    def classpath(self) -> str: pass
 
     @property
     def __password(self) -> str:
@@ -276,15 +277,15 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
     driver_memory = '2g'
     executor_memory = '3g'
 
-    def output(self) -> luigi.Target:
-        raise NotImplementedError
+    @abstractmethod
+    def output(self) -> luigi.Target: pass
 
     def main(self, sparkContext: SparkContext_T, *_args: Any) -> None:
         with task_action(self, 'main'):
             self.main_action(sparkContext)
 
-    def main_action(self, sparkContext: SparkContext_T) -> None:
-        raise NotImplementedError('subclass must implement')
+    @abstractmethod
+    def main_action(self, sparkContext: SparkContext_T) -> None: pass
 
     @property
     def classpath(self) -> str:
