@@ -280,6 +280,12 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
     @abstractmethod
     def output(self) -> luigi.Target: pass
 
+    def complete(self) -> bool:
+        with task_action(self, 'complete') as ctx:
+            result = self.output().exists()
+            ctx.add_success_fields(result=result)
+            return result
+
     def main(self, sparkContext: SparkContext_T, *_args: Any) -> None:
         with task_action(self, 'main'):
             self.main_action(sparkContext)
@@ -348,12 +354,6 @@ class NAACCR_Ontology1(SparkJDBCTask):
     ''')
 
     table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
-
-    def complete(self) -> bool:
-        with task_action(self, 'complete') as ctx:
-            result = self.output().exists()
-            ctx.add_success_fields(result=result)
-            return result
 
     def output(self) -> JDBCTableTarget:
         query = f"""
@@ -474,12 +474,6 @@ class _NAACCR_JDBC(SparkJDBCTask):
     def _flat_file_task(self) -> NAACCR_FlatFile:
         return cast(NAACCR_FlatFile, self.requires()['NAACCR_FlatFile'])
 
-    def complete(self) -> bool:
-        with task_action(self, 'complete') as ctx:
-            result = self.output().exists()
-            ctx.add_success_fields(result=result)
-            return result
-
     def output(self) -> luigi.Target:
         query = f"""
           (select 1 from {self.table_name}
@@ -571,22 +565,12 @@ class NAACCR_Facts(_NAACCR_JDBC):
 class UploadTask(JDBCTask):
     '''A task with an associated `upload_status` record.
     '''
-    schema = pv.StrParam(description='@@TODO: see client.cfg')
+    jdbc_driver_jar = pv.StrParam(significant=False)
+    schema = pv.StrParam(description='owner of upload_status table')
 
     @property
-    def source_cd(self) -> str:
-        raise NotImplementedError('subclass must implement')
-
-    @property
-    def label(self) -> str:
-        raise NotImplementedError('subclass must implement')
-
-    def run_upload(self, conn: Connection, upload_id: int) -> None:
-        raise NotImplementedError('subclass must implement')
-
-    @property
-    def transform_name(self) -> str:
-        return self.task_id
+    def classpath(self) -> str:
+        return self.jdbc_driver_jar
 
     def complete(self) -> bool:
         with task_action(self, 'complete') as ctx:
@@ -597,8 +581,18 @@ class UploadTask(JDBCTask):
     def output(self) -> luigi.Target:
         return self._upload_target()
 
-    def _upload_target(self) -> 'UploadTarget':
-        return UploadTarget(self, self.schema, self.source_cd)
+    @abstractmethod
+    def _upload_target(self) -> 'UploadTarget': pass
+
+
+class UploadRunTask(UploadTask):
+    @property
+    @abstractmethod
+    def label(self) -> str: pass
+
+    @property
+    @abstractmethod
+    def source_cd(self) -> str: pass
 
     def run(self) -> None:
         with task_action(self, 'run'):
@@ -606,19 +600,20 @@ class UploadTask(JDBCTask):
 
     def run_action(self) -> None:
         upload = self._upload_target()
-        with upload.job(label=self.label,
-                        user_id=self.user) as conn_id:
+        with upload.job(self.label, self.user, self.source_cd) as conn_id:
             conn, upload_id = conn_id
             self.run_upload(conn, upload_id)
+
+    @abstractmethod
+    def run_upload(self, conn: Connection, upload_id: int) -> None: pass
 
 
 class UploadTarget(luigi.Target):
     def __init__(self, upload_task: UploadTask,
-                 schema: str, source_cd: str) -> None:
+                 schema: str, transform_name: str) -> None:
         self._task = upload_task
         self.schema = schema
-        self.source_cd = source_cd
-        self.transform_name = upload_task.transform_name
+        self.transform_name = transform_name
 
     @property
     def nextval_q(self) -> str:
@@ -654,11 +649,11 @@ class UploadTarget(luigi.Target):
         return upload_id is not None
 
     @contextmanager
-    def job(self, label: str, user_id: str) -> Iterator[
+    def job(self, label: str, user_id: str, source_cd: str) -> Iterator[
             Tuple[Connection, int]]:
         with self._task.connection(
                 f'{self.__class__.__name__}.job({label})') as conn:
-            upload_id = self.insert(conn, label, user_id)
+            upload_id = self.insert(conn, label, user_id, source_cd)
 
             try:
                 yield conn, upload_id
@@ -671,7 +666,7 @@ class UploadTarget(luigi.Target):
             else:
                 self.update(conn, upload_id, 'OK', None)
 
-    def insert(self, conn: Connection, label: str, user_id: str) -> int:
+    def insert(self, conn: Connection, label: str, user_id: str, source_cd: str) -> int:
         '''
         :param label: a label for related facts for audit purposes
         :param user_id: an indication of who uploaded the related facts
@@ -691,7 +686,7 @@ class UploadTarget(luigi.Target):
         ''', dict(upload_id=upload_id,
                   label=label,
                   user_id=user_id,
-                  src=self.source_cd,
+                  src=source_cd,
                   params=json.dumps(
                       self._task.to_str_params(only_significant=True,
                                                only_public=True),
@@ -728,32 +723,24 @@ class HERON_Patient_Mapping(UploadTask):
     # ISSUE: task id should depend on HERON release, too
     classpath = pv.StrParam(significant=False)
 
-    @property
-    def transform_name(self) -> str:
-        return 'load_epic_dimensions'
+    transform_name = 'load_epic_dimensions'
+
+    def _upload_target(self) -> 'UploadTarget':
+        return UploadTarget(self, self.schema, self.transform_name)
 
     @property
     def source_cd(self) -> str:
         return self.patient_ide_source
 
-    @property
-    def label(self) -> str:
-        raise NotImplementedError(self)
-
     def run(self) -> None:
-        raise NotImplementedError('load_epic_dimensions is a paver task')
+        with task_action(self, 'run'):
+            raise NotImplementedError('load_epic_dimensions is a paver task')
 
 
 class _RunScriptTask(UploadTask):
-    jdbc_driver_jar = pv.StrParam(significant=False)
     log_dest = pv.PathParam(significant=False)
 
     script_name: str
-
-    @property
-    def classpath(self) -> str:
-        # ISSUE: refactor overlap with NAACCR_Load
-        return self.jdbc_driver_jar
 
     @property
     def label(self) -> str:
@@ -783,6 +770,9 @@ class NAACCR_Load(_RunScriptTask):
     @property
     def classpath(self) -> str:
         return self.jdbc_driver_jar
+
+    def _upload_target(self) -> 'UploadTarget':
+        return UploadTarget(self, self.schema, transform_name=self.task_id)
 
     def requires(self) -> Dict[str, luigi.Task]:
         _configure_logging(self.log_dest)
@@ -830,29 +820,75 @@ class NAACCR_Load(_RunScriptTask):
                     encounter_ide_source=self.encounter_ide_source))
 
 
-class MigrateUpload(_RunScriptTask):
+class _MigrateIdFacts(SparkJDBCTask):
     upload_id = pv.IntParam()
-    workspace_star = pv.StrParam(default='HERON_ETL_1')
-    parallel_degree = pv.IntParam(default=24,
-                                  significant=False)
+    i2b2_dest = pv.StrParam()
+    workspace_schema = pv.StrParam()
 
-    script_name = 'migrate_fact_upload.sql'
-    script = res.read_text(heron_load, script_name)
+    @property
+    def label(self) -> str:
+        return self.get_task_family()
+
+    def output(self) -> luigi.LocalTarget:
+        """Since making a DB connection is awkward and
+        scanning the observation_fact table is expensive,
+        let's cache status in the current directory.
+        """
+        # ISSUE: assumes linux paths
+        return luigi.LocalTarget(path=f"task_status/{self.task_id}")
+
+    def main_action(self, sc: SparkContext_T) -> None:
+        spark = SparkSession(sc)
+        src_name = f'{self.workspace_schema}.observation_fact_{self.upload_id}'
+        dest_name = f'{self.i2b2_dest}.observation_fact'
+        with el.start_action(action_type=self.label,
+                             src=src_name, dest=dest_name):
+            src = self.account().rd(spark.read, src_name)
+            print(src.limit(1).collect())
+            with self.output().open(mode='w') as out:
+                self.account().wr(src.write, dest_name, mode='append')
+                out.write(self.task_id)
 
     @property
     def source_cd(self) -> str:
-        return self.workspace_star
+        return self.workspace_schema
 
-    def run_upload(self, conn: Connection, upload_id: int) -> None:
-        self.run_script(conn, self.script_name, self.script,
-                        variables=self.variables)
+
+class MigrateUpload(UploadRunTask):
+    upload_id = pv.IntParam()
+    log_dest = pv.PathParam(significant=False)
+    workspace_schema = pv.StrParam(default='HERON_ETL_1')
 
     @property
-    def variables(self) -> Environment:
-        return dict(I2B2STAR=self.schema,
-                    workspace_star=self.workspace_star,
-                    parallel_degree=str(self.parallel_degree),
-                    upload_id=str(self.upload_id))
+    def label(self) -> str:
+        return self.get_task_family()
+
+    @property
+    def source_cd(self) -> str:
+        return self.workspace_schema
+
+    def requires(self) -> Dict[str, luigi.Task]:
+        if self.complete():
+            return {}
+
+        _configure_logging(self.log_dest)
+        return {
+            'id': _MigrateIdFacts(
+                upload_id=self.upload_id,
+                workspace_schema=self.workspace_schema,
+                i2b2_dest=self.schema,
+                db_url=self.db_url,
+                driver=self.driver,
+                user=self.user,
+                passkey=self.passkey),
+            # TODO: de-id
+        }
+
+    def _upload_target(self) -> UploadTarget:
+        return UploadTarget(self, self.schema, transform_name=self.task_id)
+
+    def run_upload(self, conn: Connection, upload_id: int) -> None:
+        pass
 
 
 if __name__ == '__main__':
@@ -863,5 +899,8 @@ if __name__ == '__main__':
 
         with el.start_task(action_type='luigi.build'):
             luigi.build([NAACCR_Load()], local_scheduler=True)
+
+        if False:  # static check
+            MigrateUpload()
 
     _script_io()
