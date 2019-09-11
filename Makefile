@@ -1,17 +1,20 @@
 
-all: check_code run_notebook
+check_code: doctest lint static
+
+release: check_code run_notebook
+
+# TODO: code archive release artifact
+# TODO: ontology release artifact
+# TODO: transformed data release artifact
 
 run_notebook: tumor_reg_data_run.html
 
-check_code: doctest lint static
+DOCTEST_FILES=tumor_reg_ont.py tumor_reg_data.py tumor_reg_tasks.py sql_script.py
 
 doctest:
 	# nosetests --with-doctest
 	# or tox?
-	python -m doctest tumor_reg_ont.py
-	python -m doctest tumor_reg_data.py
-	python -m doctest tumor_reg_tasks.py
-	python -m doctest sql_script.py
+	for f in $(DOCTEST_FILES); do echo $$f; python -m doctest $$f; done
 
 lint:
 	flake8 .
