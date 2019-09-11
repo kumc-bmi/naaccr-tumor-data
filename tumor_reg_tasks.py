@@ -302,9 +302,9 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
         from os import environ  # ISSUE: ambient
         return environ[self.passkey]
 
-    def account(self) -> td.Account:
+    def account(self, db_url: Opt[str] = None) -> td.Account:
         return td.Account(self.user, self.__password,
-                          self.db_url, self.driver)
+                          db_url or self.db_url, self.driver)
 
 
 class HelloNAACCR(SparkJDBCTask):
@@ -820,18 +820,15 @@ class NAACCR_Load(_RunScriptTask):
                     encounter_ide_source=self.encounter_ide_source))
 
 
-class _MigrateIdFacts(SparkJDBCTask):
-    upload_id = pv.IntParam()
-    i2b2_dest = pv.StrParam()
-    workspace_schema = pv.StrParam()
-
-    @property
-    def label(self) -> str:
-        return self.get_task_family()
+class CopyRecords(SparkJDBCTask):
+    src_table = pv.StrParam()
+    dest_table = pv.StrParam()
+    db_url_dest = pv.StrParam()
+    mode = pv.StrParam(default='error')
 
     def output(self) -> luigi.LocalTarget:
         """Since making a DB connection is awkward and
-        scanning the observation_fact table is expensive,
+        scanning the desination table may be expensive,
         let's cache status in the current directory.
         """
         # ISSUE: assumes linux paths
@@ -839,25 +836,21 @@ class _MigrateIdFacts(SparkJDBCTask):
 
     def main_action(self, sc: SparkContext_T) -> None:
         spark = SparkSession(sc)
-        src_name = f'{self.workspace_schema}.observation_fact_{self.upload_id}'
-        dest_name = f'{self.i2b2_dest}.observation_fact'
-        with el.start_action(action_type=self.label,
-                             src=src_name, dest=dest_name):
-            src = self.account().rd(spark.read, src_name)
-            print(src.limit(1).collect())
-            with self.output().open(mode='w') as out:
-                self.account().wr(src.write, dest_name, mode='append')
-                out.write(self.task_id)
-
-    @property
-    def source_cd(self) -> str:
-        return self.workspace_schema
+        with el.start_action(action_type=self.get_task_family(),
+                             src=self.src_table, dest=self.dest_table):
+            src = self.account().rd(spark.read, self.src_table)
+            with self.output().open(mode='w') as status:
+                self.account(self.db_url_dest).wr(
+                    src.write, self.dest_table, mode=self.mode)
+                status.write(self.task_id)
 
 
 class MigrateUpload(UploadRunTask):
     upload_id = pv.IntParam()
-    log_dest = pv.PathParam(significant=False)
     workspace_schema = pv.StrParam(default='HERON_ETL_1')
+    i2b2_deid = pv.StrParam(default='BlueHeronData')
+    db_url_deid = pv.StrParam()
+    log_dest = pv.PathParam(significant=False)
 
     @property
     def label(self) -> str:
@@ -873,15 +866,24 @@ class MigrateUpload(UploadRunTask):
 
         _configure_logging(self.log_dest)
         return {
-            'id': _MigrateIdFacts(
-                upload_id=self.upload_id,
-                workspace_schema=self.workspace_schema,
-                i2b2_dest=self.schema,
+            'id': CopyRecords(
+                src_table=f'{self.workspace_schema}.observation_fact_{self.upload_id}',
+                dest_table=f'{self.schema}.observation_fact',
+                mode='append',
                 db_url=self.db_url,
+                db_url_dest=self.db_url,
                 driver=self.driver,
                 user=self.user,
                 passkey=self.passkey),
-            # TODO: de-id
+            'deid': CopyRecords(
+                src_table=f'{self.workspace_schema}.observation_fact_deid_{self.upload_id}',
+                dest_table=f'{self.i2b2_deid}.observation_fact',
+                mode='append',
+                db_url=self.db_url,
+                db_url_dest=self.db_url_deid,
+                driver=self.driver,
+                user=self.user,
+                passkey=self.passkey),
         }
 
     def _upload_target(self) -> UploadTarget:
