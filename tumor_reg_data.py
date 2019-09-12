@@ -44,7 +44,7 @@ from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
 from sys import stderr
-from typing import ContextManager, Dict, Iterator, List, NoReturn
+from typing import Callable, ContextManager, Dict, Iterator, List, NoReturn
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import logging
@@ -131,6 +131,34 @@ if IO_TESTING:
     log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
 
 IO_TESTING and _spark
+
+
+# %%
+def _to_spark(name: str, compute: Callable[[], pd.DataFrame],
+              cache: bool = False) -> Opt[DataFrame]:
+    """Compute data locally and save as spark view"""
+    if not IO_TESTING:
+        return None
+    df = _spark.createDataFrame(compute())
+    df.createOrReplaceTempView(name)
+    if cache:
+        df.cache()
+    return df
+
+
+def _SQL(sql: str,
+         index: Opt[str] = None,
+         limit: Opt[int] = 5) -> pd.DataFrame:
+    """Run Spark SQL query and display results using .toPandas()"""
+    if not IO_TESTING:
+        return None
+    df = _spark.sql(sql)
+    if limit is not None:
+        df = df.limit(limit)
+    pdf = df.toPandas()
+    if index is not None:
+        pdf = pdf.set_index(index)
+    return pdf
 
 
 # %% [markdown]
