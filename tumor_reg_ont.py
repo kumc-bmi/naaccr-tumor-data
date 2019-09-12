@@ -8,7 +8,7 @@ from typing import (
 from xml.etree import ElementTree as XML
 import logging
 
-from mypy_extensions import TypedDict
+from mypy_extensions import TypedDict  # ISSUE: dependency?
 from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import types as ty
 from pyspark.sql.dataframe import DataFrame
@@ -138,14 +138,14 @@ class NAACCR_Layout:
     layout_180 = XML.parse(res.open_text(
         naaccr_layout, 'naaccr-18-layout.xml'))
 
-    # top-level (non-overlapping) fields, skipping reserved
+    # All but reserved fields (both groups and parts)
     fields_raw = [to_field0(f)
                   for f in layout_180.findall('.//field')
                   if f.attrib.get('naaccr-item-num') and
                   not f.attrib['name'].startswith('reserved')]
 
     # include length
-    fields = [to_field(f) for f in fields_raw]
+    fields: List[Field] = [to_field(f) for f in fields_raw]
 
     @classmethod
     def _fields_doc(cls) -> ContextManager[Path_T]:
@@ -489,11 +489,11 @@ class NAACCR_I2B2(object):
             ('naaccr_code_values', [per_item_view, 'code_labels']),
             ('naaccr_ont_aux', ['section', 'tumor_item_type']),
             ('naaccr_ont_aux_seer', ['seer_site_terms']),
-            ('naaccr_ontology', []),
+            ('naaccr_ontology', ['current_task']),
         ])
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T,
+    def ont_view_in(cls, spark: SparkSession_T, task_id: str,
                     recode: Opt[Path_T] = None) -> DataFrame:
         cls.item_views_in(spark)
 
@@ -512,6 +512,7 @@ class NAACCR_I2B2(object):
 
         to_df = spark.createDataFrame
         views = create_objects(spark, cls.ont_script,
+                               current_task=to_df([dict(task_id=task_id)]),
                                section=to_df(cls.per_section),
                                tumor_item_type=to_df(cls.tumor_item_type),
                                code_labels=to_df(NAACCR_R.code_labels()),
@@ -587,6 +588,7 @@ def create_objects(spark: SparkSession_T, script: SqlScript,
 
     >>> spark = MockCTX()
     >>> create_objects(spark, NAACCR_I2B2.ont_script,
+    ...     current_task=MockDF(spark, 'current_task'),
     ...     section=MockDF(spark, 'section'),
     ...     code_labels=MockDF(spark, 'code_labels'),
     ...     seer_site_terms=MockDF(spark, 'site_terms'),

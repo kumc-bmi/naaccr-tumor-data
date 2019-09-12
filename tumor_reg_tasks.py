@@ -378,7 +378,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         ''')
 
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.seer_recode and self.seer_recode.resolve())
+            spark, self.task_id, self.seer_recode and self.seer_recode.resolve())
 
         self.account().wr(td.case_fold(ont).write, self.table_name,
                           mode='overwrite')

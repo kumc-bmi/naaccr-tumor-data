@@ -177,18 +177,85 @@ if IO_TESTING:
     quiet_logs(_spark)
 
 # %% [markdown]
-# ## `naaccr-xml` Data Dictionary
+# ## NAACCR Items and Data Types
+#
+# Each NAACCR tumor record consists of hundreds of "items" (aka fields).
+# The **naaccr-xml** project has data dictionaries to support
+# reformatting flat files to XML and back:
 
 # %%
-if IO_TESTING:
-    ont.ddictDF(_spark).createOrReplaceTempView('ndd180')
-IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
+_to_spark('ndd180', lambda: ont.NAACCR1.items_180())
+_SQL('''
+select * from ndd180 where naaccrNum between 400 and 500
+''', index='naaccrNum')
+
+# %% [markdown]
+# But the naaccr-xml data dictionaries don't have enough information
+# to determine i2b2's notion of datatype called `valtype_cd`:
 
 # %%
-if IO_TESTING:
-    _spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
-    _ont = ont.NAACCR_I2B2.ont_view_in(_spark)  # TODO: seer recode in NAACCR_ONTOLOGY
-IO_TESTING and _ont.limit(5).toPandas()
+IO_TESTING and pd.DataFrame.from_records(
+    [('@', 'nominal'), ('N', 'numeric'), ('D', 'date'), ('T', 'text')],
+    columns=['valtype_cd', 'description'],
+    index='valtype_cd')
+
+# %% [markdown]
+# So we curated the datatypes, incorporating datatype
+# information from LOINC (`loinc_num`, `scale_typ`, `AnswerListId`)
+# and from Werth / PA DoH (`scheme`):
+
+# %%
+_to_spark('tumor_item_type', lambda: ont.NAACCR_I2B2.tumor_item_type)
+_SQL('''
+select * from tumor_item_type
+''')
+
+# %% [markdown]
+# ### Integrity check, modulo confidential sections
+#
+# Any extra curated items not in the **naaccr-xml** v18 data dictionary?
+
+# %%
+_SQL('''
+select * from tumor_item_type ty
+left join ndd180 nd
+on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
+where nd.naaccrNum is null
+''')
+
+# %% [markdown]
+# Not every item in **naaccr-xml** has a curated `valtype_cd`:
+
+# %%
+_SQL('''
+select count(*)
+from ndd180 nd
+left join tumor_item_type ty
+on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
+where ty.naaccrNum is null
+''')
+
+# %% [markdown]
+# We didn't bother curating `valtype_cd` for items in confidential sections.
+#
+# Section information is not provided in **naaccr-xml** so
+# we get it from **imsweb/layout**:
+
+# %%
+_to_spark('record_layout', lambda: ont.NAACCR_Layout.fields)
+_SQL("select * from record_layout where section like '%Confidential'")
+
+# %% [markdown]
+# Now we can see that the un-curated items are all from confidential sections:
+
+# %%
+_SQL('''
+select distinct rl.section from ndd180 nd
+left join record_layout rl on rl.`naaccr-item-num` = nd.naaccrNum
+left join tumor_item_type ty
+on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
+where ty.naaccrNum is null
+''')
 
 # %% [markdown]
 # ## tumor_item_type: numeric /  date / nominal / text; identifier?
