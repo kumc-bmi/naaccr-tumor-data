@@ -231,7 +231,7 @@ select count(*)
 from ndd180 nd
 left join tumor_item_type ty
 on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
-where ty.naaccrNum is null
+where ty.naaccrNum is null or ty.valtype_cd is null
 ''')
 
 # %% [markdown]
@@ -253,91 +253,19 @@ select distinct rl.section from ndd180 nd
 left join record_layout rl on rl.`naaccr-item-num` = nd.naaccrNum
 left join tumor_item_type ty
 on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
-where ty.naaccrNum is null
+where ty.naaccrNum is null or ty.valtype_cd is null
 ''')
-
-# %% [markdown]
-# ## tumor_item_type: numeric /  date / nominal / text; identifier?
-
-# %%
-IO_TESTING and _spark.sql('''
-select *
-from ndd180 as idef
-''').limit(8).toPandas()
-
-# %%
-if IO_TESTING:
-    ont.NAACCR_R.field_info_in(_spark)
-IO_TESTING and _spark.table('field_info').limit(5).toPandas()
-
-# %% [markdown]
-# `WerthPADOH/naaccr` has complete coverage:
-
-# %%
-# TODO: turn this into a doctest, independent of Spark
-IO_TESTING and _spark.sql('''
-with check as (
-select case when r.item is null then 0 else 1 end as has_r
-from ndd180 v18
-left join field_info r on r.item = v18.naaccrNum
-)
-select has_r, count(*) from check
-group by has_r
-
-order by has_r
-''').toPandas()
-
-# %% [markdown]
-# Werth assigns a `type` to each item:
-
-# %%
-IO_TESTING and _spark.sql('''
-select rl.section, type, nd.length, count(*), collect_list(rl.`naaccr-item-num`), collect_list(naaccrId)
-from ndd180 nd
-left join field_info f on f.item = nd.naaccrNum
-left join record_layout rl on rl.`naaccr-item-num` = nd.naaccrNum
-group by section, type, nd.length
-order by section, type, nd.length
-''').toPandas()
-
-# %% [markdown]
-# ### Mixednaaccr-xml, LOINC, and Werth
-
-# %%
-if IO_TESTING:
-    _spark.createDataFrame(ont.NAACCR_I2B2.tumor_item_type).createOrReplaceTempView('tumor_item_type')
-
-# %% [markdown]
-# #### Any missing?
-
-# %%
-IO_TESTING and _spark.sql('''
-select *
-from tumor_item_type
-where valtype_cd is null or  scale_typ is null
-''').toPandas().sort_values(['sectionId', 'naaccrNum']).reset_index(drop=True)
 
 # %% [markdown]
 # #### Ambiguous valtype_cd?
 
 # %%
-IO_TESTING and _spark.sql('''
+_SQL('''
 select naaccrId, length, count(distinct valtype_cd), collect_list(valtype_cd)
 from tumor_item_type
 group by naaccrId, length
 having count(distinct valtype_cd) > 1
-''').toPandas()
-
-# %% [markdown]
-# **ISSUE: LOINC mapping is ambiguous!**
-
-# %%
-IO_TESTING and _spark.sql('''
-select naaccrId, count(distinct valtype_cd), collect_list(valtype_cd), collect_list(loinc_num)
-from tumor_item_type
-group by naaccrId
-having count(*) > 1
-''').toPandas()
+''', limit=None)
 
 # %% [markdown]
 # ## Coded Concepts
