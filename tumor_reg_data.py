@@ -1,21 +1,44 @@
 # %% [markdown]
-# # NAACCR Tumor Registry Data
+# # Wrangling NAACCR Cancer Tumor Registry Data
 #
-# This is both a notebook and a module, sync'd using [jupytext][]. See also
+# The [NAACCR_ETL][gpc] process used at KUMC and other GPC sites to load
+# [NAACCR tumor registry data][dno] into [i2b2][] is
+# **outdated by NAACCR version 18**. Addressing this issue ([GPC ticket #739][739])
+# presents an opportunity to reconsider our platform and approach,
+# a goal since opening [#44][44] in Feb 2014:
 #
-#   - README for motivation and usage
-#   - CONTRIBUTING for coding style etc.
-#     - Note especially **ISSUE**, **TODO** and **IDEA** markers
+#   - Portable to database engines other than Oracle
+#   - Explicit tracking of data flow to facilitate parallelism
+#   - Rich test data to facilitate development without access to private data
+#   - Separate repository from HERON EMR ETL to avoid
+#     *information blocking* friction
+#
+# [gpc]: https://informatics.gpcnetwork.org/trac/Project/wiki/NAACCR_ETL
+# [dno]: http://datadictionary.naaccr.org/
+# [i2b2]: https://transmartfoundation.org/
+# [44]: https://informatics.gpcnetwork.org/trac/Project/ticket/44
+# [739]: https://informatics.gpcnetwork.org/trac/Project/ticket/739
+#
+#
+# ## About This Document
+#
+# This is both a jupyter notebook and a python module, sync'd using [jupytext][].
+#
+# Collaborators are expected to be aware of coding style etc. as discussed in [CONTRIBUTING](CONTRIBUTING.md).
 #
 # [jupytext]: https://github.com/mwouts/jupytext
 
 # %% [markdown]
-# ### Preface: PyData Tools: Pandas, PySpark
+# ## Platform for v18: Spark SQL, PySpark, and luigi
 #
+#  - [python 3.7 standard library](https://docs.python.org/3/library/index.html)
+#  - [pyspark.sql API](https://spark.apache.org/docs/latest/api/python/pyspark.sql.html)
+#  - [pandas](https://pandas.pydata.org/pandas-docs/stable/index.html)
 #
+# _Using luigi is beyond the scope of this document; see [tumor_reg_tasks](tumor_reg_tasks.py)._
 
 # %%
-# python stdlib
+# python 3.7 stdlib
 from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
@@ -27,64 +50,69 @@ import logging
 
 
 # %%
-# 3rd party code: PyData
 from pyspark.sql import SparkSession as SparkSession_T, Window
 from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
 from pyspark import sql as sq
 import numpy as np   # type: ignore
 import pandas as pd  # type: ignore
+import pyspark
+
+# %% [markdown]
+# We incorporate materials from the
+# [imsweb/naaccr-xml](https://github.com/imsweb/naaccr-xml) project,
+# such as test data.
 
 # %%
-# 3rd party: naaccr-xml
 import naaccr_xml_samples
-
 import bc_qa
 
 # %%
-# this project
 from sql_script import SqlScript
 from tumor_reg_ont import NAACCR1, NAACCR_Layout, LOINC_NAACCR, NAACCR_R, NAACCR_I2B2
 from tumor_reg_ont import create_objects, ddictDF, eltSchema, xmlDF, eltDict
+
 import heron_load
 
 
 # %%
 log = logging.getLogger(__name__)
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, stream=stderr)
-    log.info('NAACCR exploration...')
-
-
-# %%
-log.info('%s', dict(pandas=pd.__version__))
 
 # %% [markdown]
-# ## I/O Access: local files, Spark / Hive metastore
+# ## I/O Access and Integration Testing: local files, Spark / Hive metastore
 
 # %% [markdown]
 # In a notebook context, we have `__name__ == '__main__'`.
-#
-# Otherwise, we maintain ocap discipline (see CONTRIBUTING)
-# and don't import powerful objects.
-
-# %% [markdown]
-#  - **TODO/WIP**: use `_spark` and `_cwd`; i.e. be sure not to "export" ambient authority.
+# Exceptions to **ocap discipline** (see CONTRIBUTING) are guarded with `IO_TESTING`.
+# Notebook-level globals such as `_spark` and `_cwd` use a leading underscore.
 
 # %%
 IO_TESTING = __name__ == '__main__'
-_spark = cast(SparkSession_T, None)
+
+# %%
+if IO_TESTING:
+    logging.basicConfig(level=logging.INFO, stream=stderr)
+    log.info('tumor_reg_data using: %s', dict(
+        pandas=pd.__version__,
+        pyspark=pyspark.__version__,  # type: ignore
+    ))
+
+# %% [markdown]
+# The `spark` global is available when we launch as
+# `PYSPARK_DRIVER_PYTHON=jupyter PYSPARK_DRIVER_PYTHON_OPTS=notebook pyspark ...`.
+# Otherwise, we make it using techniques from
+# [Spark SQL Getting Started](https://spark.apache.org/docs/latest/sql-getting-started.html).
+
+# %%
+_spark = cast(SparkSession_T, None)  # for static type checking outside IO_TESTING
+
 if IO_TESTING:
     if 'spark' in globals():
         _spark = spark  # type: ignore  # noqa
         del spark       # type: ignore
     else:
         def _make_spark_session(appName: str = "tumor_reg_data") -> SparkSession_T:
-            """
-            ref:
-            https://spark.apache.org/docs/latest/sql-getting-started.html
-            """
             from pyspark.sql import SparkSession
 
             return SparkSession \
@@ -94,24 +122,30 @@ if IO_TESTING:
         _spark = _make_spark_session()
 
     def _get_cwd() -> Path_T:
-        # ISSUE: ambient
         from pathlib import Path
         return Path('.')
 
     _cwd = _get_cwd()
     log.info('cwd: %s', _cwd.resolve())
 
-# %% [markdown]
-# The `spark` global is available when we launch as
-# `PYSPARK_DRIVER_PYTHON=jupyter PYSPARK_DRIVER_PYTHON_OPTS=notebook
-#    pyspark ...`.
 
 # %%
 IO_TESTING and _spark
 
+
+def quiet_logs(spark: SparkSession_T) -> None:
+    sc = spark.sparkContext
+    # ack: FDS Aug 2015 https://stackoverflow.com/a/32208445
+    logger = sc._jvm.org.apache.log4j  # type: ignore
+    logger.LogManager.getLogger("org"). setLevel(logger.Level.WARN)
+    logger.LogManager.getLogger("akka").setLevel(logger.Level.WARN)
+
+
 # %%
 if IO_TESTING:
     log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
+    quiet_logs(_spark)
+
 
 # %% [markdown]
 # ## `naaccr-xml` Data Dictionary
@@ -323,6 +357,7 @@ def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
 
 IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
                 .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
+
 
 # %% [markdown]
 # What columns are covered by the 100 tumor sample?

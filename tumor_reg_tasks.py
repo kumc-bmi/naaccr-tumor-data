@@ -8,6 +8,10 @@ Main tasks are:
 
 clues from:
 https://github.com/spotify/luigi/blob/master/examples/pyspark_wc.py
+
+API docs used a lot in development:
+ - Package java.sql
+   https://docs.oracle.com/javase/8/docs/api/index.html?java/sql/package-summary.html
 """
 
 from abc import abstractmethod
