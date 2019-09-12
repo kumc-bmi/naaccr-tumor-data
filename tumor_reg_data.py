@@ -8,6 +8,7 @@
 # a goal since opening [#44][44] in Feb 2014:
 #
 #   - Portable to database engines other than Oracle
+#   - Accomodate NAACCR migration from flat file format to XML
 #   - Explicit tracking of data flow to facilitate parallelism
 #   - Rich test data to facilitate development without access to private data
 #   - Separate repository from HERON EMR ETL to avoid
@@ -78,7 +79,7 @@ log = logging.getLogger(__name__)
 
 
 # %% [markdown]
-# ## I/O Access and Integration Testing: local files, Spark / Hive metastore
+# ### I/O Access and Integration Testing: local files, Spark / Hive metastore
 
 # %% [markdown]
 # In a notebook context, we have `__name__ == '__main__'`.
@@ -95,6 +96,14 @@ if IO_TESTING:
         pandas=pd.__version__,
         pyspark=pyspark.__version__,  # type: ignore
     ))
+
+    def _get_cwd() -> Path_T:
+        from pathlib import Path
+        return Path('.')
+
+    _cwd = _get_cwd()
+    log.info('cwd: %s', _cwd.resolve())
+
 
 # %% [markdown]
 # The `spark` global is available when we launch as
@@ -119,18 +128,15 @@ if IO_TESTING:
                 .getOrCreate()
         _spark = _make_spark_session()
 
-    def _get_cwd() -> Path_T:
-        from pathlib import Path
-        return Path('.')
+    log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
 
-    _cwd = _get_cwd()
-    log.info('cwd: %s', _cwd.resolve())
-
-
-# %%
 IO_TESTING and _spark
 
 
+# %% [markdown]
+# Spark logs can be extremely verbose (especially when running this notebook in batch mode).
+
+# %%
 def quiet_logs(spark: SparkSession_T) -> None:
     sc = spark.sparkContext
     # ack: FDS Aug 2015 https://stackoverflow.com/a/32208445
@@ -139,11 +145,8 @@ def quiet_logs(spark: SparkSession_T) -> None:
     logger.LogManager.getLogger("akka").setLevel(logger.Level.WARN)
 
 
-# %%
 if IO_TESTING:
-    log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
     quiet_logs(_spark)
-
 
 # %% [markdown]
 # ## `naaccr-xml` Data Dictionary
