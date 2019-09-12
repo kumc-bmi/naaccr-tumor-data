@@ -44,7 +44,7 @@ from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
 from sys import stderr
-from typing import Callable, ContextManager, Dict, Iterator, List, NoReturn
+from typing import Callable, ContextManager, Dict, Iterator, List
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import logging
@@ -55,7 +55,6 @@ from pyspark.sql import SparkSession as SparkSession_T, Window
 from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
 from pyspark import sql as sq
-import numpy as np   # type: ignore
 import pandas as pd  # type: ignore
 import pyspark
 
@@ -339,51 +338,6 @@ from tumor_item_type
 group by naaccrId
 having count(*) > 1
 ''').toPandas()
-
-
-# %%
-def csv_meta(dtypes: Dict[str, np.dtype], path: str,
-             context: str = 'http://www.w3.org/ns/csvw') -> Dict[str, object]:
-    # ISSUE: dead code? obsolete in favor of _fixna()?
-    def xlate(dty: np.dtype) -> str:
-        if dty.kind == 'i':
-            return 'number'
-        elif dty.kind == 'O':
-            return 'string'
-        raise NotImplementedError(dty.kind)
-
-    cols = [
-        {"titles": name,
-         "datatype": xlate(dty)}
-        for name, dty in dtypes.items()
-    ]
-    return {"@context": context,
-            "url": path,
-            "tableSchema": {
-                "columns": cols
-            }}
-
-
-# %%
-def csv_spark_schema(columns: List[Dict[str, str]]) -> ty.StructType:
-    """
-    Note: limited to exactly 1 titles per column
-    IDEA: expand to boolean
-    IDEA: nullable / required
-    """
-    def oops(what: object) -> NoReturn:
-        raise NotImplementedError(what)
-    fields = [
-        ty.StructField(
-            name=col['titles'],
-            dataType=ty.IntegerType() if col['datatype'] == 'number'
-            else ty.StringType() if col['datatype'] == 'string'
-            else oops(col))
-        for col in columns]
-    return ty.StructType(fields)
-
-# IDEA: csv_spark_schema(csv_meta(x.dtypes, 'tumor_item_type.csv')['tableSchema']['columns'])
-
 
 # %% [markdown]
 # ## Coded Concepts

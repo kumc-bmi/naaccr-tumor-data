@@ -2,7 +2,7 @@ from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
     Callable, ContextManager, Dict, Iterator, List, Optional as Opt,
-    Tuple, Union,
+    Tuple, Union, NoReturn,
     cast,
 )
 from xml.etree import ElementTree as XML
@@ -13,6 +13,7 @@ from pyspark.sql import SparkSession as SparkSession_T
 from pyspark.sql import types as ty
 from pyspark.sql.dataframe import DataFrame
 import pandas as pd  # type: ignore
+import numpy as np   # type: ignore
 
 from heron_staging.tumor_reg import seer_recode
 from sql_script import SqlScript
@@ -625,6 +626,48 @@ def csv_view(spark: SparkSession_T, path: Path_T,
                         inferSchema=True, mode='FAILFAST')
     df.createOrReplaceTempView(name or path.stem)
     return df
+
+
+def csv_meta(dtypes: Dict[str, np.dtype], path: str,
+             context: str = 'http://www.w3.org/ns/csvw') -> Dict[str, object]:
+    # ISSUE: dead code? obsolete in favor of _fixna()?
+    def xlate(dty: np.dtype) -> str:
+        if dty.kind == 'i':
+            return 'number'
+        elif dty.kind == 'O':
+            return 'string'
+        raise NotImplementedError(dty.kind)
+
+    cols = [
+        {"titles": name,
+         "datatype": xlate(dty)}
+        for name, dty in dtypes.items()
+    ]
+    return {"@context": context,
+            "url": path,
+            "tableSchema": {
+                "columns": cols
+            }}
+
+
+def csv_spark_schema(columns: List[Dict[str, str]]) -> ty.StructType:
+    """
+    Note: limited to exactly 1 titles per column
+    IDEA: expand to boolean
+    IDEA: nullable / required
+    """
+    def oops(what: object) -> NoReturn:
+        raise NotImplementedError(what)
+    fields = [
+        ty.StructField(
+            name=col['titles'],
+            dataType=ty.IntegerType() if col['datatype'] == 'number'
+            else ty.StringType() if col['datatype'] == 'string'
+            else oops(col))
+        for col in columns]
+    return ty.StructType(fields)
+
+# IDEA: csv_spark_schema(csv_meta(x.dtypes, 'tumor_item_type.csv')['tableSchema']['columns'])
 
 
 class MockCTX(SparkSession_T):
