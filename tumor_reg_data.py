@@ -69,9 +69,7 @@ import bc_qa
 
 # %%
 from sql_script import SqlScript
-from tumor_reg_ont import NAACCR1, NAACCR_Layout, LOINC_NAACCR, NAACCR_R, NAACCR_I2B2
-from tumor_reg_ont import create_objects, ddictDF, eltSchema, xmlDF, eltDict
-
+import tumor_reg_ont as ont
 import heron_load
 
 
@@ -152,13 +150,13 @@ if IO_TESTING:
 
 # %%
 if IO_TESTING:
-    ddictDF(_spark).createOrReplaceTempView('ndd180')
+    ont.ddictDF(_spark).createOrReplaceTempView('ndd180')
 IO_TESTING and _spark.table('ndd180').limit(5).toPandas().set_index('naaccrId')
 
 # %%
 if IO_TESTING:
     _spark.sql("""create or replace temporary view current_task as select 'abc' task_id from (values('X'))""")
-    _ont = NAACCR_I2B2.ont_view_in(_spark)  # TODO: seer recode in NAACCR_ONTOLOGY
+    _ont = ont.NAACCR_I2B2.ont_view_in(_spark)  # TODO: seer recode in NAACCR_ONTOLOGY
 IO_TESTING and _ont.limit(5).toPandas()
 
 # %% [markdown]
@@ -172,7 +170,7 @@ from ndd180 as idef
 
 # %%
 if IO_TESTING:
-    NAACCR_R.field_info_in(_spark)
+    ont.NAACCR_R.field_info_in(_spark)
 IO_TESTING and _spark.table('field_info').limit(5).toPandas()
 
 # %% [markdown]
@@ -210,7 +208,7 @@ order by section, type, nd.length
 
 # %%
 if IO_TESTING:
-    _spark.createDataFrame(NAACCR_I2B2.tumor_item_type).createOrReplaceTempView('tumor_item_type')
+    _spark.createDataFrame(ont.NAACCR_I2B2.tumor_item_type).createOrReplaceTempView('tumor_item_type')
 
 # %% [markdown]
 # #### Any missing?
@@ -294,7 +292,7 @@ def csv_spark_schema(columns: List[Dict[str, str]]) -> ty.StructType:
 
 # %%
 if IO_TESTING:
-    LOINC_NAACCR.answers_in(_spark)
+    ont.LOINC_NAACCR.answers_in(_spark)
 
 IO_TESTING and _spark.table('loinc_naaccr_answers').where('code_value = 380').limit(5).toPandas()
 
@@ -303,8 +301,8 @@ IO_TESTING and _spark.table('loinc_naaccr_answers').where('code_value = 380').li
 
 # %%
 if IO_TESTING:
-    _spark.createDataFrame(NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
-    _spark.createDataFrame(NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
+    _spark.createDataFrame(ont.NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
+    _spark.createDataFrame(ont.NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
 IO_TESTING and _spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
 
 
@@ -342,16 +340,16 @@ def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
         ndataElt = to_parent[patElt]
         for elt in [ndataElt, patElt, tumorElt]:
             for item in elt.iterfind('./n:Item', ns):
-                for itemRecord in eltDict(item, schema, simpleContent):
+                for itemRecord in ont.eltDict(item, schema, simpleContent):
                     yield dict(itemRecord, rownum=rownum)
 
-    itemSchema = eltSchema(NAACCR1.item_xsd, simpleContent=True)
+    itemSchema = ont.eltSchema(ont.NAACCR1.item_xsd, simpleContent=True)
     rownumField = ty.StructField('rownum', ty.IntegerType(), False)
     tumorItemSchema = ty.StructType([rownumField] + itemSchema.fields)
-    data = xmlDF(spark, schema=tumorItemSchema, doc=doc, path='.//n:Tumor',
-                 eltRecords=tumorItems,
-                 ns={'n': 'http://naaccr.org/naaccrxml'},
-                 simpleContent=True)
+    data = ont.xmlDF(spark, schema=tumorItemSchema, doc=doc, path='.//n:Tumor',
+                     eltRecords=tumorItems,
+                     ns={'n': 'http://naaccr.org/naaccrxml'},
+                     simpleContent=True)
     return data.drop('naaccrNum')
 
 
@@ -380,7 +378,7 @@ def naaccr_pivot(ddict: DataFrame, skinny: DataFrame, key_cols: List[str],
     return wide.select(cast(List[Union[sq.Column, str]], sorted_cols))
 
 
-IO_TESTING and (naaccr_pivot(ddictDF(_spark),
+IO_TESTING and (naaccr_pivot(ont.ddictDF(_spark),
                              tumorDF(_spark, NAACCR2.s100x),
                              ['rownum'])
                 .limit(3).toPandas())
@@ -431,7 +429,7 @@ def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
 
 _extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
 if IO_TESTING:
-    _extract = naaccr_read_fwf(_naaccr_text_lines, ddictDF(_spark))
+    _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF(_spark))
     _extract.createOrReplaceTempView('naaccr_extract')
 # _extract.explain()
 IO_TESTING and non_blank(_extract.limit(5).toPandas())
@@ -443,7 +441,7 @@ def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
     """Cancer Identification items from a sample
 
     """
-    cols = NAACCR_I2B2.tumor_item_type
+    cols = ont.NAACCR_I2B2.tumor_item_type
     cols = cols[cols.sectionId == cancerID]
     colnames = cols.naaccrId.values.tolist()
     # TODO: test data for morphTypebehavIcdO2 etc.
@@ -587,7 +585,7 @@ class TumorKeys:
     def _pick_cols(cls, spark: SparkSession_T,
                    naaccr_text_lines: DataFrame,
                    cols: List[str]) -> DataFrame:
-        dd = ddictDF(spark)
+        dd = ont.ddictDF(spark)
         pat_tmr = naaccr_read_fwf(
             naaccr_text_lines,
             dd.where(dd.naaccrId.isin(cols)))
@@ -725,7 +723,7 @@ if IO_TESTING:
     _script1 = SqlScript('naaccr_txform.sql',
                          res.read_text(heron_load, 'naaccr_txform.sql'),
                          [('tumor_item_value', ['naaccr_obs_raw'])])
-    create_objects(_spark, _script1, naaccr_obs_raw=_raw_obs)
+    ont.create_objects(_spark, _script1, naaccr_obs_raw=_raw_obs)
 IO_TESTING and _spark.table('tumor_item_value').limit(10).toPandas()
 
 # %%
@@ -733,9 +731,9 @@ if IO_TESTING:
     _script1 = SqlScript('naaccr_txform.sql',
                          res.read_text(heron_load, 'naaccr_txform.sql'),
                          [('tumor_reg_facts', ['record_layout', 'section'])])
-    create_objects(_spark, _script1,
-                   record_layout=_spark.createDataFrame(NAACCR_Layout.fields),
-                   section=_spark.createDataFrame(NAACCR_I2B2.per_section))
+    ont.create_objects(_spark, _script1,
+                       record_layout=_spark.createDataFrame(ont.NAACCR_Layout.fields),
+                       section=_spark.createDataFrame(ont.NAACCR_I2B2.per_section))
 IO_TESTING and _spark.table('tumor_reg_facts').limit(10).toPandas()
 
 # %%
@@ -755,18 +753,18 @@ class ItemObs:
 
     @classmethod
     def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
-        item_ty = NAACCR_I2B2.item_views_in(spark)
+        item_ty = ont.NAACCR_I2B2.item_views_in(spark)
 
         raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
             stack_obs(extract, item_ty),
             TumorKeys.dtcols))
 
-        views = create_objects(
+        views = ont.create_objects(
             spark, cls.script,
             naaccr_obs_raw=raw_obs,
             # ISSUE: refactor item_views_in
-            record_layout=spark.createDataFrame(NAACCR_Layout.fields),
-            section=spark.createDataFrame(NAACCR_I2B2.per_section))
+            record_layout=spark.createDataFrame(ont.NAACCR_Layout.fields),
+            section=spark.createDataFrame(ont.NAACCR_I2B2.per_section))
 
         return list(views.values())[-1]
 
@@ -815,8 +813,8 @@ class SEER_Recode:
     @classmethod
     def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
         extract_id = ItemObs.make_extract_id(spark, extract)
-        views = create_objects(spark, cls.script,
-                               naaccr_extract_id=extract_id)
+        views = ont.create_objects(spark, cls.script,
+                                   naaccr_extract_id=extract_id)
         return list(views.values())[-1]
 
 
@@ -831,13 +829,13 @@ class SiteSpecificFactors:
     script2 = SqlScript('csschema.sql', sql,
                         [('cs_site_factor_facts', ['cs_obs_raw'])])
 
-    items = [it for it in NAACCR1.items_180()
+    items = [it for it in ont.NAACCR1.items_180()
              if it['naaccrName'].startswith('CS Site-Specific Factor')]
 
     @classmethod
     def valtypes(cls) -> pd.DataFrame:
         factor_nums = [d['naaccrNum'] for d in cls.items]
-        item_ty = NAACCR_I2B2.tumor_item_type[['naaccrNum', 'naaccrId', 'valtype_cd']]
+        item_ty = ont.NAACCR_I2B2.tumor_item_type[['naaccrNum', 'naaccrId', 'valtype_cd']]
         item_ty = item_ty[item_ty.naaccrNum.isin(factor_nums)]
         return item_ty
 
@@ -849,16 +847,16 @@ class SiteSpecificFactors:
         raw_obs = stack_obs(with_schema, ty_df,
                             key_cols=TumorKeys.key4 + TumorKeys.dtcols + ['recordId', 'cs_schema_name'])
 
-        views = create_objects(spark, cls.script2,
-                               cs_obs_raw=raw_obs)
+        views = ont.create_objects(spark, cls.script2,
+                                   cs_obs_raw=raw_obs)
         return list(views.values())[-1]
 
     @classmethod
     def make_tumor_schema(cls,
                           spark: SparkSession_T,
                           extract: DataFrame) -> DataFrame:
-        views = create_objects(spark, cls.script1,
-                               naaccr_extract_id=ItemObs.make_extract_id(spark, extract))
+        views = ont.create_objects(spark, cls.script1,
+                                   naaccr_extract_id=ItemObs.make_extract_id(spark, extract))
         return list(views.values())[-1]
 
 
@@ -987,7 +985,7 @@ def _selectedItems(ddict: DataFrame, items: DataFrame) -> DataFrame:
 
 if IO_TESTING:
     _bc_ddict = _selectedItems(
-        ddictDF(_spark),
+        ont.ddictDF(_spark),
         itemNumOfPath(_spark.createDataFrame(CancerStudy.bc_variable)),
     ).select('naaccrId', 'naaccrNum', 'parentXmlElement', 'length')
 
