@@ -34,10 +34,10 @@ create or replace temporary view naaccr_top_concept as
 select top.c_hlevel
      , top.c_fullname
      , top.c_name
-     , cast(null as string) as c_basecode
+     , (select task_id from current_task) as c_basecode
      , 'CA' as c_visualattributes
      , concat('North American Association of Central Cancer Registries version 18.0',
-              (select task_id from current_task)) as c_tooltip
+              '\n ', (select task_id from current_task)) as c_tooltip
      , top.c_fullname as c_dimcode
      , i2b2.*
      , top.update_date
@@ -118,7 +118,7 @@ left join code_labels rl
       and (la.answerlistid is null or rl.code = la.answer_code)
 ),
 with_name as (
-select concat(answer_code, ' ', answer_string) as c_name
+select substr(concat(answer_code, ' ', answer_string), 1, 200) as c_name
      , mix.*
 from mix
 where answer_code is not null

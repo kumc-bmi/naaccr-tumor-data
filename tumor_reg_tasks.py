@@ -345,7 +345,7 @@ class JDBCTableTarget(luigi.Target):
 
 class NAACCR_Ontology1(SparkJDBCTask):
     z_design_id = pv.StrParam(
-        default='2019-09-13 %s' % hash(tr_ont.NAACCR_I2B2.ont_script.code),
+        default='2019-09-13 c_name len %s' % len(tr_ont.NAACCR_I2B2.ont_script.objects),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -360,10 +360,11 @@ class NAACCR_Ontology1(SparkJDBCTask):
     table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
 
     def output(self) -> JDBCTableTarget:
-        query = f"""
+        # TODO: refactor c_fullname overlap with tumor_reg_ont
+        query = fr"""
           (select 1 from {self.table_name}
-           where c_fullname = '\\\\i2b2\\\\naaccr\\\\'
-           and c_comment = '{self.task_id}')
+           where c_fullname = '\i2b2\naaccr\'
+           and c_basecode = '{self.task_id}')
         """
         return JDBCTableTarget(self, query)
 
@@ -375,7 +376,9 @@ class NAACCR_Ontology1(SparkJDBCTask):
             spark, self.task_id, update_date=self.z_design_id[:10],
             recode=self.seer_recode and self.seer_recode.resolve())
 
-        self.account().wr(td.case_fold(ont).write, self.table_name,
+        self.account().wr(td.case_fold(ont).write
+                          .options(createTableColumnTypes="c_tooltip varchar(1024)"),
+                          self.table_name,
                           mode='overwrite')
 
 
