@@ -23,30 +23,6 @@ select task_id from current_task where 1=0;
 select * from who.topo where 1=0;
 
 
-
-/* Exploration/analysis queries ...
-
--- How many records did we load from the extract?
-select count(*)
-from naacr.extract ne;
--- 65584
-
--- How many distinct patients? How many tumors per patient?
-select count(distinct ne."Patient ID Number") as total_patients,
-round(count(*) / count(distinct ne."Patient ID Number"), 3) as tumors_per_patient
-from naacr.extract ne;
--- 60667	1.081
-
-
--- Patient mapping: do all of them have Patient IDs?
-select count(to_number(ne."Patient ID Number"))
-  from NAACR.EXTRACT ne;
--- 65584, so yes.
-
-*/
-
-
-
 /********
  * Concepts
  */
