@@ -403,26 +403,6 @@ class LOINC_NAACCR:
         for n in answer.columns
     ])
 
-    @classmethod
-    def measure_in(cls, spark: SparkSession_T) -> DataFrame:
-        return cls._load_pd(
-            spark,
-            NAACCR_I2B2.measure_view_name, cls.measure[cls.measure_cols],
-            schema=cls.measure_struct)
-
-    @classmethod
-    def answers_in(cls, spark: SparkSession_T) -> DataFrame:
-        return cls._load_pd(
-            spark, NAACCR_I2B2.answer_view_name, cls.answer,
-            schema=cls.answer_struct)
-
-    @classmethod
-    def _load_pd(cls, spark: SparkSession_T, name: str, pddf: pd.DataFrame,
-                 schema: Opt[ty.StructType] = None) -> DataFrame:
-        df = spark.createDataFrame(pddf, schema)
-        df.createOrReplaceTempView(name)
-        return df
-
 
 class NAACCR_R:
     # Names assumed by naaccr_txform.sql
@@ -505,29 +485,32 @@ class NAACCR_I2B2(object):
         'naaccr_concepts_load.sql',
         res.read_text(heron_load, 'naaccr_concepts_load.sql'),
         [
-            ('naaccr_code_values', [per_item_view, 'code_labels']),
-            ('naaccr_ont_aux', ['section', 'tumor_item_type']),
-            ('naaccr_ont_aux_seer', ['seer_site_terms']),
-            ('naaccr_ontology', ['current_task']),
+            ('i2b2_path_concept', []),
+            ('naaccr_top_concept', ['naaccr_top', 'current_task']),
+            ('section_concepts', ['section', 'naaccr_top']),
+            ('item_concepts', [per_item_view]),
+            ('code_concepts', [per_item_view, 'loinc_naaccr_answers', 'code_labels']),
+            ('icd_o_topo', ['who_topo']),
+            ('primary_site_concepts', []),
+            ('naaccr_ontology', []),
         ])
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T, task_id: str,
+    def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: str,
+                    c_fullname: str = r'\i2b2\naaccr\x'[:-1],
+                    c_name: str = 'Cancer Cases (NAACCR Hierarchy)',
+                    sourcesystem_cd: str = 'heron-admin@kumc.edu',
                     who_cache: Opt[Path_T] = None,
                     recode: Opt[Path_T] = None) -> DataFrame:
         cls.item_views_in(spark)
 
-        # Labels for coded values
-        LOINC_NAACCR.answers_in(spark)
-
+        to_df = spark.createDataFrame
         if who_cache:
-            who_topo = OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info)
+            who_topo = to_df(OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info))
         else:
-            log.warn('skipping SEER Recode terms')
-            seer_site_terms = spark.sql('''
-              select 1 hlevel, 'p' path, 'n' name, 'x' basecode,
-                'v' visualattributes
-              where 1 = 0
+            log.warn('skipping WHO Toplogy terms')
+            who_topo = spark.sql('''
+              select 'C' Kode, 'incl' Lvl, 'LIP' Title where 1 = 0
             ''')
 
         if recode:
@@ -540,13 +523,21 @@ class NAACCR_I2B2(object):
               where 1 = 0
             ''')
 
-        to_df = spark.createDataFrame
+        top = pd.DataFrame([dict(c_hlevel=0,
+                                 c_fullname=c_fullname,
+                                 c_name=c_name,
+                                 update_date=update_date,
+                                 sourcesystem_cd=sourcesystem_cd)])
+        answers = to_df(LOINC_NAACCR.answer,
+                        LOINC_NAACCR.answer_struct).cache()
         views = create_objects(spark, cls.ont_script,
                                current_task=to_df([dict(task_id=task_id)]),
+                               naaccr_top=to_df(top),
                                section=to_df(cls.per_section),
                                tumor_item_type=to_df(cls.tumor_item_type),
+                               loinc_naaccr_answers=answers,
                                code_labels=to_df(NAACCR_R.code_labels()),
-                               who_topo=to_df(who_topo),
+                               who_topo=who_topo,
                                seer_site_terms=seer_site_terms)
 
         name, _, _ = cls.ont_script.objects[-1]
@@ -588,8 +579,8 @@ class NAACCR_I2B2_Mix(NAACCR_I2B2):
     @classmethod
     def tumor_item_type_mix(cls, spark: SparkSession_T) -> DataFrame:
         ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
-        LOINC_NAACCR.measure_in(spark)
-        LOINC_NAACCR.answers_in(spark)
+        # @@ LOINC_NAACCR.measure_in(spark)
+        # @@ LOINC_NAACCR.answers_in(spark)
 
         sec = spark.createDataFrame(cls.per_section)
         rl = (spark.createDataFrame(NAACCR_Layout.fields)
@@ -620,15 +611,18 @@ def create_objects(spark: SparkSession_T, script: SqlScript,
     >>> spark = MockCTX()
     >>> create_objects(spark, NAACCR_I2B2.ont_script,
     ...     current_task=MockDF(spark, 'current_task'),
+    ...     naaccr_top=MockDF(spark, 'naaccr_top'),
     ...     section=MockDF(spark, 'section'),
+    ...     loinc_naaccr_answers=MockDF(spark, 'lna'),
     ...     code_labels=MockDF(spark, 'code_labels'),
+    ...     who_topo=MockDF(spark, 'who_topo'),
     ...     seer_site_terms=MockDF(spark, 'site_terms'),
     ...     tumor_item_type=MockDF(spark, 'ty'))
-    ... # doctest: +NORMALIZE_WHITESPACE
-    {'naaccr_code_values': MockDF(naaccr_code_values),
-     'naaccr_ont_aux': MockDF(naaccr_ont_aux),
-     'naaccr_ont_aux_seer': MockDF(naaccr_ont_aux_seer),
-     'naaccr_ontology': MockDF(naaccr_ontology)}
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    {'i2b2_path_concept': MockDF(i2b2_path_concept),
+     'naaccr_top_concept': MockDF(naaccr_top_concept),
+     'section_concepts': MockDF(section_concepts),
+     ...}
     """
     # IDEA: use a contextmanager for temp views
     for key, df in kwargs.items():

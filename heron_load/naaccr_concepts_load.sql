@@ -1,8 +1,6 @@
 /** naaccr_load.sql -- load i2b2 concepts from NAACCR tumor registry data
 
-Copyright (c) 2013 University of Kansas Medical Center
-part of the HERON* open source codebase; see NOTICE file for license details.
-* http://informatics.kumc.edu/work/wiki/HERON
+Copyright (c) 2013-2019 University of Kansas Medical Center
 
  * ack: "Key, Dustin" <key.d@ghc.org>
  * Thu, 18 Aug 2011 16:16:31 -0700
@@ -10,22 +8,145 @@ part of the HERON* open source codebase; see NOTICE file for license details.
  * see also: naacr_init.sql, naacr_txform.sql
  */
 
-/* check that the LOINC answers, scraped chapters, and R labels loaded */
-select answer_code from loinc_naaccr_answers where dep = 'loinc_naaccr_answers.csv';
-select 1 from section where 1 = 0;
-select label from code_labels where dep = 'code-labels';
-select valtype_cd from tumor_item_type where dep = 'naaccr_txform.sql';
+/* check that static dependencies are available */
+select c_hlevel, c_fullname, c_name, update_date, source_cd from naaccr_top where 'dep' = 'arbitrary';
+select sectionId from section where 'dep' = 'section.csv';
+select valtype_cd from tumor_item_type where 'dep' = 'tumor_item_type.csv';
+select label from code_labels where 'dep' = 'code-labels';
+select answer_code from loinc_naaccr_answers where 'dep' = 'loinc_naaccr_answers.csv';
+select lvl from who_topo where dep='WHO Oncology MetaFiles';
 
 /* oh for bind parameters... */
 select task_id from current_task where 1=0;
 
--- check that WHO materials are staged
-select * from who.topo where 1=0;
+create or replace temporary view i2b2_path_concept as
+select 'N' as c_synonym_cd
+     , 'CONCEPT_CD' as c_facttablecolumn
+     , 'CONCEPT_DIMENSION' as c_tablename
+     , 'CONCEPT_PATH' as c_columnname
+     , 'T' c_columndatatype
+     , 'LIKE' c_operator
+     , '@' m_applied_path
+;
 
 
-/********
- * Concepts
- */
+create or replace temporary view naaccr_top_concept as
+select top.c_hlevel
+     , top.c_fullname
+     , top.c_name
+     , cast(null as string) as c_basecode
+     , 'CA' as c_visualattributes
+     , concat('North American Association of Central Cancer Registries version 18.0',
+              (select task_id from current_task)) as c_tooltip
+     , top.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     -- import_date
+     , top.sourcesystem_cd
+from naaccr_top top
+cross join i2b2_path_concept i2b2
+;
+
+create or replace temporary view section_concepts as
+with ea as (
+select nts.sectionId, nts.section
+     , top.c_hlevel + 1 c_hlevel
+     , concat(top.c_fullname, 'S:', nts.sectionid, ' ', section, '\\') as c_fullname
+     , concat(trim(format_string('%02d', nts.sectionid)), ' ', section) as c_name
+     , null as c_basecode
+     , 'FA' as c_visualattributes
+     , cast(null as string) as c_tooltip
+from section nts
+cross join naaccr_top_concept top
+)
+select sectionId, section
+     , ea.*
+     , ea.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     , top.sourcesystem_cd
+from ea
+cross join naaccr_top top
+cross join i2b2_path_concept i2b2;
+
+
+create or replace temporary view item_concepts as
+with ea as (
+select sc.sectionId, ni.naaccrNum
+     , sc.c_hlevel + 1 as c_hlevel
+     , concat(sc.c_fullname,
+       -- ISSUE: migrate from naaccrName to naaccrId for path?
+              substr(concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName), 1, 40), '\\') as c_fullname
+     , concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName) as c_name
+     , concat('NAACCR|', ni.naaccrNum, ':') as c_basecode
+     , case
+       when ni.valtype_cd = '@' then 'FA'
+       else 'LA' -- TODO: hide concepts where we have no data
+                 -- TODO: hide Histology since '0420', '0522'
+                 -- we already have Morph--Type/Behav
+       end as c_visualattributes
+     , cast(null as string) as c_tooltip -- TODO
+from tumor_item_type ni
+join section_concepts sc on sc.section = ni.section
+)
+select sectionId, naaccrNum
+     , ea.*
+     , ea.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     , top.sourcesystem_cd
+from ea
+cross join naaccr_top top
+cross join i2b2_path_concept i2b2;
+
+
+create or replace temporary view code_concepts as
+with mix as (
+select ty.naaccrNum
+     , coalesce(rl.code, la.answer_code) as answer_code
+     , coalesce(rl.label, la.answer_string) as answer_string
+     , rl.description
+     , loinc_num, ty.AnswerListId, sequence_no
+     , rl.scheme, rl.means_missing
+from (select * from tumor_item_type where valtype_cd = '@') ty
+left join loinc_naaccr_answers la
+       on la.code_value = ty.naaccrNum
+      and la.answerlistid = ty.AnswerListId
+      and answer_code is not null
+left join code_labels rl
+       on rl.item = ty.naaccrNum
+      and (la.answerlistid is null or rl.code = la.answer_code)
+),
+with_name as (
+select concat(answer_code, ' ', answer_string) as c_name
+     , mix.*
+from mix
+where answer_code is not null
+),
+ea as (
+select ic.sectionId, ic.naaccrNum, answer_code
+     , ic.c_hlevel + 1 c_hlevel
+     , concat(ic.c_fullname,
+              substr(v.c_name, 1, 40), '\\') as c_fullname
+     , v.c_name
+     , concat('NAACCR|', ic.naaccrNum, ':', answer_code) as c_basecode
+     , 'LA' as c_visualattributes
+     , description as c_tooltip
+from with_name v
+join item_concepts ic on ic.naaccrNum = v.naaccrNum
+)
+select ea.*
+     , ea.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     , top.sourcesystem_cd
+from ea
+cross join naaccr_top top
+cross join i2b2_path_concept i2b2;
+;
+
+
+-- code_concepts where ic.naaccrNum not in (400, 419, 521) -- separate code for primary site, Morph. TODO: layer
 
 /* ICD-O topographic codes for primary site */
 /* TODO: check that it's OK to throw away lvl='incl' synonyms */
@@ -47,11 +168,6 @@ select 4 lvl, regexp_replace(minor.kode, '\\.', '') concept_cd,  'LA' as c_visua
 from major
 join minor on minor.kode like concat(major.kode, '%')
 ;
-
-/*
--- eyeball it
-select * from icd_o_topo order by path;
-*/
 
 /* ICD-O-2, -3 morphology codes for histology */
 whenever sqlerror continue;
@@ -106,7 +222,12 @@ select 4 lvl, minor.itemnbr, replace(minor.code, '/', '') concept_cd,  'LA' as c
 from major
 join minor on substr(minor.code, 1, 3) between major.lo and major.hi
 ;
+/*
+-- eyeball it
+select * from icd_o_morph order by path;
+*/
 
+-- TODO: preserve morph2 tests
 select case when count(*) > 0 then 1/0 else 1 end
   all_morph2_codes_joined from (
 select *
@@ -129,10 +250,25 @@ and label = 'title'
 ;
 
 
-/*
--- eyeball it
-select * from icd_o_morph order by path;
-*/
+create or replace temporary view primary_site_concepts as
+with ea as (
+select lvl + 1 as c_hlevel
+     , concat(ic.c_fullname, icdo.path) as c_fullname
+     , icdo.concept_name as c_name
+     , concat('NAACCR|400:', icdo.concept_cd) as c_basecode
+     , icdo.c_visualattributes
+     , cast(null as string) as c_tooltip
+from icd_o_topo icdo
+cross join (select * from item_concepts where naaccrNum = 400) ic
+)
+select ea.*
+     , ea.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     , top.sourcesystem_cd
+from ea
+cross join naaccr_top top
+cross join i2b2_path_concept i2b2;
 
 
 /** tumor_reg_codes - one row for each distinct concept_cd in the data
@@ -226,92 +362,6 @@ left join (
 -- 1849 (in test)
 */
 
-create or replace temporary view naaccr_code_values as
-select sectionId, section, naaccrNum, naaccrId
-     , concat('NAACCR|', naaccrNum, ':',
-              coalesce(rl.code, la.answer_code)) concept_cd
-     , answer_code, rl.code
-     , concat(coalesce(rl.code, la.answer_code), ' ',
-              coalesce(rl.label, la.answer_string)) as name_char
-     , answer_string
-     , rl.label
-     , rl.description c_tooltip
-     , loinc_num, ty.AnswerListId, sequence_no
-     , rl.scheme, rl.means_missing
-from tumor_item_type ty
-left join loinc_naaccr_answers la
-       on la.code_value = ty.naaccrNum
-      and la.answerlistid = ty.AnswerListId
-      and answer_code is not null
-left join code_labels rl
-       on rl.item = ty.naaccrNum
-      and (la.answerlistid is null or rl.code = la.answer_code)
-where ty.valtype_cd = '@'
-;
-
-
-create or replace temporary view naaccr_ont_aux as
-
-with root as (
-select 1 as c_hlevel
-     , '' as path
-     , 'Cancer Cases (NAACCR Hierarchy)' as concept_name
-     , null as concept_cd
-     , 'FA' as c_visualattributes
-from (values('X'))
-),
-
-section_concepts as (
-select 2 as c_hlevel
-     , concat('S:', nts.sectionid, ' ', section, '\\') as path
-     , concat(trim(format_string('%02d', nts.sectionid)), ' ', section) as concept_name
-     , null as concept_cd
-     , 'FA' as c_visualattributes
-     , nts.section
-from section nts
-),
-
-item_concepts as (
-select 3 as c_hlevel
-     , concat(sc.path,
-       -- ISSUE: migrate from naaccrName to naaccrId for path?
-              substr(concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName), 1, 40), '\\') as path
-     , concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName) as concept_name
-     , concat('NAACCR|', ni.naaccrNum, ':') as concept_cd
-     , case
-       when ni.valtype_cd = '@' then 'FA'
-       else 'LA' -- TODO: hide concepts where we have no data
-                 -- TODO: hide Histology since '0420', '0522'
-                 -- we already have Morph--Type/Behav
-       end as c_visualattributes
-     , ni.naaccrNum
-from tumor_item_type ni
-join section_concepts sc on sc.section = ni.section
-),
-
-code_concepts as (
-select 4 as c_hlevel
-     , concat(ic.path,
-              substr(v.name_char, 1, 40), '\\')
-       as path
-     , v.name_char as concept_name
-     , v.concept_cd
-     , 'LA' as c_visualattributes
-from naaccr_code_values v
-join item_concepts ic on ic.naaccrNum = v.naaccrNum
-where ic.naaccrNum not in (400, 419, 521) -- separate code for primary site, Morph. TODO: layer
-),
-
-primary_site_concepts as (
-select lvl + 1 as c_hlevel
-     , concat(ic.path, icdo.path) as path
-     , icdo.concept_name concept_name
-     , concat('NAACCR|400:', icdo.concept_cd) as concept_cd
-     , icdo.c_visualattributes
-from icd_o_topo icdo
-cross join (select * from item_concepts where naaccrNum = 400) ic
-)
-
 /* Morph--Type/Behav concepts -- TODO
 union all
 select distinct lvl + 1 as c_hlevel
@@ -327,18 +377,7 @@ where tr.itemnbr in (419, 521)
 */
 
 
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from root
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from section_concepts
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from item_concepts
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from code_concepts
-union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from primary_site_concepts
-;
-
-create or replace temporary view naaccr_ont_aux_seer as
+--@@@ create or replace temporary view naaccr_ont_aux_seer as
 with seer_terms as (
 select 2 as c_hlevel
      , 'SEER Site\\' as path
@@ -364,36 +403,42 @@ select c_hlevel, path, concept_name, concept_cd, c_visualattributes from seer_te
 ;
 
 create or replace temporary view naaccr_ontology as
-select i2b2_root.c_hlevel + terms.c_hlevel as c_hlevel
-     , concat(i2b2_root.c_fullname, naaccr_folder.path, terms.path) as c_fullname
-     , substr(terms.concept_name, 1, 200) as c_name
-     , terms.concept_cd as c_basecode
-     , concat(i2b2_root.c_fullname, naaccr_folder.path, terms.path) as c_dimcode
-     , (select task_id from current_task) as c_comment
-     , c_visualattributes
-     , norm.*
-     , current_timestamp as update_date, current_timestamp as import_date -- @@ISSUE: ambient
-     , tumor_reg_source.source_cd as sourcesystem_cd
-from
 
-naaccr_ont_aux terms
-cross join (select 'naaccr\\' as path
-     , 'NAACCR' as concept_name
-     from (values('X'))) naaccr_folder
-cross join (select 0 c_hlevel, '\\i2b2\\' c_fullname from (values('X'))) i2b2_root
-cross join (
-  select 'N' as c_synonym_cd
-       , 'concept_cd' as c_facttablecolumn
-       , 'concept_dimension' as c_tablename
-       , 'CONCEPT_PATH' as c_columnname
-       , 'T' c_columndatatype
-       , 'like' c_operator
-       , '@' m_applied_path
-  from (values('X'))
-) norm
-cross join (select 'tumor_registry@kumed.com' as source_cd
-   from (values('X'))) tumor_reg_source
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from naaccr_top_concept
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from section_concepts
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from item_concepts
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from code_concepts
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from primary_site_concepts
 ;
+
+--TODO limit to 200     , substr(terms.concept_name, 1, 200) as c_name
 
 
 /* Regression tests for earlier bugs. */

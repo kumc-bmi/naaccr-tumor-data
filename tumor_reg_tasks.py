@@ -345,7 +345,7 @@ class JDBCTableTarget(luigi.Target):
 
 class NAACCR_Ontology1(SparkJDBCTask):
     z_design_id = pv.StrParam(
-        default='create_objects %s' % hash(tr_ont.NAACCR_I2B2.ont_script.code),
+        default='2019-09-13 %s' % hash(tr_ont.NAACCR_I2B2.ont_script.code),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -371,14 +371,9 @@ class NAACCR_Ontology1(SparkJDBCTask):
         quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
 
-        # oh for bind variables...
-        spark.sql(f'''
-          create or replace temporary view current_task as
-          select "{self.task_id}" as task_id from (values('X'))
-        ''')
-
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.task_id, self.seer_recode and self.seer_recode.resolve())
+            spark, self.task_id, update_date=self.z_design_id[:10],
+            recode=self.seer_recode and self.seer_recode.resolve())
 
         self.account().wr(td.case_fold(ont).write, self.table_name,
                           mode='overwrite')
