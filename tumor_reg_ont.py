@@ -7,6 +7,7 @@ from typing import (
 )
 from xml.etree import ElementTree as XML
 import logging
+import zipfile
 
 from mypy_extensions import TypedDict  # ISSUE: dependency?
 from pyspark.sql import SparkSession as SparkSession_T
@@ -40,6 +41,7 @@ class XSD:
         we're dealing with static data that we know matches,
         we can refine the type by asserting that there's a match.
 
+        IDEA: move this to an XPath class
         """
         found = elt.find(path, ns)
         assert found is not None, (elt, path)
@@ -127,7 +129,7 @@ class NAACCR_Layout:
     ...            [f['naaccr-item-num'] for f in NAACCR_Layout.fields])
     []
 
-    ISSUE: Note sure about these two oddballs...
+    ISSUE: Not sure about these two oddballs...
 
     >>> check_fkey([f for f in NAACCR_Layout.fields if not f['grouped']],
     ...            'naaccr-item-num',  ## TODO
@@ -466,6 +468,22 @@ class NAACCR_R:
         return with_field_info
 
 
+class OncologyMeta:
+    morph3_info = ('ICD-O-2_CSV.zip', 'icd-o-3-morph.csv', ['code', 'label', 'notes'])
+    topo_info = ('ICD-O-2_CSV.zip', 'Topoenglish.txt', None)
+    encoding = 'ISO-8859-1'
+
+    @classmethod
+    def read_table(cls, cache: Path_T,
+                   zip: str, item: str, names: Opt[List[str]]) -> pd.DataFrame:
+        archive = zipfile.ZipFile(cache / zip)
+
+        return pd.read_csv(archive.open(item),
+                           header=None if names else 0,
+                           delimiter=',' if item.endswith('.csv') else '\t',
+                           encoding=cls.encoding, names=names)
+
+
 class NAACCR_I2B2(object):
     tumor_item_type = fixna(pd.read_csv(res.open_text(
         heron_load, 'tumor_item_type.csv')))
@@ -495,11 +513,22 @@ class NAACCR_I2B2(object):
 
     @classmethod
     def ont_view_in(cls, spark: SparkSession_T, task_id: str,
+                    who_cache: Opt[Path_T] = None,
                     recode: Opt[Path_T] = None) -> DataFrame:
         cls.item_views_in(spark)
 
         # Labels for coded values
         LOINC_NAACCR.answers_in(spark)
+
+        if who_cache:
+            who_topo = OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info)
+        else:
+            log.warn('skipping SEER Recode terms')
+            seer_site_terms = spark.sql('''
+              select 1 hlevel, 'p' path, 'n' name, 'x' basecode,
+                'v' visualattributes
+              where 1 = 0
+            ''')
 
         if recode:
             seer_site_terms = cls.seer_terms(spark, recode)
@@ -517,6 +546,7 @@ class NAACCR_I2B2(object):
                                section=to_df(cls.per_section),
                                tumor_item_type=to_df(cls.tumor_item_type),
                                code_labels=to_df(NAACCR_R.code_labels()),
+                               who_topo=to_df(who_topo),
                                seer_site_terms=seer_site_terms)
 
         name, _, _ = cls.ont_script.objects[-1]

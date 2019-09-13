@@ -268,6 +268,9 @@ having count(distinct valtype_cd) > 1
 ''', limit=None)
 
 # %% [markdown]
+# ## NAACCR Ontology
+
+# %% [markdown]
 # ## Coded Concepts
 
 # %%
@@ -284,6 +287,27 @@ if IO_TESTING:
     _spark.createDataFrame(ont.NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
     _spark.createDataFrame(ont.NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
 IO_TESTING and _spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
+
+# %% [markdown]
+# ### Oncology MetaFiles from the World Health Organization
+#
+# [materials](http://www.who.int/classifications/icd/adaptations/oncology/en/index.html)
+
+# %%
+if IO_TESTING:
+    _who_topo = ont.OncologyMeta.read_table(_cwd / ',cache', *ont.OncologyMeta.topo_info)
+IO_TESTING and _who_topo.set_index('Kode').head()
+
+# %%
+if IO_TESTING:
+    ont.NAACCR_I2B2.ont_view_in(_spark, task_id='task1', who_cache=_cwd / ',cache')
+
+_SQL(r'''
+select *
+from naaccr_ont_aux
+where concept_cd like 'NAACCR|400:%'
+order by path
+''')
 
 
 # %% [markdown]

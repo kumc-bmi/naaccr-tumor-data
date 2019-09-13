@@ -53,26 +53,23 @@ select count(to_number(ne."Patient ID Number"))
 
 /* ICD-O topographic codes for primary site */
 /* TODO: check that it's OK to throw away lvl='incl' synonyms */
-whenever sqlerror continue;
-drop table icd_o_topo;
-whenever sqlerror exit;
-create table icd_o_topo as
+create or replace temporary view icd_o_topo as
 with major as (
-  select * from who.topo
+  select * from who_topo
   where lvl = '3'
 )
 , minor as (
-  select * from who.topo
+  select * from who_topo
   where lvl = '4'
 )
 select 3 lvl, major.kode concept_cd, 'FA' as c_visualattributes,
-       major.kode || '\' path, major.title concept_name
+       concat(major.kode, '\\') as path, major.title concept_name
 from major
 union all
-select 4 lvl, replace(minor.kode, '.', '') concept_cd,  'LA' as c_visualattributes,
-       major.kode || '\' || minor.kode || '\', minor.title
+select 4 lvl, regexp_replace(minor.kode, '\\.', '') concept_cd,  'LA' as c_visualattributes,
+       concat(major.kode, '\\', minor.kode, '\\'), minor.title
 from major
-join minor on minor.kode like (major.kode || '%')
+join minor on minor.kode like concat(major.kode, '%')
 ;
 
 /*
@@ -317,39 +314,27 @@ join section_concepts sc on sc.section = ni.section
 ),
 
 code_concepts as (
-select distinct 4 as c_hlevel
+select 4 as c_hlevel
      , concat(ic.path,
               substr(v.name_char, 1, 40), '\\')
        as path
      , v.name_char as concept_name
      , v.concept_cd
-     , /* TODO: case
-       when itemnbr in (
-                    -- hide Histology since
-                    -- we already have Morph--Type/Behav
-                    '0420', '0522')
-       then 'LH'
-       else c_visualattributes
-       end as*/ 'LA' as c_visualattributes
+     , 'LA' as c_visualattributes
 from naaccr_code_values v
 join item_concepts ic on ic.naaccrNum = v.naaccrNum
-)
+where ic.naaccrNum not in (400, 419, 521) -- separate code for primary site, Morph. TODO: layer
+),
 
--- TODO: where itemnbr not in (400, 419, 521) -- separate code for primary site, Morph.
-
-
-/* Primary site concepts -- TODO
-select distinct lvl + 1 as c_hlevel
-     , 'S:' || sectionid || ' ' || section || '\'
-       || substr(trim(to_char(itemnbr, '0999')) || ' ' || itemname, 1, 40) || '\'
-       || icdo.path
-       as concept_path
+primary_site_concepts as (
+select lvl + 1 as c_hlevel
+     , concat(ic.path, icdo.path) as path
      , icdo.concept_name concept_name
-     , 'NAACCR|400:' || icdo.concept_cd concept_cd
+     , concat('NAACCR|400:', icdo.concept_cd) as concept_cd
      , icdo.c_visualattributes
-from icd_o_topo icdo, tumor_reg_concepts
-where itemnbr  = 400
-*/
+from icd_o_topo icdo
+cross join (select * from item_concepts where naaccrNum = 400) ic
+)
 
 /* Morph--Type/Behav concepts -- TODO
 union all
@@ -373,6 +358,8 @@ union all
 select c_hlevel, path, concept_name, concept_cd, c_visualattributes from item_concepts
 union all
 select c_hlevel, path, concept_name, concept_cd, c_visualattributes from code_concepts
+union all
+select c_hlevel, path, concept_name, concept_cd, c_visualattributes from primary_site_concepts
 ;
 
 create or replace temporary view naaccr_ont_aux_seer as
