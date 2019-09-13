@@ -378,7 +378,7 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
                  ns=NAACCR1.ns)
 
 
-def _fixna(df: pd.DataFrame) -> pd.DataFrame:
+def fixna(df: pd.DataFrame) -> pd.DataFrame:
     """
     avoid string + double errors from spark.createDataFrame(pd.read_csv())
     """
@@ -386,13 +386,13 @@ def _fixna(df: pd.DataFrame) -> pd.DataFrame:
 
 
 class LOINC_NAACCR:
-    measure = _fixna(pd.read_csv(res.open_text(
+    measure = fixna(pd.read_csv(res.open_text(
         loinc_naaccr, 'loinc_naaccr.csv')))
     measure_cols = ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']
     measure_struct = ty.StructType([
         ty.StructField(n, ty.StringType()) for n in measure_cols])
 
-    answer = _fixna(pd.read_csv(res.open_text(
+    answer = fixna(pd.read_csv(res.open_text(
         loinc_naaccr, 'loinc_naaccr_answer.csv')))
     answer_struct = ty.StructType([
         ty.StructField(n.lower(),
@@ -467,7 +467,7 @@ class NAACCR_R:
 
 
 class NAACCR_I2B2(object):
-    tumor_item_type = _fixna(pd.read_csv(res.open_text(
+    tumor_item_type = fixna(pd.read_csv(res.open_text(
         heron_load, 'tumor_item_type.csv')))
 
     tx_script = SqlScript(
@@ -630,7 +630,7 @@ def csv_view(spark: SparkSession_T, path: Path_T,
 
 def csv_meta(dtypes: Dict[str, np.dtype], path: str,
              context: str = 'http://www.w3.org/ns/csvw') -> Dict[str, object]:
-    # ISSUE: dead code? obsolete in favor of _fixna()?
+    # ISSUE: dead code? obsolete in favor of fixna()?
     def xlate(dty: np.dtype) -> str:
         if dty.kind == 'i':
             return 'number'
