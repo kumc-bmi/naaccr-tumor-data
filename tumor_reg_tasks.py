@@ -344,9 +344,14 @@ class JDBCTableTarget(luigi.Target):
                 return False
 
 
+def _stable_hash(*code: str) -> int:
+    data = ('\n'.join(code)).encode('utf-8')
+    return crc32(data)
+
+
 class NAACCR_Ontology1(SparkJDBCTask):
     z_design_id = pv.StrParam(
-        default='2019-09-13 c_name len %s' % len(tr_ont.NAACCR_I2B2.ont_script.objects),
+        default='2019-09-16 c_hlevel fix %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -550,11 +555,6 @@ class NAACCR_Patients(_NAACCR_JDBC):
         patients = td.TumorKeys.with_patient_num(
             patients, spark, cdw, self.schema, self.patient_ide_source)
         return patients
-
-
-def _stable_hash(*code: str) -> int:
-    data = ('\n'.join(code)).encode('utf-8')
-    return crc32(data)
 
 
 class NAACCR_Facts(_NAACCR_JDBC):

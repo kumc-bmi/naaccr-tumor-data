@@ -497,6 +497,7 @@ class NAACCR_I2B2(object):
 
     @classmethod
     def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: str,
+                    c_hlevel: int = 1,
                     c_fullname: str = r'\i2b2\naaccr\x'[:-1],
                     c_name: str = 'Cancer Cases (NAACCR Hierarchy)',
                     sourcesystem_cd: str = 'heron-admin@kumc.edu',
@@ -523,7 +524,7 @@ class NAACCR_I2B2(object):
               where 1 = 0
             ''')
 
-        top = pd.DataFrame([dict(c_hlevel=0,
+        top = pd.DataFrame([dict(c_hlevel=c_hlevel,
                                  c_fullname=c_fullname,
                                  c_name=c_name,
                                  update_date=update_date,
