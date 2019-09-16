@@ -399,6 +399,7 @@ class NAACCR_FlatFile(ManualTask):
     naaccrRecordVersion = pv.IntParam(default=180)
     dateCaseReportExported = pv.DateParam()
     npiRegistryId = pv.StrParam()
+    testData = pv.BoolParam(default=False, significant=False)
     flat_file = pv.PathParam(significant=False)
     record_qty_min = pv.IntParam(significant=False, default=1)
 
@@ -433,7 +434,13 @@ class NAACCR_FlatFile(ManualTask):
         dtOk = self._checkItem(record0, 'dateCaseReportExported',
                                self.dateCaseReportExported.strftime('%Y%m%d'))
 
-        return vOk and regOk and dtOk and qty >= self.record_qty_min
+        if vOk and regOk and dtOk and qty >= self.record_qty_min:
+            return True
+        else:
+            if self.testData:
+                log.warn('ignoring failed FlatFile check')
+                return True
+            return False
 
     @classmethod
     def _checkItem(cls, record: str, naaccrId: str, expected: str) -> bool:
