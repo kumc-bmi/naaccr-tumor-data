@@ -846,6 +846,67 @@ class NAACCR_Load(_RunScriptTask):
                     encounter_ide_source=self.encounter_ide_source))
 
 
+class NAACCR_Ontology2(_RunScriptTask):
+    '''NAACCR Ontology: un-published code values
+
+    i.e. code values that occur in tumor registry data but not in published ontologies
+    '''
+    # flat file attributes
+    dateCaseReportExported = pv.DateParam()
+    npiRegistryId = pv.StrParam()
+    source_cd = pv.StrParam(default='tumor_registry@kumed.com')
+
+    z_design_id = pv.StrParam(default='pls log 33')
+
+    script_name = 'naaccr_concepts_mix.sql'
+    script = res.read_text(heron_load, script_name)
+
+    @property
+    def classpath(self) -> str:
+        return self.jdbc_driver_jar
+
+    def _upload_target(self) -> 'UploadTarget':
+        return UploadTarget(self, self.schema, transform_name=self.task_id)
+
+    def requires(self) -> Dict[str, luigi.Task]:
+        _configure_logging(self.log_dest)
+
+        summary = NAACCR_Summary(
+            db_url=self.db_url,
+            user=self.user,
+            passkey=self.passkey,
+            dateCaseReportExported=self.dateCaseReportExported,
+            npiRegistryId=self.npiRegistryId,
+        )
+        ont1 = NAACCR_Ontology1(
+            db_url=self.db_url,
+            user=self.user,
+            passkey=self.passkey,
+        )
+        ff = self._flat_file_task()
+
+        return dict(NAACCR_Ontology1=ont1,
+                    NAACCR_Summary=summary,
+                    NAACCR_FlatFile=ff)
+
+    def _flat_file_task(self) -> NAACCR_FlatFile:
+        return NAACCR_FlatFile(
+            dateCaseReportExported=self.dateCaseReportExported,
+            npiRegistryId=self.npiRegistryId)
+
+    def run_upload(self, conn: Connection, upload_id: int) -> None:
+        ff = self._flat_file_task()
+
+        self.run_script(
+            conn, self.script_name, self.script,
+            variables=dict(upload_id=str(upload_id),
+                           task_id=self.task_id),
+            script_params=dict(
+                upload_id=upload_id,
+                task_id=self.task_id,
+                update_date=ff.dateCaseReportExported))
+
+
 class CopyRecords(SparkJDBCTask):
     src_table = pv.StrParam()
     dest_table = pv.StrParam()
