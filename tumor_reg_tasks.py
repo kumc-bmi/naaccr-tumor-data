@@ -538,7 +538,7 @@ class NAACCR_Patients(_NAACCR_JDBC):
                         patient_ide_source=self.patient_ide_source,
                         schema=self.schema,
                         db_url=self.db_url,
-                        classpath=self.classpath,
+                        jdbc_driver_jar=self.classpath,  # KLUDGE
                         driver=self.driver,
                         user=self.user,
                         passkey=self.passkey))
@@ -575,6 +575,18 @@ class NAACCR_Facts(_NAACCR_JDBC):
         ssf = td.SiteSpecificFactors.make(spark, extract)
         # ISSUE: make these separate tables?
         return item.union(seer).union(ssf)
+
+
+class NAACCR_Summary(_NAACCR_JDBC):
+    table_name = "NAACCR_EXPORT_STATS"
+
+    z_design_id = pv.StrParam('original')
+
+    def _data(self, spark: SparkSession,
+              naaccr_text_lines: DataFrame) -> DataFrame:
+        dd = tr_ont.ddictDF(spark)
+        extract = td.naaccr_read_fwf(naaccr_text_lines, dd)
+        return td.DataSummary.nominal_stats(extract, spark)
 
 
 class UploadTask(JDBCTask):
@@ -736,7 +748,6 @@ def _fix_null(it: T, rs: ResultSet) -> Opt[T]:
 class HERON_Patient_Mapping(UploadTask):
     patient_ide_source = pv.StrParam()
     # ISSUE: task id should depend on HERON release, too
-    classpath = pv.StrParam(significant=False)
 
     transform_name = 'load_epic_dimensions'
 

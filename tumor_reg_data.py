@@ -826,6 +826,78 @@ IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 
 
 # %% [markdown]
+# ### Code from Data Summary
+
+# %%
+class DataSummary:
+    script = SqlScript('data_char_sim.sql',
+                       res.read_text(heron_load, 'data_char_sim.sql'),
+                       [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type']),
+                        ('data_char_naaccr_nom', ['record_layout'])])
+
+    @classmethod
+    def nominal_stats(cls, tumors_raw: DataFrame, spark: SparkSession_T) -> DataFrame:
+        to_df = spark.createDataFrame
+
+        ty = to_df(ont.NAACCR_I2B2.tumor_item_type)
+        views = ont.create_objects(spark, cls.script,
+                                   section=to_df(ont.NAACCR_I2B2.per_section),
+                                   record_layout=to_df(ont.NAACCR_Layout.fields),
+                                   tumor_item_type=ty,
+                                   naaccr_extract=tumors_raw,
+                                   tumors_eav=cls.stack_nominals(tumors_raw, ty))
+        return list(views.values())[-1]
+
+    @classmethod
+    def stack_nominals(cls, data: DataFrame, ty: DataFrame,
+                       nominal_cd: str = '@',
+                       var_name: str = 'naaccrId',
+                       id_col: str = 'recordId') -> DataFrame:
+        value_vars = [row.naaccrId
+                      for row in ty.where(ty.valtype_cd == nominal_cd)
+                      .collect()]
+        df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),
+                  value_vars=value_vars, id_vars=[id_col], var_name=var_name)
+        return df.where(func.trim(df.value) > '')
+
+
+# if IO_TESTING:
+#     DataSummary.stack_nominals(_extract, _ty).createOrReplaceTempView('tumors_eav')
+# _SQL('select * from tumors_eav')
+
+# %%
+if IO_TESTING:
+    DataSummary.nominal_stats(_extract, _spark)
+    _spark.table('data_char_naaccr_nom').cache()
+    _spark.table('item_concepts').cache()
+
+_SQL('select * from data_char_naaccr_nom order by sectionId, naaccrNum, value', limit=15)
+
+# %%
+_SQL(r'''
+with ea as (
+select nom.sectionId, nom.naaccrNum, nom.value
+     , ic.c_hlevel + 1 as c_hlevel
+     , concat(ic.c_fullname, value, '\\') as c_fullname
+     , value as c_name
+     , concat('NAACCR|', ic.naaccrNum, ':', value) as c_basecode
+     , 'LA' as c_visualattributes
+     , cast(null as string) as c_tooltip
+from data_char_naaccr_nom nom
+join item_concepts ic on ic.naaccrNum = nom.naaccrNum
+)
+select ea.*
+     , ea.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     , top.sourcesystem_cd
+from ea
+cross join naaccr_top top
+cross join i2b2_path_concept i2b2
+''', limit=20)
+
+
+# %% [markdown]
 # ## SEER Site Recode
 
 # %%
