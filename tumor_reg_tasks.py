@@ -15,6 +15,7 @@ API docs used a lot in development:
 """
 
 from abc import abstractmethod
+from binascii import crc32
 from contextlib import contextmanager
 from importlib import resources as res
 from pathlib import Path as Path_T
@@ -544,14 +545,19 @@ class NAACCR_Patients(_NAACCR_JDBC):
         return patients
 
 
+def _stable_hash(*code: str) -> int:
+    data = ('\n'.join(code)).encode('utf-8')
+    return crc32(data)
+
+
 class NAACCR_Facts(_NAACCR_JDBC):
     table_name = "NAACCR_OBSERVATIONS"
 
-    z_design_id = pv.StrParam('nested fields (%s)' % hash(
-        (td.ItemObs.script,
-         td.SEER_Recode.script,
-         td.SiteSpecificFactors.script1,
-         td.SiteSpecificFactors.script2)))
+    z_design_id = pv.StrParam('nested fields (%s)' % _stable_hash(
+        td.ItemObs.script.code,
+        td.SEER_Recode.script.code,
+        td.SiteSpecificFactors.script1.code,
+        td.SiteSpecificFactors.script2.code))
 
     def _data(self, spark: SparkSession,
               naaccr_text_lines: DataFrame) -> DataFrame:
