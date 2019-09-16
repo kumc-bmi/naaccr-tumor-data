@@ -763,7 +763,7 @@ class HERON_Patient_Mapping(UploadTask):
             raise NotImplementedError('load_epic_dimensions is a paver task')
 
 
-class _RunScriptTask(UploadTask):
+class _RunScriptTask(UploadRunTask):
     log_dest = pv.PathParam(significant=False)
 
     script_name: str
