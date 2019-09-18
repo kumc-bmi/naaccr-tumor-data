@@ -883,20 +883,11 @@ class NAACCR_Ontology2(_RunScriptTask):
             user=self.user,
             passkey=self.passkey,
         )
-        ff = self._flat_file_task()
 
         return dict(NAACCR_Ontology1=ont1,
-                    NAACCR_Summary=summary,
-                    NAACCR_FlatFile=ff)
-
-    def _flat_file_task(self) -> NAACCR_FlatFile:
-        return NAACCR_FlatFile(
-            dateCaseReportExported=self.dateCaseReportExported,
-            npiRegistryId=self.npiRegistryId)
+                    NAACCR_Summary=summary)
 
     def run_upload(self, conn: Connection, upload_id: int) -> None:
-        ff = self._flat_file_task()
-
         self.run_script(
             conn, self.script_name, self.script,
             variables=dict(upload_id=str(upload_id),
@@ -904,7 +895,7 @@ class NAACCR_Ontology2(_RunScriptTask):
             script_params=dict(
                 upload_id=upload_id,
                 task_id=self.task_id,
-                update_date=ff.dateCaseReportExported))
+                update_date=self.dateCaseReportExported))
 
 
 class CopyRecords(SparkJDBCTask):
