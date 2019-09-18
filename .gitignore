@@ -1,16 +1,23 @@
-naaccr_ddict/?c=*
+# emacs backups
 *~
+
+# mh-style temp stuff
 ,*
+
 .ipynb_checkpoints
+
+*log.json
+
 *.db
+
+# spark stuff
 derby.log
 metastore_db
+
 .direnv
 vendor/
 __pycache__
 .mypy_cache/
 
-# TODO: license?
-naaccr_ddict/data_descriptor.csv
-naaccr_ddict/item_description.csv
-naaccr_ddict/record_layout.csv
+# luigi config files
+client-*.cfg
