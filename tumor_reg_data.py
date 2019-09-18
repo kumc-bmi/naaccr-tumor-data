@@ -330,7 +330,7 @@ from code_concepts where naaccrNum = 610
 
 # %%
 if IO_TESTING:
-    _who_topo = ont.OncologyMeta.read_table(_cwd / ',cache', *ont.OncologyMeta.topo_info)
+    _who_topo = ont.OncologyMeta.read_table((_cwd / ',cache').resolve(), *ont.OncologyMeta.topo_info)
 
 IO_TESTING and _who_topo.set_index('Kode').head()
 
@@ -466,7 +466,7 @@ def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
 
 _extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
 if IO_TESTING:
-    _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF(_spark))
+    _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF(_spark)).cache()
     _extract.createOrReplaceTempView('naaccr_extract')
 # _extract.explain()
 IO_TESTING and non_blank(_extract.limit(5).toPandas())
@@ -575,7 +575,7 @@ _key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
 IO_TESTING and dups(_extract.select('sequenceNumberCentral',
                                     'dateOfDiagnosis', 'dateCaseCompleted',
                                     *_key1),
-                    _key1).set_index(_key1)
+                    _key1).set_index(_key1).head(10)
 
 
 # %%
@@ -729,9 +729,8 @@ def melt(df: DataFrame,
 
 # %%
 if IO_TESTING:
-    _ty = _spark.read.csv('heron_load/tumor_item_type.csv',
-                          header=True, inferSchema=True)
-    _ty.cache()
+    _to_spark('tumor_item_type', lambda: ont.NAACCR_I2B2.tumor_item_type, cache=True)
+    _ty = _spark.table('tumor_item_type')
 IO_TESTING and _ty.limit(5).toPandas()
 
 
@@ -753,29 +752,9 @@ def stack_obs(records: DataFrame, ty: DataFrame,
 
 if IO_TESTING:
     _raw_obs = TumorKeys.with_tumor_id(naaccr_dates(stack_obs(_extract, _ty), TumorKeys.dtcols))
-    _raw_obs.createOrReplaceTempView('naaccr_obs_raw')
-IO_TESTING and _raw_obs.limit(10).toPandas()
+    _to_view('naaccr_obs_raw', lambda: _raw_obs, cache=True)
 
-# %%
-if IO_TESTING:
-    _script1 = SqlScript('naaccr_txform.sql',
-                         res.read_text(heron_load, 'naaccr_txform.sql'),
-                         [('tumor_item_value', ['naaccr_obs_raw'])])
-    ont.create_objects(_spark, _script1, naaccr_obs_raw=_raw_obs)
-IO_TESTING and _spark.table('tumor_item_value').limit(10).toPandas()
-
-# %%
-if IO_TESTING:
-    _script1 = SqlScript('naaccr_txform.sql',
-                         res.read_text(heron_load, 'naaccr_txform.sql'),
-                         [('tumor_reg_facts', ['record_layout', 'section'])])
-    ont.create_objects(_spark, _script1,
-                       record_layout=_spark.createDataFrame(ont.NAACCR_Layout.fields),
-                       section=_spark.createDataFrame(ont.NAACCR_I2B2.per_section))
-IO_TESTING and _spark.table('tumor_reg_facts').limit(10).toPandas()
-
-# %%
-IO_TESTING and _spark.table('tumor_reg_facts').where("valtype_cd != '@'").limit(5).toPandas()
+_SQL('select * from naaccr_obs_raw', limit=10)
 
 
 # %%
@@ -816,8 +795,13 @@ class ItemObs:
         return spark.table(cls.extract_id_view)
 
 
-_to_view('naaccr_observations', lambda: ItemObs.make(_spark, _extract), cache=True)
-_SQL('select * from naaccr_observations')
+_to_view('naaccr_observations1', lambda: ItemObs.make(_spark, _extract), cache=True)
+if IO_TESTING:
+    _obs = _spark.table('naaccr_observations1')
+_SQL('select * from naaccr_observations1')
+
+# %%
+_SQL("select * from tumor_reg_facts where valtype_cd != '@'")
 
 # %% [markdown]
 # #### dateOfBirth regression test
@@ -832,7 +816,7 @@ _SQL('select * from naaccr_observations')
 
 # %%
 _SQL('''
-select * from naaccr_observations where concept_cd = 'NAACCR|240:'
+select * from naaccr_observations1 where concept_cd = 'NAACCR|240:'
 ''')
 
 # %%
@@ -887,6 +871,11 @@ if IO_TESTING:
 
 _SQL('select * from data_char_naaccr_nom order by sectionId, naaccrNum, value', limit=15)
 
+# %%
+if IO_TESTING:
+    _SQL('select * from data_char_naaccr_nom order by sectionId, naaccrNum, value', limit=None).to_csv(
+        _cwd / 'naaccr_export_stats.csv', index=False)
+
 
 # %% [markdown]
 # ## SEER Site Recode
@@ -906,7 +895,8 @@ class SEER_Recode:
         return list(views.values())[-1]
 
 
-IO_TESTING and SEER_Recode.make(_spark, _extract).limit(5).toPandas()
+_to_view('naaccr_obs_seer', lambda: SEER_Recode.make(_spark, _extract), cache=True)
+_SQL('select * from naaccr_obs_seer')
 
 
 # %%
@@ -952,7 +942,21 @@ if IO_TESTING:
     _ssf_facts = SiteSpecificFactors.make(_spark, _extract)
     assert _obs.columns == _ssf_facts.columns
 
-IO_TESTING and _ssf_facts.limit(7).toPandas()
+_to_view('naaccr_obs_ssf', lambda: _ssf_facts, cache=True)
+_SQL('select * from naaccr_obs_ssf', limit=7)
+
+# %%
+_SQL('''
+create or replace temporary view naaccr_observations as
+    select * from naaccr_observations1
+    union all
+    select * from naaccr_obs_seer
+    union all
+    select * from naaccr_obs_ssf
+    ''')
+
+if IO_TESTING:
+    _spark.table('naaccr_observations').toPandas().to_csv(_cwd / 'naaccr_observations.csv', index=False)
 
 # %% [markdown]
 # ## Concept stats
@@ -972,15 +976,15 @@ having count(*) > 1
 # %%
 class ConceptStats:
     script = SqlScript('concept_stats.sql',
-                        res.read_text(heron_load, 'concept_stats.sql'),
-                        [('concept_stats', ['ontology', 'observations'])])
+                       res.read_text(heron_load, 'concept_stats.sql'),
+                       [('concept_stats', ['ontology', 'observations'])])
 
     @classmethod
     def make(cls, spark: SparkSession_T,
              ontology: DataFrame, observations: DataFrame) -> DataFrame:
         views = ont.create_objects(spark, cls.script,
-                           ontology=ontology.cache(),
-                           observations=observations.cache())
+                                   ontology=ontology.cache(),
+                                   observations=observations.cache())
         return list(views.values())[-1]
 
 

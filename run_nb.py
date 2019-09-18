@@ -3,13 +3,12 @@ import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
 
 
-def main(argv, cwd,
-         meta='notebooks/'):
-    [notebook_filename, out_path] = argv[1:3]
+def main(argv, cwd):
+    [notebook_filename, workspace, out_path] = argv[1:4]
     with (cwd / notebook_filename).open() as f:
         nb = nbformat.read(f, as_version=4)
         ep = ExecutePreprocessor(timeout=600)  # , kernel_name='python3'
-        ep.preprocess(nb, {'metadata': {'path': str((cwd / meta).resolve())}})
+        ep.preprocess(nb, {'metadata': {'path': str((cwd / workspace).resolve())}})
     with (cwd / out_path).open('w', encoding='utf-8') as f:
         nbformat.write(nb, f)
 

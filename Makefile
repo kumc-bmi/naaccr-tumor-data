@@ -1,13 +1,28 @@
 
 check_code: doctest lint static
 
-release: check_code run_notebook
+VERSION := $(shell git log --pretty=format:'%h' HEAD -n1)
+ARCHIVE=build/naaccr-tumor-reg-$(VERSION).zip
 
-# TODO: code archive release artifact
+release: check_code build run_notebook $(ARCHIVE)
+
+build:
+	mkdir -p build
+
+archive: $(ARCHIVE)
+
+$(ARCHIVE): build
+	git archive -o $(ARCHIVE) HEAD
+
 # TODO: ontology release artifact
-# TODO: transformed data release artifact
 
-run_notebook: tumor_reg_data_run.html
+test_data_etl: build/naaccr_observations.csv build/naaccr_export_stats.csv
+
+build/naaccr_observations.csv: build/tumor_reg_data_run.ipynb
+
+build/naaccr_export_stats.csv: build/tumor_reg_data_run.ipynb
+
+run_notebook: build/tumor_reg_data_run.html
 
 DOCTEST_FILES=tumor_reg_ont.py tumor_reg_data.py tumor_reg_tasks.py sql_script.py
 
@@ -25,11 +40,11 @@ static:
 	# mypy --strict --show-traceback .
 	# MYPYPATH=.:$(CONDA_PREFIX)/lib/python3.7 mypy --strict .
 
-tumor_reg_data_run.html: tumor_reg_data_run.ipynb
+build/tumor_reg_data_run.html: build/tumor_reg_data_run.ipynb
 	jupyter nbconvert --to html $< $@
 
-tumor_reg_data_run.ipynb: tumor_reg_data.ipynb
-	PYSPARK_DRIVER_PYTHON=python spark-submit run_nb.py $< $@
+build/tumor_reg_data_run.ipynb: tumor_reg_data.ipynb
+	PYSPARK_DRIVER_PYTHON=python spark-submit run_nb.py $< build/ $@
 
 tumor_reg_data.ipynb: tumor_reg_data.py
 	jupytext --to notebook $<
