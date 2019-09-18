@@ -958,20 +958,9 @@ create or replace temporary view naaccr_observations as
 if IO_TESTING:
     _spark.table('naaccr_observations').toPandas().to_csv(_cwd / 'naaccr_observations.csv', index=False)
 
+
 # %% [markdown]
 # ## Concept stats
-#
-# Does Spark SQL have a good hash function? looks like it...
-
-# %%
-_SQL("""
-select k, count(*) from (
-select hash(c_fullname) as k from naaccr_ontology
-)
-group by k
-having count(*) > 1
-""")
-
 
 # %%
 class ConceptStats:
@@ -988,9 +977,11 @@ class ConceptStats:
         return list(views.values())[-1]
 
 
-if IO_TESTING:
-    ConceptStats.make(_spark, _spark.table('naaccr_ontology'), _spark.table('naaccr_observations'))
-_SQL('select * from concept_stats order by c_fullname', limit=15)
+# if IO_TESTING:
+#    ConceptStats.make(_spark,
+#                      _spark.table('naaccr_ontology').sample(False, 0.01),
+#                      _spark.table('naaccr_observations1'))
+# _SQL('select * from concept_stats order by c_fullname', limit=15)
 
 # %% [markdown]
 # ## Oracle DB Access
