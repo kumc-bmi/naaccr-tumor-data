@@ -815,9 +815,8 @@ class ItemObs:
         return spark.table(cls.extract_id_view)
 
 
-if IO_TESTING:
-    _obs = ItemObs.make(_spark, _extract)
-IO_TESTING and _obs.limit(5).toPandas()
+_to_view('naaccr_observations', lambda: ItemObs.make(_spark, _extract), cache=True)
+_SQL('select * from naaccr_observations')
 
 # %% [markdown]
 # #### dateOfBirth regression test
@@ -831,14 +830,16 @@ IO_TESTING and _obs.limit(5).toPandas()
 # See also [imsweb/layout/issues/72](https://github.com/imsweb/layout/issues/72).
 
 # %%
-IO_TESTING and _obs.where("concept_cd = 'NAACCR|240:'").limit(10).toPandas()
+_SQL('''
+select * from naaccr_observations where concept_cd = 'NAACCR|240:'
+''')
 
 # %%
 IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 
 
 # %% [markdown]
-# ### Code from Data Summary
+# ### Coded Concepts from Data Summary
 
 # %%
 class DataSummary:
@@ -884,29 +885,6 @@ if IO_TESTING:
     _spark.table('item_concepts').cache()
 
 _SQL('select * from data_char_naaccr_nom order by sectionId, naaccrNum, value', limit=15)
-
-# %%
-_SQL(r'''
-with ea as (
-select nom.sectionId, nom.naaccrNum, nom.value
-     , ic.c_hlevel + 1 as c_hlevel
-     , concat(ic.c_fullname, value, '\\') as c_fullname
-     , value as c_name
-     , concat('NAACCR|', ic.naaccrNum, ':', value) as c_basecode
-     , 'LA' as c_visualattributes
-     , cast(null as string) as c_tooltip
-from data_char_naaccr_nom nom
-join item_concepts ic on ic.naaccrNum = nom.naaccrNum
-)
-select ea.*
-     , ea.c_fullname as c_dimcode
-     , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
-from ea
-cross join naaccr_top top
-cross join i2b2_path_concept i2b2
-''', limit=20)
 
 
 # %% [markdown]
@@ -974,6 +952,40 @@ if IO_TESTING:
     assert _obs.columns == _ssf_facts.columns
 
 IO_TESTING and _ssf_facts.limit(7).toPandas()
+
+# %% [markdown]
+# ## Concept stats
+#
+# Does Spark SQL have a good hash function? looks like it...
+
+# %%
+_SQL("""
+select k, count(*) from (
+select hash(c_fullname) as k from naaccr_ontology
+)
+group by k
+having count(*) > 1
+""")
+
+
+# %%
+class ConceptStats:
+    script = SqlScript('concept_stats.sql',
+                        res.read_text(heron_load, 'concept_stats.sql'),
+                        [('concept_stats', ['ontology', 'observations'])])
+
+    @classmethod
+    def make(cls, spark: SparkSession_T,
+             ontology: DataFrame, observations: DataFrame) -> DataFrame:
+        views = ont.create_objects(spark, cls.script,
+                           ontology=ontology.cache(),
+                           observations=observations.cache())
+        return list(views.values())[-1]
+
+
+if IO_TESTING:
+    ConceptStats.make(_spark, _spark.table('naaccr_ontology'), _spark.table('naaccr_observations'))
+_SQL('select * from concept_stats order by c_fullname', limit=15)
 
 # %% [markdown]
 # ## Oracle DB Access
