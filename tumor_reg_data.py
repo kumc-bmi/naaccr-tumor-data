@@ -652,6 +652,7 @@ class TumorKeys:
                     start: int = 1,
                     new_col: str = 'encounter_num',
                     key_col: str = 'recordId') -> DataFrame:
+        # ISSUE: deid encounter_num further?
         tumors = tumors.withColumn(
             new_col,
             func.lit(start) +
