@@ -1,0 +1,103 @@
+hlevel,path,name,basecode,visualattributes
+0,Oral Cavity and Phar,Oral Cavity and Pharynx,,FA
+1,Oral Cavity and Phar\Lip,Lip,20010,LA
+1,Oral Cavity and Phar\Tongue,Tongue,20020,LA
+1,Oral Cavity and Phar\Salivary Gland,Salivary Gland,20030,LA
+1,Oral Cavity and Phar\Floor of Mouth,Floor of Mouth,20040,LA
+1,Oral Cavity and Phar\Gum and Other Mouth,Gum and Other Mouth,20050,LA
+1,Oral Cavity and Phar\Nasopharynx,Nasopharynx,20060,LA
+1,Oral Cavity and Phar\Tonsil,Tonsil,20070,LA
+1,Oral Cavity and Phar\Oropharynx,Oropharynx,20080,LA
+1,Oral Cavity and Phar\Hypopharynx,Hypopharynx,20090,LA
+1,Oral Cavity and Phar\Other Oral Cavity an,Other Oral Cavity and Pharynx,20100,LA
+0,Digestive System,Digestive System,,FA
+1,Digestive System\Esophagus,Esophagus,21010,LA
+1,Digestive System\Stomach,Stomach,21020,LA
+1,Digestive System\Small Intestine,Small Intestine,21030,LA
+1,Digestive System\Colon and Rectum,Colon and Rectum,,FA
+2,Digestive System\Colon and Rectum\Colon excluding Rect,Colon excluding Rectum,,FA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Cecum,Cecum,21041,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Appendix,Appendix,21042,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Ascending Colon,Ascending Colon,21043,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Hepatic Flexure,Hepatic Flexure,21044,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Transverse Colon,Transverse Colon,21045,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Splenic Flexure,Splenic Flexure,21046,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Descending Colon,Descending Colon,21047,LA
+3,Digestive System\Colon and Rectum\Colon excluding Rect\Sigmoid Colon,Sigmoid Colon,21048,LA
+3,"Digestive System\Colon and Rectum\Colon excluding Rect\Large Intestine, NOS","Large Intestine, NOS",21049,LA
+2,Digestive System\Colon and Rectum\Rectum and Rectosigm,Rectum and Rectosigmoid Junction,,FA
+3,Digestive System\Colon and Rectum\Rectum and Rectosigm\Rectosigmoid Junctio,Rectosigmoid Junction,21051,LA
+3,Digestive System\Colon and Rectum\Rectum and Rectosigm\Rectum,Rectum,21052,LA
+1,"Digestive System\Anus, Anal Canal and","Anus, Anal Canal and Anorectum",21060,LA
+1,Digestive System\Liver and Intrahepat,Liver and Intrahepatic Bile Duct,,FA
+2,Digestive System\Liver and Intrahepat\Liver,Liver,21071,LA
+2,Digestive System\Liver and Intrahepat\Intrahepatic Bile Du,Intrahepatic Bile Duct,21072,LA
+1,Digestive System\Gallbladder,Gallbladder,21080,LA
+1,Digestive System\Other Biliary,Other Biliary,21090,LA
+1,Digestive System\Pancreas,Pancreas,21100,LA
+1,Digestive System\Retroperitoneum,Retroperitoneum,21110,LA
+1,"Digestive System\Peritoneum, Omentum ","Peritoneum, Omentum and Mesentery",21120,LA
+1,Digestive System\Other Digestive Orga,Other Digestive Organs,21130,LA
+0,Respiratory System,Respiratory System,,FA
+1,"Respiratory System\Nose, Nasal Cavity a","Nose, Nasal Cavity and Middle Ear",22010,LA
+1,Respiratory System\Larynx,Larynx,22020,LA
+1,Respiratory System\Lung and Bronchus,Lung and Bronchus,22030,LA
+1,Respiratory System\Pleura,Pleura,22050,LA
+1,"Respiratory System\Trachea, Mediastinum","Trachea, Mediastinum and Other Respiratory Organs",22060,LA
+0,Bones and Joints,Bones and Joints,23000,LA
+0,Soft Tissue includin,Soft Tissue including Heart,24000,LA
+0,Skin excluding Basal,Skin excluding Basal and Squamous,,FA
+1,Skin excluding Basal\Melanoma of the Skin,Melanoma of the Skin,25010,LA
+1,Skin excluding Basal\Other Non-Epithelial,Other Non-Epithelial Skin,25020,LA
+0,Breast,Breast,26000,LA
+0,Female Genital Syste,Female Genital System,,FA
+1,Female Genital Syste\Cervix Uteri,Cervix Uteri,27010,LA
+1,"Female Genital Syste\Corpus and Uterus, N","Corpus and Uterus, NOS",,FA
+2,"Female Genital Syste\Corpus and Uterus, N\Corpus Uteri",Corpus Uteri,27020,LA
+2,"Female Genital Syste\Corpus and Uterus, N\Uterus, NOS","Uterus, NOS",27030,LA
+1,Female Genital Syste\Ovary,Ovary,27040,LA
+1,Female Genital Syste\Vagina,Vagina,27050,LA
+1,Female Genital Syste\Vulva,Vulva,27060,LA
+1,Female Genital Syste\Other Female Genital,Other Female Genital Organs,27070,LA
+0,Male Genital System,Male Genital System,,FA
+1,Male Genital System\Prostate,Prostate,28010,LA
+1,Male Genital System\Testis,Testis,28020,LA
+1,Male Genital System\Penis,Penis,28030,LA
+1,Male Genital System\Other Male Genital O,Other Male Genital Organs,28040,LA
+0,Urinary System,Urinary System,,FA
+1,Urinary System\Urinary Bladder,Urinary Bladder,29010,LA
+1,Urinary System\Kidney and Renal Pel,Kidney and Renal Pelvis,29020,LA
+1,Urinary System\Ureter,Ureter,29030,LA
+1,Urinary System\Other Urinary Organs,Other Urinary Organs,29040,LA
+0,Eye and Orbit,Eye and Orbit,30000,LA
+0,Brain and Other Nerv,Brain and Other Nervous System,,FA
+1,Brain and Other Nerv\Brain,Brain,31010,LA
+1,Brain and Other Nerv\Cranial Nerves Other,Cranial Nerves Other Nervous System,31040,LA
+0,Endocrine System,Endocrine System,,FA
+1,Endocrine System\Thyroid,Thyroid,32010,LA
+1,Endocrine System\Other Endocrine incl,Other Endocrine including Thymus,32020,LA
+0,Lymphoma,Lymphoma,,FA
+1,Lymphoma\Hodgkin Lymphoma,Hodgkin Lymphoma,,FA
+2,Lymphoma\Hodgkin Lymphoma\Hodgkin - Nodal,Hodgkin - Nodal,33011,LA
+2,Lymphoma\Hodgkin Lymphoma\Hodgkin - Extranodal,Hodgkin - Extranodal,33012,LA
+1,Lymphoma\Non-Hodgkin Lymphoma,Non-Hodgkin Lymphoma,,FA
+2,Lymphoma\Non-Hodgkin Lymphoma\NHL - Nodal,NHL - Nodal,33041,LA
+2,Lymphoma\Non-Hodgkin Lymphoma\NHL - Extranodal,NHL - Extranodal,33042,LA
+0,Myeloma,Myeloma,34000,LA
+0,Leukemia,Leukemia,,FA
+1,Leukemia\Lymphocytic Leukemia,Lymphocytic Leukemia,,FA
+2,Leukemia\Lymphocytic Leukemia\Acute Lymphocytic Le,Acute Lymphocytic Leukemia,35011,LA
+2,Leukemia\Lymphocytic Leukemia\Chronic Lymphocytic ,Chronic Lymphocytic Leukemia,35012,LA
+2,Leukemia\Lymphocytic Leukemia\Other Lymphocytic Le,Other Lymphocytic Leukemia,35013,LA
+1,Leukemia\Myeloid and Monocyti,Myeloid and Monocytic Leukemia,,FA
+2,Leukemia\Myeloid and Monocyti\Acute Myeloid Leukem,Acute Myeloid Leukemia,35021,LA
+2,Leukemia\Myeloid and Monocyti\Acute Monocytic Leuk,Acute Monocytic Leukemia,35031,LA
+2,Leukemia\Myeloid and Monocyti\Chronic Myeloid Leuk,Chronic Myeloid Leukemia,35022,LA
+2,Leukemia\Myeloid and Monocyti\Other Myeloid/Monocy,Other Myeloid/Monocytic Leukemia,35023,LA
+1,Leukemia\Other Leukemia,Other Leukemia,,FA
+2,Leukemia\Other Leukemia\Other Acute Leukemia,Other Acute Leukemia,35041,LA
+2,"Leukemia\Other Leukemia\Aleukemic, subleukem","Aleukemic, subleukemic and NOS",35043,LA
+0,Mesothelioma,Mesothelioma,36010,LA
+0,Kaposi Sarcoma,Kaposi Sarcoma,36020,LA
+0,Miscellaneous,Miscellaneous,37000,LA
+0,Invalid,Invalid,99999,LA
