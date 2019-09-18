@@ -135,10 +135,22 @@ IO_TESTING and _spark
 # %%
 def _to_spark(name: str, compute: Callable[[], pd.DataFrame],
               cache: bool = False) -> Opt[DataFrame]:
-    """Compute data locally and save as spark view"""
+    """Compute pandas data locally and save as spark view"""
     if not IO_TESTING:
         return None
     df = _spark.createDataFrame(compute())
+    df.createOrReplaceTempView(name)
+    if cache:
+        df.cache()
+    return df
+
+
+def _to_view(name: str, compute: Callable[[], DataFrame],
+             cache: bool = False) -> Opt[DataFrame]:
+    """Save Spark DF as spark view"""
+    if not IO_TESTING:
+        return None
+    df = compute()
     df.createOrReplaceTempView(name)
     if cache:
         df.cache()
