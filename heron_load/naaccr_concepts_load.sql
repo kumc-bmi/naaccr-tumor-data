@@ -1,11 +1,11 @@
-/** naaccr_load.sql -- load i2b2 concepts from NAACCR tumor registry data
-
-Copyright (c) 2013-2019 University of Kansas Medical Center
-
+/** naaccr_concepts_load.sql -- build i2b2 concepts for NAACCR tumor registry
+ *
+ * Copyright (c) 2013-2019 University of Kansas Medical Center
+ *
  * ack: "Key, Dustin" <key.d@ghc.org>
  * Thu, 18 Aug 2011 16:16:31 -0700
  *
- * see also: naacr_init.sql, naacr_txform.sql
+ * see also: naacr_txform.sql
  */
 
 /* check that static dependencies are available */
@@ -15,6 +15,7 @@ select valtype_cd from tumor_item_type where 'dep' = 'tumor_item_type.csv';
 select label from code_labels where 'dep' = 'code-labels';
 select answer_code from loinc_naaccr_answers where 'dep' = 'loinc_naaccr_answers.csv';
 select lvl from who_topo where dep='WHO Oncology MetaFiles';
+select hlevel from seer_terms where 'dep' = 'seer_recode_terms.csv'
 
 /* oh for bind parameters... */
 select task_id from current_task where 1=0;

@@ -16,7 +16,6 @@ from pyspark.sql.dataframe import DataFrame
 import pandas as pd  # type: ignore
 import numpy as np   # type: ignore
 
-from heron_staging.tumor_reg import seer_recode
 from sql_script import SqlScript
 import heron_load
 import loinc_naaccr  # included with permission
@@ -468,6 +467,9 @@ class NAACCR_I2B2(object):
     tumor_item_type = fixna(pd.read_csv(res.open_text(
         heron_load, 'tumor_item_type.csv')))
 
+    seer_recode_terms = fixna(pd.read_csv(res.open_text(
+        heron_load, 'seer_recode_terms.csv')))
+
     tx_script = SqlScript(
         'naaccr_txform.sql',
         res.read_text(heron_load, 'naaccr_txform.sql'),
@@ -501,27 +503,16 @@ class NAACCR_I2B2(object):
                     c_fullname: str = r'\i2b2\naaccr\x'[:-1],
                     c_name: str = 'Cancer Cases (NAACCR Hierarchy)',
                     sourcesystem_cd: str = 'heron-admin@kumc.edu',
-                    who_cache: Opt[Path_T] = None,
-                    recode: Opt[Path_T] = None) -> DataFrame:
+                    who_cache: Opt[Path_T] = None) -> DataFrame:
         cls.item_views_in(spark)
 
         to_df = spark.createDataFrame
         if who_cache:
             who_topo = to_df(OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info))
         else:
-            log.warn('skipping WHO Toplogy terms')
+            log.warn('skipping WHO Topology terms')
             who_topo = spark.sql('''
               select 'C' Kode, 'incl' Lvl, 'LIP' Title where 1 = 0
-            ''')
-
-        if recode:
-            seer_site_terms = cls.seer_terms(spark, recode)
-        else:
-            log.warn('skipping SEER Recode terms')
-            seer_site_terms = spark.sql('''
-              select 1 hlevel, 'p' path, 'n' name, 'x' basecode,
-                'v' visualattributes
-              where 1 = 0
             ''')
 
         top = pd.DataFrame([dict(c_hlevel=c_hlevel,
@@ -539,7 +530,7 @@ class NAACCR_I2B2(object):
                                loinc_naaccr_answers=answers,
                                code_labels=to_df(NAACCR_R.code_labels()),
                                who_topo=who_topo,
-                               seer_site_terms=seer_site_terms)
+                               seer_site_terms=to_df(cls.seer_recode_terms))
 
         name, _, _ = cls.ont_script.objects[-1]
         return views[name]
@@ -557,12 +548,6 @@ class NAACCR_I2B2(object):
         rl.createOrReplaceTempView(cls.layout_view_name)
 
         return item_ty
-
-    @classmethod
-    def seer_terms(cls, spark: SparkSession_T, recode: Path_T) -> DataFrame:
-        rules = seer_recode.Rule.from_lines(recode.open())  # ISSUE: -> static
-        terms = seer_recode.Rule.as_terms(rules)
-        return spark.createDataFrame(terms)
 
 
 class NAACCR_I2B2_Mix(NAACCR_I2B2):

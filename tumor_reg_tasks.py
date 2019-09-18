@@ -359,9 +359,6 @@ class NAACCR_Ontology1(SparkJDBCTask):
         '''.strip(),
     )
     naaccr_version = pv.IntParam(default=18)
-    seer_recode = pv.PathParam(default=None, description='''
-      cache of http://seer.cancer.gov/siterecode/icdo3_dwhoheme/index.txt
-    ''')
 
     table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
 
@@ -379,8 +376,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         spark = SparkSession(sparkContext)
 
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.task_id, update_date=self.z_design_id[:10],
-            recode=self.seer_recode and self.seer_recode.resolve())
+            spark, self.task_id, update_date=self.z_design_id[:10])
 
         self.account().wr(td.case_fold(ont).write
                           .options(createTableColumnTypes="c_tooltip varchar(1024)"),
