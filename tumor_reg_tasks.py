@@ -900,6 +900,10 @@ class CopyRecords(SparkJDBCTask):
     db_url_dest = pv.StrParam()
     mode = pv.StrParam(default='error')
 
+    # IDEA (performance): we can go parallel if we set
+    # partitionColumn, lowerBound, upperBound, numPartitions
+    # ref. https://stackoverflow.com/a/35062411
+
     def output(self) -> luigi.LocalTarget:
         """Since making a DB connection is awkward and
         scanning the desination table may be expensive,
@@ -920,6 +924,10 @@ class CopyRecords(SparkJDBCTask):
 
 
 class MigrateUpload(UploadRunTask):
+    """
+    TODO: explain of why run() is trivial, i.e. why we
+    don't get an upload_status record until the end. Or fix it.
+    """
     upload_id = pv.IntParam()
     workspace_schema = pv.StrParam(default='HERON_ETL_1')
     i2b2_deid = pv.StrParam(default='BlueHeronData')
