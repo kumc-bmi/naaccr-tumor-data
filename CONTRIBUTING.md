@@ -9,9 +9,15 @@ Exploratory design is done using pyspark and jupyter notebook.
 ## PySpark and jupyter notebooks vs. sqldeveloper
 
   - jupyter notebooks are great for exploration, visualization
-  - Spark / Jupyter integration is a bit klunky: restarts...
+  - A `local` spark session makes a `metastore_db` in the current
+    directory, which effectively limits pyspark notebooks to one per
+    directory.
   - sqldeveloper features I miss: selecting and running a subquery
     - see SQL IDE below
+  - troubleshooting pain:
+    - pyspark: Java/Scala stack-traces inside python stack traces
+    - having SQL be a 2nd-class citizen in notebooks
+    - having the Oracle world and the spark world split
 
 ---
 
@@ -102,6 +108,10 @@ export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
 
   - *NOTE*: with static type annotations, the 79 character line
             length limit is awkward; in GROUSE we used 99 in `setup.cfg`.
+
+  - *NOTE*: Though imports at the top of a notebook cell are handy for
+            prototyping, we move them to the top of the notebook (module)
+            to conform to community style.
 
 ---
 

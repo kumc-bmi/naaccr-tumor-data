@@ -494,6 +494,8 @@ class NAACCR_I2B2(object):
             ('code_concepts', [per_item_view, 'loinc_naaccr_answers', 'code_labels']),
             ('icd_o_topo', ['who_topo']),
             ('primary_site_concepts', []),
+            # TODO: morphology
+            ('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
             ('naaccr_ontology', []),
         ])
 

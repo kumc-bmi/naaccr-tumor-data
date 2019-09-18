@@ -287,30 +287,47 @@ where tr.itemnbr in (419, 521)
 */
 
 
---@@@ create or replace temporary view naaccr_ont_aux_seer as
-with seer_terms as (
-select 2 as c_hlevel
-     , 'SEER Site\\' as path
-     , 'SEER Site Summary' as concept_name
-     , null as concept_cd
+create or replace temporary view seer_recode_concepts as
+with
+
+folder as (
+select top.c_hlevel + 1 c_hlevel
+     , concat(top.c_fullname, 'SEER Site\\') as c_fullname
+     , 'SEER Site Summary' as c_name
+     , null as c_basecode
      , 'FA' as c_visualattributes
-from (values('X'))
+     , 'SEER Site Recode ICD-O-3/WHO 2008 Definition' as c_tooltip
+from (values('X')) f
+cross join naaccr_top_concept top
+),
 
-union all
-
-select 3 + hlevel as c_hlevel
-     , concat('SEER Site\\', path, '\\') as path
-     , name as concept_name
+site as (
+select f.c_hlevel + s.hlevel as c_hlevel
+     , concat(f.c_fullname, s.path, '\\') as c_fullname
+     , name as c_name
      , case when basecode is null then null
        else concat('SEER_SITE:', basecode) end as concept_cd
      , visualattributes as c_visualattributes
-from seer_site_terms
-)
+     , cast(null as string) as c_tooltip
+from seer_site_terms s
+cross join folder f
+),
 
-select * from naaccr_ont_aux
+ea as (
+select * from folder
 union all
-select c_hlevel, path, concept_name, concept_cd, c_visualattributes from seer_terms
+select * from site
+)
+select ea.*
+     , ea.c_fullname as c_dimcode
+     , i2b2.*
+     , top.update_date
+     , top.sourcesystem_cd
+from ea
+cross join naaccr_top top
+cross join i2b2_path_concept i2b2;
 ;
+
 
 create or replace temporary view naaccr_ontology as
 
@@ -346,6 +363,20 @@ select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecod
      , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
      , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
 from primary_site_concepts
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from seer_recode_concepts
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from seer_recode_concepts
 ;
 
 --TODO limit to 200     , substr(terms.concept_name, 1, 200) as c_name
