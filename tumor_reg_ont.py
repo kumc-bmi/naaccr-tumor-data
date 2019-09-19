@@ -496,6 +496,9 @@ class NAACCR_I2B2(object):
     seer_recode_terms = fixna(pd.read_csv(res.open_text(
         heron_load, 'seer_recode_terms.csv')))
 
+    cs_terms = fixna(pd.read_csv(res.open_text(
+        heron_load, 'cs-terms.csv'))).drop(['update_date', 'sourcesystem_cd'], axis=1)
+
     tx_script = SqlScript(
         'naaccr_txform.sql',
         res.read_text(heron_load, 'naaccr_txform.sql'),
@@ -518,6 +521,7 @@ class NAACCR_I2B2(object):
             ('primary_site_concepts', ['icd_o_topo']),
             # TODO: morphology
             ('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
+            ('site_schema_concepts', ['cs_terms']),
             ('naaccr_ontology', []),
         ])
 
@@ -550,6 +554,7 @@ class NAACCR_I2B2(object):
                                loinc_naaccr_answers=answers,
                                code_labels=to_df(NAACCR_R.code_labels()),
                                icd_o_topo=icd_o_topo,
+                               cs_terms=to_df(cls.cs_terms),
                                seer_site_terms=to_df(cls.seer_recode_terms))
 
         name, _, _ = cls.ont_script.objects[-1]
@@ -609,6 +614,7 @@ def create_objects(spark: SparkSession_T, script: SqlScript,
     ...     code_labels=MockDF(spark, 'code_labels'),
     ...     icd_o_topo=MockDF(spark, 'icd_o_topo'),
     ...     seer_site_terms=MockDF(spark, 'site_terms'),
+    ...     cs_terms=MockDF(spark, 'cs_terms'),
     ...     tumor_item_type=MockDF(spark, 'ty'))
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     {'i2b2_path_concept': MockDF(i2b2_path_concept),

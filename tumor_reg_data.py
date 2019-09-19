@@ -340,6 +340,9 @@ _to_spark('icd_o_topo', lambda: ont.OncologyMeta.icd_o_topo(_who_topo))
 _SQL('select * from icd_o_topo order by path')
 
 # %%
+ont.NAACCR_I2B2.cs_terms
+
+# %%
 if IO_TESTING:
     ont.NAACCR_I2B2.ont_view_in(_spark, task_id='task1', update_date=dt.date(2019, 9, 13), who_cache=_cwd / ',cache')
 
