@@ -150,26 +150,6 @@ cross join i2b2_path_concept i2b2;
 
 -- code_concepts where ic.naaccrNum not in (400, 419, 521) -- separate code for primary site, Morph. TODO: layer
 
-/* ICD-O topographic codes for primary site */
-/* TODO: check that it's OK to throw away lvl='incl' synonyms */
-create or replace temporary view icd_o_topo as
-with major as (
-  select * from who_topo
-  where lvl = '3'
-)
-, minor as (
-  select * from who_topo
-  where lvl = '4'
-)
-select 3 lvl, major.kode concept_cd, 'FA' as c_visualattributes,
-       concat(major.kode, '\\') as path, major.title concept_name
-from major
-union all
-select 4 lvl, regexp_replace(minor.kode, '\\.', '') concept_cd,  'LA' as c_visualattributes,
-       concat(major.kode, '\\', minor.kode, '\\'), minor.title
-from major
-join minor on minor.kode like concat(major.kode, '%')
-;
 
 /* ICD-O-2, -3 morphology codes for histology */
 whenever sqlerror continue;
@@ -261,7 +241,12 @@ select lvl + 1 as c_hlevel
      , icdo.c_visualattributes
      , cast(null as string) as c_tooltip
 from icd_o_topo icdo
-cross join (select * from item_concepts where naaccrNum = 400) ic
+cross join (
+  -- The DRY approach is somehow WAY slower:
+  -- select * from item_concepts where naaccrNum = 400
+  -- so let's try a hard-coded KLUDGE:
+  select '\\i2b2\\naaccr\\S:1 Cancer Identification\\0400 Primary Site\\' as c_fullname
+) ic
 )
 select ea.*
      , ea.c_fullname as c_dimcode
@@ -363,21 +348,14 @@ union all
 select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
      , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
      , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
+from seer_recode_concepts
+
+union all
+
+select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
+     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
+     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
 from primary_site_concepts
-
-union all
-
-select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
-     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
-     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
-from seer_recode_concepts
-
-union all
-
-select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
-     , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
-     , c_dimcode, c_tooltip, m_applied_path, update_date, /*import_date,*/ sourcesystem_cd
-from seer_recode_concepts
 ;
 
 --TODO limit to 200     , substr(terms.concept_name, 1, 200) as c_name

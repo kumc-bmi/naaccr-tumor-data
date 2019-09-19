@@ -352,7 +352,7 @@ def _stable_hash(*code: str) -> int:
 class NAACCR_Ontology1(SparkJDBCTask):
     who_cache = pv.PathParam()
     z_design_id = pv.StrParam(
-        default='2019-09-19 who sites, coltypes %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
+        default='2019-09-19 primary site perf %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -381,11 +381,10 @@ class NAACCR_Ontology1(SparkJDBCTask):
     )
 
     def output(self) -> JDBCTableTarget:
-        # TODO: refactor c_fullname overlap with tumor_reg_ont
         query = fr"""
           (select 1 from {self.table_name}
-           where c_fullname = '\i2b2\naaccr\'
            and c_basecode = '{self.task_id}')
+           where c_fullname = '{tr_ont.NAACCR_I2B2.top_folder}'
         """
         return JDBCTableTarget(self, query)
 

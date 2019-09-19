@@ -463,8 +463,33 @@ class OncologyMeta:
                            delimiter=',' if item.endswith('.csv') else '\t',
                            encoding=cls.encoding, names=names)
 
+    @classmethod
+    def icd_o_topo(cls, topo: pd.DataFrame) -> pd.DataFrame:
+        major = topo[topo.Lvl == '3']
+        minor = topo[(topo.Lvl == '4')].copy()
+        minor['major'] = minor.Kode.apply(lambda s: s.split('.')[0])
+        out3 = pd.DataFrame(dict(
+            lvl=3,
+            concept_cd=major.Kode,
+            c_visualattributes='FA',
+            path=major.Kode + '\\',
+            concept_name=major.Title
+        ))
+        out4 = pd.DataFrame(dict(
+            lvl=4,
+            concept_cd=minor.Kode.str.replace('.', ''),
+            c_visualattributes='LA',
+            path=minor.major + '\\' + minor.Kode + '\\',
+            concept_name=minor.Title
+        ))
+        return pd.concat([out3, out4], sort=False)
+
 
 class NAACCR_I2B2(object):
+    top_folder = r'\i2b2\naaccr\x'[:-1]
+    c_name = 'Cancer Cases (NAACCR Hierarchy)'
+    sourcesystem_cd = 'heron-admin@kumc.edu'
+
     tumor_item_type = fixna(pd.read_csv(res.open_text(
         heron_load, 'tumor_item_type.csv')))
 
@@ -490,8 +515,7 @@ class NAACCR_I2B2(object):
             ('section_concepts', ['section', 'naaccr_top']),
             ('item_concepts', [per_item_view]),
             ('code_concepts', [per_item_view, 'loinc_naaccr_answers', 'code_labels']),
-            ('icd_o_topo', ['who_topo']),
-            ('primary_site_concepts', []),
+            ('primary_site_concepts', ['icd_o_topo']),
             # TODO: morphology
             ('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
             ('naaccr_ontology', []),
@@ -499,35 +523,33 @@ class NAACCR_I2B2(object):
 
     @classmethod
     def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: dt.date,
-                    c_hlevel: int = 1,
-                    c_fullname: str = r'\i2b2\naaccr\x'[:-1],
-                    c_name: str = 'Cancer Cases (NAACCR Hierarchy)',
-                    sourcesystem_cd: str = 'heron-admin@kumc.edu',
                     who_cache: Opt[Path_T] = None) -> DataFrame:
         to_df = spark.createDataFrame
         if who_cache:
-            who_topo = to_df(OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info))
+            who_topo = OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info)
+            icd_o_topo = to_df(OncologyMeta.icd_o_topo(who_topo))
         else:
             log.warn('skipping WHO Topology terms')
-            who_topo = spark.sql('''
-              select 'C' Kode, 'incl' Lvl, 'LIP' Title where 1 = 0
+            icd_o_topo = spark.sql('''
+              select 3 lvl, 'C00' concept_cd, 'FA' c_visualattributes
+                   , 'abc' path, 'LIP' concept_path
             ''')
 
-        top = pd.DataFrame([dict(c_hlevel=c_hlevel,
-                                 c_fullname=c_fullname,
-                                 c_name=c_name,
+        top = pd.DataFrame([dict(c_hlevel=1,
+                                 c_fullname=cls.top_folder,
+                                 c_name=cls.c_name,
                                  update_date=update_date,
-                                 sourcesystem_cd=sourcesystem_cd)])
+                                 sourcesystem_cd=cls.sourcesystem_cd)])
         answers = to_df(LOINC_NAACCR.answer,
                         LOINC_NAACCR.answer_struct).cache()
         views = create_objects(spark, cls.ont_script,
                                current_task=to_df([dict(task_id=task_id)]),
                                naaccr_top=to_df(top),
-                               section=to_df(cls.per_section),
+                               section=to_df(cls.per_section).cache(),
                                tumor_item_type=to_df(cls.tumor_item_type),
                                loinc_naaccr_answers=answers,
                                code_labels=to_df(NAACCR_R.code_labels()),
-                               who_topo=who_topo,
+                               icd_o_topo=icd_o_topo,
                                seer_site_terms=to_df(cls.seer_recode_terms))
 
         name, _, _ = cls.ont_script.objects[-1]
@@ -585,7 +607,7 @@ def create_objects(spark: SparkSession_T, script: SqlScript,
     ...     section=MockDF(spark, 'section'),
     ...     loinc_naaccr_answers=MockDF(spark, 'lna'),
     ...     code_labels=MockDF(spark, 'code_labels'),
-    ...     who_topo=MockDF(spark, 'who_topo'),
+    ...     icd_o_topo=MockDF(spark, 'icd_o_topo'),
     ...     seer_site_terms=MockDF(spark, 'site_terms'),
     ...     tumor_item_type=MockDF(spark, 'ty'))
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
