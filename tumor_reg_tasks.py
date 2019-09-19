@@ -279,8 +279,8 @@ def _json_ok(values: List[BindValue]) -> List[Union[int, str]]:
 class SparkJDBCTask(PySparkTask, JDBCTask):
     """Support for JDBC access from spark tasks
     """
-    driver_memory = '2g'
-    executor_memory = '3g'
+    driver_memory = pv.StrParam(default='4g', significant=False)
+    executor_memory = pv.StrParam(default='4g', significant=False)
 
     @abstractmethod
     def output(self) -> luigi.Target: pass
