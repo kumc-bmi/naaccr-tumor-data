@@ -350,8 +350,9 @@ def _stable_hash(*code: str) -> int:
 
 
 class NAACCR_Ontology1(SparkJDBCTask):
+    who_cache = pv.PathParam()
     z_design_id = pv.StrParam(
-        default='2019-09-16 c_hlevel fix %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
+        default='2019-09-19 who sites, coltypes %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
@@ -595,7 +596,8 @@ class NAACCR_Facts(_NAACCR_JDBC):
 class NAACCR_Summary(_NAACCR_JDBC):
     table_name = "NAACCR_EXPORT_STATS"
 
-    z_design_id = pv.StrParam('original')
+    z_design_id = pv.StrParam('original (%s)' %
+                              _stable_hash(td.DataSummary.script.code))
 
     def _data(self, spark: SparkSession,
               naaccr_text_lines: DataFrame) -> DataFrame:
@@ -871,7 +873,9 @@ class NAACCR_Ontology2(_RunScriptTask):
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
 
-    z_design_id = pv.StrParam(default='pls log 33')
+    z_design_id = pv.StrParam(default='primary site (%s)' % _stable_hash(
+        tr_ont.NAACCR_I2B2.ont_script.code,
+        td.DataSummary.script.code))
 
     script_name = 'naaccr_concepts_mix.sql'
     script = res.read_text(heron_load, script_name)
