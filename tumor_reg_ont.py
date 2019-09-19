@@ -6,6 +6,7 @@ from typing import (
     cast,
 )
 from xml.etree import ElementTree as XML
+import datetime as dt
 import logging
 import zipfile
 
@@ -500,14 +501,12 @@ class NAACCR_I2B2(object):
         ])
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: str,
+    def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: dt.date,
                     c_hlevel: int = 1,
                     c_fullname: str = r'\i2b2\naaccr\x'[:-1],
                     c_name: str = 'Cancer Cases (NAACCR Hierarchy)',
                     sourcesystem_cd: str = 'heron-admin@kumc.edu',
                     who_cache: Opt[Path_T] = None) -> DataFrame:
-        cls.item_views_in(spark)
-
         to_df = spark.createDataFrame
         if who_cache:
             who_topo = to_df(OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info))

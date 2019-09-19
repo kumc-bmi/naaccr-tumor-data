@@ -375,8 +375,10 @@ class NAACCR_Ontology1(SparkJDBCTask):
         quiet_logs(sparkContext)
         spark = SparkSession(sparkContext)
 
+        update_date = dt.datetime.strptime(self.z_design_id[:10], '%Y-%m-%d').date()
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.task_id, update_date=self.z_design_id[:10])
+            spark, self.task_id, who_cache=self.who_cache,
+            update_date=update_date)
 
         self.account().wr(td.case_fold(ont).write
                           .options(createTableColumnTypes="c_tooltip varchar(1024)"),

@@ -47,6 +47,7 @@ from sys import stderr
 from typing import Callable, ContextManager, Dict, Iterator, List
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
+import datetime as dt
 import logging
 
 
@@ -284,7 +285,7 @@ having count(distinct valtype_cd) > 1
 
 # %%
 IO_TESTING and ont.NAACCR_I2B2.ont_view_in(
-    _spark, task_id='task1', update_date='2019-09-13')
+    _spark, task_id='task1', update_date=dt.date(2019, 9, 13))
 _SQL('''
 select * from naaccr_top_concept
 ''')
@@ -336,7 +337,7 @@ IO_TESTING and _who_topo.set_index('Kode').head()
 
 # %%
 if IO_TESTING:
-    ont.NAACCR_I2B2.ont_view_in(_spark, task_id='task1', update_date='2019-09-13', who_cache=_cwd / ',cache')
+    ont.NAACCR_I2B2.ont_view_in(_spark, task_id='task1', update_date=dt.date(2019, 9, 13), who_cache=_cwd / ',cache')
 
 _SQL(r'''
 select * from primary_site_concepts
