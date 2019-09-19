@@ -771,7 +771,7 @@ class ItemObs:
 
     @classmethod
     def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
-        item_ty = ont.NAACCR_I2B2.item_views_in(spark)
+        item_ty = spark.createDataFrame(ont.NAACCR_I2B2.tumor_item_type)
 
         raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
             stack_obs(extract, item_ty),

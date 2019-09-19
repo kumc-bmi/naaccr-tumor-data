@@ -476,9 +476,6 @@ class NAACCR_I2B2(object):
         res.read_text(heron_load, 'naaccr_txform.sql'),
         [])
 
-    layout_view_name = 'record_layout'
-    measure_view_name = 'loinc_naaccr'
-    answer_view_name = 'loinc_naaccr_answers'
     per_item_view = 'tumor_item_type'
 
     per_section = pd.read_csv(res.open_text(
@@ -535,20 +532,6 @@ class NAACCR_I2B2(object):
 
         name, _, _ = cls.ont_script.objects[-1]
         return views[name]
-
-    @classmethod
-    def item_views_in(cls, spark: SparkSession_T) -> DataFrame:
-        # Assign i2b2 valtype_cd to each NAACCR item.
-        item_ty = spark.createDataFrame(cls.tumor_item_type)
-        item_ty.createOrReplaceTempView(cls.per_item_view)
-
-        sec = spark.createDataFrame(cls.per_section)
-        sec.createOrReplaceTempView('section')
-
-        rl = spark.createDataFrame(NAACCR_Layout.fields)
-        rl.createOrReplaceTempView(cls.layout_view_name)
-
-        return item_ty
 
 
 class NAACCR_I2B2_Mix(NAACCR_I2B2):
