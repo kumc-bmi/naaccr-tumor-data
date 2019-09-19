@@ -62,7 +62,7 @@ select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
      , :update_date update_date
-     , :task_id sourcesystem_cd
+     , :source_cd sourcesystem_cd
 from ea
 cross join naaccr_top top
 cross join i2b2_path_concept i2b2
@@ -81,6 +81,6 @@ commit;
 
 select 1 as complete
 from naaccr_ontology_unpub
-where sourcesystem_cd = :task_id
+where sourcesystem_cd = :source_cd
 and rownum <= 1
 ;

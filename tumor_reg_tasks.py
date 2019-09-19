@@ -380,11 +380,18 @@ class NAACCR_Ontology1(SparkJDBCTask):
         for (name, ty) in col_to_type.items()
     )
 
+    @property
+    def version_name(self) -> str:
+        """version info that fits in an i2b2 name (50 characters)
+        """
+        task_hash = self.task_id.split('_')[-1]  # hmm... luigi doesn't export this
+        return f'v{self.naaccr_version}-{task_hash}'
+
     def output(self) -> JDBCTableTarget:
         query = fr"""
           (select 1 from {self.table_name}
-           and c_basecode = '{self.task_id}')
            where c_fullname = '{tr_ont.NAACCR_I2B2.top_folder}'
+           and c_basecode = '{self.version_name}')
         """
         return JDBCTableTarget(self, query)
 
@@ -394,7 +401,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
         update_date = dt.datetime.strptime(self.z_design_id[:10], '%Y-%m-%d').date()
         ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.task_id, who_cache=self.who_cache,
+            spark, self.version_name, who_cache=self.who_cache,
             update_date=update_date)
 
         self.account().wr(td.case_fold(ont).write
@@ -872,7 +879,7 @@ class NAACCR_Ontology2(_RunScriptTask):
     npiRegistryId = pv.StrParam()
     source_cd = pv.StrParam(default='tumor_registry@kumed.com')
 
-    z_design_id = pv.StrParam(default='primary site (%s)' % _stable_hash(
+    z_design_id = pv.StrParam(default='length 50 (%s)' % _stable_hash(
         tr_ont.NAACCR_I2B2.ont_script.code,
         td.DataSummary.script.code))
 
@@ -913,6 +920,7 @@ class NAACCR_Ontology2(_RunScriptTask):
             script_params=dict(
                 upload_id=upload_id,
                 task_id=self.task_id,
+                source_cd=self.source_cd,
                 update_date=self.dateCaseReportExported))
 
 

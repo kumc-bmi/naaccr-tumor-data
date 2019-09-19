@@ -35,8 +35,7 @@ create or replace temporary view naaccr_top_concept as
 select top.c_hlevel
      , top.c_fullname
      , top.c_name
-     -- task_id can be too long; 'NAACCR' is pretty boring, so let's strip that
-     , (select substr(task_id, length('NAACCR'), 50) from current_task) as c_basecode
+     , (select substr(task_id, 1, 50) from current_task) as c_basecode
      , 'CA' as c_visualattributes
      , concat('North American Association of Central Cancer Registries version 18.0',
               '\n ', (select task_id from current_task)) as c_tooltip
