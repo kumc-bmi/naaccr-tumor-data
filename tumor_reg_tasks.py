@@ -362,6 +362,23 @@ class NAACCR_Ontology1(SparkJDBCTask):
 
     table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
 
+    # based on custom_meta
+    col_to_type = dict(
+        c_hlevel='int',
+        c_fullname='varchar(700)',
+        c_name='varchar(2000)',
+        c_visualattributes='varchar(3)',
+        c_basecode='varchar(50)',
+        c_dimcode='varchar(700)',
+        c_tooltip='varchar(900)',
+        update_date='date',
+        sourcesystem_cd='varchar(50)',
+    )
+    coltypes = ','.join(
+        f'{name} {ty}'
+        for (name, ty) in col_to_type.items()
+    )
+
     def output(self) -> JDBCTableTarget:
         # TODO: refactor c_fullname overlap with tumor_reg_ont
         query = fr"""
@@ -381,7 +398,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
             update_date=update_date)
 
         self.account().wr(td.case_fold(ont).write
-                          .options(createTableColumnTypes="c_tooltip varchar(1024)"),
+                          .options(createTableColumnTypes=self.coltypes),
                           self.table_name,
                           mode='overwrite')
 
