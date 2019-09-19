@@ -78,7 +78,6 @@ commit;
 
 -- eyeball it:
 -- select * from naaccr_ontology_unpub;
-select * from dconnolly.upload_status;
 
 select 1 as complete
 from naaccr_ontology_unpub
