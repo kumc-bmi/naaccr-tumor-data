@@ -350,6 +350,7 @@ def _stable_hash(*code: str) -> int:
 
 
 class NAACCR_Ontology1(SparkJDBCTask):
+    table_name = pv.StrParam(default="NAACCR_ONTOLOGY")
     who_cache = pv.PathParam()
     z_design_id = pv.StrParam(
         default='2019-09-19 recode not double %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
@@ -360,8 +361,6 @@ class NAACCR_Ontology1(SparkJDBCTask):
         '''.strip(),
     )
     naaccr_version = pv.IntParam(default=18)
-
-    table_name = "NAACCR_ONTOLOGY"  # ISSUE: parameterize? include schema name?
 
     # based on custom_meta
     col_to_type = dict(
