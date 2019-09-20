@@ -493,8 +493,12 @@ class NAACCR_I2B2(object):
     tumor_item_type = fixna(pd.read_csv(res.open_text(
         heron_load, 'tumor_item_type.csv')))
 
-    seer_recode_terms = fixna(pd.read_csv(res.open_text(
-        heron_load, 'seer_recode_terms.csv')))
+    # Make sure basecode loads as string, not double.
+    seer_recode_terms = fixna(pd.read_csv(
+        res.open_text(
+            heron_load, 'seer_recode_terms.csv'),
+        dtype={'basecode': str},
+    ))
 
     cs_terms = fixna(pd.read_csv(res.open_text(
         heron_load, 'cs-terms.csv'))).drop(['update_date', 'sourcesystem_cd'], axis=1)

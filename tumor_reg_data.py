@@ -370,6 +370,11 @@ _SQL(r'''
 select * from primary_site_concepts
 ''')
 
+# %%
+_SQL(r'''
+select * from seer_recode_concepts
+''')
+
 
 # %% [markdown]
 # ## NAACCR XML Data

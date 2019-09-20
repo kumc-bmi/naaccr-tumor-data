@@ -352,7 +352,7 @@ def _stable_hash(*code: str) -> int:
 class NAACCR_Ontology1(SparkJDBCTask):
     who_cache = pv.PathParam()
     z_design_id = pv.StrParam(
-        default='2019-09-19 site specific %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
+        default='2019-09-19 recode not double %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
