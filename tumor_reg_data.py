@@ -300,8 +300,28 @@ _SQL('''
 select * from item_concepts where naaccrNum between 400 and 450 order by naaccrNum
 ''')
 
+
 # %% [markdown]
 # ## Coded Concepts
+
+# %%
+# TODO: use these in preference to LOINC, Werth codes.
+
+def field_doc(xmlId,
+              subdir: str = 'naaccr18'):
+    with ont.NAACCR_Layout._fields_doc() as doc_dir: #@@cls.
+        field_path = (doc_dir / subdir / xmlId).with_suffix('.html')
+        return ont._parse_html_fragment(field_path)
+
+
+def item_codes(doc):
+    rows = [
+        (tr.find('td[@class="code-nbr"]').text,
+         ''.join(tr.find('td[@class="code-desc"]').itertext()))
+        for tr in doc.findall('./div/table/tr[@class="code-row"]')]
+    return [(code, desc) for (code, desc) in rows if code]
+
+item_codes(field_doc('recordType'))
 
 # %%
 # if IO_TESTING:
