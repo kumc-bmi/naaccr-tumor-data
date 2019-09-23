@@ -187,6 +187,25 @@ class NAACCR_Layout:
         return [(code, desc) for (code, desc) in rows if code]
 
     @classmethod
+    def iter_description(cls) -> Iterator[Tuple[int, str, str]]:
+        for _p, doc in cls._field_docs():
+            qname = cls._xmlId(doc)
+            if not qname:
+                continue
+            _parent, xmlId = qname
+            if xmlId.startswith('reserved'):
+                continue
+            num = int(cls._field_info(doc)['Item #'])
+            hd = None
+            for div in doc.findall('./div'):
+                text = ''.join(div.itertext())
+                if hd == 'Description':
+                    yield num, xmlId, text
+                    break
+                if text == 'Description':
+                    hd = text
+
+    @classmethod
     def fields_source(cls) -> Iterator[Tuple[int, str, Opt[str]]]:
         for _p, doc in cls._field_docs():
             qname = cls._xmlId(doc)
