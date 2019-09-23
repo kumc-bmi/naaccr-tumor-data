@@ -118,6 +118,12 @@ class NAACCR_Layout:
     (70, 'addrAtDxCity', 'CoC')
 
 
+    >>> list(NAACCR_Layout.iter_codes())[:3]
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    [(70, 'addrAtDxCity', 'UNKNOWN', 'City at diagnosis unknown'),
+     (102, 'addrAtDxCountry', 'ZZN', 'North America NOS'),
+     (102, 'addrAtDxCountry', 'ZZC', 'Central America NOS')]
+
     >>> def check_fkey(src, k, dest):
     ...    range = set(dest)
     ...    return [rec for rec in src if rec[k] not in range]
@@ -137,6 +143,7 @@ class NAACCR_Layout:
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     [{'short-label': 'NPCR Spec Fld', ..., 'naaccr-item-num': 3720, ..., 'grouped': False},
      {'short-label': 'State Req Item', ..., 'naaccr-item-num': 2220, ..., 'grouped': False}]
+
     """
     layout_180 = XML.parse(res.open_text(
         naaccr_layout, 'naaccr-18-layout.xml'))
@@ -151,42 +158,75 @@ class NAACCR_Layout:
     fields: List[Field] = [to_field(f) for f in fields_raw]
 
     @classmethod
+    def item_codes(cls) -> pd.DataFrame:
+        ea = cls.iter_codes()
+        return pd.DataFrame(ea,
+                            columns=['naaccrNum', 'naaccrId', 'code', 'desc'])
+
+    @classmethod
+    def iter_codes(cls) -> Iterator[Tuple[int, str, str, str]]:
+        for path, doc in cls._field_docs():
+            qname = cls._xmlId(doc)
+            if not qname:
+                continue
+            _parent, xmlId = qname
+            info = cls._field_info(doc)
+            naaccrNum = int(info['Item #'])
+            for code, desc in cls._item_codes(doc):
+                yield naaccrNum, xmlId, code, desc
+
+    @classmethod
+    def _item_codes(cls, doc: XML.Element) -> List[Tuple[str, str]]:
+        rows = [
+            (codeElt.text,
+             ''.join(descElt.itertext()))
+            for tr in doc.findall('./div/table/tr[@class="code-row"]')
+            for (codeElt, descElt) in [(tr.find('td[@class="code-nbr"]'),
+                                        tr.find('td[@class="code-desc"]'))]
+            if codeElt is not None and descElt is not None]
+        return [(code, desc) for (code, desc) in rows if code]
+
+    @classmethod
+    def fields_source(cls) -> Iterator[Tuple[int, str, Opt[str]]]:
+        for _p, doc in cls._field_docs():
+            qname = cls._xmlId(doc)
+            if not qname:
+                continue
+            _parent, xmlId = qname
+            if xmlId.startswith('reserved'):
+                continue
+            info = cls._field_info(doc)
+            yield (int(info['Item #']), xmlId,
+                   info.get('Source of Standard'))
+
+    @classmethod
     def _fields_doc(cls) -> ContextManager[Path_T]:
         return res.path(naaccr_layout, 'doc')
 
     @classmethod
-    def fields_source(cls) -> Iterator[Tuple[int, str, Opt[str]]]:
-        for info in cls.fields_doc():
-            if info['xmlId'].startswith('reserved'):
-                continue
-            yield (int(info['Item #']), info['xmlId'],
-                   info.get('Source of Standard'))
-
-    @classmethod
-    def fields_doc(cls,
-                   subdir: str = 'naaccr18') -> Iterator[Dict[str, str]]:
+    def _field_docs(cls,
+                    subdir: str = 'naaccr18') -> Iterator[Tuple[Path_T, XML.Element]]:
         with cls._fields_doc() as doc_dir:
             for field_path in sorted((doc_dir / subdir).glob('*.html')):
-                doc = cls.field_doc(field_path)
-                if doc:
-                    yield doc
+                doc = _parse_html_fragment(field_path)
+                yield field_path, doc
 
     @classmethod
-    def field_doc(cls, path: Path_T) -> Opt[Dict[str, str]]:
-        doc = _parse_html_fragment(path)
+    def _xmlId(cls, doc: XML.Element) -> Opt[Tuple[str, str]]:
         naaccr_xml_elt = doc.find('./strong')
         if naaccr_xml_elt is None:
             return None
         naaccr_xml = (naaccr_xml_elt.tail or '')[2:].strip()  # </strong>: ...
         [parentElement, xmlId] = naaccr_xml.split('.')
+        return parentElement, xmlId
+
+    @classmethod
+    def _field_info(cls, doc: XML.Element) -> Dict[str, str]:
         summary_table = XSD.the(
             doc, './table[@class="naaccr-summary-table naaccr-borders"]', {})
         [hd, detail] = summary_table.findall('tr')
-        summary = dict(zip([cast(str, th.text) for th in hd.findall('th')],
-                           [cast(str, td.text) for td in detail.findall('td')]))
-        return dict(summary,
-                    parentElement=parentElement,
-                    xmlId=xmlId)
+        return dict(zip([cast(str, th.text) for th in hd.findall('th')],
+                        [cast(str, td.text) for td in detail.findall('td')]))
 
 
 def _parse_html_fragment(path: Path_T) -> XML.Element:

@@ -49,6 +49,7 @@ from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import datetime as dt
 import logging
+import re
 
 
 # %%
@@ -57,6 +58,7 @@ from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
 from pyspark import sql as sq
 import pandas as pd  # type: ignore
+import numpy as np   # type: ignore
 import pyspark
 
 # %% [markdown]
@@ -280,6 +282,79 @@ group by naaccrId, length
 having count(distinct valtype_cd) > 1
 ''', limit=None)
 
+
+# %% [markdown]
+# ## Aside: Toward PCORNet CDM tumor table
+
+# %%
+def upper_snake_case(camel: str) -> str:
+    """
+    >>> upper_snake_case('dateOfBirth')
+    'DATE_OF_BIRTH'
+    """
+    return re.sub('([A-Z])', r'_\1', camel).upper()
+
+
+class TumorTable:
+    @classmethod
+    def valuesets(cls) -> pd.DataFrame:
+        ea = ont.NAACCR_Layout.item_codes().reset_index(drop=True)
+        return pd.DataFrame(dict(
+            TABLE='TUMOR',
+            FIELD_NAME=ea.naaccrId.apply(upper_snake_case),
+            VALUESET_ITEM=ea.code,
+            VALUESET_ITEM_DESCRIPTOR=ea.code + '=' + ea.desc,
+            VALUESET_ITEM_ORDER=ea.index + 1,
+            naaccrNum=ea.naaccrNum
+        ))
+
+    @classmethod
+    def fields(cls) -> pd.DataFrame:
+        ty = ont.NAACCR_I2B2.tumor_item_type
+        decode_rdb = {
+            'N': 'Number',
+            '@': 'Text',
+            'T': 'Text',
+            'D': 'Date',
+        }
+        decode_sas = {
+            'N': 'Numeric',
+            '@': 'Char',
+            'T': 'Char',
+            'D': 'Date',
+        }
+        ty = ty[ty.valtype_cd.isin(decode_rdb.keys())]
+        size = ty.length.apply(lambda l: '(%d)' % l)
+        rdb_ty = ty.valtype_cd.apply(decode_rdb.get)
+        sas_ty = ty.valtype_cd.apply(decode_sas.get)
+        rdb_ty = rdb_ty + np.where(ty.valtype_cd == 'D', '', size)
+        sas_ty = sas_ty + np.where(ty.valtype_cd == 'D', ' (Numeric)', size)
+
+        fields = pd.DataFrame(dict(
+            TABLE_NAME='TUMOR',
+            FIELD_NAME=ty.naaccrId.apply(upper_snake_case),
+            RDBMS_DATA_TYPE='RDBMS ' + rdb_ty,
+            SAS_DATA_TYPE='SAS ' + sas_ty,
+            DATA_FORMAT='',
+            REPLICATED_FIELD='NO',
+            UNIT_OF_MEASURE=np.where(ty.valtype_cd == 'D', 'DATE', ''),
+            VALUESET='@@TODO',
+            VALUESET_DESCRIPTOR='@@TODO',
+            FIELD_DEFINITION='@@TODO ty.description',
+            FIELD_ORDER=1,
+            naaccrNum=ty.naaccrNum
+        )).set_index('naaccrNum').sort_index()
+        fields['FIELD_ORDER'] = fields.reset_index().index + 1
+
+        vals = cls.valuesets().groupby(['naaccrNum'])
+        fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
+        fields['VALUESET_DESCRIPTOR'] = vals.VALUESET_ITEM_DESCRIPTOR.apply(';'.join)
+        return fields
+
+
+# TumorTable.valuesets()
+TumorTable.fields()
+
 # %% [markdown]
 # ## NAACCR Ontology
 
@@ -300,28 +375,12 @@ _SQL('''
 select * from item_concepts where naaccrNum between 400 and 450 order by naaccrNum
 ''')
 
-
 # %% [markdown]
 # ## Coded Concepts
 
 # %%
 # TODO: use these in preference to LOINC, Werth codes.
-
-def field_doc(xmlId,
-              subdir: str = 'naaccr18'):
-    with ont.NAACCR_Layout._fields_doc() as doc_dir: #@@cls.
-        field_path = (doc_dir / subdir / xmlId).with_suffix('.html')
-        return ont._parse_html_fragment(field_path)
-
-
-def item_codes(doc):
-    rows = [
-        (tr.find('td[@class="code-nbr"]').text,
-         ''.join(tr.find('td[@class="code-desc"]').itertext()))
-        for tr in doc.findall('./div/table/tr[@class="code-row"]')]
-    return [(code, desc) for (code, desc) in rows if code]
-
-item_codes(field_doc('recordType'))
+ont.NAACCR_Layout.item_codes().query('naaccrNum == 380')
 
 # %%
 # if IO_TESTING:
