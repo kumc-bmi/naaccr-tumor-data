@@ -54,7 +54,7 @@ class XSD:
 
 
 Field0 = TypedDict('Field0', {
-    'short-label': str,
+    'long-label': str,
     'start': int, 'end': int,
     'naaccr-item-num': int,
     'section': str,
@@ -65,7 +65,7 @@ Field0 = TypedDict('Field0', {
 def to_field0(elt: XML.Element) -> Field0:
     attr = elt.attrib
     return {
-        'short-label': attr['short-label'],
+        'long-label': attr['long-label'],
         'start': int(attr['start']), 'end': int(attr['end']),
         'naaccr-item-num': int(attr['naaccr-item-num']),
         'section': attr['section'],
@@ -74,7 +74,7 @@ def to_field0(elt: XML.Element) -> Field0:
 
 
 Field = TypedDict('Field', {
-    'short-label': str,
+    'long-label': str,
     'start': int, 'end': int,
     'length': int,
     'naaccr-item-num': int,
@@ -85,7 +85,7 @@ Field = TypedDict('Field', {
 
 def to_field(f: Field0) -> Field:
     return {
-        'short-label': f['short-label'],
+        'long-label': f['long-label'],
         'start': f['start'], 'end': f['end'],
         'length': f['end'] + 1 - f['start'],
         'naaccr-item-num': f['naaccr-item-num'],
@@ -107,9 +107,9 @@ class NAACCR_Layout:
 
     >>> NAACCR_Layout.fields[:3]
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    [{'short-label': 'Rec Type', 'start': 1, 'end': 1, 'length': 1, ...},
-     {'short-label': 'Reg Type', 'start': 2, ..., 'section': 'Record ID', ...},
-     {'short-label': 'NAACCR Rec Ver', ... 'naaccr-item-num': 50, ...}]
+    [{'long-label': 'Record Type', 'start': 1, 'end': 1, 'length': 1, ...},
+     {'long-label': 'Registry Type', 'start': 2, ..., 'section': 'Record ID', ...},
+     {'long-label': 'NAACCR Record Version', ... 'naaccr-item-num': 50, ...}]
 
     >>> for info in list(NAACCR_Layout.fields_source())[:3]:
     ...     print(info)
@@ -141,8 +141,8 @@ class NAACCR_Layout:
     ...            'naaccr-item-num',  ## TODO
     ...            [i['naaccrNum'] for i in NAACCR1.items_180()])
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    [{'short-label': 'NPCR Spec Fld', ..., 'naaccr-item-num': 3720, ..., 'grouped': False},
-     {'short-label': 'State Req Item', ..., 'naaccr-item-num': 2220, ..., 'grouped': False}]
+    [{'long-label': 'NPCR Specific Field', ..., 'naaccr-item-num': 3720, ..., 'grouped': False},
+     {'long-label': 'State/Requestor Items', ..., 'naaccr-item-num': 2220, ..., 'grouped': False}]
 
     """
     layout_180 = XML.parse(res.open_text(
