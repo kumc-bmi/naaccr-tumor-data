@@ -540,7 +540,7 @@ class NAACCR_I2B2(object):
             log.warn('skipping WHO Topology terms')
             icd_o_topo = spark.sql('''
               select 3 lvl, 'C00' concept_cd, 'FA' c_visualattributes
-                   , 'abc' path, 'LIP' concept_path
+                   , 'abc' path, 'LIP' concept_path, 'x' concept_name
             ''')
 
         top = pd.DataFrame([dict(c_hlevel=1,
