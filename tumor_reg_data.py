@@ -331,20 +331,27 @@ class TumorTable:
         sas_ty = sas_ty + np.where(ty.valtype_cd == 'D', ' (Numeric)', size)
 
         fields = pd.DataFrame(dict(
+            item=ty.naaccrNum,
+            #name=ty.naaccrName,
+            #xmlId=ty.naaccrId,
             TABLE_NAME='TUMOR',
             FIELD_NAME=ty.naaccrId.apply(upper_snake_case),
             RDBMS_DATA_TYPE='RDBMS ' + rdb_ty,
             SAS_DATA_TYPE='SAS ' + sas_ty,
-            DATA_FORMAT='',
+            DATA_FORMAT='LOINC scale ' + ty.scale_typ,
             REPLICATED_FIELD='NO',
             UNIT_OF_MEASURE=np.where(ty.valtype_cd == 'D', 'DATE', ''),
-            VALUESET='@@TODO',
-            VALUESET_DESCRIPTOR='@@TODO',
-            FIELD_DEFINITION='@@TODO ty.description',
+            VALUESET='',
+            VALUESET_DESCRIPTOR='',
+            FIELD_DEFINITION='',
             FIELD_ORDER=1,
-            naaccrNum=ty.naaccrNum
-        )).set_index('naaccrNum').sort_index()
+        ))
+        fields = fields.set_index('item').sort_index()
         fields['FIELD_ORDER'] = fields.reset_index().index + 1
+
+        desc = pd.DataFrame(ont.NAACCR_Layout.iter_description(),
+                            columns=['naaccrNum', 'naaccrId', 'description']).set_index('naaccrNum')
+        fields['FIELD_DEFINITION'] = desc.description
 
         vals = cls.valuesets().groupby(['naaccrNum'])
         fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
@@ -353,7 +360,15 @@ class TumorTable:
 
 
 # TumorTable.valuesets()
-TumorTable.fields()
+TumorTable.fields().to_csv('pcornet_cdm/fields.csv')
+TumorTable.fields().loc[380:].head()
+
+# %%
+ont.NAACCR_I2B2.tumor_item_type.head()
+
+# %%
+pd.DataFrame(ont.NAACCR_Layout.iter_description(),
+             columns=['naaccrNum', 'naaccrId', 'description']).head()
 
 # %% [markdown]
 # ## NAACCR Ontology
