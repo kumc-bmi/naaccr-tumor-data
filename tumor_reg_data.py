@@ -1,4 +1,19 @@
-# %% [markdown]
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:hydrogen
+#     text_representation:
+#       extension: .py
+#       format_name: hydrogen
+#       format_version: '1.2'
+#       jupytext_version: 1.2.3
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # # Wrangling NAACCR Cancer Tumor Registry Data
 #
 # The [NAACCR_ETL][gpc] process used at KUMC and other GPC sites to load
@@ -19,8 +34,8 @@
 # [i2b2]: https://transmartfoundation.org/
 # [44]: https://informatics.gpcnetwork.org/trac/Project/ticket/44
 # [739]: https://informatics.gpcnetwork.org/trac/Project/ticket/739
-#
-#
+
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## About This Document
 #
 # This is both a jupyter notebook and a python module, sync'd using [jupytext][].
@@ -29,7 +44,7 @@
 #
 # [jupytext]: https://github.com/mwouts/jupytext
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Platform for v18: Spark SQL, PySpark, and luigi
 #
 #  - [python 3.7 standard library](https://docs.python.org/3/library/index.html)
@@ -38,7 +53,7 @@
 #
 # _Using luigi is beyond the scope of this document; see [tumor_reg_tasks](tumor_reg_tasks.py)._
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 # python 3.7 stdlib
 from gzip import GzipFile
 from importlib import resources as res
@@ -52,7 +67,7 @@ import logging
 import re
 
 
-# %%
+# %% {"slideshow": {"slide_type": "-"}}
 from pyspark.sql import SparkSession as SparkSession_T, Window
 from pyspark.sql import types as ty, functions as func
 from pyspark.sql.dataframe import DataFrame
@@ -61,37 +76,40 @@ import pandas as pd  # type: ignore
 import numpy as np   # type: ignore
 import pyspark
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # We incorporate materials from the
 # [imsweb/naaccr-xml](https://github.com/imsweb/naaccr-xml) project,
 # such as test data.
 
-# %%
+# %% {"slideshow": {"slide_type": "-"}}
 import naaccr_xml_samples
 import bc_qa
 
-# %%
+# %% {"slideshow": {"slide_type": "fragment"}}
 from sql_script import SqlScript
 import tumor_reg_ont as ont
 import heron_load
 
 
-# %%
+# %% {"slideshow": {"slide_type": "fragment"}}
 log = logging.getLogger(__name__)
 
 
-# %% [markdown]
-# ### I/O Access and Integration Testing: local files, Spark / Hive metastore
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ### Integration Testing: local files, Spark / Hive metastore
 
 # %% [markdown]
-# In a notebook context, we have `__name__ == '__main__'`.
-# Exceptions to **ocap discipline** (see CONTRIBUTING) are guarded with `IO_TESTING`.
+# For integration testing (`IO_TESTING`)
+# we set aside [ocap discipline](CONTRIBUTING.md#OCap-discipline).
 # Notebook-level globals such as `_spark` and `_cwd` use a leading underscore.
+# The `spark` global is available when we use `pyspark`.
+# Otherwise, we make it using techniques from
+# [Spark SQL Getting Started](https://spark.apache.org/docs/latest/sql-getting-started.html).
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
+# In a notebook context, we have `__name__ == '__main__'`.
 IO_TESTING = __name__ == '__main__'
 
-# %%
 if IO_TESTING:
     logging.basicConfig(level=logging.INFO, stream=stderr)
     log.info('tumor_reg_data using: %s', dict(
@@ -106,17 +124,11 @@ if IO_TESTING:
     _cwd = _get_cwd()
     log.info('cwd: %s', _cwd.resolve())
 
-
-# %% [markdown]
-# The `spark` global is available when we launch as
-# `PYSPARK_DRIVER_PYTHON=jupyter PYSPARK_DRIVER_PYTHON_OPTS=notebook pyspark ...`.
-# Otherwise, we make it using techniques from
-# [Spark SQL Getting Started](https://spark.apache.org/docs/latest/sql-getting-started.html).
-
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 _spark = cast(SparkSession_T, None)  # for static type checking outside IO_TESTING
 
 if IO_TESTING:
+    # PYSPARK_DRIVER_PYTHON=jupyter PYSPARK_DRIVER_PYTHON_OPTS=notebook pyspark ...
     if 'spark' in globals():
         _spark = spark  # type: ignore  # noqa
         del spark       # type: ignore
@@ -132,10 +144,18 @@ if IO_TESTING:
 
     log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
 
+# %% {"slideshow": {"slide_type": "-"}}
 IO_TESTING and _spark
 
 
-# %%
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ### Spark SQL
+#
+# The `_SQL` utility uses our `_spark` session in `IO_TESTING` mode.
+# We also have `_to_spark` and `_to_view` for
+# importing pandas and spark DataFrames into the session.
+
+# %% {"slideshow": {"slide_type": "skip"}}
 def _to_spark(name: str, compute: Callable[[], pd.DataFrame],
               cache: bool = False) -> Opt[DataFrame]:
     """Compute pandas data locally and save as spark view"""
@@ -175,10 +195,15 @@ def _SQL(sql: str,
     return pdf
 
 
-# %% [markdown]
+# %% {"slideshow": {"slide_type": "-"}}
+_to_spark('t1', lambda: pd.DataFrame([(x, x * x) for x in range(10)], columns=['x', 'y']))
+_SQL('select * from t1', index='x', limit=4)
+
+
+# %% [markdown] {"slideshow": {"slide_type": "skip"}}
 # Spark logs can be extremely verbose (especially when running this notebook in batch mode).
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def quiet_logs(spark: SparkSession_T) -> None:
     sc = spark.sparkContext
     # ack: FDS Aug 2015 https://stackoverflow.com/a/32208445
@@ -190,41 +215,72 @@ def quiet_logs(spark: SparkSession_T) -> None:
 if IO_TESTING:
     quiet_logs(_spark)
 
-# %% [markdown]
-# ## NAACCR Items and Data Types
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ## NAACCR Data Dictionary Items
 #
 # Each NAACCR tumor record consists of hundreds of "items" (aka fields).
 # The **naaccr-xml** project has data dictionaries to support
-# reformatting flat files to XML and back:
+# reformatting flat files to XML and back. The **imsweb/layout** project provides
+# grouping of items into sections:
 
 # %%
-_to_spark('ndd180', lambda: ont.NAACCR1.items_180())
-_SQL('''
-select * from ndd180 where naaccrNum between 400 and 500
-''', index='naaccrNum')
+_to_spark('ndd180', lambda: pd.DataFrame(ont.NAACCR1.items_180()))
+_SQL('''select * from ndd180 where naaccrNum between 400 and 500''',
+     index='naaccrNum')
 
-# %% [markdown]
+# %%
+_to_spark('record_layout',
+          lambda: pd.DataFrame(ont.NAACCR_Layout.fields,
+                               columns=ont.NAACCR_Layout.fields[0].keys()))
+_SQL("select * from record_layout where `naaccr-item-num` between 400 and 500",
+     index='naaccr-item-num')
+
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ## i2b2 datatypes: `valtype_cd`
+#
 # But the naaccr-xml data dictionaries don't have enough information
 # to determine i2b2's notion of datatype called `valtype_cd`:
 
-# %%
+# %% {"slideshow": {"slide_type": "-"}}
 IO_TESTING and pd.DataFrame.from_records(
     [('@', 'nominal'), ('N', 'numeric'), ('D', 'date'), ('T', 'text')],
     columns=['valtype_cd', 'description'],
     index='valtype_cd')
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ## Curated `valtype_cd`
+#
 # So we curated the datatypes, incorporating datatype
 # information from LOINC (`loinc_num`, `scale_typ`, `AnswerListId`)
 # and from Werth / PA DoH (`scheme`):
 
-# %%
+# %% {"slideshow": {"slide_type": "-"}}
 _to_spark('tumor_item_type', lambda: ont.NAACCR_I2B2.tumor_item_type)
+_SQL('''select * from tumor_item_type''', index='naaccrNum')
+
+# %% [markdown] {"slideshow": {"slide_type": "-"}}
+# ## Confidential Items Skipped
+#
+# Not every item in **naaccr-xml** has a curated `valtype_cd`:
+
+# %% {"slideshow": {"slide_type": "-"}}
+_SQL('''select count(*) from ndd180 nd
+left join tumor_item_type ty on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
+where ty.naaccrNum is null or ty.valtype_cd is null''')
+
+# %% [markdown] {"slideshow": {"slide_type": "-"}}
+# The un-curated items are all from confidential sections:
+
+# %%
 _SQL('''
-select * from tumor_item_type
+select distinct rl.section from ndd180 nd
+left join record_layout rl on rl.`naaccr-item-num` = nd.naaccrNum
+left join tumor_item_type ty
+on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
+where ty.naaccrNum is null or ty.valtype_cd is null
 ''')
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # ### Integrity check, modulo confidential sections
 #
 # Any extra curated items not in the **naaccr-xml** v18 data dictionary?
@@ -237,44 +293,10 @@ on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
 where nd.naaccrNum is null
 ''')
 
-# %% [markdown]
-# Not every item in **naaccr-xml** has a curated `valtype_cd`:
+# %% [markdown] {"slideshow": {"slide_type": "subslide"}}
+# ### Ambiguous valtype_cd?
 
-# %%
-_SQL('''
-select count(*)
-from ndd180 nd
-left join tumor_item_type ty
-on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
-where ty.naaccrNum is null or ty.valtype_cd is null
-''')
-
-# %% [markdown]
-# We didn't bother curating `valtype_cd` for items in confidential sections.
-#
-# Section information is not provided in **naaccr-xml** so
-# we get it from **imsweb/layout**:
-
-# %%
-_to_spark('record_layout', lambda: ont.NAACCR_Layout.fields)
-_SQL("select * from record_layout where section like '%Confidential'")
-
-# %% [markdown]
-# Now we can see that the un-curated items are all from confidential sections:
-
-# %%
-_SQL('''
-select distinct rl.section from ndd180 nd
-left join record_layout rl on rl.`naaccr-item-num` = nd.naaccrNum
-left join tumor_item_type ty
-on nd.naaccrNum = ty.naaccrNum and nd.naaccrId = ty.naaccrId
-where ty.naaccrNum is null or ty.valtype_cd is null
-''')
-
-# %% [markdown]
-# #### Ambiguous valtype_cd?
-
-# %%
+# %% {"slideshow": {"slide_type": "-"}}
 _SQL('''
 select naaccrId, length, count(distinct valtype_cd), collect_list(valtype_cd)
 from tumor_item_type
@@ -283,10 +305,12 @@ having count(distinct valtype_cd) > 1
 ''', limit=None)
 
 
-# %% [markdown]
-# ## Aside: Toward PCORNet CDM tumor table
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ## PCORNet CDM Field Types
+#
+# We can generate PCORNet CDM style type information from `valtype_cd` and such.
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def upper_snake_case(camel: str) -> str:
     """
     >>> upper_snake_case('dateOfBirth')
@@ -332,8 +356,8 @@ class TumorTable:
 
         fields = pd.DataFrame(dict(
             item=ty.naaccrNum,
-            #name=ty.naaccrName,
-            #xmlId=ty.naaccrId,
+            # name=ty.naaccrName,
+            # xmlId=ty.naaccrId,
             TABLE_NAME='TUMOR',
             FIELD_NAME=ty.naaccrId.apply(upper_snake_case),
             RDBMS_DATA_TYPE='RDBMS ' + rdb_ty,
@@ -359,51 +383,51 @@ class TumorTable:
         return fields
 
 
+# %%
 # TumorTable.valuesets()
 TumorTable.fields().to_csv('pcornet_cdm/fields.csv')
 TumorTable.fields().loc[380:].head()
 
 # %%
-ont.NAACCR_I2B2.tumor_item_type.head()
-
-# %%
 pd.DataFrame(ont.NAACCR_Layout.iter_description(),
              columns=['naaccrNum', 'naaccrId', 'description']).head()
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Ontology
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 IO_TESTING and ont.NAACCR_I2B2.ont_view_in(
-    _spark, task_id='task1', update_date=dt.date(2019, 9, 13))
+    _spark, who_cache=(_cwd / ',cache').resolve(), task_id='task1', update_date=dt.date(2019, 9, 13))
+
+# %% {"slideshow": {"slide_type": "-"}}
 _SQL('''
 select * from naaccr_top_concept
 ''')
 
-# %%
+# %% {"slideshow": {"slide_type": "subslide"}}
 _SQL('''
 select * from section_concepts order by sectionId
 ''')
 
-# %%
+# %% {"slideshow": {"slide_type": "subslide"}}
 _SQL('''
 select * from item_concepts where naaccrNum between 400 and 450 order by naaccrNum
 ''')
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Coded Concepts
 
 # %%
 # TODO: use these in preference to LOINC, Werth codes.
 ont.NAACCR_Layout.item_codes().query('naaccrNum == 380')
 
-# %%
+# %% {"slideshow": {"slide_type": "subslide"}}
 # if IO_TESTING:
 #    ont.LOINC_NAACCR.answers_in(_spark)
 
 IO_TESTING and _spark.table('loinc_naaccr_answers').where('code_value = 380').limit(5).toPandas()
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # #### Werth Code Values
 
 # %%
@@ -412,48 +436,49 @@ if IO_TESTING:
     _spark.createDataFrame(ont.NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
 IO_TESTING and _spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
 
-# %%
+# %% {"slideshow": {"slide_type": "subslide"}}
 _SQL('''
 select answer_code, c_hlevel, sectionId, c_basecode, c_name, c_visualattributes, c_fullname
 from code_concepts where naaccrNum = 610
 ''', index='answer_code')
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ### Oncology MetaFiles from the World Health Organization
 #
 # [materials](http://www.who.int/classifications/icd/adaptations/oncology/en/index.html)
 
-# %%
+# %% {"slideshow": {"slide_type": "subslide"}}
 if IO_TESTING:
     _who_topo = ont.OncologyMeta.read_table((_cwd / ',cache').resolve(), *ont.OncologyMeta.topo_info)
 
 IO_TESTING and _who_topo.set_index('Kode').head()
 
-# %%
+# %% {"slideshow": {"slide_type": "subslide"}}
 _to_spark('icd_o_topo', lambda: ont.OncologyMeta.icd_o_topo(_who_topo))
 _SQL('select * from icd_o_topo order by path')
 
-# %%
-ont.NAACCR_I2B2.cs_terms
+# %% {"slideshow": {"slide_type": "slide"}}
+_SQL(r'''select * from primary_site_concepts''')
 
-# %%
-if IO_TESTING:
-    ont.NAACCR_I2B2.ont_view_in(_spark, task_id='task1', update_date=dt.date(2019, 9, 13), who_cache=_cwd / ',cache')
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ## Site-Specific Factor Terms
 
-_SQL(r'''
-select * from primary_site_concepts
-''')
+# %% {"slideshow": {"slide_type": "-"}}
+ont.NAACCR_I2B2.cs_terms.head()
 
-# %%
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
+# ## SEER Recode Concepts
+
+# %% {"slideshow": {"slide_type": "-"}}
 _SQL(r'''
 select * from seer_recode_concepts
 ''')
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR XML Data
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 class NAACCR2:
     s100x = XML.parse(GzipFile(fileobj=res.open_binary(  # type: ignore # typeshed/issues/2580  # noqa
         naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
@@ -501,16 +526,15 @@ IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
                 .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
 
 
-# %% [markdown]
+# %% {"slideshow": {"slide_type": "skip"}}
 # What columns are covered by the 100 tumor sample?
 
-# %%
 IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)  # type: ignore
                 .select('naaccrId').distinct().sort('naaccrId')
                 .toPandas().naaccrId.values)
 
 
-# %%
+# %% {"slideshow": {"slide_type": "slide"}}
 def naaccr_pivot(ddict: DataFrame, skinny: DataFrame, key_cols: List[str],
                  pivot_on: str = 'naaccrId', value_col: str = 'value',
                  start: str = 'startColumn') -> DataFrame:
@@ -527,10 +551,10 @@ IO_TESTING and (naaccr_pivot(ont.ddictDF(_spark),
                              ['rownum'])
                 .limit(3).toPandas())
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Flat File v18
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 if IO_TESTING:
     with NAACCR2.s100t() as _tr_file:
         log.info('tr_file: %s', _tr_file)
@@ -538,14 +562,14 @@ if IO_TESTING:
 else:
     _naaccr_text_lines = cast(DataFrame, None)
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 IO_TESTING and _naaccr_text_lines.rdd.getNumPartitions()
 
 # %%
 IO_TESTING and _naaccr_text_lines.limit(5).toPandas()
 
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def non_blank(df: pd.DataFrame) -> pd.DataFrame:
     return df[[
         col for col in df.columns
@@ -553,7 +577,7 @@ def non_blank(df: pd.DataFrame) -> pd.DataFrame:
     ]]
 
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
                     value_col: str = 'value',
                     exclude_pfx: str = 'reserved') -> DataFrame:
@@ -576,10 +600,12 @@ if IO_TESTING:
     _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF(_spark)).cache()
     _extract.createOrReplaceTempView('naaccr_extract')
 # _extract.explain()
+
+# %% {"slideshow": {"slide_type": "-"}}
 IO_TESTING and non_blank(_extract.limit(5).toPandas())
 
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
                    portion: float = 1.0, cancerID: int = 1) -> DataFrame:
     """Cancer Identification items from a sample
@@ -598,11 +624,11 @@ if False and IO_TESTING:
 
 False and IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 False and IO_TESTING and _cancer_id.toPandas().describe()
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Dates
 #
 #  - **ISSUE**: hide date flags in i2b2? They just say why a date is missing, which doesn't seem worth the screenspace.
@@ -629,7 +655,7 @@ IO_TESTING and naaccr_dates(
     keep=True).limit(10).toPandas()
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # ### Strange dates: TODO?
 
 # %%
@@ -649,7 +675,7 @@ IO_TESTING and (strange_dates(_extract)
                 .toPandas().groupby(['dtlen', 'cc']).count())
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Patients, Tumors, Unique key columns
 #
 #  - `patientSystemIdHosp` - "This provides a stable identifier to
@@ -685,7 +711,7 @@ IO_TESTING and dups(_extract.select('sequenceNumberCentral',
                     _key1).set_index(_key1).head(10)
 
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 class TumorKeys:
     # issue: accessionNumberHosp is not unique
     pat_ids = ['patientSystemIdHosp', 'patientIdNumber']
@@ -804,17 +830,17 @@ if IO_TESTING:
     _patients = TumorKeys.patients(_spark, _naaccr_text_lines)
 IO_TESTING and (_pat_tmr, _patients)
 
-# %%
+# %% {"slideshow": {"slide_type": "slide"}}
 IO_TESTING and _pat_tmr.limit(15).toPandas()
 
-# %%
+# %% {"slideshow": {"slide_type": "slide"}}
 IO_TESTING and _patients.limit(10).toPandas()
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ##  Observations
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def melt(df: DataFrame,
          id_vars: List[str], value_vars: List[str],
          var_name: str = 'variable', value_name: str = 'value') -> DataFrame:
@@ -834,17 +860,17 @@ def melt(df: DataFrame,
     return _tmp.select(*cols)
 
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 if IO_TESTING:
     _to_spark('tumor_item_type', lambda: ont.NAACCR_I2B2.tumor_item_type, cache=True)
     _ty = _spark.table('tumor_item_type')
 IO_TESTING and _ty.limit(5).toPandas()
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "skip"}}
 # **ISSUE**: performance: whenever we change cardinality, consider persisting the data. e.g. stack_obs
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def stack_obs(records: DataFrame, ty: DataFrame,
               known_valtype_cd: List[str] = ['@', 'D', 'N', 'Ni', 'T'],
               key_cols: List[str] = TumorKeys.key4 + TumorKeys.dtcols) -> DataFrame:
@@ -864,7 +890,7 @@ if IO_TESTING:
 _SQL('select * from naaccr_obs_raw', limit=10)
 
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 class ItemObs:
     script = SqlScript('naaccr_txform.sql',
                        res.read_text(heron_load, 'naaccr_txform.sql'),
@@ -902,6 +928,7 @@ class ItemObs:
         return spark.table(cls.extract_id_view)
 
 
+# %% {"slideshow": {"slide_type": "-"}}
 _to_view('naaccr_observations1', lambda: ItemObs.make(_spark, _extract), cache=True)
 if IO_TESTING:
     _obs = _spark.table('naaccr_observations1')
@@ -1066,7 +1093,7 @@ if IO_TESTING:
     _spark.table('naaccr_observations').toPandas().to_csv(_cwd / 'naaccr_observations.csv', index=False)
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Concept stats
 
 # %%
@@ -1090,7 +1117,7 @@ class ConceptStats:
 #                      _spark.table('naaccr_observations1'))
 # _SQL('select * from concept_stats order by c_fullname', limit=15)
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Oracle DB Access
 
 # %% [markdown]
@@ -1172,7 +1199,7 @@ if DB_TESTING:
 DB_TESTING and _patients_mapped.limit(5).toPandas()
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Use Case: GPC Breast Cancer Survey
 #
 # The NAACCR format has 500+ items. To provide initial focus, let's use
@@ -1219,13 +1246,13 @@ IO_TESTING and (
 )
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ### Patients, Encounters, and Observations per Variable
 #
 #   - **ISSUE**: naaccr-xml test data has no data on classOfCase etc.
 #     at least not the 100 tumor sample.
 
-# %%
+# %% {"slideshow": {"slide_type": "skip"}}
 def bc_var_facts(coded_facts: DataFrame, ddict: DataFrame) -> DataFrame:
     return coded_facts.join(
         ddict.select('naaccrId'),
@@ -1258,6 +1285,7 @@ def bc_var_summary(spark: SparkSession_T,
             .drop(agg.variable))
 
 
+# %%
 IO_TESTING and bc_var_summary(
     _spark, _obs, _bc_ddict).where(
         'fact_qty is null').toPandas()
@@ -1271,7 +1299,7 @@ IO_TESTING and bc_var_summary(
 IO_TESTING and _obs.where("naaccrId == 'dateOfDiagnosis'").limit(5).toPandas()
 
 
-# %% [markdown]
+# %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # #### TODO: Code labels; e.g. 1 = Male; 2 = Female
 
 # %%
