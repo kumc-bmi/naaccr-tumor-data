@@ -601,14 +601,14 @@ class NAACCR_Facts(_NAACCR_JDBC):
 class NAACCR_Summary(_NAACCR_JDBC):
     table_name = "NAACCR_EXPORT_STATS"
 
-    z_design_id = pv.StrParam('original (%s)' %
+    z_design_id = pv.StrParam('fill NaN (%s)' %
                               _stable_hash(td.DataSummary.script.code))
 
     def _data(self, spark: SparkSession,
               naaccr_text_lines: DataFrame) -> DataFrame:
         dd = tr_ont.ddictDF(spark)
         extract = td.naaccr_read_fwf(naaccr_text_lines, dd)
-        return td.DataSummary.stats(extract, spark)
+        return td.DataSummary.stats(extract, spark).na.fill(0, subset=['sd'])
 
 
 class UploadTask(JDBCTask):
