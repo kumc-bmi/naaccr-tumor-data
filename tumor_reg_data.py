@@ -972,16 +972,18 @@ class DataSummary:
         to_df = spark.createDataFrame
 
         ty = to_df(ont.NAACCR_I2B2.tumor_item_type)
+        tumors = naaccr_dates(tumors_raw, ['dateOfDiagnosis'])
         views = ont.create_objects(spark, cls.script,
                                    section=to_df(ont.NAACCR_I2B2.per_section),
                                    record_layout=to_df(ont.NAACCR_Layout.fields),
                                    tumor_item_type=ty,
-                                   naaccr_extract=tumors_raw,
-                                   tumors_eav=cls.stack_nominals(tumors_raw, ty))
+                                   naaccr_extract=tumors,
+                                   tumors_eav=cls.stack_nominals(tumors, ty, ['dateOfDiagnosis']))
         return list(views.values())[-1]
 
     @classmethod
     def stack_nominals(cls, data: DataFrame, ty: DataFrame,
+                       id_vars: List[str] = [],
                        nominal_cd: str = '@',
                        var_name: str = 'naaccrId',
                        id_col: str = 'recordId') -> DataFrame:
@@ -989,7 +991,7 @@ class DataSummary:
                       for row in ty.where(ty.valtype_cd == nominal_cd)
                       .collect()]
         df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),
-                  value_vars=value_vars, id_vars=[id_col], var_name=var_name)
+                  value_vars=value_vars, id_vars=[id_col] + id_vars, var_name=var_name)
         return df.where(func.trim(df.value) > '')
 
 

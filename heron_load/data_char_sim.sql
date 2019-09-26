@@ -19,28 +19,35 @@ select valtype_cd from tumor_item_type where 1=0;
 create or replace temporary view data_agg_naaccr as
 with
 cases as (
-  select count(*) as tumor_qty
+  select year(dateOfDiagnosis) as dx_yr, count(*) as tumor_qty
   from naaccr_extract
+  group by year(dateOfDiagnosis)
 )
--- count data points by item (variable)
-, by_item as (
-  select agg.naaccrId, ty.naaccrNum, ty.valtype_cd, present
+, with_yr as (
+  select year(dateOfDiagnosis) dx_yr
+       , eav.*
+  from tumors_eav eav
+)
+-- count data points by item (variable) and year of diagnosis
+, by_item_yr as (
+  select dx_yr, agg.naaccrId, ty.naaccrNum, ty.valtype_cd, present
   from
   (
-    select eav.naaccrId, count(*) present
-    from tumors_eav eav
-    group by eav.naaccrId
+    select dx_yr, eav.naaccrId, count(*) present
+    from with_yr eav
+    group by dx_yr, eav.naaccrId
   ) agg
   join tumor_item_type ty on ty.naaccrId = agg.naaccrId
 )
 ,
 -- break down nominals by value
 by_val as (
-  select by_item.naaccrId, by_item.naaccrNum, eav.value, count(*) freq
-  from tumors_eav eav
-  join by_item on eav.naaccrId = by_item.naaccrId
+  select by_item.dx_yr, by_item.naaccrId, by_item.naaccrNum, by_item.present,
+         by_item.valtype_cd, eav.value, count(*) freq
+  from with_yr eav
+  join by_item_yr by_item on eav.naaccrId = by_item.naaccrId and eav.dx_yr = by_item.dx_yr
   where by_item.valtype_cd = '@'
-  group by by_item.naaccrId, by_item.naaccrNum, eav.value
+  group by by_item.dx_yr, by_item.naaccrId, by_item.naaccrNum, by_item.present, by_item.valtype_cd, eav.value
 )
 /*
 ,
@@ -87,13 +94,13 @@ stats as (
 */
 
 -- For nominal data, save the probability of each value
-select by_val.naaccrId, by_val.naaccrNum, '@' valtype_cd
+select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
      , cast(null as float) mean, cast(null as float) sd
-     , by_val.value, by_val.freq, by_val.freq * 1.0 / cases.tumor_qty * 100 as pct
-     , by_item.present
+     , by_val.value, by_val.freq, by_val.freq * 100.0 / cases.tumor_qty as pct
+     , by_val.present
      , cases.tumor_qty
-from by_val join by_item on by_item.naaccrId = by_val.naaccrId
-cross join cases
+from by_val
+join cases on cases.dx_yr = by_val.dx_yr
 
 /* TODO
 union all
@@ -134,21 +141,21 @@ order by ty.sectionid, ty.NaaccrNum, value
 ;
 
 create or replace temporary view nominal_cdf as
-select naaccrNum, naaccrId, value, pct
+select dx_yr, naaccrNum, naaccrId, value, pct
      , sum(pct)
-       over(partition by naaccrNum, xmlid
+       over(partition by dx_yr, naaccrNum, naaccrId
             order by value
             rows between unbounded preceding and current row)
             as cdf
 from data_agg_naaccr
-order by naaccrNum, xmlid, value;
+order by naaccrNum, naaccrId, value;
 ;
 
 
 create or replace temporary view simulated_naaccr_nom as
 with
 by_item as (
-  select distinct naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
+  select distinct dx_yr, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
   from data_char_naaccr d
 )
 ,
