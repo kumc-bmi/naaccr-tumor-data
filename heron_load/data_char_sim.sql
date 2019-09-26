@@ -126,14 +126,14 @@ join section s
 ;
 
 create or replace temporary view data_char_naaccr as
-select ty.sectionid, ty.section, ty.naaccrNum, ty.naaccrId, ty.valtype_cd
+select d.dx_yr, ty.sectionid, ty.section, ty.naaccrNum, ty.naaccrId, ty.valtype_cd
      , freq, present, tumor_qty
      , round(mean / 365.25, 2) mean_yr, round(sd / 365.25, 2) sd_yr
      , mean                           , sd
      , value, round(pct, 3) pct
 from tumor_item_type ty
 join data_agg_naaccr d on d.NaaccrNum = ty.NaaccrNum
-order by ty.sectionid, ty.NaaccrNum, value
+-- order by ty.sectionid, ty.NaaccrNum, value
 ;
 
 
@@ -148,31 +148,61 @@ select dx_yr, naaccrNum, naaccrId, value, pct
             rows between unbounded preceding and current row)
             as cdf
 from data_agg_naaccr
-order by naaccrNum, naaccrId, value;
+;
+
+create or replace temporary view simulated_case_year as
+with by_yr as (
+select distinct dx_yr, tumor_qty
+from data_agg_naaccr
+where dx_yr >= 2004  -- ISSUE: parameterize registry reference year?
+),
+all_yr as (
+select sum(tumor_qty) as qty
+from by_yr
+),
+yr_cum as (
+select dx_yr
+     , tumor_qty
+     , sum(tumor_qty)
+       over(partition by 1
+            order by dx_yr
+            rows between unbounded preceding and current row)
+            as qty_cum
+from by_yr
+),
+pick as (
+select case_index, cast(rand() * all_yr.qty as int) as x
+from simulated_entity
+cross join all_yr
+)
+select pick.*, yr_cum.*
+from pick
+join yr_cum on pick.x >= yr_cum.qty_cum - yr_cum.tumor_qty
+and pick.x < yr_cum.qty_cum
 ;
 
 
 create or replace temporary view simulated_naaccr_nom as
 with
 by_item as (
-  select distinct dx_yr, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
+  select distinct dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
   from data_char_naaccr d
 )
 ,
 -- for each item of each case, pick a uniformly random percentage
 ea as (
-  select e.case_index, by_item.naaccrNum, by_item.naaccrId, by_item.valtype_cd
+  select cy.case_index, cy.dx_yr, sectionId, by_item.naaccrNum, by_item.naaccrId, by_item.valtype_cd
        , by_item.present, by_item.tumor_qty
        , rand() * 100 as x
        -- , (e.case_index * 1017 + by_item.naaccrNum) % 100 as x  -- kludge; random() and CTEs don't work in Oracle
-  from simulated_entity e
-  cross join by_item
+  from simulated_case_year cy
+  join by_item on cy.dx_yr = by_item.dx_yr
 )
-select ea.case_index, ea.naaccrNum, ea.naaccrId, by_val.value
+select ea.case_index, sectionId, ea.dx_yr, ea.naaccrNum, ea.naaccrId, by_val.value
      , ea.x, by_val.cdf, by_val.pct
 from ea
 join nominal_cdf by_val
-  on by_val.naaccrNum = ea.naaccrNum
+  on by_val.naaccrNum = ea.naaccrNum and by_val.dx_yr = ea.dx_yr
 where ea.x >= by_val.cdf - by_val.pct
   and ea.x < by_val.cdf
 ;
