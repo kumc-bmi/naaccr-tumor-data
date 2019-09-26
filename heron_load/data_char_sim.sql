@@ -93,10 +93,10 @@ stats as (
 )
 */
 
--- For nominal data, save the probability of each value
+-- For nominal data, save the frequency of each value
 select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
      , cast(null as float) mean, cast(null as float) sd
-     , by_val.value, by_val.freq, by_val.freq * 100.0 / cases.tumor_qty as pct
+     , by_val.value, by_val.freq
      , by_val.present
      , cases.tumor_qty
 from by_val
@@ -130,23 +130,21 @@ select d.dx_yr, ty.sectionid, ty.section, ty.naaccrNum, ty.naaccrId, ty.valtype_
      , freq, present, tumor_qty
      , round(mean / 365.25, 2) mean_yr, round(sd / 365.25, 2) sd_yr
      , mean                           , sd
-     , value, round(pct, 3) pct
+     , value
 from tumor_item_type ty
 join data_agg_naaccr d on d.NaaccrNum = ty.NaaccrNum
 -- order by ty.sectionid, ty.NaaccrNum, value
 ;
 
 
--- Compute cumulative distribution function for each value of each nominal item.
-;
-
 create or replace temporary view nominal_cdf as
-select dx_yr, naaccrNum, naaccrId, value, pct
-     , sum(pct)
+-- Compute cumulative distribution function for each value of each nominal item.
+select dx_yr, naaccrNum, naaccrId, value, freq
+     , sum(freq)
        over(partition by dx_yr, naaccrNum, naaccrId
             order by value
             rows between unbounded preceding and current row)
-            as cdf
+            as cum_freq
 from data_agg_naaccr
 ;
 
@@ -185,26 +183,29 @@ and pick.x < yr_cum.qty_cum
 create or replace temporary view simulated_naaccr_nom as
 with
 by_item as (
-  select distinct dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
+  select dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd
+       , present, tumor_qty
+       , sum(freq) + (tumor_qty - present) as denominator
   from data_char_naaccr d
+  group by dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
 )
 ,
--- for each item of each case, pick a uniformly random percentage
+-- for each item of each case, pick a uniformly random number
 ea as (
   select cy.case_index, cy.dx_yr, sectionId, by_item.naaccrNum, by_item.naaccrId, by_item.valtype_cd
        , by_item.present, by_item.tumor_qty
-       , rand() * 100 as x
-       -- , (e.case_index * 1017 + by_item.naaccrNum) % 100 as x  -- kludge; random() and CTEs don't work in Oracle
+       , rand() * denominator as x
   from simulated_case_year cy
   join by_item on cy.dx_yr = by_item.dx_yr
 )
 select ea.case_index, sectionId, ea.dx_yr, ea.naaccrNum, ea.naaccrId, by_val.value
-     , ea.x, by_val.cdf, by_val.pct
+     , ea.x, by_val.cum_freq
 from ea
+-- this join will not match when x corresponds to a null (i.e. tumor_qty - present)
 join nominal_cdf by_val
   on by_val.naaccrNum = ea.naaccrNum and by_val.dx_yr = ea.dx_yr
-where ea.x >= by_val.cdf - by_val.pct
-  and ea.x < by_val.cdf
+where ea.x >= by_val.cum_freq - by_val.freq
+  and ea.x < by_val.cum_freq
 ;
 
 
