@@ -608,7 +608,7 @@ class NAACCR_Summary(_NAACCR_JDBC):
               naaccr_text_lines: DataFrame) -> DataFrame:
         dd = tr_ont.ddictDF(spark)
         extract = td.naaccr_read_fwf(naaccr_text_lines, dd)
-        return td.DataSummary.nominal_stats(extract, spark)
+        return td.DataSummary.stats(extract, spark)
 
 
 class UploadTask(JDBCTask):

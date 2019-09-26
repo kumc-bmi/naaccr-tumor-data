@@ -165,7 +165,7 @@ select raw.*
        else false
        end as identified_only
      , case when valtype_cd = '@'
-       then raw_value
+       then raw_value  -- TODO: trim
        end as code_value
      , case
        when valtype_cd in ('N', 'Ni')

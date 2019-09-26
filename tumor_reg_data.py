@@ -965,10 +965,10 @@ class DataSummary:
     script = SqlScript('data_char_sim.sql',
                        res.read_text(heron_load, 'data_char_sim.sql'),
                        [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type']),
-                        ('data_char_naaccr_nom', ['record_layout'])])
+                        ('data_char_naaccr', ['record_layout'])])
 
     @classmethod
-    def nominal_stats(cls, tumors_raw: DataFrame, spark: SparkSession_T) -> DataFrame:
+    def stats(cls, tumors_raw: DataFrame, spark: SparkSession_T) -> DataFrame:
         to_df = spark.createDataFrame
 
         ty = to_df(ont.NAACCR_I2B2.tumor_item_type)
@@ -978,18 +978,19 @@ class DataSummary:
                                    record_layout=to_df(ont.NAACCR_Layout.fields),
                                    tumor_item_type=ty,
                                    naaccr_extract=tumors,
-                                   tumors_eav=cls.stack_nominals(tumors, ty, ['dateOfDiagnosis']))
+                                   tumors_eav=cls.stack_obs(tumors, ty, ['dateOfDiagnosis']))
         return list(views.values())[-1]
 
     @classmethod
-    def stack_nominals(cls, data: DataFrame, ty: DataFrame,
-                       id_vars: List[str] = [],
-                       nominal_cd: str = '@',
-                       var_name: str = 'naaccrId',
-                       id_col: str = 'recordId') -> DataFrame:
+    def stack_obs(cls, data: DataFrame, ty: DataFrame,
+                  id_vars: List[str] = [],
+                  valtype_cds: List[str] = ['@', 'D', 'N'],
+                  var_name: str = 'naaccrId',
+                  id_col: str = 'recordId') -> DataFrame:
         value_vars = [row.naaccrId
-                      for row in ty.where(ty.valtype_cd == nominal_cd)
-                      .collect()]
+                      for row in ty.where(ty.valtype_cd.isin(valtype_cds))
+                      .collect()
+                      if row.naaccrId not in id_vars]
         df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),
                   value_vars=value_vars, id_vars=[id_col] + id_vars, var_name=var_name)
         return df.where(func.trim(df.value) > '')
@@ -1001,11 +1002,11 @@ class DataSummary:
 
 # %%
 if IO_TESTING:
-    DataSummary.nominal_stats(_extract, _spark)
-    _spark.table('data_char_naaccr_nom').cache()
+    DataSummary.stats(_extract, _spark)
+    _spark.table('data_char_naaccr').cache()
     _spark.table('item_concepts').cache()
 
-_SQL('select * from data_char_naaccr_nom order by sectionId, naaccrNum, value', limit=15)
+_SQL('select * from data_char_naaccr order by sectionId, naaccrNum, value', limit=15)
 
 # %%
 if IO_TESTING:

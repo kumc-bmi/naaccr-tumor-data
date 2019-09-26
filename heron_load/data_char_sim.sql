@@ -28,70 +28,66 @@ cases as (
        , eav.*
   from tumors_eav eav
 )
+, with_ty as (
+  select with_yr.dx_yr, with_yr.dateOfDiagnosis, ty.valtype_cd
+       , value
+/*       , case when valtype_cd = '@'
+         then raw_value  -- TODO: trim
+         end as code_value */
+       , case
+         when valtype_cd in ('N', 'Ni')
+         then cast(value as float)
+         end as numeric_value
+       , case
+         when valtype_cd = 'D'
+         -- ISSUE: length 14 datetime?
+         then to_date(substring(concat(value, '0101'), 1, 8),
+                      'yyyyMMdd')
+         end as date_value
+       , ty.valtype_cd
+       , ty.naaccrNum
+       , ty.naaccrId
+  from with_yr
+  join tumor_item_type ty on ty.naaccrId = with_yr.naaccrId
+)
 -- count data points by item (variable) and year of diagnosis
 , by_item_yr as (
-  select dx_yr, agg.naaccrId, ty.naaccrNum, ty.valtype_cd, present
+  select dx_yr, naaccrId, present
   from
   (
-    select dx_yr, eav.naaccrId, count(*) present
+    select dx_yr, naaccrId, count(*) present
     from with_yr eav
-    group by dx_yr, eav.naaccrId
+    group by dx_yr, naaccrId
   ) agg
-  join tumor_item_type ty on ty.naaccrId = agg.naaccrId
 )
 ,
 -- break down nominals by value
 by_val as (
-  select by_item.dx_yr, by_item.naaccrId, by_item.naaccrNum, by_item.present,
-         by_item.valtype_cd, eav.value, count(*) freq
-  from with_yr eav
+  select by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present,
+         eav.valtype_cd, eav.value, count(*) freq
+  from with_ty eav
   join by_item_yr by_item on eav.naaccrId = by_item.naaccrId and eav.dx_yr = by_item.dx_yr
-  where by_item.valtype_cd = '@'
-  group by by_item.dx_yr, by_item.naaccrId, by_item.naaccrNum, by_item.present, by_item.valtype_cd, eav.value
+  where eav.valtype_cd = '@'
+  group by by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present, eav.valtype_cd, eav.value
 )
-/*
 ,
--- TODO: parse dates
+-- normalize date variables to the reference date: diagnosis
 event as (
-  select tumorid as case_index, eav.naaccrNum
-       , date(substr(value, 1, 4) || '-' || substr(value, 5, 2) || '-' || substr(value, 7, 2)) as t
-  from tumors_eav eav
-  join tumor_item_type by_item on eav.naaccrNum = by_item.naaccrNum
-  where by_item.valtype_cd = 'D'
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, datediff(e.date_value, e.dateOfDiagnosis) as mag
+  from with_ty e where valtype_cd = 'D'
 )
 ,
--- pick out reference date variable: date of diagnosis
-dxty as (
-  select *
-  from by_item
-  where itemname = 'Date of Diagnosis')
-,
--- pick out the reference event for each case
-e0 as (
-  select *
-  from event
-  where event.naaccrNum = (select naaccrNum from dxty)
-)
-,
--- normalize other events to the reference event
-e2 as (
-  select e0.naaccrNum, julianday(current_date) - julianday(e0.t) mag
-  from e0
-  union all
-  select e.naaccrNum, julianday(e.t) - julianday(e0.t) mag
-  from event e
-  join e0
-    on e0.case_index = e.case_index
-   and e0.naaccrNum <> e.naaccrNum
+measurement as (
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, numeric_value as mag
+  from with_ty where valtype_cd = 'N'
 )
 ,
 -- assuming normal distribution, characterize continuous data
 stats as (
-  select naaccrNum, count(mag) present, avg(mag) mean, stddev(mag) sd
-  from e2
-  group by naaccrNum
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, avg(mag) mean, stddev(mag) sd
+  from (select * from event union all select * from measurement)
+  group by dx_yr, naaccrNum, naaccrId, valtype_cd
 )
-*/
 
 -- For nominal data, save the frequency of each value
 select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
@@ -102,21 +98,17 @@ select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
 from by_val
 join cases on cases.dx_yr = by_val.dx_yr
 
-/* TODO
 union all
 
--- For continuous data, save mean, stddev
-select stats.naaccrNum, by_item.valtype_cd
+select stats.dx_yr, by_item.naaccrId, stats.naaccrNum, stats.valtype_cd
      , mean, sd
-     , null value, null freq, null pct, stats.present, cases.tumor_qty
+     , null value, null freq, by_item.present, cases.tumor_qty
 from stats
-join by_item on stats.naaccrNum = by_item.naaccrNum
-cross join cases
-*/
-
+join by_item_yr by_item on stats.naaccrId = by_item.naaccrId and stats.dx_yr = by_item.dx_yr
+join cases on stats.dx_yr = cases.dx_yr
 ;
 
-create or replace temporary view data_char_naaccr_nom as
+create or replace temporary view data_char_naaccr as
 select s.sectionId, rl.section, nom.*
 from data_agg_naaccr nom
 join record_layout rl
@@ -124,18 +116,6 @@ join record_layout rl
 join section s
   on s.section = rl.section
 ;
-
-create or replace temporary view data_char_naaccr as
-select d.dx_yr, ty.sectionid, ty.section, ty.naaccrNum, ty.naaccrId, ty.valtype_cd
-     , freq, present, tumor_qty
-     , round(mean / 365.25, 2) mean_yr, round(sd / 365.25, 2) sd_yr
-     , mean                           , sd
-     , value
-from tumor_item_type ty
-join data_agg_naaccr d on d.NaaccrNum = ty.NaaccrNum
--- order by ty.sectionid, ty.NaaccrNum, value
-;
-
 
 create or replace temporary view nominal_cdf as
 -- Compute cumulative distribution function for each value of each nominal item.
