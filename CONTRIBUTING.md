@@ -1,12 +1,23 @@
 # Design, development notes for contributors
 
-Exploratory design is done using pyspark and jupyter notebook.
+To get started, make sure you can run the unit tests: `python -m doctest
+$MODULE.py` for each of the main modules:
+
+ - `tumor_reg_ont.py`
+ - `tumor_reg_data.py`
+ - `tumor_reg_tasks.py`
+ - `sql_script.py`
+
+All contributions should also pass the `lint` and `static` checks
+discussed below. Use `make` or `make code_check` to check all three.
 
 *Bootstrap notes below are still a bit rough.*
 
 ---
 
 ## PySpark and jupyter notebooks vs. sqldeveloper
+
+Exploratory design is done using pyspark and jupyter notebook.
 
   - jupyter notebooks are great for exploration, visualization
   - A `local` spark session makes a `metastore_db` in the current
@@ -82,8 +93,9 @@ In production, we use luigi `PySparkTask`.
 
 ---
 
-## QA with doctest and mypy
+## Static type checking with mypy (`static`)
 
+  - use `mypy --strict .` or `make static`.
   - ETL code is often hard to unit test: mocking a DB is expensive
   - static type checking finds typos etc.
   - types provide documentation
@@ -97,17 +109,16 @@ export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
 
 ---
 
-### Python coding style
+### Python coding style (`lint`)
 
-  - We follow python community norms: PEP8; use flake8 to check.
-    - **ISSUE**: explain how to check; establish Jenkins ci.
+  - We follow python community norms: PEP8; use `flake8 .` or `make lint` to check.
   - The first line of a module or function docstring should be a short description
     - if it is blank, either the item is in an early stage of
       development or the name and doctests are supposed to make the purpose
       obvious.
 
   - *NOTE*: with static type annotations, the 79 character line
-            length limit is awkward; in GROUSE we used 99 in `setup.cfg`.
+            length limit is awkward; see `max-line-length` in `setup.cfg`.
 
   - *NOTE*: Though imports at the top of a notebook cell are handy for
             prototyping, we move them to the top of the notebook (module)

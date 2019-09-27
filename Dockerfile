@@ -1,8 +1,8 @@
-FROM python:3.7
+FROM jupyter/pyspark-notebook
 
-RUN pip install --no-cache-dir py-make
+RUN pip freeze
 
-WORKDIR /usr/src/app
+WORKDIR /home/jovyan
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -10,8 +10,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 ARG ARCHIVE
 
 ADD build/${ARCHIVE} .
-
-# ISSUE: refactor overlap with Makefile check_code
-# pymake lacks support for basic x: y dependencies. :-/
-# https://github.com/tqdm/py-make/issues/2
-CMD ["pymake", "doctest", "lint", "static", "freeze"]

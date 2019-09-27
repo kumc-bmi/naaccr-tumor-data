@@ -8,8 +8,8 @@ name: py3tr
 dependencies:
   - python=3.7
   - tabulate
-  - pyspark==2.4.3
-  - pandas==0.24.2
+  - pyspark==2.4.4
+  - pandas==0.25.1
   - luigi
   - pip
   - pip:

@@ -19,14 +19,9 @@ build/naaccr_export_stats.csv: build/tumor_reg_data_run.ipynb
 #
 # IDEA: nosetests --with-doctest
 # IDEA: or tox?
-#
-# Note: for compatibility with pymake, we use python rather than shell
-# syntax for this loop.
 DOCTEST_FILES=tumor_reg_ont.py tumor_reg_data.py tumor_reg_tasks.py sql_script.py
 doctest:
-	python -c 'from subprocess import check_call;\
-                   [print(f) or check_call(["python", "-m", "doctest", f])\
-                    for f in "$(DOCTEST_FILES)".split()]'
+	for f in $(DOCTEST_FILES); do echo $$f; python -m doctest $$f; done
 
 ##
 # Python community style
@@ -66,7 +61,13 @@ build/$(ARCHIVE): build
 # ISSUE: user ids, permissions
 docker-check: build/$(ARCHIVE)
 	docker build -t tr-check --build-arg ARCHIVE=$(ARCHIVE) .
-	docker run --rm --name check-$(VERSION) -v /tmp:/var/spool tr-check
+	docker run --rm --name check-$(VERSION) -v /tmp:/var/spool tr-check make check_code freeze
+
+docker-notebook: build/$(ARCHIVE)
+	docker build -t tr-check --build-arg ARCHIVE=$(ARCHIVE) .
+	docker run --rm --name notebook-$(VERSION) \
+		-p 4090:4040 -p 4091:4041 -p 8899:8888 \
+		tr-check
 
 ##
 # Integration testing with jupyter notebook
@@ -76,7 +77,7 @@ build/tumor_reg_data_run.html: build/tumor_reg_data_run.ipynb
 	jupyter nbconvert --to html $< $@
 
 build/tumor_reg_data_run.ipynb: tumor_reg_data.ipynb
-	PYSPARK_DRIVER_PYTHON=python spark-submit run_nb.py $< build/ $@
+	PYSPARK_DRIVER_PYTHON=python $(SPARK_HOME)/bin/spark-submit run_nb.py $< build/ $@
 
 tumor_reg_data.ipynb: tumor_reg_data.py
 	jupytext --to notebook $<
