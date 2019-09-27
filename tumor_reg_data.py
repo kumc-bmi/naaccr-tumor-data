@@ -385,7 +385,8 @@ class TumorTable:
 
 # %%
 # TumorTable.valuesets()
-TumorTable.fields().to_csv('pcornet_cdm/fields.csv')
+if IO_TESTING:
+    TumorTable.fields().to_csv('pcornet_cdm/fields.csv')
 TumorTable.fields().loc[380:].head()
 
 # %%
