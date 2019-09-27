@@ -2,9 +2,6 @@ language: python
 python:
   - "3.7"
 install:
-  # TODO: requirements.txt
-  - pip install pyspark pandas luigi pyspark-stubs eliot
-  # pip install jupyter jupytext
-  - pip install mypy flake8 eliot-tree
+  - pip install -r requirements.txt
 script:
   - make
