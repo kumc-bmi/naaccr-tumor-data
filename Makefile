@@ -45,6 +45,11 @@ static-type-deps:
 	pip install
 
 ##
+# Derived requirements.txt
+freeze:
+	sh -c 'pip freeze >/var/spool/requirements.txt'
+
+##
 # Source Archive
 #
 # Turns out github does this automatically. Oh well.
@@ -61,7 +66,7 @@ build/$(ARCHIVE): build
 # ISSUE: user ids, permissions
 docker-check: build/$(ARCHIVE)
 	docker build -t tr-check --build-arg ARCHIVE=$(ARCHIVE) .
-	docker run --rm --name check-$(VERSION) tr-check
+	docker run --rm --name check-$(VERSION) -v /tmp:/var/spool tr-check
 
 ##
 # Integration testing with jupyter notebook

@@ -11,9 +11,7 @@ ARG ARCHIVE
 
 ADD build/${ARCHIVE} .
 
-RUN ls
-
 # ISSUE: refactor overlap with Makefile check_code
 # pymake lacks support for basic x: y dependencies. :-/
 # https://github.com/tqdm/py-make/issues/2
-CMD ["pymake", "doctest", "lint", "static"]
+CMD ["pymake", "doctest", "lint", "static", "freeze"]
