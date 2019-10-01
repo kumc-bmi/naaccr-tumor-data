@@ -108,15 +108,6 @@ join by_item_yr by_item on stats.naaccrId = by_item.naaccrId and stats.dx_yr = b
 join cases on stats.dx_yr = cases.dx_yr
 ;
 
-create or replace temporary view data_char_naaccr as
-select s.sectionId, rl.section, nom.*
-from data_agg_naaccr nom
-join record_layout rl
-  on rl.`naaccr-item-num` = nom.naaccrNum
-join section s
-  on s.section = rl.section
-;
-
 create or replace temporary view nominal_cdf as
 -- Compute cumulative distribution function for each value of each nominal item.
 select dx_yr, naaccrNum, naaccrId, value, freq
@@ -166,7 +157,7 @@ by_item as (
   select dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd
        , present, tumor_qty
        , sum(freq) + (tumor_qty - present) as denominator
-  from data_char_naaccr d
+  from data_agg_naaccr d
   group by dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
 )
 ,
@@ -193,7 +184,7 @@ create or replace temporary view simulated_naaccr as
 with
 by_item as (
   select distinct naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
-  from data_char_naaccr d
+  from data_agg_naaccr d
 )
 ,
 -- for each item of each case, pick a uniformly random percentage and a normally distributed magnitude

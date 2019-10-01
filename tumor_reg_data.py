@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: hydrogen
 #       format_version: '1.2'
-#       jupytext_version: 1.2.3
+#       jupytext_version: 1.2.4
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -55,11 +55,12 @@
 
 # %% {"slideshow": {"slide_type": "skip"}}
 # python 3.7 stdlib
+from functools import reduce
 from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
 from sys import stderr
-from typing import Callable, ContextManager, Dict, Iterator, List
+from typing import Callable, ContextManager, Dict, Iterator, List, Tuple
 from typing import Optional as Opt, Union, cast
 from xml.etree import ElementTree as XML
 import datetime as dt
@@ -552,6 +553,60 @@ IO_TESTING and (naaccr_pivot(ont.ddictDF(_spark),
                              ['rownum'])
                 .limit(3).toPandas())
 
+# %% [markdown]
+# ## Synthetic Tumor Data
+#
+# Since the naaccr-xml test data doesn't supply important items
+# such as class of case, let's synthesize some data.
+
+# %%
+_SQL("select * from data_agg_naaccr where dx_yr = 2017 and naaccrId like 'date%'")
+
+
+# %%
+class SyntheticTumors:
+    script = SqlScript('data_char_sim.sql',
+                       res.read_text(heron_load, 'data_char_sim.sql'),
+                       [('nominal_cdf', []),
+                        ('simulated_case_year', ['data_agg_naaccr', 'simulated_entity']),
+                        ('simulated_naaccr_nom', ['data_agg_naaccr', 'simulated_entity'])])
+
+    @classmethod
+    def make_eav(cls, spark: SparkSession_T, agg: DataFrame,
+                 qty: int = 500,
+                 years: Tuple[int, int] = (2004, 2018)) -> DataFrame:
+        simulated_entity = spark.createDataFrame([(ix,) for ix in range(1, qty)], ['case_index'])
+        to_df = spark.createDataFrame
+
+        views = ont.create_objects(spark, cls.script,
+                                   record_layout=to_df(ont.NAACCR_Layout.fields),
+                                   section=to_df(ont.NAACCR_I2B2.per_section),
+                                   tumor_item_type=to_df(ont.NAACCR_I2B2.tumor_item_type),
+                                   data_agg_naaccr=agg,
+                                   simulated_entity=simulated_entity)
+        return list(views.values())[-1]
+
+    @classmethod
+    def pivot(cls, spark: SparkSession_T, skinny: DataFrame,
+              key_cols: List[str] = ['case_index']) -> DataFrame:
+        ddict = ont.ddictDF(_spark)
+        return naaccr_pivot(ddict, skinny, key_cols)
+
+
+if IO_TESTING:
+    SyntheticTumors.make_eav(
+        _spark,
+        _spark.read.csv('test_data/naaccr_nom_stats.csv',
+                        header=True, inferSchema=True),
+        qty=2000)
+
+# %%
+_SQL('select * from simulated_naaccr_nom limit 500')
+
+# %%
+IO_TESTING and SyntheticTumors.pivot(
+    _spark, _spark.table('simulated_naaccr_nom')).limit(10).toPandas().set_index('case_index')
+
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Flat File v18
 
@@ -604,29 +659,6 @@ if IO_TESTING:
 
 # %% {"slideshow": {"slide_type": "-"}}
 IO_TESTING and non_blank(_extract.limit(5).toPandas())
-
-
-# %% {"slideshow": {"slide_type": "skip"}}
-def cancerIdSample(spark: SparkSession_T, cache: Path_T, tumors: DataFrame,
-                   portion: float = 1.0, cancerID: int = 1) -> DataFrame:
-    """Cancer Identification items from a sample
-
-    """
-    cols = ont.NAACCR_I2B2.tumor_item_type
-    cols = cols[cols.sectionId == cancerID]
-    colnames = cols.naaccrId.values.tolist()
-    # TODO: test data for morphTypebehavIcdO2 etc.
-    colnames = [cn for cn in colnames if cn in tumors.columns]
-    return tumors.sample(False, portion).select(colnames)
-
-
-if False and IO_TESTING:
-    _cancer_id = cancerIdSample(_spark, _cwd / 'naaccr_ddict', _extract)
-
-False and IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
-
-# %% {"slideshow": {"slide_type": "skip"}}
-False and IO_TESTING and _cancer_id.toPandas().describe()
 
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -965,8 +997,7 @@ IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 class DataSummary:
     script = SqlScript('data_char_sim.sql',
                        res.read_text(heron_load, 'data_char_sim.sql'),
-                       [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type']),
-                        ('data_char_naaccr', ['record_layout'])])
+                       [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type'])])
 
     @classmethod
     def stats(cls, tumors_raw: DataFrame, spark: SparkSession_T) -> DataFrame:
@@ -1011,7 +1042,7 @@ _SQL('select * from data_char_naaccr order by sectionId, naaccrNum, value', limi
 
 # %%
 if IO_TESTING:
-    _SQL('select * from data_char_naaccr_nom order by sectionId, naaccrNum, value', limit=None).to_csv(
+    _SQL('select * from data_char_naaccr order by sectionId, naaccrNum, value', limit=None).to_csv(
         _cwd / 'naaccr_export_stats.csv', index=False)
 
 
@@ -1202,12 +1233,76 @@ if DB_TESTING:
 
 DB_TESTING and _patients_mapped.limit(5).toPandas()
 
-
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Use Case: GPC Breast Cancer Survey
 #
 # The NAACCR format has 500+ items. To provide initial focus, let's use
 # the variables from the 2016 GPC breast cancer survey:
+
+# %%
+_SQL('''
+create table concept_dimension as
+select c_fullname as concept_path, c_basecode as concept_cd
+from naaccr_ontology
+where c_basecode is not null
+''')
+if IO_TESTING:
+    _spark.table('concept_dimension').cache()
+
+
+# %%
+def concept_queries(generated_sql: str) -> pd.DataFrame:
+    stmts = generated_sql.split('<*>')
+    qs = pd.DataFrame(dict(stmt=stmts))
+    qs['subq'] = qs.stmt.str.extract(r'\((\s*select concept[^)]*)\)')
+    qs.subq = qs.subq.str.replace('i2b2demodata.', '', regex=False)
+    qs['patt'] = qs.subq.str.extract(r"like '([^']+)'")
+    qs['path'] = qs.patt.str.replace('\\\\', '\\', regex=False).str.replace('%', '')
+    qs.subq = qs.subq.str.replace('\\', '\\\\', regex=False)
+    return qs[~qs.path.isnull()]
+
+
+if IO_TESTING:
+    _qs = concept_queries(res.read_text(bc_qa, 'bc204_generated.sql'))
+IO_TESTING and _qs[['subq', 'path']].head()
+
+# %%
+if IO_TESTING:
+    _to_spark('bc_terms', lambda: _qs[['path']])
+    _qs['df'] = _qs.subq.apply(_spark.sql)
+    _bigq = reduce(lambda acc, next: acc.union(next), _qs.df.values[:3])
+    _qterms = _bigq.toPandas()
+
+IO_TESTING and _qterms
+
+
+# %% [markdown]
+# @@ really? `\\0610 Class of Case\\30 \\%'` with a space after 30?
+#
+# and morph...
+
+# %% {"slideshow": {"slide_type": "skip"}}
+def cancerIdSample(spark: SparkSession_T, tumors: DataFrame,
+                   portion: float = 1.0, cancerID: int = 1) -> DataFrame:
+    """Cancer Identification items from a sample
+
+    """
+    cols = ont.NAACCR_I2B2.tumor_item_type
+    cols = cols[cols.sectionId == cancerID]
+    colnames = cols.naaccrId.values.tolist()
+    # TODO: test data for morphTypebehavIcdO2 etc.
+    colnames = [cn for cn in colnames if cn in tumors.columns]
+    return tumors.sample(False, portion).select(colnames)
+
+
+if IO_TESTING:
+    _cancer_id = cancerIdSample(_spark, _extract)
+
+IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
+
+# %% {"slideshow": {"slide_type": "skip"}}
+IO_TESTING and _cancer_id.toPandas().describe()
+
 
 # %%
 class CancerStudy:
@@ -1223,8 +1318,8 @@ def itemNumOfPath(bc_var: DataFrame,
                   item: str = 'item') -> DataFrame:
     digits = func.regexp_extract('concept_path',
                                  r'\\i2b2\\naaccr\\S:[^\\]+\\(\d+)', 1)
-    items = bc_var.select(digits.cast('int').alias(item))   # TODO: .dropna().distinct()
-    return items.sort(item)
+    items = bc_var.select(digits.cast('int').alias(item)).dropna().distinct()  # type: ignore
+    return items.sort(item)  # type: ignore
 
 
 IO_TESTING and itemNumOfPath(_spark.createDataFrame(
