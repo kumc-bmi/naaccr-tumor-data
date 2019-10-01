@@ -1,4 +1,4 @@
-# NAACCR Tumor Registry v18 Data in i2b2 etc. (WIP)
+# NAACCR Tumor Registry v18 Data in i2b2 etc.
 
 The [NAACCR_ETL][gpc] process used at KUMC and other GPC sites to load
 tumor registry data into [i2b2][] is **outdated by version 18** of the
@@ -11,7 +11,9 @@ our platform and approach:
   - Separate repository from HERON EMR ETL to avoid
     *information blocking* friction
 
-This is very *much work in progress*.
+While various issues remain, it is in production as of the [Sep 2019
+HERON Great Salt Lake
+release](https://bmi-work.kumc.edu/work/blog/2019/09/slug).
 
 ref:
 
@@ -25,7 +27,7 @@ ref:
 
 ## Previous work: KUMC HERON i2b2 NAACCR ETL
 
-  - 2011: HERON i2b2 clinical data warehouse helps KUMC win CTSA award
+  - 2011: [HERON i2b2 clinical data warehouse helps KUMC win CTSA award][bmi-ctsa]
   - 2011: HERON [TumorRegistry][] integration helps KU Med Center win NCI designation
   - 2017: [Using the NAACCR Cancer Registry in i2b2 with HERON
     ETL][2017bos] presented by Dan Connolly at i2b2 tranSMART
@@ -38,8 +40,13 @@ please cite:
     based Clinical Data Repository to Support Research and Quality
     Improvement][RW2011].  AMIA Annu Symp Proc. 2011;2011:1454-63. Epub 2011
     Oct 22.
+  * Rogers AR, Lai S, Keighley J, Jungk J. [The Incidence of Breast
+    Cancer among Disabled Kansans with Medicare][JK15] KJM 2015-08
+
 
 [RW2011]: http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3243191/
+[bmi-ctsa]: https://informatics.kumc.edu/work/blog/2011/06/ctsa-grant-funded
+[JK15]: https://doi.org/10.17161/kjm.v8i3.11526
 
 ---
 
@@ -147,12 +154,29 @@ Metadata for coded values is also work in progress.
 
 ---
 
-### TODO: site-specific factors, primary sites, morphologies
+### Primary sites, morphologies from WHO
 
-We have yet to port / integrate the code from `heron_staging/tumor_reg` that gets
+Maintained by the World Health Organization (WHO)
 
- - primary sites and morphologies from WHO
- - SEER site summary
+ - primary sites: e.g. `C50` for Breast
+   - i2b2 ontology support ported from HERON ETL
+ - morphology: `9800/3` for Leukemia
+   - morphology i2b2 ontology support TODO
+
+---
+
+### SEER Site Recode
+
+ - combines primary site and histology
+ - e.g. `20010` for **Lip**
+ - i2b2 ontology support ported from HERON ETL
+
+---
+
+### site-specific factors
+
+Obsolete in 2018, but to capture data from older cases...
+
  - site-specific factors from cancerstaging.org
    -  added to HERON March 2016; see [GPC ticket 150](https://informatics.gpcnetwork.org/trac/Project/ticket/150)
    - These are obsolete in cases abstracted per v18 but still used in older cases.

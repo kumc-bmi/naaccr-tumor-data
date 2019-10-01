@@ -11,7 +11,7 @@ ojdbc=$HOME/Downloads/ojdbc8.jar
 export PYSPARK_SUBMIT_ARGS="--driver-class-path $ojdbc --jars $ojdbc"
 
 # Luigi expects modules to be installed; help it find sources.
-# ISSUE: use `pip install -e` instead?
+# IDEA: use `pip install -e` instead?
 export PYTHONPATH=$HOME/projects/naaccr-tumor-data
 
 layout anaconda py3tr

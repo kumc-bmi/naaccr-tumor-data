@@ -40,6 +40,12 @@ static-type-deps:
 	pip install
 
 ##
+# TODO, ISSUE markers
+SOURCES=$(shell git ls-tree -r --name-only --full-tree HEAD)
+TODO.md: $(SOURCES)
+	@egrep -n 'TODO:|ISSUE:|@@' $(SOURCES) >$@
+
+##
 # Derived requirements.txt
 freeze:
 	sh -c 'pip freeze >/var/spool/requirements.txt'
