@@ -239,17 +239,20 @@ class DBSession:
         self._tables[name] = df
         return df
 
-    def read_csv(self, access: Path_T) -> 'DataFrame':
-        rel = tab.read_csv(access)
-        gen_name = '_table_%d' % abs(hash(str(rel.raw_data)))  # KLUDGE?
+    def createDataFrame(self, df: tab.DataFrame) -> 'DataFrame':
+        gen_name = '_table_%d' % abs(hash(str(df.data)))  # KLUDGE?
         load_table(self.__conn, gen_name,
-                   header=[col['name'] for col in rel.schema['columns']],
-                   rows=rel.data)
+                   header=[col['name'] for col in df.schema['columns']],
+                   rows=df.data)
         return DataFrame(self, gen_name)
+
+    def read_csv(self, access: Path_T) -> 'DataFrame':
+        df = tab.read_csv(access)
+        return self.createDataFrame(df)
 
 
 def load_table(dest: Connection, table: str,
-               header: List[str], rows: Iterable[List[Opt[tab.Value]]],
+               header: List[str], rows: Iterable[tab.Row],
                batch_size: int = 500) -> None:
     '''Load rows of a table in batches.
     '''
@@ -263,7 +266,7 @@ def load_table(dest: Connection, table: str,
         placeholders=', '.join('?' for _ in header)
     )
     log.debug('%s', stmt)
-    batch = []  # type: List[List[Opt[tab.Value]]]
+    batch = []  # type: List[tab.Row]
 
     def do_batch() -> None:
         work.executemany(stmt, batch)

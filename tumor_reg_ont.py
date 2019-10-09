@@ -2,7 +2,7 @@ from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
     Callable, ContextManager, Dict, Iterator, List, Optional as Opt,
-    Tuple, Union,
+    Sequence, Tuple, Union,
     cast,
 )
 from xml.etree import ElementTree as XML
@@ -10,7 +10,7 @@ import datetime as dt
 import logging
 import zipfile
 
-from mypy_extensions import TypedDict  # ISSUE: dependency?
+from typing_extensions import TypedDict
 
 from sql_script import create_objects, SqlScript, DataFrame, DBSession as SparkSession_T
 import tabular as tab
@@ -159,11 +159,12 @@ class NAACCR_Layout:
     @classmethod
     def item_codes(cls) -> tab.DataFrame:
         ea = cls.iter_codes()
-        return tab.DataFrame(ea, schema=tab.Schema(columns=[
-            tab.Column(number=1, name='naaccrNum', datatype='number', null=[]),
-            tab.Column(number=2, name='naaccrId', datatype='string', null=[]),
-            tab.Column(number=3, name='code', datatype='string', null=[]),
-            tab.Column(number=4, name='desc', datatype='string', null=[''])]))
+        schema: tab.Schema = {'columns': [
+            {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
+            {'number': 2, 'name': 'naaccrId', 'datatype': 'string', 'null': []},
+            {'number': 3, 'name': 'code', 'datatype': 'string', 'null': []},
+            {'number': 4, 'name': 'desc', 'datatype': 'string', 'null': ['']}]}
+        return tab.DataFrame(ea, schema=schema)
 
     @classmethod
     def iter_codes(cls) -> Iterator[List[Opt[tab.Value]]]:
@@ -367,19 +368,27 @@ class NAACCR1:
 def eltSchema(xsd_complex_type: XML.Element,
               simpleContent: bool = False) -> tab.Schema:
     decls = xsd_complex_type.findall('xsd:attribute', XSD.ns)
-    fields = [
-        tab.Column(
-            name=d.attrib['name'],
-            datatype='number' if d.attrib['type'] == 'xsd:integer'
-            else 'boolean' if d.attrib['type'] == 'xsd:boolean' else 'string',
+    xlate: Dict[str, tab.DataType] = {
+        'xsd:integer': 'number',
+        'xsd:boolean': 'boolean',
+    }
+
+    fields: List[tab.Column] = [
+        {
+            'number': ix + 1,
+            'name': d.attrib['name'],
+            'datatype': xlate.get(d.attrib['type'], 'string'),
             # IDEA/YAGNI?: use pd.Categorical for xsd:enumeration
             # e.g. tns:parentType
             # IDEA: metadata=d.attrib
-            null=[] if d.attrib.get('use') == 'required' else [''])
-        for d in decls]
+            'null': [] if d.attrib.get('use') == 'required' else ['']
+        }
+        for (ix, d) in enumerate(decls)]
     if simpleContent:
-        fields = fields + [tab.Column(name='value', datatype='string')]
-    return tab.Schema(columns=fields)
+        v: tab.Column = {'number': len(fields) + 2, 'name': 'value', 'datatype': 'string', 'null': []}
+        fields = fields + [v]
+    out: tab.Schema = {'columns': fields}
+    return out
 
 
 RawRecordMaker = Callable[[XML.Element, bool],
@@ -438,8 +447,7 @@ def ddictDF(spark: SparkSession_T) -> DataFrame:
                  ns=NAACCR1.ns)
 
 
-def _with_path(gen, f: Callable[[Path_T], List]) -> List:
-    # note: Any should be 't
+def _with_path(gen: ContextManager[Path_T], f: Callable[[Path_T], tab.DataFrame]) -> tab.DataFrame:
     with gen as p:
         return f(p)
 
@@ -447,18 +455,16 @@ def _with_path(gen, f: Callable[[Path_T], List]) -> List:
 class LOINC_NAACCR:
     measure = _with_path(res.path(loinc_naaccr, 'loinc_naaccr.csv'),
                          tab.read_csv)
-    measure_cols = ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']
-    measure_struct = tab.Schema(columns=[
-        tab.Column(name=n, datatype='string') for n in measure_cols])
 
     answer = _with_path(res.path(loinc_naaccr, 'loinc_naaccr_answer.csv'),
                         tab.read_csv)
-    answer_struct = tab.Schema([
-        tab.Column(name=n.lower(),
-                   datatype='number' if n.lower() == 'sequence_no'
-                   else 'string')
-        for n in answer.columns
-    ])
+    answer_struct: tab.Schema = {'columns': [
+        {'number': ix + 1,
+         'name': n.lower(),
+         'datatype': 'number' if n.lower() == 'sequence_no' else 'string',
+         'null': []}
+        for (ix, n) in enumerate(answer.columns)
+    ]}
 
 
 class NAACCR_R:
@@ -484,27 +490,27 @@ class NAACCR_R:
     def code_labels(cls,
                     implicit: List[str] = ['iso_country']) -> tab.DataFrame:
         found = []
-        schema = tab.Schema(columns=[
-            tab.Column(number=1, name="code", datatype='string', null=[]),
-            tab.Column(number=2, name="label", datatype='string', null=[]),
-            tab.Column(number=3, name="means_missing", datatype='boolean', null=[]),
-            tab.Column(number=4, name="description", datatype='string', null=[''])])
+        schema: tab.Schema = {'columns': [
+            {'number': 1, 'name': "code", 'datatype': 'string', 'null': []},
+            {'number': 2, 'name': "label", 'datatype': 'string', 'null': []},
+            {'number': 3, 'name': "means_missing", 'datatype': 'boolean', 'null': []},
+            {'number': 4, 'name': "description", 'datatype': 'string', 'null': ['']}]}
         with cls._code_labels() as cl_dir:
             for scheme in cls.field_code_scheme.scheme.unique():
                 if scheme in implicit:
                     continue
-                info = (cl_dir / scheme).with_suffix('.csv')
+                info = (cl_dir / str(scheme)).with_suffix('.csv')
                 skiprows = 0
                 if info.open().readline().startswith('#'):
                     skiprows = 1
                 codes = tab.read_csv(info, schema=schema, skiprows=skiprows)
-                codes['scheme'] = info.stem
+                codes = codes.withColumn('scheme', codes.code.const(info.stem))
                 if 'code' not in codes.columns or 'label' not in codes.columns:
                     raise ValueError((info, codes.columns))
                 found.append(codes)
         all_schemes = tab.concat(found)
         with_fields = cls.field_code_scheme.merge(all_schemes)
-        with_field_info = cls.field_info[['item', 'name']].merge(with_fields)
+        with_field_info = cls.field_info.select('item', 'name').merge(with_fields)
         return with_field_info
 
 
@@ -515,34 +521,42 @@ class OncologyMeta:
 
     @classmethod
     def read_table(cls, cache: Path_T,
-                   zip: str, item: str, names: Opt[List[str]]) -> tab.DataFrame:
+                   zip: str, item: str, names: Opt[Sequence[str]]) -> tab.DataFrame:
+        import csv
+
         archive = zipfile.ZipFile(cache / zip)
 
-        return tab.read_csv(archive.open(item),
-                            header=None if names else 0,
-                            delimiter=',' if item.endswith('.csv') else '\t',
-                            encoding=cls.encoding, names=names)
+        with archive.open(item) as infp:
+            rows = csv.reader(
+                (line.decode(cls.encoding) for line in infp),
+                delimiter=',' if item.endswith('.csv') else '\t')
+            if names is None:
+                names = next(rows)
+            schema: tab.Schema = {'columns': [
+                {'number': ix + 1, 'name': name, 'datatype': 'string', 'null': ['']}
+                for (ix, name) in enumerate(names)]}
+            return tab.DataFrame((row for row in rows), schema)
 
     @classmethod
     def icd_o_topo(cls, topo: tab.DataFrame) -> tab.DataFrame:
         major = topo[topo.Lvl == '3']
-        minor = topo[(topo.Lvl == '4')].copy()
-        minor['major'] = minor.Kode.apply(lambda s: s.split('.')[0])
-        out3 = tab.DataFrame(dict(
-            lvl=3,
+        minor = topo[(topo.Lvl == '4')]
+        minor = minor.withColumn('major', minor.Kode.apply(lambda s: str(s).split('.')[0]))
+        out3 = tab.DataFrame.from_columns(dict(
+            lvl=major.Kode.const(3),
             concept_cd=major.Kode,
-            c_visualattributes='FA',
-            path=major.Kode + '\\',
+            c_visualattributes=major.Koke.const('FA'),
+            path=major.Kode.apply(lambda s: str(s) + '\\'),
             concept_name=major.Title
         ))
-        out4 = tab.DataFrame(dict(
-            lvl=4,
-            concept_cd=minor.Kode.str.replace('.', ''),
-            c_visualattributes='LA',
-            path=minor.major + '\\' + minor.Kode + '\\',
+        out4 = tab.DataFrame.from_columns(dict(
+            lvl=minor.Kode.const(4),
+            concept_cd=minor.Kode.apply(lambda v: str(v).replace('.', '')),
+            c_visualattributes=minor.Kode.const('LA'),
+            path=minor.apply('string', lambda major, Kode, **_: major + '\\' + Kode + '\\'),
             concept_name=minor.Title
         ))
-        return tab.concat([out3, out4], sort=False)
+        return tab.concat([out3, out4])
 
 
 class NAACCR_I2B2(object):
@@ -599,17 +613,17 @@ class NAACCR_I2B2(object):
                    , 'abc' path, 'LIP' concept_path, 'x' concept_name
             ''')
 
-        top = tab.DataFrame([dict(c_hlevel=1,
-                                  c_fullname=cls.top_folder,
-                                  c_name=cls.c_name,
-                                  update_date=update_date,
-                                  sourcesystem_cd=cls.sourcesystem_cd)])
-        answers = to_df(LOINC_NAACCR.answer,
-                        LOINC_NAACCR.answer_struct).cache()
+        top = tab.DataFrame.from_record(dict(
+            c_hlevel=1,
+            c_fullname=cls.top_folder,
+            c_name=cls.c_name,
+            update_date=update_date,
+            sourcesystem_cd=cls.sourcesystem_cd))
+        answers = to_df(LOINC_NAACCR.answer)
         views = create_objects(spark, cls.ont_script,
-                               current_task=to_df([dict(task_id=task_id)]),
+                               current_task=to_df(tab.DataFrame.from_record(dict(task_id=task_id))),
                                naaccr_top=to_df(top),
-                               section=to_df(cls.per_section).cache(),
+                               section=to_df(cls.per_section),
                                tumor_item_type=to_df(cls.tumor_item_type),
                                loinc_naaccr_answers=answers,
                                code_labels=to_df(NAACCR_R.code_labels()),
@@ -640,9 +654,11 @@ class NAACCR_I2B2_Mix(NAACCR_I2B2):
         # @@ LOINC_NAACCR.answers_in(spark)
 
         sec = spark.createDataFrame(cls.per_section)
-        rl = (spark.createDataFrame(NAACCR_Layout.fields)
-              .withColumnRenamed('naaccr-item-num', 'item'))
-        desc = spark.createDataFrame([dict(item=item, source=source)
+        maintained = False
+        if maintained:
+            rl = spark.createDataFrame(
+                NAACCR_Layout.fields.withColumnRenamed('naaccr-item-num', 'item'))  # type: ignore
+        desc = spark.createDataFrame([dict(item=item, source=source)  # type: ignore
                                       for (item, _, source)
                                       in NAACCR_Layout.fields_source()])
         for name, data in [
@@ -657,5 +673,4 @@ class NAACCR_I2B2_Mix(NAACCR_I2B2):
         # create_object(cls.per_item_view,
         #               cls.txform_script,
         #               spark)
-        spark.catalog.cacheTable(cls.per_item_view)
         return spark.table(cls.per_item_view)
