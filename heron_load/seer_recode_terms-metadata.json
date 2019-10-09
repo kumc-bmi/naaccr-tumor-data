@@ -1,0 +1,47 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "hlevel",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "path",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 2
+      },
+      {
+        "name": "name",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 3
+      },
+      {
+        "name": "basecode",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 4
+      },
+      {
+        "name": "visualattributes",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 5
+      }
+    ]
+  }
+}

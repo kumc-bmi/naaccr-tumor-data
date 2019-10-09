@@ -1,0 +1,135 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "c_hlevel",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "c_fullname",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 2
+      },
+      {
+        "name": "c_basecode",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 3
+      },
+      {
+        "name": "c_name",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 4
+      },
+      {
+        "name": "c_visualattributes",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 5
+      },
+      {
+        "name": "m_applied_path",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 6
+      },
+      {
+        "name": "c_tooltip",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 7
+      },
+      {
+        "name": "c_synonym_cd",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 8
+      },
+      {
+        "name": "update_date",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 9
+      },
+      {
+        "name": "sourcesystem_cd",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 10
+      },
+      {
+        "name": "c_dimcode",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 11
+      },
+      {
+        "name": "c_operator",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 12
+      },
+      {
+        "name": "c_columndatatype",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 13
+      },
+      {
+        "name": "c_columnname",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 14
+      },
+      {
+        "name": "c_tablename",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 15
+      },
+      {
+        "name": "c_facttablecolumn",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 16
+      }
+    ]
+  }
+}

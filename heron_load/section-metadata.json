@@ -1,0 +1,23 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "sectionid",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "section",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 2
+      }
+    ]
+  }
+}
