@@ -6,17 +6,13 @@
         "name": "LOINC_NUMBER",
         "datatype": "string",
         "number": 1,
-        "null": [
-          ""
-        ]
+        "null": []
       },
       {
         "name": "COMPONENT",
         "datatype": "string",
         "number": 2,
-        "null": [
-          ""
-        ]
+        "null": []
       },
       {
         "name": "CODE_SYSTEM",
@@ -38,9 +34,7 @@
         "name": "AnswerListId",
         "datatype": "string",
         "number": 5,
-        "null": [
-          ""
-        ]
+        "null": []
       },
       {
         "name": "AnswerListName",
@@ -54,17 +48,13 @@
         "name": "ANSWER_CODE",
         "datatype": "string",
         "number": 7,
-        "null": [
-          ""
-        ]
+        "null": []
       },
       {
         "name": "SEQUENCE_NO",
-        "datatype": "string",
+        "datatype": "number",
         "number": 8,
-        "null": [
-          ""
-        ]
+        "null": []
       },
       {
         "name": "ANSWER_STRING\r\n",
