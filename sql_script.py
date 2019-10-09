@@ -1,6 +1,14 @@
 from typing import Dict, Iterable, List, Optional as Opt, Text, Tuple, Union
-import re
+from importlib import resources as res
+from pathlib import Path as Path_T
+from sqlite3 import Connection
 import datetime as dt
+import logging
+import re
+
+import tabular as tab
+
+log = logging.getLogger(__name__)
 
 Name = Text
 SQL = Text
@@ -208,3 +216,169 @@ def to_qmark(sql: SQL, params: Params) -> Tuple[SQL, List[BindValue]]:
         done = ref.end()
     out += sql[done:]
     return out, values
+
+
+class DBSession:
+    """a la SparkSession, but using python stdlib only
+    """
+
+    def __init__(self, conn: Connection) -> None:
+        self._tables = {}  # type: Dict[str, DataFrame]
+        self.__conn = conn
+
+    def __setitem__(self, k: str, v: 'DataFrame') -> None:
+        self._tables[k] = v
+
+    def table(self, k: str) -> 'DataFrame':
+        return self._tables[k]
+
+    def sql(self, code: str) -> 'DataFrame':
+        _c, _o, _r, _v, name, _ = code.split(None, 6)
+        self.__conn.execute(code)
+        df = DataFrame(self, name)
+        self._tables[name] = df
+        return df
+
+    def read_csv(self, access: Path_T) -> 'DataFrame':
+        rel = tab.read_csv(access)
+        gen_name = '_table_%d' % abs(hash(str(rel.raw_data)))  # KLUDGE?
+        load_table(self.__conn, gen_name,
+                   header=[col['name'] for col in rel.schema['columns']],
+                   rows=rel.data)
+        return DataFrame(self, gen_name)
+
+
+def load_table(dest: Connection, table: str,
+               header: List[str], rows: Iterable[List[Opt[tab.Value]]],
+               batch_size: int = 500) -> None:
+    '''Load rows of a table in batches.
+    '''
+    log.info('loading %s', table)
+    work = dest.cursor()
+    stmt = """
+      insert into "{table}" ({header})
+      values ({placeholders})""".format(
+        table=table,
+        header=', '.join(f'"{col}"' for col in header),
+        placeholders=', '.join('?' for _ in header)
+    )
+    log.debug('%s', stmt)
+    batch = []  # type: List[List[Opt[tab.Value]]]
+
+    def do_batch() -> None:
+        work.executemany(stmt, batch)
+        log.info('inserted %s rows into %s', len(batch), table)
+        del batch[:]
+
+    for row in rows:
+        if row:  # skip blank row at end
+            batch.append(row)
+        if len(batch) >= batch_size:
+            do_batch()
+    if batch:
+        do_batch()
+    dest.commit()
+
+
+class DataFrame:
+    """a la pandas or Spark DataFrame, but using python stdlib only
+    """
+    def __init__(self, ctx: DBSession, label: str) -> None:
+        self.__ctx = ctx
+        self.label = label
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.label})'
+
+    def createOrReplaceTempView(self, name: str) -> None:
+        self.__ctx[name] = self
+
+
+class _TestData:
+    per_item_view = 'tumor_item_type'
+    import heron_load
+
+    ont_script = SqlScript(
+        'naaccr_concepts_load.sql',
+        res.read_text(heron_load, 'naaccr_concepts_load.sql'),
+        [
+            ('i2b2_path_concept', []),
+            ('naaccr_top_concept', ['naaccr_top', 'current_task']),
+            ('section_concepts', ['section', 'naaccr_top']),
+            ('item_concepts', [per_item_view]),
+            ('code_concepts', [per_item_view, 'loinc_naaccr_answers', 'code_labels']),
+            ('primary_site_concepts', ['icd_o_topo']),
+            # TODO: morphology
+            ('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
+            ('site_schema_concepts', ['cs_terms']),
+            ('naaccr_ontology', []),
+        ])
+
+
+def create_objects(spark: DBSession, script: SqlScript,
+                   **kwargs: DataFrame) -> Dict[str, DataFrame]:
+    """Run SQL create ... statements given DFs for input views.
+
+    >>> spark = MockCTX()
+    >>> create_objects(spark, _TestData.ont_script,
+    ...     current_task=MockDF(spark, 'current_task'),
+    ...     naaccr_top=MockDF(spark, 'naaccr_top'),
+    ...     section=MockDF(spark, 'section'),
+    ...     loinc_naaccr_answers=MockDF(spark, 'lna'),
+    ...     code_labels=MockDF(spark, 'code_labels'),
+    ...     icd_o_topo=MockDF(spark, 'icd_o_topo'),
+    ...     seer_site_terms=MockDF(spark, 'site_terms'),
+    ...     cs_terms=MockDF(spark, 'cs_terms'),
+    ...     tumor_item_type=MockDF(spark, 'ty'))
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    {'i2b2_path_concept': MockDF(i2b2_path_concept),
+     'naaccr_top_concept': MockDF(naaccr_top_concept),
+     'section_concepts': MockDF(section_concepts),
+     ...}
+    """
+    # IDEA: use a contextmanager for temp views
+    for key, df in kwargs.items():
+        df = kwargs[key]
+        log.info('%s: %s = %s', script.name, key, df)
+        df.createOrReplaceTempView(key)  # ISSUE: don't replace?
+    provided = set(kwargs.keys())
+    out = {}
+    for name, ddl, inputs in script.objects:
+        missing = set(inputs) - provided
+        if missing:
+            raise TypeError(missing)
+        log.info('%s: create %s', script.name, name)
+        spark.sql(ddl)
+        df = spark.table(name)
+        df.createOrReplaceTempView(name)  # ISSUE: don't replace?
+        out[name] = df
+    return out
+
+
+class MockCTX(DBSession):
+    def __init__(self) -> None:
+        self._tables = {}  # type: Dict[str, DataFrame]
+
+    def __setitem__(self, k: str, v: DataFrame) -> None:
+        self._tables[k] = v
+
+    def table(self, k: str) -> DataFrame:
+        return self._tables[k]
+
+    def sql(self, code: str) -> DataFrame:
+        _c, _o, _r, _t, _v, name, _ = code.split(None, 6)
+        df = MockDF(self, name)
+        self._tables[name] = df
+        return df
+
+
+class MockDF(DataFrame):
+    def __init__(self, ctx: MockCTX, label: str) -> None:
+        self.__ctx = ctx
+        self.label = label
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.label})'
+
+    def createOrReplaceTempView(self, name: str) -> None:
+        self.__ctx[name] = self
