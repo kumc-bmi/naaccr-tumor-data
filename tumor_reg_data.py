@@ -45,7 +45,13 @@
 # [jupytext]: https://github.com/mwouts/jupytext
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
-# ## Platform for v18: Spark SQL, PySpark, and luigi
+# ## Platform for v18: python3, JVM (WIP)
+#
+# **ISSUE:** Spark SQL is overkill for O(100,000) records x O(1000) columns.
+# Even pandas is probably not necessary other than notebook formatting.
+# Let's see if we can do all the pivoting and ontology building with sqlite3.
+# Then we can make a little ant job with a groovy or JS script to shove
+# the results into the DB with JDBC.
 #
 #  - [python 3.7 standard library](https://docs.python.org/3/library/index.html)
 #  - [pyspark.sql API](https://spark.apache.org/docs/latest/api/python/pyspark.sql.html)
@@ -59,6 +65,7 @@ from functools import reduce
 from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
+from sqlite3 import connect as connect_mem
 from sys import stderr
 from typing import Callable, ContextManager, Dict, Iterator, List, Tuple
 from typing import Optional as Opt, Union, cast
@@ -68,14 +75,17 @@ import logging
 import re
 
 
-# %% {"slideshow": {"slide_type": "-"}}
-from pyspark.sql import SparkSession as SparkSession_T, Window
-from pyspark.sql import types as ty, functions as func
-from pyspark.sql.dataframe import DataFrame
-from pyspark import sql as sq
-import pandas as pd  # type: ignore
-import numpy as np   # type: ignore
-import pyspark
+# %% [markdown]
+# The tabular module provides a pandas-like DataFrame API using the [W3C Tabular Data model](https://www.w3.org/TR/tabular-data-primer/).
+
+# %%
+import tabular as tab
+
+# %% [markdown]
+# We also have utilities for running SQL from files. The resulting DataFrames "remember" which SQL DB they came from.
+
+# %%
+from sql_script import SqlScript, DBSession, DataFrame
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # We incorporate materials from the
@@ -87,35 +97,30 @@ import naaccr_xml_samples
 import bc_qa
 
 # %% {"slideshow": {"slide_type": "fragment"}}
-from sql_script import SqlScript
 import tumor_reg_ont as ont
 import heron_load
 
 
-# %% {"slideshow": {"slide_type": "fragment"}}
-log = logging.getLogger(__name__)
-
-
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
-# ### Integration Testing: local files, Spark / Hive metastore
+# ### Integration Testing: local files, ... (WIP)
 
 # %% [markdown]
 # For integration testing (`IO_TESTING`)
 # we set aside [ocap discipline](CONTRIBUTING.md#OCap-discipline).
-# Notebook-level globals such as `_spark` and `_cwd` use a leading underscore.
-# The `spark` global is available when we use `pyspark`.
-# Otherwise, we make it using techniques from
-# [Spark SQL Getting Started](https://spark.apache.org/docs/latest/sql-getting-started.html).
+# Notebook-level globals such as `_cwd` use a leading underscore.
 
 # %% {"slideshow": {"slide_type": "skip"}}
 # In a notebook context, we have `__name__ == '__main__'`.
 IO_TESTING = __name__ == '__main__'
 
+log = logging.getLogger(__name__)
+
 if IO_TESTING:
+    import pandas as pd
+
     logging.basicConfig(level=logging.INFO, stream=stderr)
     log.info('tumor_reg_data using: %s', dict(
         pandas=pd.__version__,
-        pyspark=pyspark.__version__,  # type: ignore
     ))
 
     def _get_cwd() -> Path_T:
@@ -125,41 +130,20 @@ if IO_TESTING:
     _cwd = _get_cwd()
     log.info('cwd: %s', _cwd.resolve())
 
-# %% {"slideshow": {"slide_type": "skip"}}
-_spark = cast(SparkSession_T, None)  # for static type checking outside IO_TESTING
-
-if IO_TESTING:
-    # PYSPARK_DRIVER_PYTHON=jupyter PYSPARK_DRIVER_PYTHON_OPTS=notebook pyspark ...
-    if 'spark' in globals():
-        _spark = spark  # type: ignore  # noqa
-        del spark       # type: ignore
-    else:
-        def _make_spark_session(appName: str = "tumor_reg_data") -> SparkSession_T:
-            from pyspark.sql import SparkSession
-
-            return SparkSession \
-                .builder \
-                .appName(appName) \
-                .getOrCreate()
-        _spark = _make_spark_session()
-
-    log.info('spark web UI: %s', _spark.sparkContext.uiWebUrl)
-
-# %% {"slideshow": {"slide_type": "-"}}
-IO_TESTING and _spark
-
-
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
-# ### Spark SQL
+# ### In-memory SQL
 #
-# The `_SQL` utility uses our `_spark` session in `IO_TESTING` mode.
-# We also have `_to_spark` and `_to_view` for
-# importing pandas and spark DataFrames into the session.
+# The `_SQL` utility uses an in-memory sqlite3 database.
 
 # %% {"slideshow": {"slide_type": "skip"}}
-def _to_spark(name: str, compute: Callable[[], pd.DataFrame],
+if IO_TESTING:
+    _spark = DBSession(connect_mem(':memory:'))
+    from tumor_reg_ont import _with_path
+
+
+def _to_spark(name: str, compute: Callable[[], tab.DataFrame],
               cache: bool = False) -> Opt[DataFrame]:
-    """Compute pandas data locally and save as spark view"""
+    """Compute data locally and save as SQL view"""
     if not IO_TESTING:
         return None
     df = _spark.createDataFrame(compute())
@@ -176,45 +160,31 @@ def _to_view(name: str, compute: Callable[[], DataFrame],
         return None
     df = compute()
     df.createOrReplaceTempView(name)
-    if cache:
-        df.cache()
     return df
 
 
-def _SQL(sql: str,
-         index: Opt[str] = None,
-         limit: Opt[int] = 5) -> pd.DataFrame:
-    """Run Spark SQL query and display results using .toPandas()"""
-    if not IO_TESTING:
-        return None
-    df = _spark.sql(sql)
-    if limit is not None:
-        df = df.limit(limit)
-    pdf = df.toPandas()
+def _to_pd(df: tab.DataFrame,
+           index: Opt[str] = None):
+    pdf = pd.DataFrame.from_records((row for (_, row) in df.iterrows()),
+                                    columns=df.columns)
     if index is not None:
         pdf = pdf.set_index(index)
     return pdf
 
 
-# %% {"slideshow": {"slide_type": "-"}}
-_to_spark('t1', lambda: pd.DataFrame([(x, x * x) for x in range(10)], columns=['x', 'y']))
-_SQL('select * from t1', index='x', limit=4)
+def _SQL(sql: str,
+         index: Opt[str] = None,
+         limit: Opt[int] = 5):
+    """Run SQL query and display results using Pandas dataframe"""
+    if not IO_TESTING:
+        return None
+    if limit and limit is not None:
+        sql = f'select * from ({sql}) limit {limit}'
+    df = _spark.sql(sql)
+    return _to_pd(df, index)
 
-
-# %% [markdown] {"slideshow": {"slide_type": "skip"}}
-# Spark logs can be extremely verbose (especially when running this notebook in batch mode).
-
-# %% {"slideshow": {"slide_type": "skip"}}
-def quiet_logs(spark: SparkSession_T) -> None:
-    sc = spark.sparkContext
-    # ack: FDS Aug 2015 https://stackoverflow.com/a/32208445
-    logger = sc._jvm.org.apache.log4j  # type: ignore
-    logger.LogManager.getLogger("org"). setLevel(logger.Level.WARN)
-    logger.LogManager.getLogger("akka").setLevel(logger.Level.WARN)
-
-
-if IO_TESTING:
-    quiet_logs(_spark)
+_to_spark('section', lambda: _with_path(res.path(heron_load, 'section.csv'), tab.read_csv))
+_SQL('select * from section', index='sectionid', limit=4)
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Data Dictionary Items
@@ -225,14 +195,13 @@ if IO_TESTING:
 # grouping of items into sections:
 
 # %%
-_to_spark('ndd180', lambda: pd.DataFrame(ont.NAACCR1.items_180()))
+_to_spark('ndd180', lambda: tab.DataFrame.from_records(ont.NAACCR1.items_180()))
 _SQL('''select * from ndd180 where naaccrNum between 400 and 500''',
      index='naaccrNum')
 
 # %%
 _to_spark('record_layout',
-          lambda: pd.DataFrame(ont.NAACCR_Layout.fields,
-                               columns=ont.NAACCR_Layout.fields[0].keys()))
+          lambda: tab.DataFrame.from_records(ont.NAACCR_Layout.fields))
 _SQL("select * from record_layout where `naaccr-item-num` between 400 and 500",
      index='naaccr-item-num')
 
@@ -243,10 +212,10 @@ _SQL("select * from record_layout where `naaccr-item-num` between 400 and 500",
 # to determine i2b2's notion of datatype called `valtype_cd`:
 
 # %% {"slideshow": {"slide_type": "-"}}
-IO_TESTING and pd.DataFrame.from_records(
-    [('@', 'nominal'), ('N', 'numeric'), ('D', 'date'), ('T', 'text')],
-    columns=['valtype_cd', 'description'],
-    index='valtype_cd')
+IO_TESTING and _to_pd(tab.DataFrame.from_records(
+    dict(valtype_cd=cd, description=desc)
+    for (cd, desc) in
+    [('@', 'nominal'), ('N', 'numeric'), ('D', 'date'), ('T', 'text')]))
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## Curated `valtype_cd`
@@ -299,19 +268,38 @@ where nd.naaccrNum is null
 
 # %% {"slideshow": {"slide_type": "-"}}
 _SQL('''
-select naaccrId, length, count(distinct valtype_cd), collect_list(valtype_cd)
+select naaccrId, length, count(distinct valtype_cd), group_concat(valtype_cd, ',')
 from tumor_item_type
 group by naaccrId, length
 having count(distinct valtype_cd) > 1
 ''', limit=None)
-
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## PCORNet CDM Field Types
 #
 # We can generate PCORNet CDM style type information from `valtype_cd` and such.
 
-# %% {"slideshow": {"slide_type": "skip"}}
+# %%
+import sql_script
+item_codes_ddl = sql_script.table_ddl('item_codes', ont.NAACCR_Layout.item_codes().schema)
+print(item_codes_ddl)
+
+# %%
+from pprint import pprint
+
+import sqlite3
+conn1 = sqlite3.connect(':memory:')
+
+conn1.cursor().execute(item_codes_ddl)
+
+with sql_script.txn(conn1) as tx1:
+    tx1.execute('''insert into item_codes (naaccrId, code) values (?, ?)''',
+                [40, '0000000000'])
+    tx1.execute('select * from item_codes')
+    pprint(tx1.fetchmany(10))
+
+
+# %%
 def upper_snake_case(camel: str) -> str:
     """
     >>> upper_snake_case('dateOfBirth')
@@ -320,75 +308,112 @@ def upper_snake_case(camel: str) -> str:
     return re.sub('([A-Z])', r'_\1', camel).upper()
 
 
-class TumorTable:
-    @classmethod
-    def valuesets(cls) -> pd.DataFrame:
-        ea = ont.NAACCR_Layout.item_codes().reset_index(drop=True)
-        return pd.DataFrame(dict(
-            TABLE='TUMOR',
-            FIELD_NAME=ea.naaccrId.apply(upper_snake_case),
-            VALUESET_ITEM=ea.code,
-            VALUESET_ITEM_DESCRIPTOR=ea.code + '=' + ea.desc,
-            VALUESET_ITEM_ORDER=ea.index + 1,
-            naaccrNum=ea.naaccrNum
-        ))
+class GroupConcatOrd:
+    # XXX dead code except for upper_snake_case...
+    def __init__(self) -> None:
+        self.parts = []  # type: List[str]
+        self.sep = ','
+
+    def step(self, sep: str, part: str) -> None:
+        self.sep = sep
+        if not isinstance(part, str):
+            print("@@not str:", part)
+        self.parts.append(part)
+
+    def finalize(self) -> str:
+        value = self.sep.join(sorted(self.parts))
+        return value
 
     @classmethod
-    def fields(cls) -> pd.DataFrame:
-        ty = ont.NAACCR_I2B2.tumor_item_type
-        decode_rdb = {
-            'N': 'Number',
-            '@': 'Text',
-            'T': 'Text',
-            'D': 'Date',
-        }
-        decode_sas = {
-            'N': 'Numeric',
-            '@': 'Char',
-            'T': 'Char',
-            'D': 'Date',
-        }
-        ty = ty[ty.valtype_cd.isin(decode_rdb.keys())]
-        size = ty.length.apply(lambda l: '(%d)' % l)
-        rdb_ty = ty.valtype_cd.apply(decode_rdb.get)
-        sas_ty = ty.valtype_cd.apply(decode_sas.get)
-        rdb_ty = rdb_ty + np.where(ty.valtype_cd == 'D', '', size)
-        sas_ty = sas_ty + np.where(ty.valtype_cd == 'D', ' (Numeric)', size)
+    def custom_mem_db(cls,
+                      name='group_concat_ord'):
+        from sqlite3 import connect as connect_mem  # no file I/O
+        conn = connect_mem(':memory:')
+        conn.create_aggregate(name, 2, GroupConcatOrd)
+        conn.create_function('upper_snake_case', 1, upper_snake_case)
+        return conn
 
-        fields = pd.DataFrame(dict(
-            item=ty.naaccrNum,
-            # name=ty.naaccrName,
-            # xmlId=ty.naaccrId,
-            TABLE_NAME='TUMOR',
-            FIELD_NAME=ty.naaccrId.apply(upper_snake_case),
-            RDBMS_DATA_TYPE='RDBMS ' + rdb_ty,
-            SAS_DATA_TYPE='SAS ' + sas_ty,
-            DATA_FORMAT='LOINC scale ' + ty.scale_typ,
-            REPLICATED_FIELD='NO',
-            UNIT_OF_MEASURE=np.where(ty.valtype_cd == 'D', 'DATE', ''),
-            VALUESET='',
-            VALUESET_DESCRIPTOR='',
-            FIELD_DEFINITION='',
-            FIELD_ORDER=1,
-        ))
-        fields = fields.set_index('item').sort_index()
-        fields['FIELD_ORDER'] = fields.reset_index().index + 1
+ctx = DBSession(GroupConcatOrd.custom_mem_db())
+df = ctx.createDataFrame(ont.NAACCR_Layout.item_codes())
+df.createOrReplaceTempView('item_codes')
+_to_pd(ctx.sql('''
+select naaccrNum, upper_snake_case('itemType') as FIELD_NAME, group_concat_ord(';', '' || code) as valueset
+from item_codes
+group by naaccrNum
+order by naaccrNum
+limit 3
+'''))
 
-        desc = pd.DataFrame(ont.NAACCR_Layout.iter_description(),
-                            columns=['naaccrNum', 'naaccrId', 'description']).set_index('naaccrNum')
-        fields['FIELD_DEFINITION'] = desc.description
+# %%
+ctx.createDataFrame(tab.DataFrame(
+        ont.NAACCR_Layout.iter_description(),
+        schema={'columns': [
+            {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
+            {'number': 3, 'name': 'description', 'datatype': 'string', 'null': ['']}]}
+    )).createOrReplaceTempView('ch10')
+ctx.sql('select * from ch10')
 
-        vals = cls.valuesets().groupby(['naaccrNum'])
-        fields['VALUESET'] = vals.VALUESET_ITEM.apply(';'.join)
-        fields['VALUESET_DESCRIPTOR'] = vals.VALUESET_ITEM_DESCRIPTOR.apply(';'.join)
-        return fields
+# %%
+_to_spark('item_codes', lambda: ont.NAACCR_Layout.item_codes())
+_SQL('select * from item_codes')
 
+# %%
+ctx.createDataFrame(ont.NAACCR_I2B2.tumor_item_type).createOrReplaceTempView('tumor_item_type')
+
+# %%
+fields = ctx.sql('''
+select 'TUMOR' as TABLE_NAME
+     , ty.naaccrNum as item
+     , upper_snake_case(naaccrId) as FIELD_NAME
+     , 'RDBMS ' || (case valtype_cd
+        when 'N' then 'Number'
+        when '@' then 'Text'
+        when 'T' then 'Text'
+        when 'D' then 'Date' end) ||
+        (case when valtype_cd == 'D' then '' else '(' || length || ')' end)
+        as RDBMS_DATA_TYPE
+     , 'SAS ' || (case valtype_cd
+        when 'N' then 'Numeric'
+        when '@' then 'Char'
+        when 'T' then 'Char'
+        when 'D' then 'Date' end) ||
+        (case when valtype_cd == 'D' then ' (Numeric)' else '(' || length || ')' end)
+        as SAS_DATA_TYPE
+     , 'LOINC scale ' || scale_typ as DATA_FORMAT
+     , 'NO' as REPLICATED_FIELD
+     , case when valtype_cd = 'D' then 'DATE' else null end as UNIT_OF_MEASURE
+     , VALUESET
+     , VALUESET_DESCRIPTOR
+     , ch10.description as FIELD_DEFINITION
+     , row_number() over (order by ty.naaccrNum) FIELD_ORDER
+from tumor_item_type ty
+left join ch10 on ch10.naaccrNum = ty.naaccrNum
+left join (
+  select naaccrNum
+       , group_concat('' || code, ';') as VALUESET
+       , group_concat('' || code || '=' || desc, ';')as VALUESET_DESCRIPTOR
+  from item_codes
+  where code is not null
+  group by naaccrNum
+) vs on vs.naaccrNum = ty.naaccrNum
+where valtype_cd in ('N', '@', 'T', 'D')
+order by ty.naaccrNum
+''')
+
+_to_pd(fields, index='item')
 
 # %%
 # TumorTable.valuesets()
 if IO_TESTING:
-    TumorTable.fields().to_csv('pcornet_cdm/fields.csv')
-TumorTable.fields().loc[380:].head()
+    _to_pd(fields).set_index('item').to_csv('pcornet_cdm/fields.csv')
+_to_pd(fields, index='item').loc[380:].head()
+
+# %%
+_SQL('''
+select *
+from item_codes
+where naaccrNum = 40
+''')
 
 # %%
 pd.DataFrame(ont.NAACCR_Layout.iter_description(),
