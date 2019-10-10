@@ -1,3 +1,32 @@
+"""
+
+Treat a database table as a DataFrame:
+
+    >>> from sqlite3 import connect as connect_mem
+    >>> conn = connect_mem(':memory:')
+    >>> conn.execute('create table t1 as select 1 as c1') and None
+    >>> ctx = DBSession(conn)
+    >>> DataFrame.select_from(ctx, 't1')
+    DataFrame({'c1': 'number'})
+
+Load CSV into a database table and select from it:
+
+    >>> import heron_load
+    >>> ctx = DBSession(connect_mem(':memory:'))
+    >>> with res.path(heron_load, 'section.csv') as p:
+    ...     df = ctx.createDataFrame(tab.read_csv(p))
+    ...     print(df)
+    ...     for ix, row in df.iterrows():
+    ...         if ix >= 3:
+    ...             break
+    ...         print(row)
+    DataFrame({'sectionid': 'number', 'section': 'string'})
+    (1, 'Cancer Identification')
+    (2, 'Demographic')
+    (3, 'Edit Overrides/Conversion History/System Admin')
+
+"""
+
 from typing import Dict, List, Optional as Opt, Text, Tuple, Union
 from typing import Iterator, Iterable
 from contextlib import contextmanager
@@ -232,11 +261,12 @@ class DBSession:
 
     def sql(self, code: str) -> 'DataFrame':
         if code.lower().strip().startswith('select '):
-            return DataFrame(self, f'({code})')
+            return DataFrame.select_from(self, f'({code})')
+
         with txn(self.__conn) as work:  # type: Cursor
             log.debug('DBSession.sql: %s', code)
             work.execute(code)
-        return DataFrame(self, '(select 1 as c)')
+        return DataFrame.select_from(self, '(select 1 as _dummy)')
 
     @contextmanager
     def _query(self, sql: str) -> Iterator[Cursor]:
@@ -253,7 +283,7 @@ class DBSession:
         load_table(self.__conn, gen_name,
                    header=[col['name'] for col in df.schema['columns']],
                    rows=(row for (_, row) in df.iterrows()))
-        return DataFrame(self, gen_name)
+        return DataFrame.select_from(self, gen_name)
 
     def read_csv(self, access: Path_T) -> 'DataFrame':
         df = tab.read_csv(access)
@@ -313,13 +343,18 @@ def load_table(dest: Connection, table: str,
 class DataFrame(tab.DataFrame):
     """a la pandas or Spark DataFrame, based on a sqlite3 table
     """
-    def __init__(self, ctx: DBSession, table: str) -> None:
+    def __init__(self, ctx: DBSession, table: str, schema: tab.Schema) -> None:
+        tab.DataFrame.__init__(self, [], schema)
         self.__ctx = ctx
         self.table = table
-        self.schema = {'columns': []}  # KLUDGE?
 
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.table})'
+    @classmethod
+    def select_from(cls, ctx: DBSession, table: str) -> 'DataFrame':
+        with ctx._query(f'select * from {table} limit 1') as q:
+            row = q.fetchone()
+            record = dict(zip((d[0] for d in q.description), row))
+            schema = tab.DataFrame.from_record(record).schema
+        return DataFrame(ctx, table, schema)
 
     def iterrows(self) -> Iterator[Tuple[int, tab.Row]]:
         ix = 0
