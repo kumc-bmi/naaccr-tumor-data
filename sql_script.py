@@ -353,7 +353,7 @@ class DataFrame(tab.DataFrame):
         with ctx._query(f'select * from {table} limit 1') as q:
             row = q.fetchone()
             record = dict(zip((d[0] for d in q.description), row))
-            schema = tab.DataFrame.from_record(record).schema
+            schema = tab.DataFrame.from_records([record]).schema
         return DataFrame(ctx, table, schema)
 
     def iterrows(self) -> Iterator[Tuple[int, tab.Row]]:

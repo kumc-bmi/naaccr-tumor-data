@@ -626,14 +626,14 @@ class NAACCR_I2B2(object):
                    , 'abc' path, 'LIP' concept_path, 'x' concept_name
             ''')
 
-        top = tab.DataFrame.from_record(dict(
+        top = tab.DataFrame.from_records([dict(
             c_hlevel=1,
             c_fullname=cls.top_folder,
             c_name=cls.c_name,
             update_date=update_date,
-            sourcesystem_cd=cls.sourcesystem_cd))
+            sourcesystem_cd=cls.sourcesystem_cd)])
         answers = to_df(LOINC_NAACCR.answer)
-        current_task = tab.DataFrame.from_record(dict(task_id=task_id))
+        current_task = tab.DataFrame.from_records([dict(task_id=task_id)])
         views = create_objects(spark, cls.ont_script,
                                current_task=to_df(current_task),
                                naaccr_top=to_df(top),

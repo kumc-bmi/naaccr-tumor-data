@@ -1,9 +1,51 @@
 """tabular -- DataFrame API for tabular data
 
-This provides features of the DataFrame APIs from pandas and pyspark
-but using only the python3 standard library.
+Script usage
+~~~~~~~~~~~~
+
+To produce `a-metadata.json` etc. (or to add missing number, null
+info):
+
+  python tabular.py a.csv b.csv c.csv ...
 
 ref https://www.w3.org/TR/tabular-data-primer/#datatypes
+
+DataFrame API
+~~~~~~~~~~~~~
+
+This provides some features of the DataFrame APIs from pandas and
+pyspark but using only the python3 standard library, mostly with the
+goal of getting data from CSV and XML files into sqlite where more
+advanced transformations are well supported. (See sql_script.py)
+
+Note datatypes taken from metadata:
+
+    >>> from importlib import resources as res
+    >>> import heron_load
+    >>> with res.path(heron_load, 'section.csv') as sp:
+    ...     df = read_csv(sp)
+    >>> df
+    DataFrame({'sectionid': 'number', 'section': 'string'})
+
+Note the printed representation has only schema info, as in spark,
+rather than the data, as in pandas. To get the data, use `iterrows` as
+in pandas:
+
+    >>> for ix, row in df.iterrows():
+    ...     if ix >= 3:
+    ...         break
+    ...     print(row)
+    [1, 'Cancer Identification']
+    [2, 'Demographic']
+    [3, 'Edit Overrides/Conversion History/System Admin']
+
+Metadata can also be determined from values:
+
+    >>> DataFrame.from_records([dict(id=1, name='Pete')])
+    DataFrame({'id': 'number', 'name': 'string'})
+
+(Oops; I think `from_records` in pandas actually takes tuples, not
+dicts)
 
 """
 
@@ -13,6 +55,7 @@ from typing_extensions import Literal, TypedDict
 from pathlib import Path as Path_T
 import csv
 import datetime as dt
+import itertools
 import json
 import logging
 
@@ -71,24 +114,33 @@ class DataFrame:
         return DataFrame(data, schema)
 
     @classmethod
-    def from_record(cls, record: Dict[str, Opt[Value]]) -> 'DataFrame':
-        return cls.from_columns({name: Seq.from_value(val, name=name)
-                                 for name, val in record.items()})
+    def from_records(cls, records: Iterable[Dict[str, Opt[Value]]]) -> 'DataFrame':
+        """
+        Note: we assume all records have the same keys and the 1st record has no nulls.
+        """
+        reciter = iter(records)
+        r0 = next(reciter)
+        data = (list(r.values()) for r in itertools.chain([r0], reciter))
+        columns = [Seq.column_of(val, name=name, number=ix + 1)
+                   for (ix, (name, val)) in enumerate(r0.items())]
+        return cls(data, {'columns': columns})
 
-    def apply(self, dt: DataType, f: Callable[..., Opt[Value]]) -> 'Seq':
+    def apply(self, dty: DataType, f: Callable[..., Opt[Value]]) -> 'Seq':
         names = self.columns
         data: List[Row] = [[f(**dict(zip(names, row)))] for (_, row) in self.iterrows()]
-        column: Column = {'number': 1, 'name': '_', 'datatype': dt, 'null': ['']}
+        column: Column = {'number': 1, 'name': '_', 'datatype': dty, 'null': ['']}
         return Seq(column, data)
 
     def withColumn(self, name: str, seq: 'Seq') -> 'DataFrame':
+        df = self.drop([name]) if name in self.columns else self
+
         data = [list(row) + [value]
-                for (row, value) in zip(self._data, seq.values)]
+                for (row, value) in zip(df._data, seq.values)]
         col: Column = {'number': len(data[0]),
                        'name': name,
-                       'datatype': 'string',
-                       'null': []}
-        schema: Schema = {'columns': self.schema['columns'] + [col]}
+                       'datatype': seq.column['datatype'],
+                       'null': seq.column['null']}
+        schema: Schema = {'columns': df.schema['columns'] + [col]}
         return DataFrame(data, schema)
 
     def withColumnRenamed(self, old: str, new: str) -> 'DataFrame':
@@ -99,9 +151,14 @@ class DataFrame:
         return DataFrame(self._data, schema)
 
     def select(self, *names: str) -> 'DataFrame':
-        """i.e. project (but following pyspark API)"""
-        schema = Schema(columns=[col for col in self.schema['columns']
-                                 if col['name'] in names])
+        """i.e. project (but following pyspark API)
+
+        Take care with column order:
+        >>> df = DataFrame.from_records([dict(a=1, b=2)])
+        >>> df.select('b', 'a')
+        DataFrame({'b': 'number', 'a': 'number'})
+        """
+        schema = Schema(columns=[self.byName[n] for n in names])
         return DataFrame(self._data, schema)
 
     def drop(self, names: List[str]) -> 'DataFrame':
@@ -111,6 +168,19 @@ class DataFrame:
 
     def __getitem__(self, which: Iterable[bool]) -> 'DataFrame':
         data = [row for (ok, row) in zip(which, self._data) if ok]
+        return DataFrame(data, self.schema)
+
+    def head(self, qty: int = 5) -> 'DataFrame':
+        return DataFrame(self._data[:qty], self.schema)
+
+    def filter(self, f: Callable[..., bool]) -> 'DataFrame':
+        names = self.columns
+        ok = (f(**dict(zip(names, row))) for (_, row) in self.iterrows())
+        return self[ok]
+
+    def sort_values(self, keys: List[str]) -> 'DataFrame':
+        ixs = [self.byName[key]['number'] - 1 for key in keys]
+        data = sorted(self._data, key=lambda row: tuple(row[ix] for ix in ixs))
         return DataFrame(data, self.schema)
 
     def merge(self, rt: 'DataFrame') -> 'DataFrame':
@@ -175,7 +245,7 @@ class DataFrame:
         assert name != 'data', 'older API'
         col = self.byName.get(name)
         if not col:
-            raise AttributeError(col)
+            raise AttributeError(name)
 
         return Seq(col, self._data)
 
@@ -209,17 +279,31 @@ def read_csv(path: Path_T,
         return DataFrame((decode(row) for row in reader), schema)
 
 
+def _decoders() -> Dict[str, Callable[[str], Value]]:
+    def boolean(s: str) -> Value:
+        return bool(s)
+
+    def number(s: str) -> Value:
+        return int(s)
+
+    def text(s: str) -> Value:
+        return s
+
+    return {'number': number, 'string': text, 'boolean': boolean}
+
+
 class Seq:
     def __init__(self, column: Column, data: List[Row]) -> None:
         self.column = column
         self._data = data
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.column})'
+        return f'{self.__class__.__name__}({len(self._data)} x {self.column})'
 
     @classmethod
-    def from_value(cls, val: Opt[Value],
-                   name: str = '_') -> 'Seq':
+    def column_of(cls, val: Opt[Value],
+                  null: List[str] = [''],
+                  number: int = 1, name: Opt[str] = None) -> Column:
         if type(val) == int:
             datatype: DataType = 'number'
         elif isinstance(val, dt.date):
@@ -228,20 +312,41 @@ class Seq:
             datatype = 'boolean'
         else:
             datatype = 'string'
-        column: Column = {'number': 1, 'name': name, 'datatype': datatype, 'null': []}
-        return Seq(column, [[val]])
+        return {'number': number, 'name': name or '_%d' % number,
+                'datatype': datatype, 'null': null}
+
+    @classmethod
+    def from_value(cls, val: Opt[Value],
+                   name: Opt[str] = None) -> 'Seq':
+        return Seq(cls.column_of(val, name=name), [[val]])
+
+    @classmethod
+    def from_values(cls, vals: Iterable[Opt[Value]]) -> 'Seq':
+        valiter = iter(vals)
+        v0 = next(valiter)
+        valiter = itertools.chain([v0], valiter)
+        return cls(cls.column_of(v0), [[v] for v in valiter])
 
     def const(self, value: Opt[Value]) -> 'Seq':
-        column = self.column
-        column['number'] = 1
+        column = self.column_of(value)
         data: List[Row] = [[value] for _ in self._data]
         return Seq(column, data)
 
     def apply(self, f: Callable[[Opt[Value]], Opt[Value]]) -> 'Seq':
-        column = self.column
+        column = self.column.copy()
         column['number'] = 1
         data: List[Row] = [[f(v)] for v in self.values]
         return Seq(column, data)
+
+    def isin(self, those: Iterable[Opt[Value]]) -> Iterable[bool]:
+        """
+        >>> nums = Seq.from_values([1, 2, 3, 4])
+        >>> odds = [1, 3, 5, 7]
+        >>> list(nums.isin(odds))
+        [True, False, True, False]
+        """
+        target = list(those)
+        return (v in target for v in self.values)
 
     @property
     def values(self) -> List[Opt[Value]]:
@@ -255,27 +360,20 @@ class Seq:
         # Return type "List[bool]" of "__eq__" incompatible with return type "bool" in supertype "
         return [v == val for v in self.values]
 
+    decoders = _decoders()
+
     @classmethod
     def decoder(cls, col: Column) -> Callable[[str], Opt[Value]]:
-        def boolean(s: str) -> Value:
-            return bool(s)
-
-        def number(s: str) -> Value:
-            return int(s)
-
-        def text(s: str) -> Value:
-            return s
-
         def maybe(nulls: List[str], f: Callable[[str], Value]) -> Callable[[str], Opt[Value]]:
             def check(s: str) -> Opt[Value]:
                 return None if s in nulls else f(s)
             return check
 
-        def some(dt: Callable[[str], Value]) -> Callable[[str], Opt[Value]]:
-            return dt
+        def some(dty: Callable[[str], Value]) -> Callable[[str], Opt[Value]]:
+            return dty
 
-        dt = {'number': number, 'string': text, 'boolean': boolean}[col['datatype']]
-        return maybe(col['null'], dt) if col['null'] else some(dt)
+        dty = cls.decoders[col['datatype']]
+        return maybe(col['null'], dty) if col['null'] else some(dty)
 
 
 def add_meta(path: Path_T) -> TableMeta:
