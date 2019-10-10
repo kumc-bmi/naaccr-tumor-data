@@ -1,7 +1,9 @@
-from typing import Dict, Iterable, List, Optional as Opt, Text, Tuple, Union
+from typing import Dict, List, Optional as Opt, Text, Tuple, Union
+from typing import Iterator, Iterable
+from contextlib import contextmanager
 from importlib import resources as res
 from pathlib import Path as Path_T
-from sqlite3 import Connection
+from sqlite3 import Connection, Cursor
 import datetime as dt
 import logging
 import re
@@ -223,32 +225,57 @@ class DBSession:
     """
 
     def __init__(self, conn: Connection) -> None:
-        self._tables = {}  # type: Dict[str, DataFrame]
         self.__conn = conn
 
-    def __setitem__(self, k: str, v: 'DataFrame') -> None:
-        self._tables[k] = v
-
     def table(self, k: str) -> 'DataFrame':
-        return self._tables[k]
+        return DataFrame(self, k)
 
     def sql(self, code: str) -> 'DataFrame':
-        _c, _o, _r, _v, name, _ = code.split(None, 6)
-        self.__conn.execute(code)
-        df = DataFrame(self, name)
-        self._tables[name] = df
-        return df
+        if code.lower().strip().startswith('select '):
+            return DataFrame(self, f'({code})')
+        with txn(self.__conn) as work:  # type: Cursor
+            log.debug('DBSession.sql: %s', code)
+            work.execute(code)
+        return DataFrame(self, '(select 1 as c)')
+
+    @contextmanager
+    def _query(self, sql: str) -> Iterator[Cursor]:
+        with txn(self.__conn) as q:
+            log.debug('DBSession._query: %s', sql)
+            q.execute(sql)
+            yield q
 
     def createDataFrame(self, df: tab.DataFrame) -> 'DataFrame':
-        gen_name = '_table_%d' % abs(hash(str(df.data)))  # KLUDGE?
+        gen_name = '_table_%d' % abs(hash(df))
+        with txn(self.__conn) as work:  # type: Cursor
+            work.execute(f'drop table if exists {gen_name}')
+            work.execute(table_ddl(gen_name, df.schema))
         load_table(self.__conn, gen_name,
                    header=[col['name'] for col in df.schema['columns']],
-                   rows=df.data)
+                   rows=(row for (_, row) in df.iterrows()))
         return DataFrame(self, gen_name)
 
     def read_csv(self, access: Path_T) -> 'DataFrame':
         df = tab.read_csv(access)
         return self.createDataFrame(df)
+
+
+@contextmanager
+def txn(conn: Connection) -> Iterator[Cursor]:
+    cur = conn.cursor()
+    try:
+        yield cur
+    except Exception:
+        conn.rollback()
+        raise
+    else:
+        conn.commit()
+
+
+def table_ddl(name: str, schema: tab.Schema) -> str:
+    col_specs = ',\n  '.join(f'"{col["name"]}" {col["datatype"]}'
+                             for col in schema['columns'])
+    return f'create table "{name}" ({col_specs})'
 
 
 def load_table(dest: Connection, table: str,
@@ -283,18 +310,41 @@ def load_table(dest: Connection, table: str,
     dest.commit()
 
 
-class DataFrame:
-    """a la pandas or Spark DataFrame, but using python stdlib only
+class DataFrame(tab.DataFrame):
+    """a la pandas or Spark DataFrame, based on a sqlite3 table
     """
-    def __init__(self, ctx: DBSession, label: str) -> None:
+    def __init__(self, ctx: DBSession, table: str) -> None:
         self.__ctx = ctx
-        self.label = label
+        self.table = table
+        self.schema = {'columns': []}  # KLUDGE?
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.label})'
+        return f'{self.__class__.__name__}({self.table})'
+
+    def iterrows(self) -> Iterator[Tuple[int, tab.Row]]:
+        ix = 0
+        with self.__ctx._query(f'select * from {self.table}') as q:
+            while True:
+                chunk = q.fetchmany()
+                if not chunk:
+                    break
+                for row in chunk:
+                    yield ix, row
+                    ix += 1
 
     def createOrReplaceTempView(self, name: str) -> None:
-        self.__ctx[name] = self
+        try:
+            self.__ctx.sql(
+                f'drop table {name}')
+        except Exception:
+            pass
+        try:
+            self.__ctx.sql(
+                f'drop view {name}')
+        except Exception:
+            pass
+        self.__ctx.sql(
+            f'create view {name} as select * from {self.table}')
 
 
 class _TestData:
@@ -369,7 +419,7 @@ class MockCTX(DBSession):
         return self._tables[k]
 
     def sql(self, code: str) -> DataFrame:
-        _c, _o, _r, _t, _v, name, _ = code.split(None, 6)
+        _c, _v, name, _ = code.split(None, 3)
         df = MockDF(self, name)
         self._tables[name] = df
         return df
@@ -384,4 +434,4 @@ class MockDF(DataFrame):
         return f'{self.__class__.__name__}({self.label})'
 
     def createOrReplaceTempView(self, name: str) -> None:
-        self.__ctx[name] = self
+        self.__ctx[name] = self  # type: ignore

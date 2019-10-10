@@ -20,7 +20,7 @@ select hlevel from seer_terms where 'dep' = 'seer_recode_terms.csv'
 /* oh for bind parameters... */
 select task_id from current_task where 1=0;
 
-create or replace temporary view i2b2_path_concept as
+create view i2b2_path_concept as
 select 'N' as c_synonym_cd
      , 'CONCEPT_CD' as c_facttablecolumn
      , 'CONCEPT_DIMENSION' as c_tablename
@@ -36,7 +36,7 @@ select 'N' as c_synonym_cd
 ;
 
 
-create or replace temporary view naaccr_top_concept as
+create view naaccr_top_concept as
 select top.c_hlevel
      , top.c_fullname
      , top.c_name
@@ -53,7 +53,7 @@ from naaccr_top top
 cross join i2b2_path_concept i2b2
 ;
 
-create or replace temporary view section_concepts as
+create view section_concepts as
 with ea as (
 select nts.sectionId, nts.section
      , top.c_hlevel + 1 c_hlevel
@@ -76,7 +76,7 @@ cross join naaccr_top top
 cross join i2b2_path_concept i2b2;
 
 
-create or replace temporary view item_concepts as
+create view item_concepts as
 with ea as (
 select sc.sectionId, ni.naaccrNum
      , sc.c_hlevel + 1 as c_hlevel
@@ -106,7 +106,7 @@ cross join naaccr_top top
 cross join i2b2_path_concept i2b2;
 
 
-create or replace temporary view code_concepts as
+create view code_concepts as
 with mix as (
 select ty.naaccrNum
      , coalesce(rl.code, la.answer_code) as answer_code
@@ -236,7 +236,7 @@ and label = 'title'
 ;
 
 
-create or replace temporary view primary_site_concepts as
+create view primary_site_concepts as
 with ea as (
 select lvl + 1 as c_hlevel
      , concat(ic.c_fullname, icdo.path) as c_fullname
@@ -277,7 +277,7 @@ where tr.itemnbr in (419, 521)
 */
 
 
-create or replace temporary view seer_recode_concepts as
+create view seer_recode_concepts as
 with
 
 folder as (
@@ -318,7 +318,7 @@ cross join naaccr_top top
 cross join i2b2_path_concept i2b2;
 ;
 
-create or replace temporary view site_schema_concepts as
+create view site_schema_concepts as
 with
 ea as (
 select c_hlevel, c_fullname, c_name, c_basecode, c_visualattributes, c_tooltip from cs_terms
@@ -334,7 +334,7 @@ cross join i2b2_path_concept i2b2;
 ;
 
 
-create or replace temporary view naaccr_ontology as
+create view naaccr_ontology as
 
 select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_totalnum, c_basecode
      , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator

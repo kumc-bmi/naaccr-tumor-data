@@ -1,3 +1,16 @@
+r"""
+    >>> from sys import stderr
+    >>> logging.basicConfig(level=logging.DEBUG, stream=stderr)
+    >>> from sqlite3 import connect
+    >>> spark = SparkSession_T(connect(':memory:'))  # _T isn't appropriate here
+    >>> ont = NAACCR_I2B2.ont_view_in(spark, task_id='abc123',
+    ...                               update_date=dt.date(2001, 1, 1))
+    >>> ont
+    DataFrame(naaccr_ontology)
+
+    # TODO: test ont.iterrows()
+"""
+
 from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
@@ -509,8 +522,8 @@ class NAACCR_R:
                     raise ValueError((info, codes.columns))
                 found.append(codes)
         all_schemes = tab.concat(found)
-        with_fields = cls.field_code_scheme.merge(all_schemes)
-        with_field_info = cls.field_info.select('item', 'name').merge(with_fields)
+        with_fields = all_schemes.merge(cls.field_code_scheme)
+        with_field_info = with_fields.merge(cls.field_info.select('item', 'name'))
         return with_field_info
 
 
@@ -620,8 +633,9 @@ class NAACCR_I2B2(object):
             update_date=update_date,
             sourcesystem_cd=cls.sourcesystem_cd))
         answers = to_df(LOINC_NAACCR.answer)
+        current_task = tab.DataFrame.from_record(dict(task_id=task_id))
         views = create_objects(spark, cls.ont_script,
-                               current_task=to_df(tab.DataFrame.from_record(dict(task_id=task_id))),
+                               current_task=to_df(current_task),
                                naaccr_top=to_df(top),
                                section=to_df(cls.per_section),
                                tumor_item_type=to_df(cls.tumor_item_type),
