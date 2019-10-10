@@ -12,7 +12,7 @@ Treat a database table as a DataFrame:
 Load CSV into a database table and select from it:
 
     >>> import heron_load
-    >>> ctx = DBSession(connect_mem(':memory:'))
+    >>> ctx = DBSession.in_memory()
     >>> with res.path(heron_load, 'section.csv') as p:
     ...     df = ctx.createDataFrame(tab.read_csv(p))
     ...     print(df)
@@ -256,8 +256,13 @@ class DBSession:
     def __init__(self, conn: Connection) -> None:
         self.__conn = conn
 
+    @classmethod
+    def in_memory(cls) -> 'DBSession':
+        from sqlite3 import connect as connect_mem
+        return cls(connect_mem(':memory:'))
+
     def table(self, k: str) -> 'DataFrame':
-        return DataFrame(self, k)
+        return DataFrame.select_from(self, k)
 
     def sql(self, code: str) -> 'DataFrame':
         if code.lower().strip().startswith('select '):
@@ -303,8 +308,25 @@ def txn(conn: Connection) -> Iterator[Cursor]:
 
 
 def table_ddl(name: str, schema: tab.Schema) -> str:
-    col_specs = ',\n  '.join(f'"{col["name"]}" {col["datatype"]}'
-                             for col in schema['columns'])
+    '''
+    ISSUE: we assume all numbers are int; probably should say so.
+
+    Denote text columns as such in order to preserve leading 0s in codes:
+
+    >>> record = dict(code='001', num=123)
+    >>> schema = tab.DataFrame.from_records([record]).schema
+    >>> print(table_ddl('t1', schema))
+    create table "t1" ("code" text,
+      "num" int)
+    '''
+    sqltypes = {'string': 'text',
+                'number': 'int',
+                'boolean': 'int',
+                'date': 'text'}
+    col_info = [(col['name'], sqltypes[col['datatype']])
+                for col in schema['columns']]
+    col_specs = ',\n  '.join(f'"{name}" {ty}'
+                             for (name, ty) in col_info)
     return f'create table "{name}" ({col_specs})'
 
 
@@ -342,6 +364,12 @@ def load_table(dest: Connection, table: str,
 
 class DataFrame(tab.DataFrame):
     """a la pandas or Spark DataFrame, based on a sqlite3 table
+
+    Handle empty results. KLUDGE assume string columns:
+
+    >>> ctx = DBSession.in_memory()
+    >>> DataFrame.select_from(ctx, '(select 1 as c where 1=0)')
+    DataFrame({'c': 'string'})
     """
     def __init__(self, ctx: DBSession, table: str, schema: tab.Schema) -> None:
         tab.DataFrame.__init__(self, [], schema)
@@ -352,6 +380,8 @@ class DataFrame(tab.DataFrame):
     def select_from(cls, ctx: DBSession, table: str) -> 'DataFrame':
         with ctx._query(f'select * from {table} limit 1') as q:
             row = q.fetchone()
+            if row is None:
+                row = ['_' for _ in q.description]
             record = dict(zip((d[0] for d in q.description), row))
             schema = tab.DataFrame.from_records([record]).schema
         return DataFrame(ctx, table, schema)

@@ -1,8 +1,7 @@
 r"""
     >>> from sys import stderr
     >>> logging.basicConfig(level=logging.DEBUG, stream=stderr)
-    >>> from sqlite3 import connect
-    >>> spark = SparkSession_T(connect(':memory:'))  # _T isn't appropriate here
+    >>> spark = SparkSession_T.in_memory()  # _T isn't appropriate here
     >>> ont = NAACCR_I2B2.ont_view_in(spark, task_id='abc123',
     ...                               update_date=dt.date(2001, 1, 1))
     >>> ont
