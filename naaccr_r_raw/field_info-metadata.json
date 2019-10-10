@@ -4,11 +4,9 @@
     "columns": [
       {
         "name": "item",
-        "datatype": "string",
+        "datatype": "number",
         "number": 1,
-        "null": [
-          ""
-        ]
+        "null": []
       },
       {
         "name": "name",

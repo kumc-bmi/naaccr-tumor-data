@@ -57,7 +57,7 @@
         "null": []
       },
       {
-        "name": "ANSWER_STRING\r\n",
+        "name": "ANSWER_STRING",
         "datatype": "string",
         "number": 9,
         "null": [
