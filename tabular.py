@@ -7,7 +7,8 @@ ref https://www.w3.org/TR/tabular-data-primer/#datatypes
 
 """
 
-from typing import Callable, Dict, Iterable, List, Optional as Opt, Sequence, Union
+from typing import Dict, List, Optional as Opt, Sequence, Tuple
+from typing import Callable, Iterable, Iterator, Union
 from typing_extensions import Literal, TypedDict
 from pathlib import Path as Path_T
 import csv
@@ -41,16 +42,32 @@ def main(argv: List[str], cwd: Path_T) -> None:
 class DataFrame:
     def __init__(self, data: Iterable[Row], schema: Schema) -> None:
         self.schema = schema
+        self.columns = [c['name'] for c in self.schema['columns']]
         self.byName = {col['name']: col for col in schema['columns']}
-        self.data = list(data)
+        byNum = self.byNum = {col['number']: col for col in schema['columns']}
+        self._col_ixs = [n - 1 for n in byNum.keys()]
+        self._data = list(data)
+
+    def __repr__(self) -> str:
+        info = {col['name']: col['datatype']
+                for col in self.schema['columns']}
+        return f'{self.__class__.__name__}({info})'
+
+    def __hash__(self) -> int:
+        return hash(str((self.schema, self._data)))
+
+    def iterrows(self) -> Iterator[Tuple[int, Row]]:
+        col_ixs = self._col_ixs
+        return ((cx, [row[ix] for ix in col_ixs])
+                for (cx, row) in enumerate(self._data))
 
     @classmethod
     def from_columns(cls, seqs: Dict[str, 'Seq']) -> 'DataFrame':
-        from itertools import zip_longest
         schema: Schema = {'columns': [
-            {'name': name, 'number': ix + 1, 'datatype': seq.column['datatype'], 'null': seq.column['null']}
+            {'name': name, 'number': ix + 1,
+             'datatype': seq.column['datatype'], 'null': seq.column['null']}
             for (ix, (name, seq)) in enumerate(seqs.items())]}
-        data = zip_longest(seq.values for seq in seqs.values())
+        data = zip(*[seq.values for seq in seqs.values()])
         return DataFrame(data, schema)
 
     @classmethod
@@ -58,19 +75,16 @@ class DataFrame:
         return cls.from_columns({name: Seq.from_value(val, name=name)
                                  for name, val in record.items()})
 
-    @property
-    def columns(self) -> List[str]:
-        return [c['name'] for c in self.schema['columns']]
-
     def apply(self, dt: DataType, f: Callable[..., Opt[Value]]) -> 'Seq':
         names = self.columns
-        data: List[Row] = [[f(**dict(zip(names, row)))] for row in self.data]
+        data: List[Row] = [[f(**dict(zip(names, row)))] for (_, row) in self.iterrows()]
         column: Column = {'number': 1, 'name': '_', 'datatype': dt, 'null': ['']}
         return Seq(column, data)
 
     def withColumn(self, name: str, seq: 'Seq') -> 'DataFrame':
-        data = [list(row) + [value] for (row, value) in zip(self.data, seq.values)]
-        col: Column = {'number': len(self.schema['columns']) + 1,
+        data = [list(row) + [value]
+                for (row, value) in zip(self._data, seq.values)]
+        col: Column = {'number': len(data[0]),
                        'name': name,
                        'datatype': 'string',
                        'null': []}
@@ -82,25 +96,68 @@ class DataFrame:
             {'name': new if old == col['name'] else col['name'],
              'number': col['number'], 'datatype': col['datatype'], 'null': col['null']}
             for col in self.schema['columns']]}
-        return DataFrame(self.data, schema)
+        return DataFrame(self._data, schema)
 
     def select(self, *names: str) -> 'DataFrame':
         """i.e. project (but following pyspark API)"""
         schema = Schema(columns=[col for col in self.schema['columns']
                                  if col['name'] in names])
-        return DataFrame(self.data, schema)
+        return DataFrame(self._data, schema)
 
     def drop(self, names: List[str]) -> 'DataFrame':
         schema = Schema(columns=[col for col in self.schema['columns']
                                  if col['name'] not in names])
-        return DataFrame(self.data, schema)
+        return DataFrame(self._data, schema)
 
-    def __getitem__(self, which: List[bool]) -> 'DataFrame':
-        data = [row for (ok, row) in zip(which, self.data) if ok]
+    def __getitem__(self, which: Iterable[bool]) -> 'DataFrame':
+        data = [row for (ok, row) in zip(which, self._data) if ok]
         return DataFrame(data, self.schema)
 
     def merge(self, rt: 'DataFrame') -> 'DataFrame':
-        raise NotImplementedError
+        """Natural join.
+
+        Note: we assume they intersecting columns
+        form a unique key on rt.
+        """
+        keys = (set(self.columns) & set(rt.columns))
+        if not keys:
+            raise ValueError
+
+        def key_ixs(s: Schema) -> List[int]:
+            return [col['number'] - 1
+                    for col in s['columns']
+                    if col['name'] in keys]
+
+        # key column indexes (right side)
+        kx_r = key_ixs(rt.schema)
+        # data columns indexes (rt)
+        dx_r = [ix for ix in range(len(rt.schema['columns']))
+                if ix not in kx_r]
+        # key -> non-key cols
+        rtByKey = {tuple(row[kx] for kx in kx_r): [row[ix] for ix in dx_r]
+                   for row in rt._data}
+
+        # key column indexes (self, i.e. left side)
+        kx_l = key_ixs(self.schema)
+
+        def lookup(row_lt: Row) -> Iterable[Row]:
+            key = tuple(row_lt[ix] for ix in kx_l)
+            row_rt = rtByKey.get(key)
+            if row_rt:
+                yield list(row_lt) + row_rt
+
+        data = [new for old in self._data for new in lookup(old)]
+
+        rt_cols = []
+        # renumber the non-key columns from rt.
+        for cx, ix in enumerate(dx_r):
+            col = rt.schema['columns'][ix]
+            col['number'] = len(self.schema['columns']) + cx + 1
+            rt_cols.append(col)
+
+        schema: Schema = {'columns': self.schema['columns'] + rt_cols}
+
+        return DataFrame(data, schema)
 
     @classmethod
     def decoder(cls, schema: Schema) -> (Callable[[List[str]], List[Opt[Value]]]):
@@ -115,18 +172,19 @@ class DataFrame:
         return decode
 
     def __getattr__(self, name: str) -> 'Seq':
+        assert name != 'data', 'older API'
         col = self.byName.get(name)
         if not col:
             raise AttributeError(col)
 
-        return Seq(col, self.data)
+        return Seq(col, self._data)
 
 
 def concat(dfs: Iterable[DataFrame]) -> DataFrame:
     from functools import reduce
     dfs = iter(dfs)
     df0 = next(dfs)
-    data = reduce(lambda acc, next: acc + next, (df.data for df in dfs), df0.data)
+    data = reduce(lambda acc, next: acc + next, (df._data for df in dfs), df0._data)
     return DataFrame(data, schema=df0.schema)
 
 
@@ -147,13 +205,17 @@ def read_csv(path: Path_T,
         for _ in range(skiprows):
             next(reader)
         # IDEA: check consistency between header and schema
-        _ = next(reader)
+        next(reader)
         return DataFrame((decode(row) for row in reader), schema)
+
 
 class Seq:
     def __init__(self, column: Column, data: List[Row]) -> None:
         self.column = column
-        self.data = data
+        self._data = data
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.column})'
 
     @classmethod
     def from_value(cls, val: Opt[Value],
@@ -172,7 +234,7 @@ class Seq:
     def const(self, value: Opt[Value]) -> 'Seq':
         column = self.column
         column['number'] = 1
-        data: List[Row] = [[value] for _ in self.data]
+        data: List[Row] = [[value] for _ in self._data]
         return Seq(column, data)
 
     def apply(self, f: Callable[[Opt[Value]], Opt[Value]]) -> 'Seq':
@@ -184,12 +246,12 @@ class Seq:
     @property
     def values(self) -> List[Opt[Value]]:
         ix = self.column['number'] - 1
-        return [row[ix] for row in self.data]
+        return [row[ix] for row in self._data]
 
     def unique(self) -> List[Opt[Value]]:
         return list(set(self.values))
 
-    def __eq__(self, val: object) -> List[bool]: # type: ignore
+    def __eq__(self, val: object) -> List[bool]:  # type: ignore
         # Return type "List[bool]" of "__eq__" incompatible with return type "bool" in supertype "
         return [v == val for v in self.values]
 
