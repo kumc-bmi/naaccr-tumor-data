@@ -558,7 +558,7 @@ class OncologyMeta:
         out3 = tab.DataFrame.from_columns(dict(
             lvl=major.Kode.const(3),
             concept_cd=major.Kode,
-            c_visualattributes=major.Koke.const('FA'),
+            c_visualattributes=major.Kode.const('FA'),
             path=major.Kode.apply(lambda s: str(s) + '\\'),
             concept_name=major.Title
         ))
