@@ -138,7 +138,7 @@ if IO_TESTING:
 # %% {"slideshow": {"slide_type": "skip"}}
 if IO_TESTING:
     _conn = connect_mem(':memory:')
-    _spark = DBSession(_conn)
+    _spark = SparkSession_T(_conn)
     from tumor_reg_ont import _with_path
 
 
@@ -436,6 +436,8 @@ select * from seer_recode_concepts
 
 # %% {"slideshow": {"slide_type": "skip"}}
 class NAACCR2:
+    ns = {'n': 'http://naaccr.org/naaccrxml'}
+
     s100x = XML.parse(GzipFile(fileobj=res.open_binary(  # type: ignore # typeshed/issues/2580  # noqa
         naaccr_xml_samples, 'naaccr-xml-sample-v180-incidence-100.xml.gz')))
 
@@ -450,62 +452,74 @@ class NAACCR2:
 
 
 # %%
-def tumorDF(spark: SparkSession_T, doc: XML.ElementTree) -> DataFrame:
+import itertools
+from typing import Iterable
+
+def simple_schema(records: Iterable[Dict[str, str]], order: Dict[str, object],
+                  max_length: int = 15) -> tab.Schema:
+    field_set = set(k for r in records for k in r.keys())
+    field_list = sorted(field_set, key=lambda k: order[k])
+    blanks = [' ' * w for w in range(max_length)]
+    nums = itertools.count(start=1)
+    return tab.Schema(columns=[tab.Column(number=next(nums), name=name, datatype='string', null=blanks)
+                               for name in field_list])
+
+
+def tumorDF(doc: XML.ElementTree,
+            items=ont.NAACCR_I2B2.tumor_item_type) -> tab.DataFrame:
     rownum = 0
-    ns = {'n': 'http://naaccr.org/naaccrxml'}
+    ns = NAACCR2.ns
 
     to_parent = {c: p for p in doc.iter() for c in p}
 
-    def tumorItems(tumorElt: XML.Element, schema: ty.StructType,
-                   simpleContent: bool = True) -> Iterator[Dict[str, object]]:
+    order = {id: (sec, num)
+             for (_, [id, sec, num]) in
+             items.select('naaccrId', 'sectionId', 'naaccrNum').iterrows()}
+    order = dict(order, rownum=(0, 0))
+    blank = {id: None
+             for id in items.naaccrId.values}
+
+    def tumorRecord(tumorElt: XML.Element) -> Dict[str, str]:
         nonlocal rownum
-        assert simpleContent
         rownum += 1
         patElt = to_parent[tumorElt]
         ndataElt = to_parent[patElt]
-        for elt in [ndataElt, patElt, tumorElt]:
-            for item in elt.iterfind('./n:Item', ns):
-                for itemRecord in ont.eltDict(item, schema, simpleContent):
-                    yield dict(itemRecord, rownum=rownum)
+        items = {item.attrib['naaccrId']: item.text
+                 for elt in [ndataElt, patElt, tumorElt]
+                 for item in elt.iterfind('./n:Item', ns)}
+        record = blank.copy()
+        record.update(items)
+        record = dict(record, rownum=rownum)
+        return record
 
-    itemSchema = ont.eltSchema(ont.NAACCR1.item_xsd, simpleContent=True)
-    rownumField = ty.StructField('rownum', ty.IntegerType(), False)
-    tumorItemSchema = ty.StructType([rownumField] + itemSchema.fields)
-    data = ont.xmlDF(spark, schema=tumorItemSchema, doc=doc, path='.//n:Tumor',
-                     eltRecords=tumorItems,
-                     ns={'n': 'http://naaccr.org/naaccrxml'},
-                     simpleContent=True)
-    return data.drop('naaccrNum')
+    tumor_elts = doc.iterfind('./*/n:Tumor', ns)
+    records =[tumorRecord(e) for e in tumor_elts]
+    schema = simple_schema(records, order)
+    names = [field['name'] for field in schema['columns']]
+    data =[[record[key] for key in names]
+           for record in records]
+    return tab.DataFrame(data, schema)
 
 
-IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)
-                .toPandas().sort_values(['naaccrId', 'rownum']).head(5))
+def without_empty_cols(df):
+    non_empty = [seq.column['name']
+                 for name in df.columns
+                 for seq in [getattr(df, name)]
+                 if not set(seq.values) <= set([None])]
+    return df.select(*non_empty)
+
+###IO_TESTING and
+_to_pd(
+    without_empty_cols(tumorDF(NAACCR2.s100x)), index='rownum'
+)
+###.sort_values(['naaccrId', 'rownum']).head(5))
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
 # What columns are covered by the 100 tumor sample?
 
-IO_TESTING and (tumorDF(_spark, NAACCR2.s100x)  # type: ignore
-                .select('naaccrId').distinct().sort('naaccrId')
-                .toPandas().naaccrId.values)
-
-
-# %% {"slideshow": {"slide_type": "slide"}}
-def naaccr_pivot(ddict: DataFrame, skinny: DataFrame, key_cols: List[str],
-                 pivot_on: str = 'naaccrId', value_col: str = 'value',
-                 start: str = 'startColumn') -> DataFrame:
-    groups = skinny.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
-    wide = groups.pivot(pivot_on).agg(func.first(value_col))
-    start_by_id = {id: start
-                   for (id, start) in ddict.select(pivot_on, start).collect()}
-    sorted_cols = sorted(wide.columns, key=lambda id: start_by_id.get(id, -1))
-    return wide.select(cast(List[Union[sq.Column, str]], sorted_cols))
-
-
-IO_TESTING and (naaccr_pivot(ont.ddictDF(_spark),
-                             tumorDF(_spark, NAACCR2.s100x),
-                             ['rownum'])
-                .limit(3).toPandas())
+if IO_TESTING:
+    print(without_empty_cols(tumorDF(NAACCR2.s100x)).columns)
 
 # %% [markdown]
 # ## Synthetic Tumor Data
