@@ -19,9 +19,13 @@ build/naaccr_export_stats.csv: build/tumor_reg_data_run.ipynb
 #
 # IDEA: nosetests --with-doctest
 # IDEA: or tox?
-DOCTEST_FILES=tumor_reg_ont.py tumor_reg_data.py tumor_reg_tasks.py sql_script.py
+# IDEA: __pycache__/tabular.cpython-37.pyc depends tabular.py; doctest, mypy it
+DOCTEST_FILES=tabular.py sql_script.py tumor_reg_ont.py tumor_reg_data.py tumor_reg_tasks.py
 doctest:
 	for f in $(DOCTEST_FILES); do echo $$f; python -m doctest $$f; done
+
+testandtype:
+	for f in $(DOCTEST_FILES); do echo $$f; python -m doctest $$f; mypy --strict $$f; done
 
 ##
 # Python community style
