@@ -14,7 +14,7 @@ Load CSV into a database table and select from it:
     >>> import heron_load
     >>> ctx = DBSession.in_memory()
     >>> with res.path(heron_load, 'section.csv') as p:
-    ...     df = ctx.createDataFrame(tab.read_csv(p))
+    ...     df = ctx.load_data_frame('section', tab.read_csv(p))
     ...     print(df)
     ...     for ix, row in df.iterrows():
     ...         if ix >= 3:
@@ -27,7 +27,7 @@ Load CSV into a database table and select from it:
 
 """
 
-from typing import Dict, List, Optional as Opt, Text, Tuple, Union
+from typing import Callable, Dict, List, Optional as Opt, Text, Tuple, Union
 from typing import Iterator, Iterable
 from contextlib import contextmanager
 from importlib import resources as res
@@ -49,6 +49,20 @@ Params = Dict[str, BindValue]
 Line = int
 Comment = Text
 StatementInContext = Tuple[Line, Comment, SQL]
+
+
+def main(argv: List[str], cwd: Path_T, connect: Callable[[str], Connection]) -> None:
+    db = argv[1]
+
+    ctx = DBSession(connect(db))
+    for csv_file in argv[2:]:
+        p = cwd / csv_file
+        df = ctx.load_data_frame(p.stem, tab.read_csv(p))
+        log.info('%s -> %s', p, df)
+        for ix, row in df.iterrows():
+            if ix >= 3:
+                break
+            log.info('row %d: %s', ix, row)
 
 
 class SqlScript(object):
@@ -280,19 +294,18 @@ class DBSession:
             q.execute(sql)
             yield q
 
-    def createDataFrame(self, df: tab.DataFrame) -> 'DataFrame':
-        gen_name = '_table_%d' % abs(hash(df))
+    def load_data_frame(self, name: str, df: tab.DataFrame) -> 'DataFrame':
         with txn(self.__conn) as work:  # type: Cursor
-            work.execute(f'drop table if exists {gen_name}')
-            work.execute(table_ddl(gen_name, df.schema))
-        load_table(self.__conn, gen_name,
+            work.execute(f'drop table if exists {name}')
+            work.execute(table_ddl(name, df.schema))
+        load_table(self.__conn, name,
                    header=[col['name'] for col in df.schema['columns']],
                    rows=(row for (_, row) in df.iterrows()))
-        return DataFrame.select_from(self, gen_name)
+        return DataFrame.select_from(self, name)
 
     def read_csv(self, access: Path_T) -> 'DataFrame':
         df = tab.read_csv(access)
-        return self.createDataFrame(df)
+        return self.load_data_frame(access.stem, df)
 
 
 @contextmanager
@@ -362,7 +375,7 @@ def load_table(dest: Connection, table: str,
     dest.commit()
 
 
-class DataFrame(tab.DataFrame):
+class DataFrame(tab.Relation):
     """a la pandas or Spark DataFrame, based on a sqlite3 table
 
     Handle empty results. KLUDGE assume string columns:
@@ -372,7 +385,7 @@ class DataFrame(tab.DataFrame):
     DataFrame({'c': 'string'})
     """
     def __init__(self, ctx: DBSession, table: str, schema: tab.Schema) -> None:
-        tab.DataFrame.__init__(self, [], schema)
+        tab.Relation.__init__(self, schema)
         self.__ctx = ctx
         self.table = table
 
@@ -397,20 +410,6 @@ class DataFrame(tab.DataFrame):
                     yield ix, row
                     ix += 1
 
-    def createOrReplaceTempView(self, name: str) -> None:
-        try:
-            self.__ctx.sql(
-                f'drop table {name}')
-        except Exception:
-            pass
-        try:
-            self.__ctx.sql(
-                f'drop view {name}')
-        except Exception:
-            pass
-        self.__ctx.sql(
-            f'create view {name} as select * from {self.table}')
-
 
 class _TestData:
     per_item_view = 'tumor_item_type'
@@ -434,7 +433,7 @@ class _TestData:
 
 
 def create_objects(spark: DBSession, script: SqlScript,
-                   **kwargs: DataFrame) -> Dict[str, DataFrame]:
+                   **kwargs: tab.DataFrame) -> Dict[str, DataFrame]:
     """Run SQL create ... statements given DFs for input views.
 
     >>> spark = MockCTX()
@@ -456,9 +455,8 @@ def create_objects(spark: DBSession, script: SqlScript,
     """
     # IDEA: use a contextmanager for temp views
     for key, df in kwargs.items():
-        df = kwargs[key]
         log.info('%s: %s = %s', script.name, key, df)
-        df.createOrReplaceTempView(key)  # ISSUE: don't replace?
+        spark.load_data_frame(key, df)
     provided = set(kwargs.keys())
     out = {}
     for name, ddl, inputs in script.objects:
@@ -467,9 +465,8 @@ def create_objects(spark: DBSession, script: SqlScript,
             raise TypeError(missing)
         log.info('%s: create %s', script.name, name)
         spark.sql(ddl)
-        df = spark.table(name)
-        df.createOrReplaceTempView(name)  # ISSUE: don't replace?
-        out[name] = df
+        dft = spark.table(name)
+        out[name] = dft
     return out
 
 
@@ -477,14 +474,16 @@ class MockCTX(DBSession):
     def __init__(self) -> None:
         self._tables = {}  # type: Dict[str, DataFrame]
 
-    def __setitem__(self, k: str, v: DataFrame) -> None:
-        self._tables[k] = v
+    def load_data_frame(self, k: str, v: tab.DataFrame) -> 'DataFrame':
+        df = self._tables[k] = MockDF(self, k)
+        return df
 
     def table(self, k: str) -> DataFrame:
-        return self._tables[k]
+        return MockDF(self, k)
 
     def sql(self, code: str) -> DataFrame:
-        _c, _v, name, _ = code.split(None, 3)
+        c, _v, name, _ = code.split(None, 3)
+        assert(c == 'create')
         df = MockDF(self, name)
         self._tables[name] = df
         return df
@@ -498,5 +497,14 @@ class MockDF(DataFrame):
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.label})'
 
-    def createOrReplaceTempView(self, name: str) -> None:
-        self.__ctx[name] = self  # type: ignore
+
+if __name__ == '__main__':
+    def _script_io() -> None:
+        from sys import argv
+        from pathlib import Path
+        from sqlite3 import connect
+
+        logging.basicConfig(level=logging.INFO)
+        main(argv[:], Path('.'), connect)
+
+    _script_io()

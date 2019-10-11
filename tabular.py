@@ -52,6 +52,7 @@ dicts)
 from typing import Dict, List, Optional as Opt, Sequence, Tuple
 from typing import Callable, Iterable, Iterator, Union
 from typing_extensions import Literal, TypedDict
+from abc import abstractmethod
 from pathlib import Path as Path_T
 import csv
 import datetime as dt
@@ -82,19 +83,27 @@ def main(argv: List[str], cwd: Path_T) -> None:
         add_meta(cwd / csvname)
 
 
-class DataFrame:
-    def __init__(self, data: Iterable[Row], schema: Schema) -> None:
+class Relation:
+    def __init__(self, schema: Schema) -> None:
         self.schema = schema
         self.columns = [c['name'] for c in self.schema['columns']]
         self.byName = {col['name']: col for col in schema['columns']}
-        byNum = self.byNum = {col['number']: col for col in schema['columns']}
-        self._col_ixs = [n - 1 for n in byNum.keys()]
-        self._data = list(data)
 
     def __repr__(self) -> str:
         info = {col['name']: col['datatype']
                 for col in self.schema['columns']}
         return f'{self.__class__.__name__}({info})'
+
+    @abstractmethod
+    def iterrows(self) -> Iterator[Tuple[int, Row]]: ...
+
+
+class DataFrame(Relation):
+    def __init__(self, data: Iterable[Row], schema: Schema) -> None:
+        Relation.__init__(self, schema)
+        byNum = self.byNum = {col['number']: col for col in schema['columns']}
+        self._col_ixs = [n - 1 for n in byNum.keys()]
+        self._data = list(data)
 
     def __hash__(self) -> int:
         return hash(str((self.schema, self._data)))
