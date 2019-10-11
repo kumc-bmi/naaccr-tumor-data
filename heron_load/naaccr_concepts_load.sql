@@ -9,17 +9,19 @@
  */
 
 /* check that static dependencies are available */
-select c_hlevel, c_fullname, c_name, update_date, source_cd from naaccr_top where 'dep' = 'arbitrary';
+
+select c_hlevel, c_fullname, c_name, update_date, sourcesystem_cd from naaccr_top where 'dep' = 'arbitrary';
 select sectionId from section where 'dep' = 'section.csv';
 select valtype_cd from tumor_item_type where 'dep' = 'tumor_item_type.csv';
 select label from code_labels where 'dep' = 'code-labels';
-select answer_code from loinc_naaccr_answers where 'dep' = 'loinc_naaccr_answers.csv';
+select answer_code from loinc_naaccr_answer where 'dep' = 'loinc_naaccr_answer.csv';
 select lvl from who_topo where dep='WHO Oncology MetaFiles';
-select hlevel from seer_terms where 'dep' = 'seer_recode_terms.csv'
+select hlevel from seer_recode_terms where 'dep' = 'seer_recode_terms.csv';
 
 /* oh for bind parameters... */
 select task_id from current_task where 1=0;
 
+drop view if exists i2b2_path_concept;
 create view i2b2_path_concept as
 select 'N' as c_synonym_cd
      , 'CONCEPT_CD' as c_facttablecolumn
@@ -36,14 +38,15 @@ select 'N' as c_synonym_cd
 ;
 
 
+drop view if exists naaccr_top_concept;
 create view naaccr_top_concept as
 select top.c_hlevel
      , top.c_fullname
      , top.c_name
      , (select substr(task_id, 1, 50) from current_task) as c_basecode
      , 'CA' as c_visualattributes
-     , concat('North American Association of Central Cancer Registries version 18.0',
-              '\n ', (select task_id from current_task)) as c_tooltip
+     , ('North American Association of Central Cancer Registries version 18.0' ||
+              '\n ' || (select task_id from current_task)) as c_tooltip
      , top.c_fullname as c_dimcode
      , i2b2.*
      , top.update_date
@@ -52,7 +55,9 @@ select top.c_hlevel
 from naaccr_top top
 cross join i2b2_path_concept i2b2
 ;
+-- select * from naaccr_top_concept;
 
+drop view if exists section_concepts;
 create view section_concepts as
 with ea as (
 select nts.sectionId, nts.section
@@ -74,8 +79,10 @@ select sectionId, section
 from ea
 cross join naaccr_top top
 cross join i2b2_path_concept i2b2;
+-- select * from section_concepts limit 10;
 
 
+drop view if exists item_concepts;
 create view item_concepts as
 with ea as (
 select sc.sectionId, ni.naaccrNum
@@ -104,8 +111,10 @@ select sectionId, naaccrNum
 from ea
 cross join naaccr_top top
 cross join i2b2_path_concept i2b2;
+-- select * from item_concepts;
 
 
+drop view if exists code_concepts;
 create view code_concepts as
 with mix as (
 select ty.naaccrNum
@@ -115,7 +124,7 @@ select ty.naaccrNum
      , loinc_num, ty.AnswerListId, sequence_no
      , rl.scheme, rl.means_missing
 from (select * from tumor_item_type where valtype_cd = '@') ty
-left join loinc_naaccr_answers la
+left join loinc_naaccr_answer la
        on la.code_value = ty.naaccrNum
       and la.answerlistid = ty.AnswerListId
       and answer_code is not null
@@ -150,7 +159,7 @@ from ea
 cross join naaccr_top top
 cross join i2b2_path_concept i2b2;
 ;
-
+-- select * from code_concepts;
 
 -- code_concepts where ic.naaccrNum not in (400, 419, 521) -- separate code for primary site, Morph. TODO: layer
 
@@ -236,6 +245,7 @@ and label = 'title'
 ;
 
 
+drop view if exists primary_site_concepts;
 create view primary_site_concepts as
 with ea as (
 select lvl + 1 as c_hlevel
