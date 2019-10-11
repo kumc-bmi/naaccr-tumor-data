@@ -410,12 +410,12 @@ RecordMaker = Callable[[XML.Element, tab.Schema, bool],
                        Iterator[Dict[str, Opt[tab.Value]]]]
 
 
-def xmlDF(spark: SparkSession_T, schema: tab.Schema,
+def xmlDF(schema: tab.Schema,
           doc: XML.ElementTree, path: str, ns: Dict[str, str],
           eltRecords: Opt[RecordMaker] = None,
-          simpleContent: bool = False) -> DataFrame:
+          simpleContent: bool = False) -> tab.DataFrame:
     data = xmlRecords(schema, doc, path, ns, eltRecords, simpleContent)
-    return spark.createDataFrame(data, schema)  # type: ignore
+    return tab.DataFrame.from_records(data)
 
 
 def xmlRecords(schema: tab.Schema,
@@ -451,9 +451,8 @@ def eltDict(elt: XML.Element, schema: tab.Schema,
     yield out
 
 
-def ddictDF(spark: SparkSession_T) -> DataFrame:
-    return xmlDF(spark,
-                 schema=eltSchema(XSD.the(NAACCR1.ItemDef, '*')),
+def ddictDF() -> tab.DataFrame:
+    return xmlDF(schema=eltSchema(XSD.the(NAACCR1.ItemDef, '*')),
                  doc=NAACCR1.ndd180,
                  path='./n:ItemDefs/n:ItemDef',
                  ns=NAACCR1.ns)
