@@ -85,7 +85,7 @@ import tabular as tab
 # We also have utilities for running SQL from files. The resulting DataFrames "remember" which SQL DB they came from.
 
 # %%
-from sql_script import SqlScript, DBSession, DataFrame
+from sql_script import SqlScript, DBSession as SparkSession_T, DataFrame
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # We incorporate materials from the
@@ -137,7 +137,8 @@ if IO_TESTING:
 
 # %% {"slideshow": {"slide_type": "skip"}}
 if IO_TESTING:
-    _spark = DBSession(connect_mem(':memory:'))
+    _conn = connect_mem(':memory:')
+    _spark = DBSession(_conn)
     from tumor_reg_ont import _with_path
 
 
@@ -146,10 +147,7 @@ def _to_spark(name: str, compute: Callable[[], tab.DataFrame],
     """Compute data locally and save as SQL view"""
     if not IO_TESTING:
         return None
-    df = _spark.createDataFrame(compute())
-    df.createOrReplaceTempView(name)
-    if cache:
-        df.cache()
+    df = _spark.load_data_frame(name, compute())
     return df
 
 
@@ -165,6 +163,8 @@ def _to_view(name: str, compute: Callable[[], DataFrame],
 
 def _to_pd(df: tab.DataFrame,
            index: Opt[str] = None):
+    if not IO_TESTING:
+        return None
     pdf = pd.DataFrame.from_records((row for (_, row) in df.iterrows()),
                                     columns=df.columns)
     if index is not None:
@@ -274,30 +274,11 @@ group by naaccrId, length
 having count(distinct valtype_cd) > 1
 ''', limit=None)
 
+
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## PCORNet CDM Field Types
 #
 # We can generate PCORNet CDM style type information from `valtype_cd` and such.
-
-# %%
-import sql_script
-item_codes_ddl = sql_script.table_ddl('item_codes', ont.NAACCR_Layout.item_codes().schema)
-print(item_codes_ddl)
-
-# %%
-from pprint import pprint
-
-import sqlite3
-conn1 = sqlite3.connect(':memory:')
-
-conn1.cursor().execute(item_codes_ddl)
-
-with sql_script.txn(conn1) as tx1:
-    tx1.execute('''insert into item_codes (naaccrId, code) values (?, ?)''',
-                [40, '0000000000'])
-    tx1.execute('select * from item_codes')
-    pprint(tx1.fetchmany(10))
-
 
 # %%
 def upper_snake_case(camel: str) -> str:
@@ -308,116 +289,64 @@ def upper_snake_case(camel: str) -> str:
     return re.sub('([A-Z])', r'_\1', camel).upper()
 
 
-class GroupConcatOrd:
-    # XXX dead code except for upper_snake_case...
-    def __init__(self) -> None:
-        self.parts = []  # type: List[str]
-        self.sep = ','
+if IO_TESTING:
+        _conn.create_function('upper_snake_case', 1, upper_snake_case)
 
-    def step(self, sep: str, part: str) -> None:
-        self.sep = sep
-        if not isinstance(part, str):
-            print("@@not str:", part)
-        self.parts.append(part)
 
-    def finalize(self) -> str:
-        value = self.sep.join(sorted(self.parts))
-        return value
-
-    @classmethod
-    def custom_mem_db(cls,
-                      name='group_concat_ord'):
-        from sqlite3 import connect as connect_mem  # no file I/O
-        conn = connect_mem(':memory:')
-        conn.create_aggregate(name, 2, GroupConcatOrd)
-        conn.create_function('upper_snake_case', 1, upper_snake_case)
-        return conn
-
-ctx = DBSession(GroupConcatOrd.custom_mem_db())
-df = ctx.createDataFrame(ont.NAACCR_Layout.item_codes())
-df.createOrReplaceTempView('item_codes')
-_to_pd(ctx.sql('''
-select naaccrNum, upper_snake_case('itemType') as FIELD_NAME, group_concat_ord(';', '' || code) as valueset
-from item_codes
-group by naaccrNum
+_to_spark('item_codes', lambda: ont.NAACCR_Layout.item_codes())
+_SQL('''
+select upper_snake_case(naaccrId) as FIELD_NAME
+from tumor_item_type
 order by naaccrNum
 limit 3
-'''))
+''')
 
 # %%
-ctx.createDataFrame(tab.DataFrame(
+_to_spark('ch10', lambda: tab.DataFrame(
         ont.NAACCR_Layout.iter_description(),
         schema={'columns': [
             {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
             {'number': 3, 'name': 'description', 'datatype': 'string', 'null': ['']}]}
-    )).createOrReplaceTempView('ch10')
-ctx.sql('select * from ch10')
+    ))
+_SQL('select * from ch10')
 
 # %%
 _to_spark('item_codes', lambda: ont.NAACCR_Layout.item_codes())
 _SQL('select * from item_codes')
 
-# %%
-ctx.createDataFrame(ont.NAACCR_I2B2.tumor_item_type).createOrReplaceTempView('tumor_item_type')
 
 # %%
-fields = ctx.sql('''
-select 'TUMOR' as TABLE_NAME
-     , ty.naaccrNum as item
-     , upper_snake_case(naaccrId) as FIELD_NAME
-     , 'RDBMS ' || (case valtype_cd
-        when 'N' then 'Number'
-        when '@' then 'Text'
-        when 'T' then 'Text'
-        when 'D' then 'Date' end) ||
-        (case when valtype_cd == 'D' then '' else '(' || length || ')' end)
-        as RDBMS_DATA_TYPE
-     , 'SAS ' || (case valtype_cd
-        when 'N' then 'Numeric'
-        when '@' then 'Char'
-        when 'T' then 'Char'
-        when 'D' then 'Date' end) ||
-        (case when valtype_cd == 'D' then ' (Numeric)' else '(' || length || ')' end)
-        as SAS_DATA_TYPE
-     , 'LOINC scale ' || scale_typ as DATA_FORMAT
-     , 'NO' as REPLICATED_FIELD
-     , case when valtype_cd = 'D' then 'DATE' else null end as UNIT_OF_MEASURE
-     , VALUESET
-     , VALUESET_DESCRIPTOR
-     , ch10.description as FIELD_DEFINITION
-     , row_number() over (order by ty.naaccrNum) FIELD_ORDER
-from tumor_item_type ty
-left join ch10 on ch10.naaccrNum = ty.naaccrNum
-left join (
-  select naaccrNum
-       , group_concat('' || code, ';') as VALUESET
-       , group_concat('' || code || '=' || desc, ';')as VALUESET_DESCRIPTOR
-  from item_codes
-  where code is not null
-  group by naaccrNum
-) vs on vs.naaccrNum = ty.naaccrNum
-where valtype_cd in ('N', '@', 'T', 'D')
-order by ty.naaccrNum
-''')
+class TumorTable:
+    script = SqlScript('naaccr_concepts_load.sql',
+                       res.read_text(heron_load, 'naaccr_concepts_load.sql'),
+                      [('pcornet_tumor_fields', ['tumor_item_type', 'ch10', 'item_codes'])])
 
-_to_pd(fields, index='item')
+    @classmethod
+    def fields(cls, spark):
+        ch10 = tab.DataFrame(
+            ont.NAACCR_Layout.iter_description(),
+            schema={'columns': [
+                {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
+                {'number': 3, 'name': 'description', 'datatype': 'string', 'null': ['']}]}
+        )
+        views = ont.create_objects(spark, cls.script,
+                                   tumor_item_type=ont.NAACCR_I2B2.tumor_item_type,
+                                   ch10=ch10,
+                                   item_codes=ont.NAACCR_Layout.item_codes())
+        return list(views.values())[-1]
+
+
+if IO_TESTING:
+    _fields = TumorTable.fields(_spark)
+IO_TESTING and _SQL('select * from pcornet_tumor_fields')
 
 # %%
 # TumorTable.valuesets()
 if IO_TESTING:
-    _to_pd(fields).set_index('item').to_csv('pcornet_cdm/fields.csv')
-_to_pd(fields, index='item').loc[380:].head()
-
-# %%
-_SQL('''
-select *
-from item_codes
-where naaccrNum = 40
-''')
-
-# %%
-pd.DataFrame(ont.NAACCR_Layout.iter_description(),
-             columns=['naaccrNum', 'naaccrId', 'description']).head()
+    _to_pd(_fields).set_index('item').to_csv('pcornet_cdm/fields.csv')
+else:
+    _fields = tab.DataFrame.from_records([dict(x=1)])
+IO_TESTING and _to_pd(_fields, index='item').loc[380:].head()
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Ontology
@@ -446,28 +375,28 @@ select * from item_concepts where naaccrNum between 400 and 450 order by naaccrN
 
 # %%
 # TODO: use these in preference to LOINC, Werth codes.
-ont.NAACCR_Layout.item_codes().query('naaccrNum == 380')
+IO_TESTING and _to_pd(ont.NAACCR_Layout.item_codes()).query('naaccrNum == 380')
 
 # %% {"slideshow": {"slide_type": "subslide"}}
-# if IO_TESTING:
-#    ont.LOINC_NAACCR.answers_in(_spark)
+if IO_TESTING:
+   _to_spark('loinc_naaccr_answer', lambda: ont.LOINC_NAACCR.answer)
 
-IO_TESTING and _spark.table('loinc_naaccr_answers').where('code_value = 380').limit(5).toPandas()
+IO_TESTING and _SQL('select * from loinc_naaccr_answer where code_value = 380', limit=5)
 
 # %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # #### Werth Code Values
 
 # %%
 if IO_TESTING:
-    _spark.createDataFrame(ont.NAACCR_R.field_code_scheme).createOrReplaceTempView('field_code_scheme')
-    _spark.createDataFrame(ont.NAACCR_R.code_labels()).createOrReplaceTempView('code_labels')
-IO_TESTING and _spark.table('code_labels').limit(5).toPandas().set_index(['item', 'name', 'scheme', 'code'])
+    _spark.load_data_frame('field_code_scheme', ont.NAACCR_R.field_code_scheme)
+    _spark.load_data_frame('code_labels', ont.NAACCR_R.code_labels())
+IO_TESTING and _SQL('select * from code_labels', limit=5).set_index(['item', 'name', 'scheme', 'code'])
 
 # %% {"slideshow": {"slide_type": "subslide"}}
 _SQL('''
 select answer_code, c_hlevel, sectionId, c_basecode, c_name, c_visualattributes, c_fullname
 from code_concepts where naaccrNum = 610
-''', index='answer_code')
+''', index='answer_code', limit=10)
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ### Oncology MetaFiles from the World Health Organization
@@ -478,7 +407,7 @@ from code_concepts where naaccrNum = 610
 if IO_TESTING:
     _who_topo = ont.OncologyMeta.read_table((_cwd / ',cache').resolve(), *ont.OncologyMeta.topo_info)
 
-IO_TESTING and _who_topo.set_index('Kode').head()
+IO_TESTING and _to_pd(_who_topo).set_index('Kode').head()
 
 # %% {"slideshow": {"slide_type": "subslide"}}
 _to_spark('icd_o_topo', lambda: ont.OncologyMeta.icd_o_topo(_who_topo))
@@ -491,7 +420,7 @@ _SQL(r'''select * from primary_site_concepts''')
 # ## Site-Specific Factor Terms
 
 # %% {"slideshow": {"slide_type": "-"}}
-ont.NAACCR_I2B2.cs_terms.head()
+IO_TESTING and _to_pd(ont.NAACCR_I2B2.cs_terms).head()
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## SEER Recode Concepts
@@ -651,14 +580,6 @@ IO_TESTING and _naaccr_text_lines.limit(5).toPandas()
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
-def non_blank(df: pd.DataFrame) -> pd.DataFrame:
-    return df[[
-        col for col in df.columns
-        if (df[col].str.strip() > '').any()
-    ]]
-
-
-# %% {"slideshow": {"slide_type": "skip"}}
 def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
                     value_col: str = 'value',
                     exclude_pfx: str = 'reserved') -> DataFrame:
@@ -683,7 +604,7 @@ if IO_TESTING:
 # _extract.explain()
 
 # %% {"slideshow": {"slide_type": "-"}}
-IO_TESTING and non_blank(_extract.limit(5).toPandas())
+#@@ IO_TESTING and non_blank(_extract.limit(5).toPandas())
 
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -755,10 +676,14 @@ IO_TESTING and (strange_dates(_extract)
 # Turns out to be not enough:
 
 # %%
-def dups(df_spark: DataFrame, key_cols: List[str]) -> pd.DataFrame:
-    df_pd = df_spark.toPandas().sort_values(key_cols)
-    df_pd['dup'] = df_pd.duplicated(key_cols, keep=False)
-    return df_pd[df_pd.dup]
+def dups(df_spark: DataFrame, key_cols: List[str]) -> DataFrame:
+    key_list = ', '.join(key_cols)
+    dup_q = f'''(
+        select count(*) qty, {key_list} from {df_spark.table}
+        group by {key_list}
+        having count(*) > 1
+    )'''
+    return df_spark._ctx.sql(dup_q)
 
 
 _key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
@@ -828,13 +753,13 @@ class TumorKeys:
                       extra: List[str] = ['dateOfDiagnosis',
                                           'dateCaseCompleted'],
                       # keep recordId length consistent
-                      extra_default: Opt[sq.Column] = None) -> DataFrame:
+                      extra_default: Opt[str] = None) -> DataFrame:
         # ISSUE: performance: add encounter_num column here?
         if extra_default is None:
             extra_default = func.lit('0000-00-00')
         id_col = func.concat(data.patientSystemIdHosp,
                              data.tumorRecordNumber,
-                             *[func.coalesce(data[col], extra_default)
+                             *[func.coalesce(data[col], func.lit(extra_default))
                                for col in extra])
         return data.withColumn(name, id_col)
 
@@ -1105,9 +1030,9 @@ class SiteSpecificFactors:
              if it['naaccrName'].startswith('CS Site-Specific Factor')]
 
     @classmethod
-    def valtypes(cls) -> pd.DataFrame:
+    def valtypes(cls) -> tab.DataFrame:
         factor_nums = [d['naaccrNum'] for d in cls.items]
-        item_ty = ont.NAACCR_I2B2.tumor_item_type[['naaccrNum', 'naaccrId', 'valtype_cd']]
+        item_ty = ont.NAACCR_I2B2.tumor_item_type.select('naaccrNum', 'naaccrId', 'valtype_cd')
         item_ty = item_ty[item_ty.naaccrNum.isin(factor_nums)]
         return item_ty
 
@@ -1323,7 +1248,7 @@ def cancerIdSample(spark: SparkSession_T, tumors: DataFrame,
 if IO_TESTING:
     _cancer_id = cancerIdSample(_spark, _extract)
 
-IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
+#@@ IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
 
 # %% {"slideshow": {"slide_type": "skip"}}
 IO_TESTING and _cancer_id.toPandas().describe()

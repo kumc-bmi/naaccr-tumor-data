@@ -386,7 +386,7 @@ class DataFrame(tab.Relation):
     """
     def __init__(self, ctx: DBSession, table: str, schema: tab.Schema) -> None:
         tab.Relation.__init__(self, schema)
-        self.__ctx = ctx
+        self._ctx = ctx
         self.table = table
 
     @classmethod
@@ -401,7 +401,7 @@ class DataFrame(tab.Relation):
 
     def iterrows(self) -> Iterator[Tuple[int, tab.Row]]:
         ix = 0
-        with self.__ctx._query(f'select * from {self.table}') as q:
+        with self._ctx._query(f'select * from {self.table}') as q:
             while True:
                 chunk = q.fetchmany()
                 if not chunk:
@@ -491,7 +491,7 @@ class MockCTX(DBSession):
 
 class MockDF(DataFrame):
     def __init__(self, ctx: MockCTX, label: str) -> None:
-        self.__ctx = ctx
+        self._ctx = ctx
         self.label = label
 
     def __repr__(self) -> str:

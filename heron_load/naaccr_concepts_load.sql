@@ -460,3 +460,43 @@ and ti.codenbr not like '% %'
 
 drop table icd_o_topo;
 drop table icd_o_morph;
+
+drop view if exists pcornet_tumor_fields;
+create view pcornet_tumor_fields as
+select 'TUMOR' as TABLE_NAME
+     , ty.naaccrNum as item
+     , upper_snake_case(naaccrId) as FIELD_NAME
+     , 'RDBMS ' || (case valtype_cd
+        when 'N' then 'Number'
+        when '@' then 'Text'
+        when 'T' then 'Text'
+        when 'D' then 'Date' end) ||
+        (case when valtype_cd == 'D' then '' else '(' || length || ')' end)
+        as RDBMS_DATA_TYPE
+     , 'SAS ' || (case valtype_cd
+        when 'N' then 'Numeric'
+        when '@' then 'Char'
+        when 'T' then 'Char'
+        when 'D' then 'Date' end) ||
+        (case when valtype_cd == 'D' then ' (Numeric)' else '(' || length || ')' end)
+        as SAS_DATA_TYPE
+     , 'LOINC scale ' || scale_typ as DATA_FORMAT
+     , 'NO' as REPLICATED_FIELD
+     , case when valtype_cd = 'D' then 'DATE' else null end as UNIT_OF_MEASURE
+     , VALUESET
+     , VALUESET_DESCRIPTOR
+     , ch10.description as FIELD_DEFINITION
+     , row_number() over (order by ty.naaccrNum) FIELD_ORDER
+from tumor_item_type ty
+left join ch10 on ch10.naaccrNum = ty.naaccrNum
+left join (
+  select naaccrNum
+       , group_concat('' || code, ';') as VALUESET
+       , group_concat('' || code || '=' || desc, ';') as VALUESET_DESCRIPTOR
+  from item_codes
+  where code is not null
+  group by naaccrNum
+) vs on vs.naaccrNum = ty.naaccrNum
+where valtype_cd in ('N', '@', 'T', 'D')
+order by ty.naaccrNum
+;
