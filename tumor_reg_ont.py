@@ -1,11 +1,11 @@
 r"""
     >>> from sys import stderr
-    >>> logging.basicConfig(level=logging.DEBUG, stream=stderr)
+    >>> logging.basicConfig(level=logging.WARNING, stream=stderr)
     >>> spark = SparkSession_T.in_memory()  # _T isn't appropriate here
     >>> ont = NAACCR_I2B2.ont_view_in(spark, task_id='abc123',
     ...                               update_date=dt.date(2001, 1, 1))
-    >>> ont
-    DataFrame(naaccr_ontology)
+    >>> ont  # doctest: +ELLIPSIS
+    DataFrame({'c_hlevel': 'number', 'c_fullname': 'string', ...})
 
     # TODO: test ont.iterrows()
 """
@@ -492,13 +492,6 @@ class NAACCR_R:
         return res.path(naaccr_r_raw, 'code-labels')
 
     @classmethod
-    def field_info_in(cls, spark: SparkSession_T) -> None:
-        info = spark.createDataFrame(cls.field_info)
-        info.createOrReplaceTempView(NAACCR_I2B2_Mix.r_field_info)
-        to_scheme = spark.createDataFrame(cls.field_code_scheme)
-        to_scheme.createOrReplaceTempView(NAACCR_I2B2_Mix.r_code_scheme)
-
-    @classmethod
     def code_labels(cls,
                     implicit: List[str] = ['iso_country']) -> tab.DataFrame:
         found = []
@@ -603,7 +596,7 @@ class NAACCR_I2B2(object):
             ('naaccr_top_concept', ['naaccr_top', 'current_task']),
             ('section_concepts', ['section', 'naaccr_top']),
             ('item_concepts', [per_item_view]),
-            ('code_concepts', [per_item_view, 'loinc_naaccr_answers', 'code_labels']),
+            ('code_concepts', [per_item_view, 'loinc_naaccr_answer', 'code_labels']),
             ('primary_site_concepts', ['icd_o_topo']),
             # TODO: morphology
             ('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
@@ -614,16 +607,14 @@ class NAACCR_I2B2(object):
     @classmethod
     def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: dt.date,
                     who_cache: Opt[Path_T] = None) -> DataFrame:
-        to_df = spark.createDataFrame
         if who_cache:
             who_topo = OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info)
-            icd_o_topo = to_df(OncologyMeta.icd_o_topo(who_topo))
+            icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
         else:
             log.warn('skipping WHO Topology terms')
-            icd_o_topo = spark.sql('''
-              select 3 lvl, 'C00' concept_cd, 'FA' c_visualattributes
-                   , 'abc' path, 'LIP' concept_path, 'x' concept_name
-            ''')
+            icd_o_topo = tab.DataFrame.from_records([dict(
+                lvl=3, concept_cd='C00', c_visualattributes='FA',
+                path='abc', concept_path='LIP', concept_name='x')])
 
         top = tab.DataFrame.from_records([dict(
             c_hlevel=1,
@@ -631,18 +622,17 @@ class NAACCR_I2B2(object):
             c_name=cls.c_name,
             update_date=update_date,
             sourcesystem_cd=cls.sourcesystem_cd)])
-        answers = to_df(LOINC_NAACCR.answer)
         current_task = tab.DataFrame.from_records([dict(task_id=task_id)])
         views = create_objects(spark, cls.ont_script,
-                               current_task=to_df(current_task),
-                               naaccr_top=to_df(top),
-                               section=to_df(cls.per_section),
-                               tumor_item_type=to_df(cls.tumor_item_type),
-                               loinc_naaccr_answers=answers,
-                               code_labels=to_df(NAACCR_R.code_labels()),
+                               current_task=current_task,
+                               naaccr_top=top,
+                               section=cls.per_section,
+                               tumor_item_type=cls.tumor_item_type,
+                               loinc_naaccr_answer=LOINC_NAACCR.answer,
+                               code_labels=NAACCR_R.code_labels(),
                                icd_o_topo=icd_o_topo,
-                               cs_terms=to_df(cls.cs_terms),
-                               seer_site_terms=to_df(cls.seer_recode_terms))
+                               cs_terms=cls.cs_terms,
+                               seer_site_terms=cls.seer_recode_terms)
 
         name, _, _ = cls.ont_script.objects[-1]
         return views[name]
