@@ -57,8 +57,8 @@ create view section_concepts as
 with ea as (
 select nts.sectionId, nts.section
      , top.c_hlevel + 1 c_hlevel
-     , concat(top.c_fullname, 'S:', nts.sectionid, ' ', section, '\\') as c_fullname
-     , concat(trim(format_string('%02d', nts.sectionid)), ' ', section) as c_name
+     , top.c_fullname || 'S:' || nts.sectionid || ' ' || section || '\' as c_fullname
+     , trim(printf('%02d', nts.sectionid)) || ' ' || section as c_name
      , null as c_basecode
      , 'FA' as c_visualattributes
      , cast(null as string) as c_tooltip
@@ -80,11 +80,11 @@ create view item_concepts as
 with ea as (
 select sc.sectionId, ni.naaccrNum
      , sc.c_hlevel + 1 as c_hlevel
-     , concat(sc.c_fullname,
+     , (sc.c_fullname ||
        -- ISSUE: migrate from naaccrName to naaccrId for path?
-              substr(concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName), 1, 40), '\\') as c_fullname
-     , concat(trim(format_string('%04d', ni.naaccrNum)), ' ', ni.naaccrName) as c_name
-     , concat('NAACCR|', ni.naaccrNum, ':') as c_basecode
+              substr((trim(printf('%04d', ni.naaccrNum)) || ' ' || ni.naaccrName), 1, 40) || '\') as c_fullname
+     , (trim(printf('%04d', ni.naaccrNum)) || ' ' || ni.naaccrName) as c_name
+     , ('NAACCR|' || ni.naaccrNum || ':') as c_basecode
      , case
        when ni.valtype_cd = '@' then 'FA'
        else 'LA' -- TODO: hide concepts where we have no data
@@ -124,7 +124,7 @@ left join code_labels rl
       and (la.answerlistid is null or rl.code = la.answer_code)
 ),
 with_name as (
-select substr(concat(answer_code, ' ', answer_string), 1, 200) as c_name
+select substr((answer_code || ' ' || answer_string), 1, 200) as c_name
      , mix.*
 from mix
 where answer_code is not null
@@ -132,10 +132,10 @@ where answer_code is not null
 ea as (
 select ic.sectionId, ic.naaccrNum, answer_code
      , ic.c_hlevel + 1 c_hlevel
-     , concat(ic.c_fullname,
-              substr(v.c_name, 1, 40), '\\') as c_fullname
+     , (ic.c_fullname ||
+              substr(v.c_name, 1, 40) || '\') as c_fullname
      , v.c_name
-     , concat('NAACCR|', ic.naaccrNum, ':', answer_code) as c_basecode
+     , ('NAACCR|' || ic.naaccrNum || ':' || answer_code) as c_basecode
      , 'LA' as c_visualattributes
      , description as c_tooltip
 from with_name v
@@ -239,9 +239,9 @@ and label = 'title'
 create view primary_site_concepts as
 with ea as (
 select lvl + 1 as c_hlevel
-     , concat(ic.c_fullname, icdo.path) as c_fullname
+     , (ic.c_fullname || icdo.path) as c_fullname
      , icdo.concept_name as c_name
-     , concat('NAACCR|400:', icdo.concept_cd) as c_basecode
+     , ('NAACCR|400:' || icdo.concept_cd) as c_basecode
      , icdo.c_visualattributes
      , cast(null as string) as c_tooltip
 from icd_o_topo icdo
@@ -282,7 +282,7 @@ with
 
 folder as (
 select top.c_hlevel + 1 c_hlevel
-     , concat(top.c_fullname, 'SEER Site\\') as c_fullname
+     , (top.c_fullname || 'SEER Site\') as c_fullname
      , 'SEER Site Summary' as c_name
      , null as c_basecode
      , 'FA' as c_visualattributes
@@ -293,10 +293,10 @@ cross join naaccr_top_concept top
 
 site as (
 select f.c_hlevel + s.hlevel + 1 as c_hlevel
-     , concat(f.c_fullname, s.path, '\\') as c_fullname
+     , (f.c_fullname || s.path || '\') as c_fullname
      , name as c_name
      , case when basecode is null then null
-       else concat('SEER_SITE:', basecode) end as concept_cd
+       else ('SEER_SITE:' || basecode) end as concept_cd
      , visualattributes as c_visualattributes
      , cast(null as string) as c_tooltip
 from seer_site_terms s
