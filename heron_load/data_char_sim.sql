@@ -145,7 +145,7 @@ from by_yr
 	select 1.61803398875 as phi
 ),
 	rand_per_entity as (
-	select phi * case_index - floor(phi * case_index) rand01
+	select phi * case_index - cast(phi * case_index as int) rand01
 	     , case_index
 	from simulated_entity cross join golden_ratio
 ),
@@ -179,7 +179,7 @@ select 1.61803398875 as phi
 ea as (
   select cy.case_index, cy.dx_yr, sectionId, by_item.naaccrNum, by_item.naaccrId, by_item.valtype_cd
        , by_item.present, by_item.tumor_qty
-       , (phi * case_index * naaccrNum - floor(phi * case_index * naaccrNum)) * denominator as x
+       , (phi * case_index * naaccrNum - cast(phi * case_index * naaccrNum as int)) * denominator as x
   from simulated_case_year cy
   join by_item on cy.dx_yr = by_item.dx_yr
   cross join golden_ratio
@@ -268,4 +268,4 @@ join tumor_item_type ty on ty.naaccrNum = d.naaccrNum
 order by dx_yr desc, d.case_index, ty.sectionid, ty.naaccrNum;
 */
 
-select * from tumor_item_type
+select count(*) from sim1;
