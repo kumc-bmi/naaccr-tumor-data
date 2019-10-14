@@ -489,7 +489,6 @@ class MockCTX(DBSession):
 
     def sql(self, code: str) -> DataFrame:
         c, _v, name, _ = code.split(None, 3)
-        assert(c == 'create')
         df = MockDF(self, name)
         self._tables[name] = df
         return df
