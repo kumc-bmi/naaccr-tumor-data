@@ -135,13 +135,14 @@ if IO_TESTING:
 #
 # The `_SQL` utility uses an in-memory sqlite3 database.
 
-# %% {"slideshow": {"slide_type": "skip"}}
+# %%
 if IO_TESTING:
     _conn = connect_mem(':memory:', detect_types=PARSE_COLNAMES)
     _spark = SparkSession_T(_conn)
     from tumor_reg_ont import _with_path
 
 
+# %% {"slideshow": {"slide_type": "skip"}}
 def _to_spark(name: str, compute: Callable[[], tab.DataFrame],
               cache: bool = False) -> Opt[DataFrame]:
     """Compute data locally and save as SQL view"""
@@ -521,15 +522,12 @@ _to_pd(
 if IO_TESTING:
     print(without_empty_cols(tumorDF(NAACCR2.s100x)).columns)
 
+
 # %% [markdown]
 # ## Synthetic Tumor Data
 #
 # Since the naaccr-xml test data doesn't supply important items
 # such as class of case, let's synthesize some data.
-
-# %%
-_SQL("select * from data_agg_naaccr where dx_yr = 2017 and naaccrId like 'date%'")
-
 
 # %%
 class SyntheticTumors:
@@ -540,85 +538,101 @@ class SyntheticTumors:
                         ('simulated_naaccr_nom', ['data_agg_naaccr', 'simulated_entity'])])
 
     @classmethod
-    def make_eav(cls, spark: SparkSession_T, agg: DataFrame,
+    def make_eav(cls, spark: SparkSession_T, agg: tab.DataFrame,
                  qty: int = 500,
                  years: Tuple[int, int] = (2004, 2018)) -> DataFrame:
-        simulated_entity = spark.createDataFrame([(ix,) for ix in range(1, qty)], ['case_index'])
-        to_df = spark.createDataFrame
+        simulated_entity = tab.DataFrame.from_records([dict(case_index=ix) for ix in range(1, qty)])
 
         views = ont.create_objects(spark, cls.script,
-                                   record_layout=to_df(ont.NAACCR_Layout.fields),
-                                   section=to_df(ont.NAACCR_I2B2.per_section),
-                                   tumor_item_type=to_df(ont.NAACCR_I2B2.tumor_item_type),
                                    data_agg_naaccr=agg,
+                                   record_layout=tab.DataFrame.from_records(ont.NAACCR_Layout.fields),
+                                   section=ont.NAACCR_I2B2.per_section,
+                                   tumor_item_type=ont.NAACCR_I2B2.tumor_item_type,
                                    simulated_entity=simulated_entity)
         return list(views.values())[-1]
-
-    @classmethod
-    def pivot(cls, spark: SparkSession_T, skinny: DataFrame,
-              key_cols: List[str] = ['case_index']) -> DataFrame:
-        ddict = ont.ddictDF(_spark)
-        return naaccr_pivot(ddict, skinny, key_cols)
 
 
 if IO_TESTING:
     SyntheticTumors.make_eav(
         _spark,
-        _spark.read.csv('test_data/naaccr_nom_stats.csv',
-                        header=True, inferSchema=True),
+        tab.read_csv(_cwd / 'test_data/naaccr_nom_stats.csv'),
         qty=2000)
 
 # %%
-_SQL('select * from simulated_naaccr_nom limit 500')
+_SQL('select * from simulated_naaccr_nom limit 50', index=['case_index', 'sectionId', 'naaccrNum'], limit=40)
 
 # %%
-IO_TESTING and SyntheticTumors.pivot(
-    _spark, _spark.table('simulated_naaccr_nom')).limit(10).toPandas().set_index('case_index')
+_SQL("select * from data_agg_naaccr where dx_yr = 2017 and naaccrId like 'date%'")
+
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ## NAACCR Flat File v18
 
-# %% {"slideshow": {"slide_type": "skip"}}
+# %%
+class TextFile(tab.Relation):
+    def __init__(self, schema, access: Path_T) -> None:
+        tab.Relation.__init__(self, schema)
+        self.__access = access
+
+    @classmethod
+    def simple(cls, access: Path_T,
+               value_col='value'):
+        col = tab.Seq.column_of('', name=value_col)
+        return cls(tab.Schema(columns=[col]), access)
+
+    def iterrows(self):
+        return zip(itertools.count(),
+                   ([line] for line in self.__access.open().readlines()))
+
 if IO_TESTING:
     with NAACCR2.s100t() as _tr_file:
         log.info('tr_file: %s', _tr_file)
-        _naaccr_text_lines = _spark.read.text(str(_tr_file))
+        _spark.load_data_frame('s100t', TextFile.simple(_tr_file))
 else:
     _naaccr_text_lines = cast(DataFrame, None)
 
-# %% {"slideshow": {"slide_type": "skip"}}
-IO_TESTING and _naaccr_text_lines.rdd.getNumPartitions()
-
-# %%
-IO_TESTING and _naaccr_text_lines.limit(5).toPandas()
+_SQL('select * from s100t')
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
-def naaccr_read_fwf(flat_file: DataFrame, itemDefs: DataFrame,
+def naaccr_fields(table: str, itemDefs: tab.DataFrame,
+                  value_col: str = 'value',
+                  exclude_pfx: str = 'reserved') -> str:
+    """
+    @param itemDefs: see ddictDF
+    """
+    fields = itemDefs.apply(
+        'string', lambda startColumn, length, naaccrId, **_:
+        f'substr({value_col}, {startColumn}, {length}) as {naaccrId}').values
+    fieldsep = "\n     , "
+    nl = "\n"
+    return f"""
+    select {fieldsep.join(fields)}
+    from {table}"""
+
+
+# %% {"slideshow": {"slide_type": "skip"}}
+def naaccr_read_fwf(text_lines: DataFrame, itemDefs: tab.DataFrame,
+                    line_table='naaccr_lines', extract_view='naaccr_fields_raw',
                     value_col: str = 'value',
                     exclude_pfx: str = 'reserved') -> DataFrame:
     """
-    @param flat_file: as from spark.read.text()
-                      typically with .value
-    @param itemDefs: see ddictDF. ISSUE: should just use static CSV data now.
+    @param text_lines: see also class TextFile
+    @param itemDefs: see ddictDF.
     """
-    fields = [
-        func.substring(flat_file[value_col],
-                       item.startColumn, item.length).alias(item.naaccrId)
-        for item in itemDefs.collect()
-        if not item.naaccrId.startswith(exclude_pfx)
-    ]  # type: List[Union[sq.Column, str]]
-    return flat_file.select(fields)
+    log.info('flat_file lines: %s', text_lines)
+    viewdef = naaccr_fields(text_lines.table, itemDefs, value_col, exclude_pfx)
+    spark = text_lines._ctx
+    spark.sql(f'drop view if exists {extract_view}')
+    spark.sql(f'create view {extract_view} as {viewdef}')
+    return spark.table(extract_view)
 
-
-_extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
+#_extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
 if IO_TESTING:
-    _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF(_spark)).cache()
-    _extract.createOrReplaceTempView('naaccr_extract')
-# _extract.explain()
+    _naaccr_text_lines = _spark.load_data_frame('naaccr_lines', TextFile.simple(_tr_file))
+    _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF())
 
-# %% {"slideshow": {"slide_type": "-"}}
-#@@ IO_TESTING and non_blank(_extract.limit(5).toPandas())
+_SQL('select * from naaccr_fields_raw')
 
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -626,55 +640,42 @@ if IO_TESTING:
 #
 #  - **ISSUE**: hide date flags in i2b2? They just say why a date is missing, which doesn't seem worth the screenspace.
 
-# %%
-def _to_date(col):
-    return f"""date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
-             || coalesce(substr({col}, 7, 2), '01')) as "{col} [date]" """
-
-
-def naaccr_date_q(select_from: str, orig_cols: List[str], date_cols: List[str],
-                  keep: bool = False):
-    w_date = (([f"{col} as {col}_"] if keep else []) + [_to_date(col)] if col in date_cols
-              else [col]
-              for col in orig_cols)
-    fmt_cols = '\n  , '.join(col for parts in w_date for col in parts)
-    return f'select {fmt_cols} from {select_from}'
-
-
-def naaccr_dates(df: DataFrame, date_cols: List[str],
-                 keep: bool = False) -> DataFrame:
-    q = naaccr_date_q(df.table, df.columns, date_cols, keep)
-    return df._ctx.sql(q)
-
-
-IO_TESTING and _to_pd(naaccr_dates(
-    _extract,
-    ['dateOfDiagnosis', 'dateOfLastContact'],
-    keep=True))[['dateOfDiagnosis', 'dateOfLastContact']].head()
-
-
 # %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # ### Strange dates: TODO?
 
 # %%
-def strange_dates(extract: DataFrame) -> DataFrame:
-    xsel = extract._ctx.sql(f'''select dateOfDiagnosis from {extract.table}''')
-    x = naaccr_dates(xsel,
-                     ['dateOfDiagnosis'], keep=True)
-    q = f'''
-    select * from (
-        select "dateOfDiagnosis [date]", dateOfDiagnosis_
-             , length(trim(dateOfDiagnosis_)) as dtlen
-             , substr(dateOfDiagnosis_, 1, 2) as cc
-        from {x.table}
-    )
-    where dtlen > 0
-    and cc not in ('19', '20')
-    '''
-    return x._ctx.sql(q)
+def _to_date(col):
+    return f"""case when trim({col}) > '' then date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
+             || coalesce(substr({col}, 7, 2), '01')) end as {col} """
 
 
-IO_TESTING and _to_pd(strange_dates(_extract)).groupby(['dtlen', 'cc']).count()
+def _to_text(col: str) -> str:
+    return f"case when trim({col}) > '' then trim({col}) end as {col}"  # ISSUE: left / right
+
+
+def _to_num(col: str) -> str:
+    return f"case when trim({col}) > '' then 0 + {col} end as {col}"
+
+
+def naaccr_fields_typed(ty: tab.DataFrame,
+                        dest_view: str = 'naaccr_fields',
+                        raw_view: str = 'naaccr_fields_raw'):
+    decode = {'T': _to_text, '@': _to_text, 'D': _to_date, 'N': _to_num}
+    ty = ty.filter(lambda valtype_cd, **_: valtype_cd in decode.keys())
+    cols = ty.apply('string', lambda naaccrId, valtype_cd, **_: decode[valtype_cd](naaccrId))
+    sep = '\n  , '
+    return f"""drop view if exists {dest_view};
+    create view {dest_view} as
+    select row_number() over (order by dateOfDiagnosis, dateOfBirth, dateOfLastContact
+                            , dateCaseLastChanged, dateCaseCompleted, dateCaseReportExported) tumor_id
+         , patientIdNumber
+         , {sep.join(cols.values)}
+    from {raw_view}"""
+
+if IO_TESTING:
+    _conn.executescript(naaccr_fields_typed(ont.NAACCR_I2B2.tumor_item_type))
+
+_SQL('select * from naaccr_fields limit 10')
 
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -701,20 +702,23 @@ IO_TESTING and _to_pd(strange_dates(_extract)).groupby(['dtlen', 'cc']).count()
 # %%
 def dups(df_spark: DataFrame, key_cols: List[str]) -> DataFrame:
     key_list = ', '.join(key_cols)
-    dup_q = f'''(
+    dup_q = f'''
         select count(*) qty, {key_list} from {df_spark.table}
         group by {key_list}
         having count(*) > 1
-    )'''
+    '''
     return df_spark._ctx.sql(dup_q)
 
 
 _key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
 
-IO_TESTING and dups(_extract.select('sequenceNumberCentral',
+IO_TESTING and _to_pd(dups(_extract.select('sequenceNumberCentral',
                                     'dateOfDiagnosis', 'dateCaseCompleted',
                                     *_key1),
-                    _key1).set_index(_key1).head(10)
+                    _key1)).set_index(_key1).head(10)
+
+# %%
+logging.getLogger('sql_script').setLevel(logging.DEBUG)
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
@@ -753,18 +757,16 @@ class TumorKeys:
         pat = cls._pick_cols(spark, naaccr_text_lines,
                              cls.pat_ids + cls.pat_attrs +
                              cls.report_ids + cls.report_attrs)
-        # distinct() wasn't fixed until the 3.x pre-release
-        # https://github.com/zero323/pyspark-stubs/pull/138 623b0c0330ef
-        return pat.distinct()  # type: ignore
+        return pat._ctx.sql(f'select distinct * from {pat.table}')
 
     @classmethod
     def _pick_cols(cls, spark: SparkSession_T,
                    naaccr_text_lines: DataFrame,
                    cols: List[str]) -> DataFrame:
-        dd = ont.ddictDF(spark)
+        dd = ont.ddictDF()
         pat_tmr = naaccr_read_fwf(
             naaccr_text_lines,
-            dd.where(dd.naaccrId.isin(cols)))
+            dd[dd.naaccrId.isin(cols)])
         pat_tmr = naaccr_dates(pat_tmr,
                                [c for c in pat_tmr.columns
                                 if c.startswith('date')])
@@ -779,11 +781,11 @@ class TumorKeys:
                       extra_default: Opt[str] = None) -> DataFrame:
         # ISSUE: performance: add encounter_num column here?
         if extra_default is None:
-            extra_default = func.lit('0000-00-00')
-        id_col = func.concat(data.patientSystemIdHosp,
-                             data.tumorRecordNumber,
-                             *[func.coalesce(data[col], func.lit(extra_default))
-                               for col in extra])
+            extra_default = '0000-00-00'
+        typed = lambda n: f'"{n} [date]"' if n.startswith('date') else n
+        extra_col = ' || '.join(f"coalesce({typed(col)}, '{extra_default}')" for col in extra)
+        id_col = 'patientSystemIdHosp || tumorRecordNumber || ' + extra_col
+        log.info('@@@id_col: %s', id_col)
         return data.withColumn(name, id_col)
 
     @classmethod
@@ -794,8 +796,7 @@ class TumorKeys:
         # ISSUE: deid encounter_num further?
         tumors = tumors.withColumn(
             new_col,
-            func.lit(start) +
-            func.row_number().over(Window.orderBy(key_col)))
+            f'1 + row_number() over (order by {key_col})')
         return tumors
 
     @classmethod
@@ -837,7 +838,7 @@ if IO_TESTING:
 IO_TESTING and (_pat_tmr, _patients)
 
 # %% {"slideshow": {"slide_type": "slide"}}
-IO_TESTING and _pat_tmr.limit(15).toPandas()
+IO_TESTING and _to_pd(_pat_tmr).head(15)
 
 # %% {"slideshow": {"slide_type": "slide"}}
 IO_TESTING and _patients.limit(10).toPandas()
@@ -846,54 +847,40 @@ IO_TESTING and _patients.limit(10).toPandas()
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # ##  Observations
 
-# %% {"slideshow": {"slide_type": "skip"}}
-def melt(df: DataFrame,
-         id_vars: List[str], value_vars: List[str],
-         var_name: str = 'variable', value_name: str = 'value') -> DataFrame:
-    """Convert :class:`DataFrame` from wide to long format."""
-    # ack: user6910411 Jan 2017 https://stackoverflow.com/a/41673644
-
-    # Create array<struct<variable: str, value: ...>>
-    _vars_and_vals = func.array(*(
-        func.struct(func.lit(c).alias(var_name), func.col(c).alias(value_name))
-        for c in value_vars))
-
-    # Add to the DataFrame and explode
-    _tmp = df.withColumn("_vars_and_vals", func.explode(_vars_and_vals))
-
-    cols = [func.col(v) for v in id_vars] + [
-        func.col("_vars_and_vals")[x].alias(x) for x in [var_name, value_name]]
-    return _tmp.select(*cols)
-
-
-# %% {"slideshow": {"slide_type": "skip"}}
-if IO_TESTING:
-    _to_spark('tumor_item_type', lambda: ont.NAACCR_I2B2.tumor_item_type, cache=True)
-    _ty = _spark.table('tumor_item_type')
-IO_TESTING and _ty.limit(5).toPandas()
-
-
-# %% [markdown] {"slideshow": {"slide_type": "skip"}}
-# **ISSUE**: performance: whenever we change cardinality, consider persisting the data. e.g. stack_obs
-
-# %% {"slideshow": {"slide_type": "skip"}}
-def stack_obs(records: DataFrame, ty: DataFrame,
-              known_valtype_cd: List[str] = ['@', 'D', 'N', 'Ni', 'T'],
-              key_cols: List[str] = TumorKeys.key4 + TumorKeys.dtcols) -> DataFrame:
-    ty = ty.select('naaccrNum', 'naaccrId', 'valtype_cd')
-    ty = ty.where(ty.valtype_cd.isin(known_valtype_cd))
-    value_vars = [row.naaccrId for row in ty.collect()]
-    obs = melt(records, key_cols, value_vars, var_name='naaccrId', value_name='raw_value')
-    obs = obs.where("trim(raw_value) != ''")
-    obs = obs.join(ty, ty.naaccrId == obs.naaccrId).drop(ty.naaccrId)
-    return obs
-
+# %%
+def tumor_item_value(ty: DataFrame,
+                     tumor_id: str = 'tumor_id',
+                     fields_table: str = 'naaccr_fields'):
+    keys = "patientIdNumber, dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis"
+    ty = ty[ty.valtype_cd.isin(['@', 'N', 'D', 'T'])]
+    ty_q = ty.withColumn('q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
+                      f'''
+                      select {tumor_id}, {keys}
+                           , {naaccrNum} as naaccrNum
+                           , {1 if valtype_cd in ('Ni', 'Ti') else 0} as identified_only
+                           , {naaccrId if valtype_cd == '@' else 'null'} as code_value
+                           , {naaccrId if valtype_cd in ('N', 'Ni') else 'null'} as numeric_value
+                           , {naaccrId if valtype_cd == 'D' else 'null'} as date_value
+                           , {naaccrId if valtype_cd in ('T', 'Ti') else 'null'} as text_value
+                      from {fields_table}
+                       ''').apply(lambda s: ' '.join(s.split())))
+    bySection = {(sid, s): ty_q[ty_q.sectionId.isin([sid])].q.values
+                 for (_, [sid, s]) in ty_q.select('sectionId', 'section').iterrows()}
+    nl = '\n'
+    views = [f'''-- {sid}: {s}{nl}drop table if exists section_{sid};{nl}create table section_{sid} as {(nl + 'union all' + nl).join(queries)};'''
+            for ((sid, s), queries) in bySection.items()]
+    section_all = '\nunion all\n'.join(f'select * from section_{i}' for (i, _) in bySection.keys())
+    top = f'create view section_all as ' + section_all + ';'
+    return views + [top]
 
 if IO_TESTING:
-    _raw_obs = TumorKeys.with_tumor_id(naaccr_dates(stack_obs(_extract, _ty), TumorKeys.dtcols))
-    _to_view('naaccr_obs_raw', lambda: _raw_obs, cache=True)
+    for sql in tumor_item_value(ont.NAACCR_I2B2.tumor_item_type):
+        print()
+        print(sql)
+        _conn.executescript(sql)
 
-_SQL('select * from naaccr_obs_raw', limit=10)
+# %%
+_SQL('select * from section_all where date_value is not null order by tumor_id, naaccrNum', limit=30)
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
