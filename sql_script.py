@@ -299,7 +299,7 @@ class DBSession:
             q.execute(sql)
             yield q
 
-    def load_data_frame(self, name: str, df: tab.DataFrame) -> 'DataFrame':
+    def load_data_frame(self, name: str, df: tab.Relation) -> 'DataFrame':
         with txn(self.__conn) as work:  # type: Cursor
             work.execute(f'drop table if exists {name}')
             work.execute(table_ddl(name, df.schema))
@@ -480,7 +480,7 @@ class MockCTX(DBSession):
     def __init__(self) -> None:
         self._tables = {}  # type: Dict[str, DataFrame]
 
-    def load_data_frame(self, k: str, v: tab.DataFrame) -> 'DataFrame':
+    def load_data_frame(self, k: str, v: tab.Relation) -> 'DataFrame':
         df = self._tables[k] = MockDF(self, k)
         return df
 
