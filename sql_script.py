@@ -3,11 +3,16 @@
 Treat a database table as a DataFrame:
 
     >>> from sqlite3 import connect as connect_mem
-    >>> conn = connect_mem(':memory:')
+    >>> conn = connect_mem(':memory:', detect_types=PARSE_COLNAMES)
     >>> conn.execute('create table t1 as select 1 as c1') and None
     >>> ctx = DBSession(conn)
     >>> DataFrame.select_from(ctx, 't1')
     DataFrame({'c1': 'number'})
+
+Or a query:
+    >>> ctx.sql('''SELECT '2019-10-01' as "t0 [date]" ''')
+    DataFrame({'t0': 'date'})
+
 
 Load CSV into a database table and select from it:
 
@@ -32,7 +37,7 @@ from typing import Iterator, Iterable
 from contextlib import contextmanager
 from importlib import resources as res
 from pathlib import Path as Path_T
-from sqlite3 import Connection, Cursor
+from sqlite3 import Connection, Cursor, PARSE_COLNAMES
 import datetime as dt
 import logging
 import re
@@ -51,10 +56,10 @@ Comment = Text
 StatementInContext = Tuple[Line, Comment, SQL]
 
 
-def main(argv: List[str], cwd: Path_T, connect: Callable[[str], Connection]) -> None:
+def main(argv: List[str], cwd: Path_T, connect: Callable[..., Connection]) -> None:
     db = argv[1]
 
-    ctx = DBSession(connect(db))
+    ctx = DBSession(connect(db, detect_types=PARSE_COLNAMES))
     for csv_file in argv[2:]:
         p = cwd / csv_file
         df = ctx.load_data_frame(p.stem, tab.read_csv(p))
@@ -326,16 +331,17 @@ def table_ddl(name: str, schema: tab.Schema) -> str:
 
     Denote text columns as such in order to preserve leading 0s in codes:
 
-    >>> record = dict(code='001', num=123)
+    >>> record = dict(code='001', num=123, dob=dt.date(1970, 1, 1))
     >>> schema = tab.DataFrame.from_records([record]).schema
     >>> print(table_ddl('t1', schema))
     create table "t1" ("code" text,
-      "num" int)
+      "num" int,
+      "dob" date)
     '''
     sqltypes = {'string': 'text',
                 'number': 'int',
                 'boolean': 'int',
-                'date': 'text'}
+                'date': 'date'}
     col_info = [(col['name'], sqltypes[col['datatype']])
                 for col in schema['columns']]
     col_specs = ',\n  '.join(f'"{name}" {ty}'

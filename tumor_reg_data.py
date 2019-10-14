@@ -65,7 +65,7 @@ from functools import reduce
 from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
-from sqlite3 import connect as connect_mem
+from sqlite3 import connect as connect_mem, PARSE_COLNAMES
 from sys import stderr
 from typing import Callable, ContextManager, Dict, Iterator, List, Tuple
 from typing import Optional as Opt, Union, cast
@@ -137,7 +137,7 @@ if IO_TESTING:
 
 # %% {"slideshow": {"slide_type": "skip"}}
 if IO_TESTING:
-    _conn = connect_mem(':memory:')
+    _conn = connect_mem(':memory:', detect_types=PARSE_COLNAMES)
     _spark = SparkSession_T(_conn)
     from tumor_reg_ont import _with_path
 
@@ -627,25 +627,30 @@ if IO_TESTING:
 #  - **ISSUE**: hide date flags in i2b2? They just say why a date is missing, which doesn't seem worth the screenspace.
 
 # %%
+def _to_date(col):
+    return f"""date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
+             || coalesce(substr({col}, 7, 2), '01')) as "{col} [date]" """
+
+
+def naaccr_date_q(select_from: str, orig_cols: List[str], date_cols: List[str],
+                  keep: bool = False):
+    w_date = (([f"{col} as {col}_"] if keep else []) + [_to_date(col)] if col in date_cols
+              else [col]
+              for col in orig_cols)
+    fmt_cols = '\n  , '.join(col for parts in w_date for col in parts)
+    return f'select {fmt_cols} from {select_from}'
+
+
 def naaccr_dates(df: DataFrame, date_cols: List[str],
                  keep: bool = False) -> DataFrame:
-    orig_cols = df.columns
-    for dtcol in date_cols:
-        strcol = dtcol + '_'
-        df = df.withColumnRenamed(dtcol, strcol)
-        dt = func.substring(func.concat(func.trim(df[strcol]), func.lit('0101')), 1, 8)
-        # df = df.withColumn(dtcol + '_str', dt)
-        dt = func.to_date(dt, 'yyyyMMdd')
-        df = df.withColumn(dtcol, dt)
-    if not keep:
-        df = df.select(cast(Union[sq.Column, str], orig_cols))
-    return df
+    q = naaccr_date_q(df.table, df.columns, date_cols, keep)
+    return df._ctx.sql(q)
 
 
-IO_TESTING and naaccr_dates(
-    _extract.select(['dateOfDiagnosis', 'dateOfLastContact']),
+IO_TESTING and _to_pd(naaccr_dates(
+    _extract,
     ['dateOfDiagnosis', 'dateOfLastContact'],
-    keep=True).limit(10).toPandas()
+    keep=True))[['dateOfDiagnosis', 'dateOfLastContact']].head()
 
 
 # %% [markdown] {"slideshow": {"slide_type": "subslide"}}
@@ -653,19 +658,23 @@ IO_TESTING and naaccr_dates(
 
 # %%
 def strange_dates(extract: DataFrame) -> DataFrame:
-    x = naaccr_dates(extract.select(['dateOfDiagnosis']),
+    xsel = extract._ctx.sql(f'''select dateOfDiagnosis from {extract.table}''')
+    x = naaccr_dates(xsel,
                      ['dateOfDiagnosis'], keep=True)
-    x = x.withColumn('dtlen', func.length(func.trim(x.dateOfDiagnosis_)))
-    x = x.where(x.dtlen > 0)
-    x = x.withColumn('cc', func.substring(func.trim(x.dateOfDiagnosis_), 1, 2))
+    q = f'''
+    select * from (
+        select "dateOfDiagnosis [date]", dateOfDiagnosis_
+             , length(trim(dateOfDiagnosis_)) as dtlen
+             , substr(dateOfDiagnosis_, 1, 2) as cc
+        from {x.table}
+    )
+    where dtlen > 0
+    and cc not in ('19', '20')
+    '''
+    return x._ctx.sql(q)
 
-    return x.where(
-        ~(x.cc.isin(['19', '20'])) |
-        ((x.dtlen < 8) & (x.dtlen > 0)))
 
-
-IO_TESTING and (strange_dates(_extract)
-                .toPandas().groupby(['dtlen', 'cc']).count())
+IO_TESTING and _to_pd(strange_dates(_extract)).groupby(['dtlen', 'cc']).count()
 
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}

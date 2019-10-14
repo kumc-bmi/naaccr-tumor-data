@@ -41,8 +41,8 @@ in pandas:
 
 Metadata can also be determined from values:
 
-    >>> DataFrame.from_records([dict(id=1, name='Pete')])
-    DataFrame({'id': 'number', 'name': 'string'})
+    >>> DataFrame.from_records([dict(id=1, name='Pete', dob=dt.date(1970, 1, 1))])
+    DataFrame({'id': 'number', 'name': 'string', 'dob': 'date'})
 
 (Oops; I think `from_records` in pandas actually takes tuples, not
 dicts)
