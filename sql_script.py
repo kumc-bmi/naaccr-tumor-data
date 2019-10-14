@@ -30,6 +30,10 @@ Load CSV into a database table and select from it:
     (2, 'Demographic')
     (3, 'Edit Overrides/Conversion History/System Admin')
 
+Project / select columns:
+
+    >>> df.select('section')
+    DataFrame({'section': 'string'})
 """
 
 from typing import Callable, Dict, List, Optional as Opt, Text, Tuple, Union
@@ -387,8 +391,14 @@ class DataFrame(tab.Relation):
     Handle empty results. KLUDGE assume string columns:
 
     >>> ctx = DBSession.in_memory()
-    >>> DataFrame.select_from(ctx, '(select 1 as c where 1=0)')
+    >>> t1 = DataFrame.select_from(ctx, '(select 1 as c where 1=0)')
+    >>> t1
     DataFrame({'c': 'string'})
+    >>> t2 = t1.withColumn('c2', 'c + 1')
+    >>> t2
+    DataFrame({'c': 'string', 'c2': 'string'})
+    >>> for _, row in t2.iterrows():
+    ...     print(row)
     """
     def __init__(self, ctx: DBSession, table: str, schema: tab.Schema) -> None:
         tab.Relation.__init__(self, schema)
@@ -405,11 +415,21 @@ class DataFrame(tab.Relation):
             schema = tab.DataFrame.from_records([record]).schema
         return DataFrame(ctx, table, schema)
 
+    chunk_size = 1000
+
+    def select(self, *cols: str) -> 'DataFrame':
+        assert set(cols) <= set(self.columns)
+        sep = '\n  , '
+        return self._ctx.sql(f'''select {sep.join(cols)} from {self.table}''')
+
+    def withColumn(self, name: str, col_expr: str) -> 'DataFrame':
+        return self._ctx.sql(f'''select self.*, {col_expr} as {name} from {self.table} self''')
+
     def iterrows(self) -> Iterator[Tuple[int, tab.Row]]:
         ix = 0
         with self._ctx._query(f'select * from {self.table}') as q:
             while True:
-                chunk = q.fetchmany()
+                chunk = q.fetchmany(self.chunk_size)
                 if not chunk:
                     break
                 for row in chunk:
@@ -470,6 +490,7 @@ def create_objects(spark: DBSession, script: SqlScript,
         if missing:
             raise TypeError(missing)
         log.info('%s: create %s', script.name, name)
+        spark.sql(f'drop view if exists {name}')
         spark.sql(ddl)
         dft = spark.table(name)
         out[name] = dft
