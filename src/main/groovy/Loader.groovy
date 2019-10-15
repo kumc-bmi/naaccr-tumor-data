@@ -45,6 +45,21 @@ class DBConfig {
 class Loader {
     static Logger logger = Logger.getLogger("")
 
+    private final Sql _sql
+
+    Loader(Sql sql) {
+        _sql = sql
+    }
+
+    void runScript(URL input) {
+        input.withInputStream { stream ->
+            new Scanner(stream).useDelimiter(";\n") each {
+                logger.info("executing $input: $it")
+                _sql.execute it
+            }
+        }
+    }
+
     static void main(String[] args) {
         if (args.length < 1) {
             logger.warning("Usage: java -jar loader.jar ACCOUNT")

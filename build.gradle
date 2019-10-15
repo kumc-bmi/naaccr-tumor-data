@@ -13,6 +13,8 @@ repositories { mavenCentral() }
 dependencies {
     testCompile 'org.codehaus.groovy:groovy-all:2.5.8'
     compile 'org.codehaus.groovy:groovy-all:2.5.8'
+    // https://mvnrepository.com/artifact/org.hsqldb/hsqldb
+    testCompile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.2'
     testCompile 'junit:junit:4.12'
 }
 
