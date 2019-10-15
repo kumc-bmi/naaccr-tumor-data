@@ -52,20 +52,54 @@ class Loader {
     }
 
     void runScript(URL input) {
+        def edited = productSqlEdits(productName())
+
         input.withInputStream { stream ->
             new Scanner(stream).useDelimiter(";\n") each {
-                logger.info("executing $input: $it")
-                _sql.execute it
+                String sql = edited(it)
+                logger.info("executing $input: $sql")
+                try {
+                    _sql.execute sql
+                } catch (java.sql.SQLException oops) {
+                    if (sql.contains("drop table")) {
+                        /* trundle on ... */
+                    } else {
+                        throw oops
+                    }
+                }
             }
         }
     }
 
+    Closure<String> productSqlEdits(productName) {
+        if (productName == "Oracle") {
+            return { String sql -> sql.replaceAll("drop table if exists", "drop table") }
+        } else {
+            return { String sql -> sql }
+        }
+    }
+
+    String productName() {
+        String productName
+        _sql.cacheConnection { java.sql.Connection conn ->
+            productName = conn.metaData.databaseProductName
+        }
+        productName
+    }
+
     static void main(String[] args) {
-        if (args.length < 1) {
-            logger.warning("Usage: java -jar loader.jar ACCOUNT")
+        def arg = { String target ->
+            int ix = args.findIndexOf({ it == target })
+            if (ix < 0 || ix + 1 >= args.length) {
+                return null
+            }
+            args[ix + 1]
+        }
+        def account = arg("--account")
+        if (!account) {
+            logger.warning("Usage: java -jar loader.jar --account A [--run abc.sql]")
             System.exit(1)
         }
-        def account = args[0]
         def config
         try {
             config = DBConfig.fromEnv(account, { String name -> System.getenv(name) })
@@ -78,8 +112,10 @@ class Loader {
         }
         logger.info("$account config: $config")
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            sql.eachRow('select * from global_name') { GroovyResultSet row ->
-                logger.info("${config.username}@${row.getAt('global_name')}: loading ...")
+            def script = arg("--run")
+            if (script) {
+                def cwd = java.nio.file.Paths.get(".").toAbsolutePath().normalize().toString()
+                new Loader(sql).runScript(new URL(new URL("file://$cwd/"), script))
             }
         }
     }
