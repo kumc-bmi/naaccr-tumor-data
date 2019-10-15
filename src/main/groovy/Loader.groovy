@@ -1,8 +1,9 @@
-import java.util.logging.Logger
-import groovy.sql.Sql
+import groovy.json.JsonBuilder
 import groovy.sql.GroovyResultSet
+import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.transform.Immutable
+import java.util.logging.Logger
 
 @Immutable
 class Password {
@@ -87,6 +88,11 @@ class Loader {
         productName
     }
 
+    String query(String sql) {
+        def results = _sql.rows(sql)
+        new JsonBuilder(results).toString()
+    }
+
     static void main(String[] args) {
         def arg = { String target ->
             int ix = args.findIndexOf({ it == target })
@@ -112,10 +118,18 @@ class Loader {
         }
         logger.info("$account config: $config")
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+            def loader = new Loader(sql)
+
             def script = arg("--run")
             if (script) {
                 def cwd = java.nio.file.Paths.get(".").toAbsolutePath().normalize().toString()
-                new Loader(sql).runScript(new URL(new URL("file://$cwd/"), script))
+                loader.runScript(new URL(new URL("file://$cwd/"), script))
+            }
+
+            def query = arg("--query")
+            if (query) {
+                def json = loader.query(query)
+                System.out.print(json)
             }
         }
     }
