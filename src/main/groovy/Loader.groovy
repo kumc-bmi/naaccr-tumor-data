@@ -2,6 +2,44 @@ import java.util.logging.Logger
 import groovy.sql.Sql
 import groovy.sql.GroovyResultSet
 import groovy.transform.CompileStatic
+import groovy.transform.Immutable
+
+@Immutable
+class Password {
+    final String value
+
+    @Override
+    String toString() {
+        return "...${value.length()}..."
+    }
+}
+
+
+@Immutable
+class DBConfig {
+    final String url
+    final String driver
+    final String username
+    final Password password
+
+    static Logger logger = Logger.getLogger("")
+
+    static DBConfig fromEnv(String account, Closure<String> getenv) {
+        logger.info("getting config for $account")
+        Closure<String> config = {
+            def name = "${account}_${it}"
+            def val = getenv(name)
+            if (val == null) {
+                throw new IllegalStateException(name)
+            }
+            val
+        }
+        def driver = config("DRIVER")
+        Class.forName(driver)
+        new DBConfig(url: config("URL"), driver: driver,
+                     username: config("USER"), password: new Password(value: config("PASSWORD")))
+    }
+}
 
 @CompileStatic
 class Loader {
@@ -13,31 +51,20 @@ class Loader {
             System.exit(1)
         }
         def account = args[0]
-        logger.info("getting config for $account")
-        def config = {
-            def name = "${account}_${it}"
-            def val = System.getenv(name)
-            if (val == null) {
-                logger.warning("Missing environment: $name")
-                System.exit(1)
-            }
-            val
-        }
-        def db_url = config("URL")
-        def username = config("USER")
-        def password = config("PASSWORD")
-        def driver = config("DRIVER")
-        logger.info("$account config: URL=$db_url; user=$username password=...${password.length()} driver=$driver")
+        def config
         try {
-            def driverClass = Class.forName(driver)
-            logger.info("driver: $driverClass")
+            config = DBConfig.fromEnv(account, { String name -> System.getenv(name) })
+        } catch (IllegalStateException oops) {
+            logger.warning("Config missing from environment: $oops")
+            System.exit(1)
         } catch (ClassNotFoundException oops) {
-            logger.warning("driver $driver not found (fix CLASSPATH?): $oops")
+            logger.warning("driver not found (fix CLASSPATH?): $oops")
             System.exit(1)
         }
-        Sql.withInstance(db_url, username, password, driver) { Sql sql ->
+        logger.info("$account config: $config")
+        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             sql.eachRow('select * from global_name') { GroovyResultSet row ->
-                logger.info("${username}@${row.getAt('global_name')}: loading ...")
+                logger.info("${config.username}@${row.getAt('global_name')}: loading ...")
             }
         }
     }
