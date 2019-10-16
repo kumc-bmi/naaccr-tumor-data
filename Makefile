@@ -91,3 +91,17 @@ build/tumor_reg_data_run.ipynb: tumor_reg_data.ipynb
 
 tumor_reg_data.ipynb: tumor_reg_data.py
 	jupytext --to notebook $<
+
+##
+# Loader testing
+test-loader: src/test/resources/data.jsonl ./build/libs/naaccr-tumor-data.jar
+	ID_URL=jdbc:oracle:thin:@localhost:8621:$(ORACLE_SID) \
+	ID_USER=$(LOGNAME) \
+	ID_DRIVER=oracle.jdbc.OracleDriver \
+	java -cp ~/Downloads/ojdbc8.jar:./build/libs/naaccr-tumor-data.jar \
+		Loader --account ID --load <src/test/resources/data.jsonl
+
+./build/libs/naaccr-tumor-data.jar: src/main/groovy/Loader.groovy
+	./gradlew test
+	./gradlew fatjar
+
