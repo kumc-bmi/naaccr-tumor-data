@@ -66,11 +66,14 @@ from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
 from sqlite3 import connect as connect_mem, PARSE_COLNAMES
+from subprocess import Popen as Popen_T, PIPE
 from sys import stderr
-from typing import Callable, ContextManager, Dict, Iterator, List, Tuple
-from typing import Optional as Opt, Union, cast
+from typing import Dict, List, Optional as Opt, Tuple
+from typing import ContextManager, Callable, Iterable, cast
 from xml.etree import ElementTree as XML
 import datetime as dt
+import itertools
+import json
 import logging
 import re
 
@@ -85,7 +88,8 @@ import tabular as tab
 # We also have utilities for running SQL from files. The resulting DataFrames "remember" which SQL DB they came from.
 
 # %%
-from sql_script import SqlScript, DBSession as SparkSession_T, DataFrame
+from sql_script import SqlScript, DBSession as SparkSession_T, DataFrame, insert_stmt
+
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
 # We incorporate materials from the
@@ -1122,15 +1126,11 @@ class ConceptStats:
 # %%
 if IO_TESTING:
     from os import environ as _environ
-    log.info(_environ['PYSPARK_SUBMIT_ARGS'])
 
-
-# %%
-IO_TESTING and _spark.sparkContext.getConf().get('spark.driver.extraClassPath')
 
 # %%
 if IO_TESTING:
-    def _set_pw(name: str = 'ID CDW') -> None:
+    def _set_pw(name: str = 'ID_PASSWORD') -> None:
         from os import environ
         from getpass import getpass
         password = getpass(name)
@@ -1141,35 +1141,67 @@ if IO_TESTING:
 
 # %%
 class Account:
-    def __init__(self, user: str, password: str,
+    def __init__(self, name: str, user: str, password: str,
+                 popen: Callable[..., Popen_T],
+                 fatjar: str = './build/libs/naaccr-tumor-data.jar',
+                 jdbcjar: str = '/home/dconnolly/Downloads/ojdbc8.jar',
                  url: str = 'jdbc:oracle:thin:@localhost:8621:nheronB2',
                  driver: str = "oracle.jdbc.OracleDriver") -> None:
+        self.name = name
         self.url = url
         db = url.split(':')[-1]
         self.label = f'{self.__class__.__name__}({user}@{db})'
-        self.__properties = {"user": user,
-                             "password": password,
-                             "driver": driver}
+        self.__popen = popen
+        self.classpath = ':'.join([jdbcjar, fatjar])
+        pfx = f'{name}_'
+        self.__env = {
+            pfx + 'URL': url,
+            pfx + 'DRIVER': driver,
+            pfx + 'USER': user,
+            pfx + 'PASSWORD': password}
 
     def __repr__(self) -> str:
         return self.label
 
-    def rd(self, io: sq.DataFrameReader, table: str) -> DataFrame:
-        return io.jdbc(self.url, table,
-                       properties=self.__properties)
+    def rd(self, table: str) -> tab.DataFrame:
+        args = ['java', '-cp', self.classpath, 'Loader',
+                '--account', self.name, '--query', f'select * from {table}']
+        log.info("Account subprocess: %s", args)
+        # ISSUE: stream results?
+        with self.__popen(args, env=self.__env, stdout=PIPE, encoding='utf-8') as proc:
+            records = json.load(proc.stdout)
+            status = proc.wait()
+            if status != 0:
+                raise IOError(proc.stderr.read())
+            return tab.DataFrame.from_records(records)
 
-    def wr(self, io: sq.DataFrameWriter, table: str,
+    def wr(self, table: str, data: tab.Relation,
            mode: Opt[str] = None) -> None:
-        io.jdbc(self.url, table,
-                properties=self.__properties,
-                mode=mode)
+        args = ['java', '-cp', self.classpath, 'Loader',
+                '--account', self.name, '--load']
+        log.info("Account subprocess: %s", args)
+        stmt = insert_stmt(table, data.columns)
+        log.info('Account insert SQL: %s', stmt)
+        header = {'sql': stmt}
+        with self.__popen(args, env=self.__env, stdin=PIPE, stderr=PIPE, encoding='utf-8') as proc:
+            dest = proc.stdin
+            json.dump(header, dest)
+            dest.write('\n')
+            for _, record in data.iterrows():
+                json.dump(record, dest)
+                dest.write('\n')
+            proc.stdin.close()
+            status = proc.wait()
+            if status != 0:
+                raise IOError(proc.stderr.read())
 
 
-DB_TESTING = IO_TESTING and 'ID CDW' in _environ
+DB_TESTING = IO_TESTING and 'ID_PASSWORD' in _environ
 if DB_TESTING:
-    _cdw = Account(_environ['LOGNAME'], _environ['ID CDW'])
+    from subprocess import Popen as _Popen
+    _cdw = Account('ID', _environ['LOGNAME'], _environ['ID_PASSWORD'], _Popen)
 
-DB_TESTING and _cdw.rd(_spark.read, "global_name").toPandas()
+DB_TESTING and _to_pd(_cdw.rd("global_name"))
 
 
 # %% [markdown]
@@ -1184,8 +1216,19 @@ def case_fold(df: DataFrame) -> DataFrame:
 
     See also: upper_snake_case in pcornet_cdm
     """
-    return df.toDF(*[n.upper() for n in df.columns])
+    parts = [f'{n} as "{n.upper()}"' for n in df.columns]
+    q = f"select {', '.join(parts)} from {df.table}"
+    return df._ctx.sql(q)
 
+
+DB_TESTING and case_fold(_spark.table('section'))
+
+# %%
+_SQL('select tumor_id, dateOfDiagnosis, primarySite from naaccr_fields')
+
+# %%
+DB_TESTING and _cdw.wr(
+    'NAACCR_TUMORS', case_fold(_spark.sql('select tumor_id, dateOfDiagnosis, primarySite from naaccr_fields')))
 
 # %%
 if DB_TESTING:
