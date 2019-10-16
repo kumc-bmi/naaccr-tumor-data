@@ -1,9 +1,15 @@
 import groovy.json.JsonBuilder
+import groovy.json.JsonParserType
+import groovy.json.JsonSlurper
+import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.GroovyResultSet
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.transform.Immutable
 import java.util.logging.Logger
+import java.io.Reader
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 @Immutable
 class Password {
@@ -16,35 +22,35 @@ class Password {
 }
 
 
-@Immutable
-class DBConfig {
-    final String url
-    final String driver
-    final String username
-    final Password password
-
-    static Logger logger = Logger.getLogger("")
-
-    static DBConfig fromEnv(String account, Closure<String> getenv) {
-        logger.info("getting config for $account")
-        Closure<String> config = {
-            def name = "${account}_${it}"
-            def val = getenv(name)
-            if (val == null) {
-                throw new IllegalStateException(name)
-            }
-            val
-        }
-        def driver = config("DRIVER")
-        Class.forName(driver)
-        new DBConfig(url: config("URL"), driver: driver,
-                     username: config("USER"), password: new Password(value: config("PASSWORD")))
-    }
-}
-
 @CompileStatic
 class Loader {
     static Logger logger = Logger.getLogger("")
+
+    @Immutable
+    public static class DBConfig {
+        final String url
+        final String driver
+        final String username
+        final Password password
+
+        static Logger logger = Logger.getLogger("")
+
+        static DBConfig fromEnv(String account, Closure<String> getenv) {
+            logger.info("getting config for $account")
+            Closure<String> config = {
+                def name = "${account}_${it}"
+                def val = getenv(name)
+                if (val == null) {
+                    throw new IllegalStateException(name)
+                }
+                val
+            }
+            def driver = config("DRIVER")
+            Class.forName(driver)
+            new DBConfig(url: config("URL"), driver: driver,
+                    username: config("USER"), password: new Password(value: config("PASSWORD")))
+        }
+    }
 
     private final Sql _sql
 
@@ -58,7 +64,7 @@ class Loader {
         input.withInputStream { stream ->
             new Scanner(stream).useDelimiter(";\n") each {
                 String sql = edited(it)
-                logger.info("executing $input: $sql")
+                logger.fine("executing $input: $sql")
                 try {
                     _sql.execute sql
                 } catch (java.sql.SQLException oops) {
@@ -80,6 +86,12 @@ class Loader {
         }
     }
 
+    void setSessionDateFormat() {
+        if (productName() == "Oracle") {
+            _sql.execute("alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD'")
+        }
+    }
+
     String productName() {
         String productName
         _sql.cacheConnection { java.sql.Connection conn ->
@@ -93,9 +105,41 @@ class Loader {
         new JsonBuilder(results)
     }
 
+    static int batchSize = 100
+
+    int load(Reader input) {
+        def scanner = new Scanner(input)
+        def parser = new JsonSlurper()
+        def header = parser.parseText(scanner.nextLine())
+        String stmt = header['sql']
+        logger.info("batch insert: $stmt")
+
+        setSessionDateFormat()
+
+        def qty = 0
+        _sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
+            List<Object> record
+            while (scanner.hasNextLine()) {
+                try {
+                    record = parser.parseText(scanner.nextLine()) as List
+                } catch (EOFException) {
+                    break
+                }
+                // logger.info("insert record: $record")
+                ps.addBatch(record)
+                qty += 1
+            }
+        }
+        logger.info("inserted $qty records")
+        qty
+    }
+
     static void main(String[] args) {
+        def argIx = { String target ->
+            args.findIndexOf({ it == target })
+        }
         def arg = { String target ->
-            int ix = args.findIndexOf({ it == target })
+            int ix = argIx(target)
             if (ix < 0 || ix + 1 >= args.length) {
                 return null
             }
@@ -130,6 +174,10 @@ class Loader {
             if (query) {
                 def json = loader.query(query)
                 System.out << json
+            }
+
+            if (argIx("--load") >= 0) {
+                loader.load(new java.io.InputStreamReader(System.in))
             }
         }
     }
