@@ -88,9 +88,9 @@ class Loader {
         productName
     }
 
-    String query(String sql) {
+    JsonBuilder query(String sql) {
         def results = _sql.rows(sql)
-        new JsonBuilder(results).toString()
+        new JsonBuilder(results)
     }
 
     static void main(String[] args) {
@@ -129,7 +129,7 @@ class Loader {
             def query = arg("--query")
             if (query) {
                 def json = loader.query(query)
-                System.out.print(json)
+                System.out << json
             }
         }
     }

@@ -43,11 +43,13 @@ class DBConfigTest extends GroovyTestCase {
             loader.runScript(getClass().getResource('naaccr_query_data.sql'))
 
             // query for each datatype
-            def tumors = loader.query('select tumor_id, dateOfDiagnosis, primarySite, ageAtDiagnosis from naaccr_tumors')
-            assert tumors == '[{"TUMOR_ID":11,"DATEOFDIAGNOSIS":"2010-01-01T06:00:00+0000","PRIMARYSITE":"650","AGEATDIAGNOSIS":60}]'
+            def tumors = new StringWriter()
+            tumors << loader.query('select tumor_id, dateOfDiagnosis, primarySite, ageAtDiagnosis from naaccr_tumors')
+            assert tumors.toString() == '[{"TUMOR_ID":11,"DATEOFDIAGNOSIS":"2010-01-01T06:00:00+0000","PRIMARYSITE":"650","AGEATDIAGNOSIS":60}]'
 
-            def stats = loader.query('select sectionId, dx_yr, naaccrId, mean from naaccr_export_stats')
-            assert stats == '[{"SECTIONID":1,"DX_YR":2014,"NAACCRID":"tumorSizeClinical","MEAN":3.4000}]'
+            def stats = new StringWriter()
+            stats << loader.query('select sectionId, dx_yr, naaccrId, mean from naaccr_export_stats')
+            assert stats.toString() == '[{"SECTIONID":1,"DX_YR":2014,"NAACCRID":"tumorSizeClinical","MEAN":3.4000}]'
         }
     }
 }
