@@ -1266,7 +1266,7 @@ IO_TESTING and _cancer_id.toPandas().describe()
 
 # %%
 class CancerStudy:
-    bc_variable = pd.read_csv(res.open_text(bc_qa, 'bc-variable.csv'))
+    bc_variable = ont._with_path(res.path(bc_qa, 'bc-variable.csv'), tab.read_csv)
 
 
 IO_TESTING and _spark.createDataFrame(
