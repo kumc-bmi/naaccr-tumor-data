@@ -37,12 +37,13 @@ Project / select columns:
 """
 
 from typing import Callable, Dict, List, Optional as Opt, Text, Tuple, Union
-from typing import Iterator, Iterable
+from typing import Iterator, Iterable, TextIO
 from contextlib import contextmanager
 from importlib import resources as res
 from pathlib import Path as Path_T
 from sqlite3 import Connection, Cursor, PARSE_COLNAMES
 import datetime as dt
+import json
 import logging
 import re
 
@@ -353,6 +354,16 @@ def table_ddl(name: str, schema: tab.Schema) -> str:
     return f'create table "{name}" ({col_specs})'
 
 
+def insert_stmt(table: str, header: List[str]) -> str:
+    return """
+      insert into "{table}" ({header})
+      values ({placeholders})""".format(
+        table=table,
+        header=', '.join(f'"{col}"' for col in header),
+        placeholders=', '.join('?' for _ in header)
+    )
+
+
 def load_table(dest: Connection, table: str,
                header: List[str], rows: Iterable[tab.Row],
                batch_size: int = 500) -> None:
@@ -360,13 +371,7 @@ def load_table(dest: Connection, table: str,
     '''
     log.info('loading %s', table)
     work = dest.cursor()
-    stmt = """
-      insert into "{table}" ({header})
-      values ({placeholders})""".format(
-        table=table,
-        header=', '.join(f'"{col}"' for col in header),
-        placeholders=', '.join('?' for _ in header)
-    )
+    stmt = insert_stmt(table, header)
     log.debug('%s', stmt)
     batch = []  # type: List[tab.Row]
 
@@ -435,6 +440,13 @@ class DataFrame(tab.Relation):
                 for row in chunk:
                     yield ix, row
                     ix += 1
+
+    def dump(self, out: TextIO) -> None:
+        json.dump({'sql': insert_stmt(self.table, self.columns)}, out)
+        out.write('\n')
+        for _, row in self.iterrows():
+            json.dump(row, out)
+            out.write('\n')
 
 
 class _TestData:
