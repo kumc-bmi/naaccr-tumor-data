@@ -120,7 +120,7 @@ IO_TESTING = __name__ == '__main__'
 log = logging.getLogger(__name__)
 
 if IO_TESTING:
-    import pandas as pd
+    import pandas as pd  # type: ignore
 
     logging.basicConfig(level=logging.INFO, stream=stderr)
     log.info('tumor_reg_data using: %s', dict(
@@ -161,11 +161,11 @@ def _to_view(name: str, compute: Callable[[], DataFrame],
     if not IO_TESTING:
         return None
     df = compute()
-    df.createOrReplaceTempView(name)
+    df._ctx.load_data_frame(name, df)
     return df
 
 
-def _to_pd(df: tab.DataFrame,
+def _to_pd(df: tab.Relation,
            index: Opt[str] = None):
     if not IO_TESTING:
         return None
@@ -503,7 +503,7 @@ def tumorDF(doc: XML.ElementTree,
     return tab.DataFrame(data, schema)
 
 
-def without_empty_cols(df):
+def without_empty_cols(df: tab.DataFrame) -> tab.DataFrame:
     non_empty = [seq.column['name']
                  for name in df.columns
                  for seq in [getattr(df, name)]
@@ -906,8 +906,8 @@ class ItemObs:
     def make(cls, spark: SparkSession_T, extract: DataFrame) -> DataFrame:
         item_ty = spark.createDataFrame(ont.NAACCR_I2B2.tumor_item_type)
 
-        raw_obs = TumorKeys.with_tumor_id(naaccr_dates(
-            stack_obs(extract, item_ty),
+        raw_obs = TumorKeys.with_tumor_id(naaccr_dates(  # noqa @@@
+            stack_obs(extract, item_ty), # noqa @@@
             TumorKeys.dtcols))
 
         views = ont.create_objects(
@@ -924,7 +924,7 @@ class ItemObs:
                         spark: SparkSession_T,
                         extract: DataFrame) -> DataFrame:
         extract_id = TumorKeys.with_tumor_id(
-            naaccr_dates(extract, TumorKeys.dtcols))
+            naaccr_dates(extract, TumorKeys.dtcols))  # noqa @@@
         extract_id.createOrReplaceTempView(cls.extract_id_view)
         return spark.table(cls.extract_id_view)
 
@@ -968,11 +968,10 @@ class DataSummary:
                        [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type'])])
 
     @classmethod
-    def stats(cls, tumors_raw: DataFrame, spark: SparkSession_T) -> DataFrame:
+    def stats(cls, tumors: DataFrame, spark: SparkSession_T) -> DataFrame:
         to_df = spark.createDataFrame
 
         ty = to_df(ont.NAACCR_I2B2.tumor_item_type)
-        tumors = naaccr_dates(tumors_raw, ['dateOfDiagnosis'])
         views = ont.create_objects(spark, cls.script,
                                    section=to_df(ont.NAACCR_I2B2.per_section),
                                    record_layout=to_df(ont.NAACCR_Layout.fields),
@@ -991,9 +990,9 @@ class DataSummary:
                       for row in ty.where(ty.valtype_cd.isin(valtype_cds))
                       .collect()
                       if row.naaccrId not in id_vars]
-        df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),
+        df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),  # noqa @@@
                   value_vars=value_vars, id_vars=[id_col] + id_vars, var_name=var_name)
-        return df.where(func.trim(df.value) > '')
+        return df.where(func.trim(df.value) > '')  # noqa @@@
 
 
 # if IO_TESTING:
@@ -1059,7 +1058,7 @@ class SiteSpecificFactors:
         with_schema = cls.make_tumor_schema(spark, extract)
         ty_df = spark.createDataFrame(cls.valtypes())
 
-        raw_obs = stack_obs(with_schema, ty_df,
+        raw_obs = stack_obs(with_schema, ty_df,  # noqa @@@@
                             key_cols=TumorKeys.key4 + TumorKeys.dtcols + ['recordId', 'cs_schema_name'])
 
         views = ont.create_objects(spark, cls.script2,
@@ -1305,7 +1304,7 @@ def cancerIdSample(spark: SparkSession_T, tumors: DataFrame,
 if IO_TESTING:
     _cancer_id = cancerIdSample(_spark, _extract)
 
-#@@ IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())
+# IO_TESTING and non_blank(_cancer_id.limit(15).toPandas())  # @@@
 
 # %% {"slideshow": {"slide_type": "skip"}}
 IO_TESTING and _cancer_id.toPandas().describe()
@@ -1323,7 +1322,7 @@ IO_TESTING and _spark.createDataFrame(
 # %%
 def itemNumOfPath(bc_var: DataFrame,
                   item: str = 'item') -> DataFrame:
-    digits = func.regexp_extract('concept_path',
+    digits = func.regexp_extract('concept_path',  # noqa @@@
                                  r'\\i2b2\\naaccr\\S:[^\\]+\\(\d+)', 1)
     items = bc_var.select(digits.cast('int').alias(item)).dropna().distinct()  # type: ignore
     return items.sort(item)  # type: ignore
@@ -1415,7 +1414,7 @@ def pivot_obs_by_enc(skinny_obs: DataFrame,
                      value_col: str = 'concept_cd',
                      key_cols: List[str] = ['recordId', 'patientIdNumber']) -> DataFrame:
     groups = skinny_obs.select(pivot_on, value_col, *key_cols).groupBy(*key_cols)
-    wide = groups.pivot(pivot_on).agg(func.first(value_col))
+    wide = groups.pivot(pivot_on).agg(func.first(value_col))  # noqa @@@
     return wide
 
 
