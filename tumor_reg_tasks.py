@@ -1004,9 +1004,34 @@ class MigrateUpload(UploadRunTask):
         pass
 
 
+def main_edit(argv: List[str], cwd: Path_T,
+              lines_table: str = 'naaccr_lines',
+              raw_view: str = 'naaccr_fields_raw',
+              value_col: str = 'value',
+              exclude_pfx: str = 'reserved') -> Path_T:
+    [sql_fn] = argv[1:2]
+
+    viewdef = td.naaccr_fields(lines_table, tr_ont.ddictDF(), value_col, exclude_pfx)
+    sqlp = cwd / sql_fn
+    code = sqlp.open().read()
+    log.info('%s original: length %d', sqlp, len(code))
+    orig = SqlScript(sql_fn, code, [])
+    repl = orig.replace_view(raw_view, viewdef)
+    log.info('%s replacement: length %d', sqlp, len(repl.code))
+    with sqlp.open('w') as out:
+        out.write(repl.code)
+    return sqlp
+
+
 if __name__ == '__main__':
     def _script_io() -> None:
+        from sys import argv
         from pathlib import Path
+
+        if argv[1:] and argv[1].endswith('.sql'):
+            logging.basicConfig(level=logging.INFO)
+            main_edit(argv[:], Path('.'))
+            return
 
         _configure_logging(Path('log/eliot.log'))
 
