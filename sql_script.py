@@ -1,4 +1,23 @@
-"""
+r"""
+
+Run SQL create ... statements given DFs for input views.
+
+    >>> spark = MockCTX()
+    >>> create_objects(spark, _TestData.ont_script,
+    ...     current_task=MockDF(spark, 'current_task'),
+    ...     naaccr_top=MockDF(spark, 'naaccr_top'),
+    ...     section=MockDF(spark, 'section'),
+    ...     loinc_naaccr_answers=MockDF(spark, 'lna'),
+    ...     code_labels=MockDF(spark, 'code_labels'),
+    ...     icd_o_topo=MockDF(spark, 'icd_o_topo'),
+    ...     seer_site_terms=MockDF(spark, 'site_terms'),
+    ...     cs_terms=MockDF(spark, 'cs_terms'),
+    ...     tumor_item_type=MockDF(spark, 'ty'))
+    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    {'i2b2_path_concept': MockDF(i2b2_path_concept),
+     'naaccr_top_concept': MockDF(naaccr_top_concept),
+     'section_concepts': MockDF(section_concepts),
+     ...}
 
 Treat a database table as a DataFrame:
 
@@ -472,25 +491,6 @@ class _TestData:
 
 def create_objects(spark: DBSession, script: SqlScript,
                    **kwargs: tab.DataFrame) -> Dict[str, DataFrame]:
-    """Run SQL create ... statements given DFs for input views.
-
-    >>> spark = MockCTX()
-    >>> create_objects(spark, _TestData.ont_script,
-    ...     current_task=MockDF(spark, 'current_task'),
-    ...     naaccr_top=MockDF(spark, 'naaccr_top'),
-    ...     section=MockDF(spark, 'section'),
-    ...     loinc_naaccr_answers=MockDF(spark, 'lna'),
-    ...     code_labels=MockDF(spark, 'code_labels'),
-    ...     icd_o_topo=MockDF(spark, 'icd_o_topo'),
-    ...     seer_site_terms=MockDF(spark, 'site_terms'),
-    ...     cs_terms=MockDF(spark, 'cs_terms'),
-    ...     tumor_item_type=MockDF(spark, 'ty'))
-    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    {'i2b2_path_concept': MockDF(i2b2_path_concept),
-     'naaccr_top_concept': MockDF(naaccr_top_concept),
-     'section_concepts': MockDF(section_concepts),
-     ...}
-    """
     # IDEA: use a contextmanager for temp views
     for key, df in kwargs.items():
         log.info('%s: %s = %s', script.name, key, df)
