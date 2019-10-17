@@ -115,9 +115,13 @@ import heron_load
 
 # %% {"slideshow": {"slide_type": "skip"}}
 # In a notebook context, we have `__name__ == '__main__'`.
-IO_TESTING = __name__ == '__main__'
-
 log = logging.getLogger(__name__)
+
+IO_TESTING = False
+
+if __name__ == '__main__':
+    from os import environ as _environ
+    IO_TESTING = 'IO_TESTING' in _environ
 
 if IO_TESTING:
     import pandas as pd  # type: ignore
@@ -643,6 +647,28 @@ class TumorTable:
              , {sep.join(cols.values)}
         from {cls.raw_view}"""
 
+    @classmethod
+    def update_script(cls, sqlp: Path_T):
+        code = sqlp.open().read()
+        log.info('%s original: length %d', sqlp, len(code))
+        orig = SqlScript(sqlp.name, code, [])
+
+        raw_query = cls.fields_raw(cls.lines_table, ont.ddictDF(), cls.value_col, cls.exclude_pfx)
+        repl = orig.replace_ddl(cls.raw_view, raw_query)
+        log.info('%s replaced %s: length %d', sqlp, cls.raw_view, len(repl.code))
+
+        typed_query = cls.fields_typed(ont.NAACCR_I2B2.tumor_item_type)
+        repl = repl.replace_ddl(cls.typed_view, typed_query)
+        log.info('%s replaced %s: length %d', sqlp, cls.typed_view, len(repl.code))
+
+        for name, query in tumor_item_value(ont.NAACCR_I2B2.tumor_item_type).items():
+            is_table = not name.endswith('_all')
+            repl = repl.replace_ddl(name, query, is_table=is_table)
+            log.info('%s replaced %s: length %d', sqlp, name, len(repl.code))
+
+        with sqlp.open('w') as out:
+            out.write(repl.code)
+
 
 # %% {"slideshow": {"slide_type": "skip"}}
 def naaccr_read_fwf(text_lines: DataFrame, itemDefs: tab.DataFrame) -> DataFrame:
@@ -1101,11 +1127,6 @@ class ConceptStats:
 
 # %%
 if IO_TESTING:
-    from os import environ as _environ
-
-
-# %%
-if IO_TESTING:
     def _set_pw(name: str = 'ID_PASSWORD') -> None:
         from os import environ
         from getpass import getpass
@@ -1394,3 +1415,15 @@ def pivot_obs_by_enc(skinny_obs: DataFrame,
 IO_TESTING and pivot_obs_by_enc(_obs.where(
     _obs.naaccrId.isin(['dateOfDiagnosis', 'primarySite', 'sex', 'dateOfBirth'])
 )).limit(5).toPandas().set_index(['recordId', 'patientIdNumber'])
+
+
+if __name__ == '__main__':
+    def _script_io() -> None:
+        from sys import argv
+        from pathlib import Path
+
+        if argv[1:] and argv[1].endswith('.sql'):
+            logging.basicConfig(level=logging.INFO)
+            TumorTable.update_script(Path('.') / argv[1])
+
+    _script_io()

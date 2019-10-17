@@ -1004,43 +1004,9 @@ class MigrateUpload(UploadRunTask):
         pass
 
 
-def main_edit(argv: List[str], cwd: Path_T,
-              value_col: str = 'value',
-              exclude_pfx: str = 'reserved') -> Path_T:
-    [sql_fn] = argv[1:2]
-
-    sqlp = cwd / sql_fn
-    code = sqlp.open().read()
-    log.info('%s original: length %d', sqlp, len(code))
-    orig = SqlScript(sql_fn, code, [])
-
-    raw_query = td.TumorTable.fields_raw(td.TumorTable.lines_table, tr_ont.ddictDF(), value_col, exclude_pfx)
-    repl = orig.replace_ddl(td.TumorTable.raw_view, raw_query)
-    log.info('%s replaced %s: length %d', sqlp, td.TumorTable.raw_view, len(repl.code))
-
-    typed_query = td.TumorTable.fields_typed(tr_ont.NAACCR_I2B2.tumor_item_type)
-    repl = repl.replace_ddl(td.TumorTable.typed_view, typed_query)
-    log.info('%s replaced %s: length %d', sqlp, td.TumorTable.typed_view, len(repl.code))
-
-    for name, query in td.tumor_item_value(tr_ont.NAACCR_I2B2.tumor_item_type).items():
-        is_table = not name.endswith('_all')
-        repl = repl.replace_ddl(name, query, is_table=is_table)
-        log.info('%s replaced %s: length %d', sqlp, name, len(repl.code))
-
-    with sqlp.open('w') as out:
-        out.write(repl.code)
-    return sqlp
-
-
 if __name__ == '__main__':
     def _script_io() -> None:
-        from sys import argv
         from pathlib import Path
-
-        if argv[1:] and argv[1].endswith('.sql'):
-            logging.basicConfig(level=logging.INFO)
-            main_edit(argv[:], Path('.'))
-            return
 
         _configure_logging(Path('log/eliot.log'))
 
