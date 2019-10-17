@@ -77,9 +77,9 @@ import json
 import logging
 import re
 
-
 # %% [markdown]
-# The tabular module provides a pandas-like DataFrame API using the [W3C Tabular Data model](https://www.w3.org/TR/tabular-data-primer/).
+# The tabular module provides a pandas-like DataFrame API using
+# the [W3C Tabular Data model](https://www.w3.org/TR/tabular-data-primer/).
 
 # %%
 import tabular as tab
@@ -143,7 +143,6 @@ if IO_TESTING:
 if IO_TESTING:
     _conn = connect_mem(':memory:', detect_types=PARSE_COLNAMES)
     _spark = SparkSession_T(_conn)
-    from tumor_reg_ont import _with_path
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
@@ -188,7 +187,8 @@ def _SQL(sql: str,
     df = _spark.sql(sql)
     return _to_pd(df, index)
 
-_to_spark('section', lambda: _with_path(res.path(heron_load, 'section.csv'), tab.read_csv))
+
+IO_TESTING and _to_spark('section', lambda: ont._with_path(res.path(heron_load, 'section.csv'), tab.read_csv))
 _SQL('select * from section', index='sectionid', limit=4)
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -295,7 +295,7 @@ def upper_snake_case(camel: str) -> str:
 
 
 if IO_TESTING:
-        _conn.create_function('upper_snake_case', 1, upper_snake_case)
+    _conn.create_function('upper_snake_case', 1, upper_snake_case)
 
 
 _to_spark('item_codes', lambda: ont.NAACCR_Layout.item_codes())
@@ -307,12 +307,12 @@ limit 3
 ''')
 
 # %%
-_to_spark('ch10', lambda: tab.DataFrame(
-        ont.NAACCR_Layout.iter_description(),
-        schema={'columns': [
-            {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
-            {'number': 3, 'name': 'description', 'datatype': 'string', 'null': ['']}]}
-    ))
+IO_TESTING and _to_spark('ch10', lambda: tab.DataFrame(
+    ont.NAACCR_Layout.iter_description(),
+    schema={'columns': [
+        {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
+        {'number': 3, 'name': 'description', 'datatype': 'string', 'null': ['']}]}
+))
 _SQL('select * from ch10')
 
 # %%
@@ -324,7 +324,7 @@ _SQL('select * from item_codes')
 class TumorTable:
     script = SqlScript('naaccr_concepts_load.sql',
                        res.read_text(heron_load, 'naaccr_concepts_load.sql'),
-                      [('pcornet_tumor_fields', ['tumor_item_type', 'ch10', 'item_codes'])])
+                       [('pcornet_tumor_fields', ['tumor_item_type', 'ch10', 'item_codes'])])
 
     @classmethod
     def fields(cls, spark):
@@ -384,7 +384,7 @@ IO_TESTING and _to_pd(ont.NAACCR_Layout.item_codes()).query('naaccrNum == 380')
 
 # %% {"slideshow": {"slide_type": "subslide"}}
 if IO_TESTING:
-   _to_spark('loinc_naaccr_answer', lambda: ont.LOINC_NAACCR.answer)
+    _to_spark('loinc_naaccr_answer', lambda: ont.LOINC_NAACCR.answer)
 
 IO_TESTING and _SQL('select * from loinc_naaccr_answer where code_value = 380', limit=5)
 
@@ -457,9 +457,6 @@ class NAACCR2:
 
 
 # %%
-import itertools
-from typing import Iterable
-
 def simple_schema(records: Iterable[Dict[str, str]], order: Dict[str, object],
                   max_length: int = 15) -> tab.Schema:
     field_set = set(k for r in records for k in r.keys())
@@ -498,11 +495,11 @@ def tumorDF(doc: XML.ElementTree,
         return record
 
     tumor_elts = doc.iterfind('./*/n:Tumor', ns)
-    records =[tumorRecord(e) for e in tumor_elts]
+    records = [tumorRecord(e) for e in tumor_elts]
     schema = simple_schema(records, order)
     names = [field['name'] for field in schema['columns']]
-    data =[[record[key] for key in names]
-           for record in records]
+    data = [[record[key] for key in names]
+            for record in records]
     return tab.DataFrame(data, schema)
 
 
@@ -513,11 +510,11 @@ def without_empty_cols(df):
                  if not set(seq.values) <= set([None])]
     return df.select(*non_empty)
 
-###IO_TESTING and
-_to_pd(
+
+##
+IO_TESTING and _to_pd(
     without_empty_cols(tumorDF(NAACCR2.s100x)), index='rownum'
-)
-###.sort_values(['naaccrId', 'rownum']).head(5))
+).sort_values(['naaccrId', 'rownum']).head(5)
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
@@ -588,6 +585,7 @@ class TextFile(tab.Relation):
         return zip(itertools.count(),
                    ([line] for line in self.__access.open().readlines()))
 
+
 if IO_TESTING:
     with NAACCR2.s100t() as _tr_file:
         log.info('tr_file: %s', _tr_file)
@@ -609,7 +607,6 @@ def naaccr_fields(table: str, itemDefs: tab.DataFrame,
         'string', lambda startColumn, length, naaccrId, **_:
         f'substr({value_col}, {startColumn}, {length}) as {naaccrId}').values
     fieldsep = "\n     , "
-    nl = "\n"
     return f"""
     select {fieldsep.join(fields)}
     from {table}"""
@@ -631,7 +628,8 @@ def naaccr_read_fwf(text_lines: DataFrame, itemDefs: tab.DataFrame,
     spark.sql(f'create view {extract_view} as {viewdef}')
     return spark.table(extract_view)
 
-#_extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
+
+_extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
 if IO_TESTING:
     _naaccr_text_lines = _spark.load_data_frame('naaccr_lines', TextFile.simple(_tr_file))
     _extract = naaccr_read_fwf(_naaccr_text_lines, ont.ddictDF())
@@ -676,6 +674,7 @@ def naaccr_fields_typed(ty: tab.DataFrame,
          , {sep.join(cols.values)}
     from {raw_view}"""
 
+
 if IO_TESTING:
     _conn.executescript(naaccr_fields_typed(ont.NAACCR_I2B2.tumor_item_type))
 
@@ -716,10 +715,12 @@ def dups(df_spark: DataFrame, key_cols: List[str]) -> DataFrame:
 
 _key1 = ['patientSystemIdHosp', 'tumorRecordNumber']
 
-IO_TESTING and _to_pd(dups(_extract.select('sequenceNumberCentral',
-                                    'dateOfDiagnosis', 'dateCaseCompleted',
-                                    *_key1),
-                    _key1)).set_index(_key1).head(10)
+IO_TESTING and _to_pd(
+    dups(_extract.select('sequenceNumberCentral',
+                         'dateOfDiagnosis', 'dateCaseCompleted',
+                         *_key1),
+         _key1)
+).set_index(_key1).head(10)
 
 # %%
 logging.getLogger('sql_script').setLevel(logging.DEBUG)
@@ -857,7 +858,8 @@ def tumor_item_value(ty: DataFrame,
                      fields_table: str = 'naaccr_fields'):
     keys = "patientIdNumber, dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis"
     ty = ty[ty.valtype_cd.isin(['@', 'N', 'D', 'T'])]
-    ty_q = ty.withColumn('q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
+    ty_q = ty.withColumn(
+        'q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
                       f'''
                       select {tumor_id}, {keys}
                            , {naaccrNum} as naaccrNum
@@ -867,15 +869,17 @@ def tumor_item_value(ty: DataFrame,
                            , {naaccrId if valtype_cd == 'D' else 'null'} as date_value
                            , {naaccrId if valtype_cd in ('T', 'Ti') else 'null'} as text_value
                       from {fields_table}
-                       ''').apply(lambda s: ' '.join(s.split())))
+                      ''').apply(lambda s: ' '.join(s.split())))
     bySection = {(sid, s): ty_q[ty_q.sectionId.isin([sid])].q.values
                  for (_, [sid, s]) in ty_q.select('sectionId', 'section').iterrows()}
     nl = '\n'
-    views = [f'''-- {sid}: {s}{nl}drop table if exists section_{sid};{nl}create table section_{sid} as {(nl + 'union all' + nl).join(queries)};'''
-            for ((sid, s), queries) in bySection.items()]
+    views = [f'''-- {sid}: {s}{nl}drop table if exists section_{sid};
+                 create table section_{sid} as {(nl + 'union all' + nl).join(queries)};'''
+             for ((sid, s), queries) in bySection.items()]
     section_all = '\nunion all\n'.join(f'select * from section_{i}' for (i, _) in bySection.keys())
     top = f'create view section_all as ' + section_all + ';'
     return views + [top]
+
 
 if IO_TESTING:
     for sql in tumor_item_value(ont.NAACCR_I2B2.tumor_item_type):
@@ -1254,7 +1258,7 @@ if IO_TESTING:
 
 
 # %%
-def concept_queries(generated_sql: str) -> pd.DataFrame:
+def concept_queries(generated_sql: str) -> tab.DataFrame:
     stmts = generated_sql.split('<*>')
     qs = pd.DataFrame(dict(stmt=stmts))
     qs['subq'] = qs.stmt.str.extract(r'\((\s*select concept[^)]*)\)')
