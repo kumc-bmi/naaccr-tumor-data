@@ -12,10 +12,20 @@ plugins {
 repositories { mavenCentral() }
 
 dependencies {
-    testCompile 'org.codehaus.groovy:groovy-all:2.5.8'
-    compile 'org.codehaus.groovy:groovy-all:2.5.8'
+    compile 'org.codehaus.groovy:groovy:2.5.8'
+    compile 'org.codehaus.groovy:groovy-json:2.5.8'
+    compile 'org.codehaus.groovy:groovy-sql:2.5.8'
+
+    // i2b2 JDBC drivers
+    // https://github.com/i2b2/i2b2-core-server/tree/master/edu.harvard.i2b2.server-common/lib/jdbc
+    // mssql-jdbc-7.4.1.jre8.jar, ojdbc8.jar, postgresql-42.2.8.jar
+    runtime 'com.oracle.ojdbc:ojdbc8:19.3.0.0'
+    runtime 'org.postgresql:postgresql:42.2.8.jre7'
+    runtime 'com.microsoft.sqlserver:mssql-jdbc:8.1.0.jre13-preview'
+
     // https://mvnrepository.com/artifact/org.hsqldb/hsqldb
     testCompile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.2'
+
     testCompile 'junit:junit:4.12'
 }
 
@@ -23,10 +33,15 @@ task fatjar(type: Jar) {
     manifest {
         attributes 'Main-Class': 'Loader'
     }
-    from { 
+    from {
         configurations
             .runtime
             .collect { it.isDirectory() ? it : zipTree(it) }
     }
     with jar
+
+    // avoid: Error: Could not find or load main class
+    // https://stackoverflow.com/a/51456080
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+
 }
