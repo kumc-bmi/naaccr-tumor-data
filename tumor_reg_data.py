@@ -66,6 +66,7 @@ from gzip import GzipFile
 from importlib import resources as res
 from pathlib import Path as Path_T
 from sqlite3 import connect as connect_mem, PARSE_COLNAMES
+from statistics import stdev
 from subprocess import Popen as Popen_T, PIPE
 from sys import stderr
 from typing import Dict, List, Optional as Opt, Tuple
@@ -987,36 +988,37 @@ IO_TESTING and ItemObs.make_extract_id(_spark, _extract).limit(5).toPandas()
 # ### Coded Concepts from Data Summary
 
 # %%
+class StDevAgg:
+    def __init__(self):
+        self.x = []
+
+    def step(self, val):
+        self.x.append(0 + val)
+
+    def finalize(self):
+        if len(self.x) < 2:
+            return None
+        return stdev(self.x)
+
+    @classmethod
+    def create_in(cls, conn):
+        conn.create_aggregate('stdev', 1, cls)
+
+
 class DataSummary:
     script = SqlScript('data_char_sim.sql',
                        res.read_text(heron_load, 'data_char_sim.sql'),
                        [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type'])])
 
     @classmethod
-    def stats(cls, tumor_item_type: DataFrame, spark: SparkSession_T) -> DataFrame:
-        to_df = spark.createDataFrame
-
-        ty = to_df(ont.NAACCR_I2B2.tumor_item_type)
+    def stats(cls, tumors: DataFrame, tumor_item_value: DataFrame, spark: SparkSession_T) -> DataFrame:
         views = ont.create_objects(spark, cls.script,
-                                   section=to_df(ont.NAACCR_I2B2.per_section),
-                                   record_layout=to_df(ont.NAACCR_Layout.fields),
-                                   tumor_item_type=ty,
-                                   tumors_eav=tumor_item_type)
+                                   section=ont.NAACCR_I2B2.per_section,
+                                   naaccr_extract=tumors,
+                                   record_layout=tab.DataFrame.from_records(ont.NAACCR_Layout.fields),
+                                   tumor_item_type=ont.NAACCR_I2B2.tumor_item_type,
+                                   tumors_eav=tumor_item_value)
         return list(views.values())[-1]
-
-    @classmethod
-    def stack_obs(cls, data: DataFrame, ty: DataFrame,
-                  id_vars: List[str] = [],
-                  valtype_cds: List[str] = ['@', 'D', 'N'],
-                  var_name: str = 'naaccrId',
-                  id_col: str = 'recordId') -> DataFrame:
-        value_vars = [row.naaccrId
-                      for row in ty.where(ty.valtype_cd.isin(valtype_cds))
-                      .collect()
-                      if row.naaccrId not in id_vars]
-        df = melt(data.withColumn(id_col, func.monotonically_increasing_id()),  # noqa @@@
-                  value_vars=value_vars, id_vars=[id_col] + id_vars, var_name=var_name)
-        return df.where(func.trim(df.value) > '')  # noqa @@@
 
 
 # if IO_TESTING:
@@ -1444,7 +1446,7 @@ IO_TESTING and pivot_obs_by_enc(_obs.where(
 
 if __name__ == '__main__':
     def _script_io() -> None:
-        from sys import argv
+        from sys import argv, stdout
         from pathlib import Path
         from sqlite3 import connect
 
@@ -1457,13 +1459,18 @@ if __name__ == '__main__':
             [flat_file, db] = argv[-2:]
             spark = SparkSession_T(connect(db))
             TumorTable.load_flat_file(spark, Path('.') / flat_file)
-            result = spark.sql('''
-            select valtype_cd, count(*)
-            from tumor_item_value
-            group by valtype_cd
-            ''')
-            print(result.columns)
-            for _, row in result.iterrows():
-                print(row)
+            result = spark.sql(
+                "select valtype_cd, count(*) from tumor_item_value group by valtype_cd")
+            result.to_csv(stdout)
+        elif '--summarize' in argv:
+            [db, dest] = argv[-2:]
+            conn = connect(db)
+            StDevAgg.create_in(conn)
+            spark = SparkSession_T(conn)
+            stats = DataSummary.stats(spark.table(TumorTable.typed_view),
+                                      spark.table('tumor_item_value'), spark)
+            with (Path('.') / dest).open('w') as out:
+                stats.save_meta(Path('.') / dest)
+                stats.to_csv(out)
 
     _script_io()

@@ -8,47 +8,26 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 
 -- Check that NAACCR data dictionary and data is available.
 select sectionid from section where 1=0;
-select recordId, dateOfDiagnosis from naaccr_extract where 1=0;
-select recordId, naaccrNum from tumors_eav where 1=0;
+select tumor_id, dateOfDiagnosis from naaccr_extract where 1=0;
+select tumor_id, naaccrNum from tumors_eav where 1=0;
 select `naaccr-item-num`, section from record_layout;
 
 -- Check that tumor_item_type from naaccr_txform.sql is available (esp. for valtype_cd)
 select valtype_cd from tumor_item_type where 1=0;
 
 
-create or replace temporary view data_agg_naaccr as
+drop view if exists data_agg_naaccr;
+create view data_agg_naaccr as
 with
 cases as (
-  select year(dateOfDiagnosis) as dx_yr, count(*) as tumor_qty
+  select 0+strftime('%Y', dateOfDiagnosis) as dx_yr, count(*) as tumor_qty
   from naaccr_extract
-  group by year(dateOfDiagnosis)
+  group by 0+strftime('%Y', dateOfDiagnosis)
 )
 , with_yr as (
-  select year(dateOfDiagnosis) dx_yr
+  select 0+strftime('%Y', dateOfDiagnosis) dx_yr
        , eav.*
   from tumors_eav eav
-)
-, with_ty as (
-  select with_yr.dx_yr, with_yr.dateOfDiagnosis, ty.valtype_cd
-       , value
-/*       , case when valtype_cd = '@'
-         then raw_value  -- TODO: trim
-         end as code_value */
-       , case
-         when valtype_cd in ('N', 'Ni')
-         then cast(value as float)
-         end as numeric_value
-       , case
-         when valtype_cd = 'D'
-         -- ISSUE: length 14 datetime?
-         then to_date(substring(concat(value, '0101'), 1, 8),
-                      'yyyyMMdd')
-         end as date_value
-       , ty.valtype_cd
-       , ty.naaccrNum
-       , ty.naaccrId
-  from with_yr
-  join tumor_item_type ty on ty.naaccrId = with_yr.naaccrId
 )
 -- count data points by item (variable) and year of diagnosis
 , by_item_yr as (
@@ -64,42 +43,39 @@ cases as (
 -- break down nominals by value
 by_val as (
   select by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present,
-         eav.valtype_cd, eav.value, count(*) freq
-  from with_ty eav
+         eav.valtype_cd, eav.code_value, count(*) freq
+  from with_yr eav
   join by_item_yr by_item on eav.naaccrId = by_item.naaccrId and eav.dx_yr = by_item.dx_yr
   where eav.valtype_cd = '@'
-  group by by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present, eav.valtype_cd, eav.value
+  group by by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present, eav.valtype_cd, eav.code_value
 )
 ,
 -- normalize date variables to the reference date: diagnosis
 event as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, datediff(e.date_value, e.dateOfDiagnosis) as mag
-  from with_ty e where valtype_cd = 'D'
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, julianday(e.date_value) - julianday(e.dateOfDiagnosis) as mag
+  from with_yr e where valtype_cd = 'D'
 )
 ,
 measurement as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, numeric_value as mag
-  from with_ty where valtype_cd = 'N'
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, 0+numeric_value as mag /*ISSUE: fix numeric when building EAV*/
+  from with_yr where valtype_cd = 'N'
 )
 ,
 -- assuming normal distribution, characterize continuous data
 stats as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, avg(mag) mean, stddev(mag) sd
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, avg(mag) mean, stdev(mag) sd
   from (select * from event union all select * from measurement)
   group by dx_yr, naaccrNum, naaccrId, valtype_cd
 )
-
 -- For nominal data, save the frequency of each value
 select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
      , cast(null as float) mean, cast(null as float) sd
-     , by_val.value, by_val.freq
+     , by_val.code_value, by_val.freq
      , by_val.present
      , cases.tumor_qty
 from by_val
 join cases on cases.dx_yr = by_val.dx_yr
-
 union all
-
 select stats.dx_yr, by_item.naaccrId, stats.naaccrNum, stats.valtype_cd
      , mean, sd
      , null value, null freq, by_item.present, cases.tumor_qty
