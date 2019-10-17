@@ -49,7 +49,7 @@ dicts)
 
 """
 
-from typing import Dict, List, Optional as Opt, Sequence, Tuple
+from typing import Dict, List, Optional as Opt, Sequence, Tuple, TextIO
 from typing import Callable, Iterable, Iterator, Union
 from typing_extensions import Literal, TypedDict
 from abc import abstractmethod
@@ -96,6 +96,21 @@ class Relation:
 
     @abstractmethod
     def iterrows(self) -> Iterator[Tuple[int, Row]]: ...
+
+    def save_meta(self, dest: Path_T) -> Path_T:
+        mp = meta_path(dest)
+        with mp.open('w') as mout:
+            json.dump(self.schema, mout, indent=2)
+        return mp
+
+    def to_csv(self, wr: TextIO) -> int:
+        dest = csv.writer(wr)
+        qty = 0
+        dest.writerow(self.columns)
+        for _, row in self.iterrows():
+            dest.writerow(row)
+            qty += 1
+        return qty
 
 
 class DataFrame(Relation):
