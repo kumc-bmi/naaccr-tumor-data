@@ -326,6 +326,7 @@ _SQL('select * from item_codes')
 
 # %%
 class TumorTableSpec:
+    # IDEA: add SqlScript.from_path() and use res.path
     script = SqlScript('naaccr_concepts_load.sql',
                        res.read_text(heron_load, 'naaccr_concepts_load.sql'),
                        [('pcornet_tumor_fields', ['tumor_item_type', 'ch10', 'item_codes'])])
@@ -605,11 +606,28 @@ class TumorTable:
     lines_table = 'naaccr_lines'
     raw_view = 'naaccr_fields_raw'
     typed_view = 'naaccr_fields'
+    script = SqlScript('naaccr_fields.sql',
+                       res.read_text(heron_load, 'naaccr_fields.sql'),
+                       [(raw_view, [lines_table]),
+                        (typed_view, [])] +
+                       [(f'section_{id}', [])
+                        for id in [1, 2, 3, 4, 6, 9, 11, 15, 16, 17]] +
+                       [('tumor_item_value', [])])
+
     value_col = 'value'
     exclude_pfx = 'reserved'
     pat_id_cols = ['patientSystemIdHosp', 'patientIdNumber']
+
+    # Keys used to make unique tumor_id
     key_cols = ['dateOfDiagnosis', 'dateOfBirth', 'dateOfLastContact',
                 'dateCaseLastChanged', 'dateCaseCompleted', 'dateCaseReportExported']
+    # Keys used to un-pivot to tumor_item_value
+    eav_keys = ['patientIdNumber',
+                'dateOfBirth',
+                'dateOfDiagnosis',
+                'dateOfLastContact',
+                'dateCaseCompleted',
+                'dateCaseLastChanged']
 
     @classmethod
     def fields_raw(cls, table: str, itemDefs: tab.DataFrame,
@@ -668,6 +686,12 @@ class TumorTable:
 
         with sqlp.open('w') as out:
             out.write(repl.code)
+
+    @classmethod
+    def load_flat_file(cls, spark: SparkSession_T, tr_file: Path_T):
+        lines = TextFile.simple(tr_file)
+        return ont.create_objects(spark, cls.script,
+                                  naaccr_lines=lines)
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
@@ -749,7 +773,7 @@ IO_TESTING and _to_pd(
 ).set_index(_key1).head(10)
 
 # %%
-logging.getLogger('sql_script').setLevel(logging.DEBUG)
+# logging.getLogger('sql_script').setLevel(logging.DEBUG)
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
@@ -855,19 +879,21 @@ IO_TESTING and _patients.limit(10).toPandas()
 # %%
 def tumor_item_value(ty: DataFrame,
                      tumor_id: str = 'tumor_id'):
-    keys = "patientIdNumber, dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis"  # ISSUE: refactor
     ty = ty[ty.valtype_cd.isin(['@', 'N', 'D', 'T'])]
     ty_q = ty.withColumn(
         'q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
                       f'''
-                      select {tumor_id}, {keys}
+                      select {', '.join(TumorTable.eav_keys)}
                            , '{naaccrId}' as naaccrId, {naaccrNum} as naaccrNum
                            , {1 if valtype_cd in ('Ni', 'Ti') else 0} as identified_only
+                           , '{valtype_cd}' as valtype_cd
                            , {naaccrId if valtype_cd == '@' else 'null'} as code_value
                            , {naaccrId if valtype_cd in ('N', 'Ni') else 'null'} as numeric_value
                            , {naaccrId if valtype_cd == 'D' else 'null'} as date_value
                            , {naaccrId if valtype_cd in ('T', 'Ti') else 'null'} as text_value
+                           , {tumor_id}
                       from {TumorTable.typed_view}
+                      where {naaccrId} is not null
                       ''').apply(lambda s: ' '.join(s.split())))
     bySection = {(sid, s): ty_q[ty_q.sectionId.isin([sid])].q.values
                  for (_, [sid, s]) in ty_q.select('sectionId', 'section').iterrows()}
@@ -877,7 +903,7 @@ def tumor_item_value(ty: DataFrame,
                 {(nl + 'union all' + nl).join(queries)}'''
                 for ((sid, s), queries) in bySection.items()}
     section_all = '\nunion all\n'.join(f'select * from section_{i}' for (i, _) in bySection.keys())
-    return dict(sections, section_all=section_all)
+    return dict(sections, tumor_item_value=section_all)
 
 
 if IO_TESTING:
@@ -967,7 +993,7 @@ class DataSummary:
                        [('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type'])])
 
     @classmethod
-    def stats(cls, tumors: DataFrame, spark: SparkSession_T) -> DataFrame:
+    def stats(cls, tumor_item_type: DataFrame, spark: SparkSession_T) -> DataFrame:
         to_df = spark.createDataFrame
 
         ty = to_df(ont.NAACCR_I2B2.tumor_item_type)
@@ -975,8 +1001,7 @@ class DataSummary:
                                    section=to_df(ont.NAACCR_I2B2.per_section),
                                    record_layout=to_df(ont.NAACCR_Layout.fields),
                                    tumor_item_type=ty,
-                                   naaccr_extract=tumors,
-                                   tumors_eav=cls.stack_obs(tumors, ty, ['dateOfDiagnosis']))
+                                   tumors_eav=tumor_item_type)
         return list(views.values())[-1]
 
     @classmethod
@@ -1421,9 +1446,24 @@ if __name__ == '__main__':
     def _script_io() -> None:
         from sys import argv
         from pathlib import Path
+        from sqlite3 import connect
 
-        if argv[1:] and argv[1].endswith('.sql'):
-            logging.basicConfig(level=logging.INFO)
-            TumorTable.update_script(Path('.') / argv[1])
+        logging.basicConfig(format='%(asctime)s (%(levelname)s) %(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+        if '--update-sql' in argv:
+            [sql_script] = argv[-1:]
+            TumorTable.update_script(Path('.') / sql_script)
+        elif '--test-eav' in argv:
+            [flat_file, db] = argv[-2:]
+            spark = SparkSession_T(connect(db))
+            TumorTable.load_flat_file(spark, Path('.') / flat_file)
+            result = spark.sql('''
+            select valtype_cd, count(*)
+            from tumor_item_value
+            group by valtype_cd
+            ''')
+            print(result.columns)
+            for _, row in result.iterrows():
+                print(row)
 
     _script_io()
