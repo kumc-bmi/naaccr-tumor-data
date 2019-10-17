@@ -21,7 +21,7 @@ Run SQL create ... statements given DFs for input views.
 
 Replace SQL create view statements:
 
-    >>> s2 = _TestData.ont_script.replace_view('section_concepts', 'select 1 from x')
+    >>> s2 = _TestData.ont_script.replace_ddl('section_concepts', 'select 1 from x')
     >>> SqlScript.find_ddl('section_concepts', s2.code)
     'create view section_concepts as\nselect 1 from x'
 
@@ -123,13 +123,15 @@ class SqlScript(object):
                     return stmt
         raise KeyError(name)
 
-    def replace_view(self, name, query: SQL) -> 'SqlScript':
+    def replace_ddl(self, name: str, query: SQL,
+                    is_table: bool = False) -> 'SqlScript':
         parts = []
         state = 'before'
+        obj_type = "table" if is_table else "view"
         for line in self.code.split('\n')[:-1]:
-            if (state == 'before' and line.startswith('create view ') and
+            if (state == 'before' and line.startswith('create ') and
                 name in line.split()):
-                parts.append(f'create view {name} as\n{query.strip()};\n')
+                parts.append(f'create {obj_type} {name} as\n{query.strip()};\n')
                 state = 'during'
             elif state == 'during' and line.endswith(';'):
                 state = 'after'

@@ -321,7 +321,7 @@ _SQL('select * from item_codes')
 
 
 # %%
-class TumorTable:
+class TumorTableSpec:
     script = SqlScript('naaccr_concepts_load.sql',
                        res.read_text(heron_load, 'naaccr_concepts_load.sql'),
                        [('pcornet_tumor_fields', ['tumor_item_type', 'ch10', 'item_codes'])])
@@ -342,7 +342,7 @@ class TumorTable:
 
 
 if IO_TESTING:
-    _fields = TumorTable.fields(_spark)
+    _fields = TumorTableSpec.fields(_spark)
 IO_TESTING and _SQL('select * from pcornet_tumor_fields')
 
 # %%
@@ -597,36 +597,66 @@ _SQL('select * from s100t')
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
-def naaccr_fields(table: str, itemDefs: tab.DataFrame,
-                  value_col: str = 'value',
-                  exclude_pfx: str = 'reserved') -> str:
-    """
-    @param itemDefs: see ddictDF
-    """
-    fields = itemDefs.apply(
-        'string', lambda startColumn, length, naaccrId, **_:
-        f'substr({value_col}, {startColumn}, {length}) as {naaccrId}').values
-    fieldsep = "\n     , "
-    return f"""
-    select {fieldsep.join(fields)}
-    from {table}"""
+class TumorTable:
+    lines_table = 'naaccr_lines'
+    raw_view = 'naaccr_fields_raw'
+    typed_view = 'naaccr_fields'
+    value_col = 'value'
+    exclude_pfx = 'reserved'
+    pat_id_cols = ['patientSystemIdHosp', 'patientIdNumber']
+    key_cols = ['dateOfDiagnosis', 'dateOfBirth', 'dateOfLastContact',
+                'dateCaseLastChanged', 'dateCaseCompleted', 'dateCaseReportExported']
+
+    @classmethod
+    def fields_raw(cls, table: str, itemDefs: tab.DataFrame,
+                   value_col: str = 'value',
+                   exclude_pfx: str = 'reserved') -> str:
+        """
+        @param itemDefs: see ddictDF
+        """
+        fields = itemDefs.apply(
+            'string', lambda startColumn, length, naaccrId, **_:
+            f'substr({value_col}, {startColumn}, {length}) as {naaccrId}').values
+        fieldsep = "\n     , "
+        return f"""
+        select {fieldsep.join(fields)}
+        from {table}"""
+
+    @classmethod
+    def fields_typed(cls, ty: tab.DataFrame):
+        def _to_date(col):
+            return f"""case when trim({col}) > '' then date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
+                     || coalesce(substr({col}, 7, 2), '01')) end as {col} """
+
+        def _to_text(col: str) -> str:
+            return f"case when trim({col}) > '' then trim({col}) end as {col}"  # ISSUE: left / right
+
+        def _to_num(col: str) -> str:
+            return f"case when trim({col}) > '' then 0 + {col} end as {col}"
+
+        decode = {'T': _to_text, '@': _to_text, 'D': _to_date, 'N': _to_num}
+        ty = ty.filter(lambda valtype_cd, **_: valtype_cd in decode.keys())
+        cols = ty.apply('string', lambda naaccrId, valtype_cd, **_: decode[valtype_cd](naaccrId))
+        sep = '\n  , '
+        return f"""select row_number() over (order by {', '.join(cls.key_cols)}) tumor_id
+             , {', '.join(cls.pat_id_cols)}
+             , {sep.join(cols.values)}
+        from {cls.raw_view}"""
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
-def naaccr_read_fwf(text_lines: DataFrame, itemDefs: tab.DataFrame,
-                    line_table='naaccr_lines', extract_view='naaccr_fields_raw',
-                    value_col: str = 'value',
-                    exclude_pfx: str = 'reserved') -> DataFrame:
+def naaccr_read_fwf(text_lines: DataFrame, itemDefs: tab.DataFrame) -> DataFrame:
     """
     @param text_lines: see also class TextFile
     @param itemDefs: see ddictDF.
     """
     log.info('flat_file lines: %s', text_lines)
-    viewdef = naaccr_fields(text_lines.table, itemDefs, value_col, exclude_pfx)
+    viewdef = TumorTable.fields_raw(text_lines.table, itemDefs,
+                                    TumorTable.value_col, TumorTable.exclude_pfx)
     spark = text_lines._ctx
-    spark.sql(f'drop view if exists {extract_view}')
-    spark.sql(f'create view {extract_view} as {viewdef}')
-    return spark.table(extract_view)
+    spark.sql(f'drop view if exists {TumorTable.raw_view}')
+    spark.sql(f'create view {TumorTable.raw_view} as {viewdef}')
+    return spark.table(TumorTable.raw_view)
 
 
 _extract = cast(DataFrame, None)  # for static analysis when not IO_TESTING
@@ -645,38 +675,8 @@ _SQL('select * from naaccr_fields_raw')
 # %% [markdown] {"slideshow": {"slide_type": "subslide"}}
 # ### Strange dates: TODO?
 
-# %%
-def _to_date(col):
-    return f"""case when trim({col}) > '' then date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
-             || coalesce(substr({col}, 7, 2), '01')) end as {col} """
-
-
-def _to_text(col: str) -> str:
-    return f"case when trim({col}) > '' then trim({col}) end as {col}"  # ISSUE: left / right
-
-
-def _to_num(col: str) -> str:
-    return f"case when trim({col}) > '' then 0 + {col} end as {col}"
-
-
-def naaccr_fields_typed(ty: tab.DataFrame,
-                        dest_view: str = 'naaccr_fields',
-                        raw_view: str = 'naaccr_fields_raw'):
-    decode = {'T': _to_text, '@': _to_text, 'D': _to_date, 'N': _to_num}
-    ty = ty.filter(lambda valtype_cd, **_: valtype_cd in decode.keys())
-    cols = ty.apply('string', lambda naaccrId, valtype_cd, **_: decode[valtype_cd](naaccrId))
-    sep = '\n  , '
-    return f"""drop view if exists {dest_view};
-    create view {dest_view} as
-    select row_number() over (order by dateOfDiagnosis, dateOfBirth, dateOfLastContact
-                            , dateCaseLastChanged, dateCaseCompleted, dateCaseReportExported) tumor_id
-         , patientIdNumber
-         , {sep.join(cols.values)}
-    from {raw_view}"""
-
-
 if IO_TESTING:
-    _conn.executescript(naaccr_fields_typed(ont.NAACCR_I2B2.tumor_item_type))
+    _conn.executescript(TumorTable.fields_typed(ont.NAACCR_I2B2.tumor_item_type))
 
 _SQL('select * from naaccr_fields limit 10')
 
@@ -750,32 +750,6 @@ class TumorKeys:
         'patientIdNumber',      # patient_mapping
         'abstractedBy',         # IDEA/YAGNI?: provider_id
     ]
-    @classmethod
-    def pat_tmr(cls, spark: SparkSession_T,
-                naaccr_text_lines: DataFrame) -> DataFrame:
-        return cls._pick_cols(spark, naaccr_text_lines,
-                              cls.tmr_attrs + cls.pat_attrs + cls.report_attrs)
-
-    @classmethod
-    def patients(cls, spark: SparkSession_T,
-                 naaccr_text_lines: DataFrame) -> DataFrame:
-        pat = cls._pick_cols(spark, naaccr_text_lines,
-                             cls.pat_ids + cls.pat_attrs +
-                             cls.report_ids + cls.report_attrs)
-        return pat._ctx.sql(f'select distinct * from {pat.table}')
-
-    @classmethod
-    def _pick_cols(cls, spark: SparkSession_T,
-                   naaccr_text_lines: DataFrame,
-                   cols: List[str]) -> DataFrame:
-        dd = ont.ddictDF()
-        pat_tmr = naaccr_read_fwf(
-            naaccr_text_lines,
-            dd[dd.naaccrId.isin(cols)])
-        pat_tmr = naaccr_dates(pat_tmr,
-                               [c for c in pat_tmr.columns
-                                if c.startswith('date')])
-        return pat_tmr
 
     @classmethod
     def with_tumor_id(cls, data: DataFrame,
@@ -854,31 +828,30 @@ IO_TESTING and _patients.limit(10).toPandas()
 
 # %%
 def tumor_item_value(ty: DataFrame,
-                     tumor_id: str = 'tumor_id',
-                     fields_table: str = 'naaccr_fields'):
-    keys = "patientIdNumber, dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis"
+                     tumor_id: str = 'tumor_id'):
+    keys = "patientIdNumber, dateCaseLastChanged, dateOfLastContact, dateCaseCompleted, dateOfDiagnosis"  # ISSUE: refactor
     ty = ty[ty.valtype_cd.isin(['@', 'N', 'D', 'T'])]
     ty_q = ty.withColumn(
         'q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
                       f'''
                       select {tumor_id}, {keys}
-                           , {naaccrNum} as naaccrNum
+                           , '{naaccrId}' as naaccrId, {naaccrNum} as naaccrNum
                            , {1 if valtype_cd in ('Ni', 'Ti') else 0} as identified_only
                            , {naaccrId if valtype_cd == '@' else 'null'} as code_value
                            , {naaccrId if valtype_cd in ('N', 'Ni') else 'null'} as numeric_value
                            , {naaccrId if valtype_cd == 'D' else 'null'} as date_value
                            , {naaccrId if valtype_cd in ('T', 'Ti') else 'null'} as text_value
-                      from {fields_table}
+                      from {TumorTable.typed_view}
                       ''').apply(lambda s: ' '.join(s.split())))
     bySection = {(sid, s): ty_q[ty_q.sectionId.isin([sid])].q.values
                  for (_, [sid, s]) in ty_q.select('sectionId', 'section').iterrows()}
     nl = '\n'
-    views = [f'''-- {sid}: {s}{nl}drop table if exists section_{sid};
-                 create table section_{sid} as {(nl + 'union all' + nl).join(queries)};'''
-             for ((sid, s), queries) in bySection.items()]
+    sections = {f'section_{sid}':
+                f'''-- {sid}: {s}{nl}
+                {(nl + 'union all' + nl).join(queries)}'''
+                for ((sid, s), queries) in bySection.items()}
     section_all = '\nunion all\n'.join(f'select * from section_{i}' for (i, _) in bySection.keys())
-    top = f'create view section_all as ' + section_all + ';'
-    return views + [top]
+    return dict(sections, section_all=section_all)
 
 
 if IO_TESTING:
