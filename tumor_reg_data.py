@@ -602,6 +602,28 @@ else:
 _SQL('select * from s100t')
 
 
+def decode_valtypes(wrap: bool = True) -> Dict[str, Callable[[str], str]]:
+    def _to_date(col):
+        return f"""date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
+                 || coalesce(substr({col}, 7, 2), '01'))"""
+
+    def _to_text(col: str) -> str:
+        return f"trim({col})"  # ISSUE: left / right
+
+    def _to_num(col: str) -> str:
+        return f"(0 + {col})"
+
+    def w(f):
+        def convert(col):
+            return f"case when trim({col}) > '' then {f(col)} end as {col}"
+        return convert
+
+    if wrap:
+        return {'T': w(_to_text), '@': w(_to_text), 'D': w(_to_date), 'N': w(_to_num)}
+    else:
+        return {'T': _to_text, '@': _to_text, 'D': _to_date, 'N': _to_num}
+
+
 # %% {"slideshow": {"slide_type": "skip"}}
 class TumorTable:
     lines_table = 'naaccr_lines'
@@ -610,6 +632,7 @@ class TumorTable:
     script = SqlScript('naaccr_fields.sql',
                        res.read_text(heron_load, 'naaccr_fields.sql'),
                        [(raw_view, [lines_table]),
+                        (raw_view + '_id', []),
                         (typed_view, [])] +
                        [(f'section_{id}', [])
                         for id in [1, 2, 3, 4, 6, 9, 11, 15, 16, 17]] +
@@ -645,21 +668,17 @@ class TumorTable:
         select {fieldsep.join(fields)}
         from {table}"""
 
+    decode = decode_valtypes(False)
+    decode_wrap = decode_valtypes(True)
+
+    @classmethod
+    def field_typed(cls, naaccrId: str, valtype_cd: str) -> str:
+        return cls.decode[valtype_cd](naaccrId)
+
     @classmethod
     def fields_typed(cls, ty: tab.DataFrame):
-        def _to_date(col):
-            return f"""case when trim({col}) > '' then date(substr({col}, 1, 4) || '-' || coalesce(substr({col}, 5, 2), '01') || '-'
-                     || coalesce(substr({col}, 7, 2), '01')) end as {col} """
-
-        def _to_text(col: str) -> str:
-            return f"case when trim({col}) > '' then trim({col}) end as {col}"  # ISSUE: left / right
-
-        def _to_num(col: str) -> str:
-            return f"case when trim({col}) > '' then 0 + {col} end as {col}"
-
-        decode = {'T': _to_text, '@': _to_text, 'D': _to_date, 'N': _to_num}
-        ty = ty.filter(lambda valtype_cd, **_: valtype_cd in decode.keys())
-        cols = ty.apply('string', lambda naaccrId, valtype_cd, **_: decode[valtype_cd](naaccrId))
+        ty = ty.filter(lambda valtype_cd, **_: valtype_cd in cls.decode.keys())
+        cols = ty.apply('string', lambda naaccrId, valtype_cd, **_: cls.decode_wrap[valtype_cd](naaccrId))
         sep = '\n  , '
         return f"""select row_number() over (order by {', '.join(cls.key_cols)}) tumor_id
              , {', '.join(cls.pat_id_cols)}
@@ -880,21 +899,24 @@ IO_TESTING and _patients.limit(10).toPandas()
 # %%
 def tumor_item_value(ty: DataFrame,
                      tumor_id: str = 'tumor_id'):
-    ty = ty[ty.valtype_cd.isin(['@', 'N', 'D', 'T'])]
-    ty_q = ty.withColumn(
+    ok = list(ty.valtype_cd.isin(['@', 'N', 'D', 'T']))
+    log.warning('skipping: %s', ty[[not b for b in ok]].naaccrId.values)
+    ty = ty[ok]
+    typed = TumorTable.field_typed
+    ty_q = ty.select('sectionId', 'section', 'naaccrNum').withColumn(
         'q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
                       f'''
                       select {', '.join(TumorTable.eav_keys)}
                            , '{naaccrId}' as naaccrId, {naaccrNum} as naaccrNum
                            , {1 if valtype_cd in ('Ni', 'Ti') else 0} as identified_only
                            , '{valtype_cd}' as valtype_cd
-                           , {naaccrId if valtype_cd == '@' else 'null'} as code_value
-                           , {naaccrId if valtype_cd in ('N', 'Ni') else 'null'} as numeric_value
-                           , {naaccrId if valtype_cd == 'D' else 'null'} as date_value
-                           , {naaccrId if valtype_cd in ('T', 'Ti') else 'null'} as text_value
+                           , {typed(naaccrId, valtype_cd) if valtype_cd == '@' else 'null'} as code_value
+                           , {typed(naaccrId, valtype_cd) if valtype_cd in ('N', 'Ni') else 'null'} as numeric_value
+                           , {typed(naaccrId, valtype_cd) if valtype_cd == 'D' else 'null'} as date_value
+                           , {typed(naaccrId, valtype_cd) if valtype_cd in ('T', 'Ti') else 'null'} as text_value
                            , {tumor_id}
-                      from {TumorTable.typed_view}
-                      where {naaccrId} is not null
+                      from {TumorTable.raw_view}_id
+                      where trim({naaccrId}) > ''
                       ''').apply(lambda s: ' '.join(s.split())))
     bySection = {(sid, s): ty_q[ty_q.sectionId.isin([sid])].q.values
                  for (_, [sid, s]) in ty_q.select('sectionId', 'section').iterrows()}
