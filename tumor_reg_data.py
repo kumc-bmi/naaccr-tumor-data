@@ -89,7 +89,7 @@ import tabular as tab
 # We also have utilities for running SQL from files. The resulting DataFrames "remember" which SQL DB they came from.
 
 # %%
-from sql_script import SqlScript, DBSession as SparkSession_T, DataFrame, insert_stmt
+from sql_script import SqlScript, DBSession as SparkSession_T, DataFrame, insert_stmt, create_objects
 
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -333,20 +333,21 @@ class TumorTableSpec:
                        [('pcornet_tumor_fields', ['tumor_item_type', 'ch10', 'item_codes'])])
 
     @classmethod
-    def fields(cls, spark):
+    def fields(cls, spark: SparkSession_T) -> DataFrame:
         ch10 = tab.DataFrame(
             ont.NAACCR_Layout.iter_description(),
             schema={'columns': [
                 {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
                 {'number': 3, 'name': 'description', 'datatype': 'string', 'null': ['']}]}
         )
-        views = ont.create_objects(spark, cls.script,
-                                   tumor_item_type=ont.NAACCR_I2B2.tumor_item_type,
-                                   ch10=ch10,
-                                   item_codes=ont.NAACCR_Layout.item_codes())
+        views = create_objects(spark, cls.script,
+                               tumor_item_type=ont.NAACCR_I2B2.tumor_item_type,
+                               ch10=ch10,
+                               item_codes=ont.NAACCR_Layout.item_codes())
         return list(views.values())[-1]
 
 
+_fields = cast(DataFrame, None)
 if IO_TESTING:
     _fields = TumorTableSpec.fields(_spark)
 IO_TESTING and _SQL('select * from pcornet_tumor_fields')
@@ -355,8 +356,6 @@ IO_TESTING and _SQL('select * from pcornet_tumor_fields')
 # TumorTable.valuesets()
 if IO_TESTING:
     _to_pd(_fields).set_index('item').to_csv('pcornet_cdm/fields.csv')
-else:
-    _fields = tab.DataFrame.from_records([dict(x=1)])
 IO_TESTING and _to_pd(_fields, index='item').loc[380:].head()
 
 # %% [markdown] {"slideshow": {"slide_type": "slide"}}
@@ -469,12 +468,12 @@ def simple_schema(records: Iterable[Dict[str, str]], order: Dict[str, object],
     field_list = sorted(field_set, key=lambda k: order[k])
     blanks = [' ' * w for w in range(max_length)]
     nums = itertools.count(start=1)
-    return tab.Schema(columns=[tab.Column(number=next(nums), name=name, datatype='string', null=blanks)
-                               for name in field_list])
+    return {'columns': [{'number': next(nums), 'name': name, 'datatype': 'string', 'null': blanks}
+                        for name in field_list]}
 
 
 def tumorDF(doc: XML.ElementTree,
-            items=ont.NAACCR_I2B2.tumor_item_type) -> tab.DataFrame:
+            items: tab.DataFrame = ont.NAACCR_I2B2.tumor_item_type) -> tab.DataFrame:
     rownum = 0
     ns = NAACCR2.ns
 
@@ -496,7 +495,7 @@ def tumorDF(doc: XML.ElementTree,
                  for elt in [ndataElt, patElt, tumorElt]
                  for item in elt.iterfind('./n:Item', ns)}
         record = blank.copy()
-        record.update(items)
+        record.update(items)  # type: ignore  #@@@dead code?
         record = dict(record, rownum=rownum)
         return record
 
@@ -633,10 +632,7 @@ class TumorTable:
                        res.read_text(heron_load, 'naaccr_fields.sql'),
                        [(raw_view, [lines_table]),
                         (raw_view + '_id', []),
-                        (typed_view, [])] +
-                       [(f'section_{id}', [])
-                        for id in [1, 2, 3, 4, 6, 9, 11, 15, 16, 17]] +
-                       [('tumor_item_value', [])])
+                        (typed_view, [])])
 
     value_col = 'value'
     exclude_pfx = 'reserved'
@@ -646,12 +642,26 @@ class TumorTable:
     key_cols = ['dateOfDiagnosis', 'dateOfBirth', 'dateOfLastContact',
                 'dateCaseLastChanged', 'dateCaseCompleted', 'dateCaseReportExported']
     # Keys used to un-pivot to tumor_item_value
-    eav_keys = ['patientIdNumber',
-                'dateOfBirth',
-                'dateOfDiagnosis',
-                'dateOfLastContact',
-                'dateCaseCompleted',
-                'dateCaseLastChanged']
+    aDate = dt.date(2001, 1, 1)
+    eav_entity_example = dict(
+        tumor_id=1,
+        patientIdNumber='01',
+        dateOfBirth=aDate,
+        dateOfDiagnosis=aDate,
+        dateOfLastContact=aDate,
+        dateCaseCompleted=aDate,
+        dateCaseLastChanged=aDate)
+    eav_attribute_example = dict(
+        eav_entity_example,
+        naaccrId='x', naaccrNum=1,
+        identified_only=True,
+        valtype_cd='@')
+    eav_value_example = dict(
+        eav_attribute_example,
+        code_value='@',
+        numeric_value=0,
+        date_value=aDate,
+        text_value='...')
 
     @classmethod
     def fields_raw(cls, table: str, itemDefs: tab.DataFrame,
@@ -699,19 +709,17 @@ class TumorTable:
         repl = repl.replace_ddl(cls.typed_view, typed_query)
         log.info('%s replaced %s: length %d', sqlp, cls.typed_view, len(repl.code))
 
-        for name, query in tumor_item_value(ont.NAACCR_I2B2.tumor_item_type).items():
-            is_table = not name.endswith('_all')
-            repl = repl.replace_ddl(name, query, is_table=is_table)
-            log.info('%s replaced %s: length %d', sqlp, name, len(repl.code))
-
         with sqlp.open('w') as out:
             out.write(repl.code)
 
     @classmethod
     def load_flat_file(cls, spark: SparkSession_T, tr_file: Path_T):
         lines = TextFile.simple(tr_file)
-        return ont.create_objects(spark, cls.script,
-                                  naaccr_lines=lines)
+        sql_objects = ont.create_objects(spark, cls.script,
+                                     naaccr_lines=lines)
+        eav = spark.load_data_frame('tumor_item_value',
+                                    TumorEAV(lambda: tr_file.open().readlines()))
+        return dict(sql_objects, tumor_item_value=eav)
 
 
 # %% {"slideshow": {"slide_type": "skip"}}
@@ -897,43 +905,83 @@ IO_TESTING and _patients.limit(10).toPandas()
 # ##  Observations
 
 # %%
-def tumor_item_value(ty: DataFrame,
-                     tumor_id: str = 'tumor_id'):
-    ok = list(ty.valtype_cd.isin(['@', 'N', 'D', 'T']))
-    log.warning('skipping: %s', ty[[not b for b in ok]].naaccrId.values)
-    ty = ty[ok]
-    typed = TumorTable.field_typed
-    ty_q = ty.select('sectionId', 'section', 'naaccrNum').withColumn(
-        'q', ty.apply('string', lambda naaccrId, naaccrNum, valtype_cd, **_:
-                      f'''
-                      select {', '.join(TumorTable.eav_keys)}
-                           , '{naaccrId}' as naaccrId, {naaccrNum} as naaccrNum
-                           , {1 if valtype_cd in ('Ni', 'Ti') else 0} as identified_only
-                           , '{valtype_cd}' as valtype_cd
-                           , {typed(naaccrId, valtype_cd) if valtype_cd == '@' else 'null'} as code_value
-                           , {typed(naaccrId, valtype_cd) if valtype_cd in ('N', 'Ni') else 'null'} as numeric_value
-                           , {typed(naaccrId, valtype_cd) if valtype_cd == 'D' else 'null'} as date_value
-                           , {typed(naaccrId, valtype_cd) if valtype_cd in ('T', 'Ti') else 'null'} as text_value
-                           , {tumor_id}
-                      from {TumorTable.raw_view}_id
-                      where trim({naaccrId}) > ''
-                      ''').apply(lambda s: ' '.join(s.split())))
-    bySection = {(sid, s): ty_q[ty_q.sectionId.isin([sid])].q.values
-                 for (_, [sid, s]) in ty_q.select('sectionId', 'section').iterrows()}
-    nl = '\n'
-    sections = {f'section_{sid}':
-                f'''-- {sid}: {s}{nl}
-                {(nl + 'union all' + nl).join(queries)}'''
-                for ((sid, s), queries) in bySection.items()}
-    section_all = '\nunion all\n'.join(f'select * from section_{i}' for (i, _) in bySection.keys())
-    return dict(sections, tumor_item_value=section_all)
+class TumorEAV(tab.Relation):
+    """
+    >>> from sys import stdout
+    >>> TumorEAV.itemDefs.head(5).to_csv(stdout)  # doctest: +NORMALIZE_WHITESPACE
+    naaccrNum,start,length,naaccrId,valtype_cd
+    10,1,1,recordType,@
+    30,2,1,registryType,@
+    50,17,3,naaccrRecordVersion,@
+    45,20,10,npiRegistryId,T
+    40,30,10,registryId,T
 
+    >>> r = TumorEAV(lambda: ont._with_path(NAACCR2.s100t(), lambda p: p.open().readlines()))
+    >>> r.to_csv(stdout)  # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    tumor_id,patientIdNumber,dateOfBirth,dateOfDiagnosis,...,naaccrNum,identified_only,valtype_cd,code_value,numeric_value,date_value,text_value
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,recordType,10,False,@,I,,,
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,naaccrRecordVersion,50,False,@,180,,,
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,tumorRecordNumber,60,False,@,01,,,
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,patientIdNumber,20,True,Ti,,,,00000010
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,censusTract2000,130,True,Ti,,,,999999
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,censusTrCertainty2000,365,False,@,9,,,
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,censusTract2010,135,True,Ti,,,,999999
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,censusTrCertainty2010,367,False,@,9,,,
+    0,00000010,1951-04-05,2017-10-19,,,2017-10-19,maritalStatusAtDx,150,False,@,5,,,
+    ...
+    """
+    def __init__(self, get_lines: Callable[[], Iterable[str]]):
+        schema = tab.DataFrame.from_records([TumorTable.eav_value_example]).schema
+        tab.Relation.__init__(self, schema)
+        self.__get = get_lines
 
-if IO_TESTING:
-    for sql in tumor_item_value(ont.NAACCR_I2B2.tumor_item_type):
-        print()
-        print(sql)
-        _conn.executescript(sql)
+    itemDefs = (tab.DataFrame.from_records(ont.NAACCR_Layout.fields)
+                .select('naaccr-item-num', 'start', 'length')
+                .withColumnRenamed('naaccr-item-num', 'naaccrNum')
+                .merge(ont.NAACCR_I2B2.tumor_item_type
+                       .select('naaccrNum', 'naaccrId', 'valtype_cd')))
+
+    def iterrows(self):
+        itemDefs = self.itemDefs
+        entityItemIds = list(TumorTable.eav_entity_example.keys())
+        entityDefs = itemDefs[itemDefs.naaccrId.isin(entityItemIds)]
+        entity_schema = tab.DataFrame.from_records([TumorTable.eav_entity_example]).drop('tumor_id').schema
+        obs_ix = 0
+        to_date = tab.Seq.decoders['date']
+        to_num = tab.Seq.decoders['number']
+
+        def eat_ex(thunk):
+            try:
+                return thunk()
+            except ValueError:
+                return None
+
+        for tumor_id, line in enumerate(self.__get()):
+            entity_raw = [
+                line[start - 1:start - 1 + length].strip()
+                for _, [_num, start, length, naaccrId, valtype_cd] in entityDefs.iterrows()]
+            entity = [tab.Seq.decoders[col['datatype']](v) if v.strip() > '' else None
+                      for (col, v) in zip(entity_schema['columns'], entity_raw)]
+            entity = [tumor_id] + entity
+
+            if (tumor_id % 500 == 0):
+                log.info('EAV tumor_id: %d', tumor_id)
+            for _, [naaccrNum, start, length, naaccrId, valtype_cd] in itemDefs.iterrows():
+                start_ix = start - 1
+                v = line[start_ix:start_ix + length].strip()
+                if v > '':
+                    identifier_only = valtype_cd.endswith('i')
+                    attribute = [naaccrId, naaccrNum, identifier_only, valtype_cd]
+                    code_value = v if valtype_cd == '@' else None
+                    numeric_value = eat_ex(lambda: to_num(v)) if valtype_cd.startswith('N') else None
+                    date_value = eat_ex(lambda: to_date(v)) if valtype_cd == 'D' else None
+                    text_value = v if valtype_cd.startswith('T') else None
+                    value = [code_value, numeric_value, date_value, text_value]
+                    yield obs_ix, entity + attribute + value
+                    obs_ix += 1
+                    if (obs_ix % 5000 == 0):
+                        log.info('EAV tumor_id: %d obs_ix: %d', tumor_id, obs_ix)
+
 
 # %%
 _SQL('select * from section_all where date_value is not null order by tumor_id, naaccrNum', limit=30)
