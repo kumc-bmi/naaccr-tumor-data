@@ -103,14 +103,11 @@ class Relation:
             json.dump(self.schema, mout, indent=2)
         return mp
 
-    def to_csv(self, wr: TextIO) -> int:
+    def to_csv(self, wr: TextIO) -> None:
         dest = csv.writer(wr)
-        qty = 0
         dest.writerow(self.columns)
         for _, row in self.iterrows():
             dest.writerow(row)
-            qty += 1
-        return qty
 
 
 class DataFrame(Relation):
@@ -218,38 +215,46 @@ class DataFrame(Relation):
             raise ValueError
 
         def key_ixs(s: Schema) -> List[int]:
-            return [col['number'] - 1
-                    for col in s['columns']
+            return [col['number'] - 1 for col in s['columns']
                     if col['name'] in keys]
+
+        def data_ixs(s: Schema) -> List[int]:
+            return [col['number'] - 1 for col in s['columns']
+                    if col['name'] not in keys]
 
         # key column indexes (right side)
         kx_r = key_ixs(rt.schema)
         # data columns indexes (rt)
-        dx_r = [ix for ix in range(len(rt.schema['columns']))
-                if ix not in kx_r]
+        dx_r = data_ixs(rt.schema)
+        kx_l = key_ixs(self.schema)
+        dx_l = data_ixs(self.schema)
         # key -> non-key cols
         rtByKey = {tuple(row[kx] for kx in kx_r): [row[ix] for ix in dx_r]
                    for row in rt._data}
 
         # key column indexes (self, i.e. left side)
-        kx_l = key_ixs(self.schema)
-
         def lookup(row_lt: Row) -> Iterable[Row]:
             key = tuple(row_lt[ix] for ix in kx_l)
             row_rt = rtByKey.get(key)
             if row_rt:
-                yield list(row_lt) + row_rt
+                yield [row_lt[ix] for ix in kx_l + dx_l] + row_rt
 
         data = [new for old in self._data for new in lookup(old)]
 
-        rt_cols = []
-        # renumber the non-key columns from rt.
-        for cx, ix in enumerate(dx_r):
-            col = rt.schema['columns'][ix]
-            col['number'] = len(self.schema['columns']) + cx + 1
-            rt_cols.append(col)
+        # renumber rt columns
+        out_cols = []  # type: List[Column]
+        for col in self.schema['columns']:
+            col = col.copy()
+            col['number'] = len(out_cols) + 1
+            out_cols.append(col)
+        for col in rt.schema['columns']:
+            if col['name'] in keys:
+                continue
+            col = col.copy()
+            col['number'] = len(out_cols) + 1
+            out_cols.append(col)
 
-        schema: Schema = {'columns': self.schema['columns'] + rt_cols}
+        schema: Schema = {'columns': out_cols}
 
         return DataFrame(data, schema)
 
@@ -303,7 +308,7 @@ def read_csv(path: Path_T,
         return DataFrame((decode(row) for row in reader), schema)
 
 
-def _decoders() -> Dict[str, Callable[[str], Value]]:
+def _decoders() -> Dict[DataType, Callable[[str], Value]]:
     def boolean(s: str) -> Value:
         return bool(s)
 
@@ -313,7 +318,10 @@ def _decoders() -> Dict[str, Callable[[str], Value]]:
     def text(s: str) -> Value:
         return s
 
-    return {'number': number, 'string': text, 'boolean': boolean}
+    def date(s: str) -> Value:
+        return dt.datetime.strptime(s.replace('-', '')[:8], '%Y%m%d').date()
+
+    return {'number': number, 'string': text, 'boolean': boolean, 'date': date}
 
 
 class Seq:
