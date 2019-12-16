@@ -187,6 +187,9 @@ class JDBCTask(luigi.Task):
                 conn = jvm.java.sql.DriverManager.getConnection(
                     self.db_url, self.user, self.__password)
                 try:
+                    # avoid: JdbcUtils: Requested isolation level 1 is not supported;
+                    #        falling back to default isolation level 2
+                    conn.setTransactionIsolation(2)
                     yield conn
                 finally:
                     conn.close()
