@@ -284,6 +284,10 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
     """
     driver_memory = pv.StrParam(default='4g', significant=False)
     executor_memory = pv.StrParam(default='4g', significant=False)
+    max_result_size = pv.StrParam(default='4g', significant=False)
+
+    def setup(self, conf):
+        conf.set("spark.driver.maxResultSize", self.max_result_size)
 
     @abstractmethod
     def output(self) -> luigi.Target: pass
