@@ -214,12 +214,12 @@ class DataFrame(Relation):
         if not keys:
             raise ValueError
 
-        def key_ixs(s: Schema) -> List[int]:
-            return [col['number'] - 1 for col in s['columns']
+        def key_ixs(s: Schema) -> List[Tuple[int, int]]:
+            return [(pos, col['number'] - 1) for pos, col in enumerate(s['columns'])
                     if col['name'] in keys]
 
-        def data_ixs(s: Schema) -> List[int]:
-            return [col['number'] - 1 for col in s['columns']
+        def data_ixs(s: Schema) -> List[Tuple[int, int]]:
+            return [(pos, col['number'] - 1) for pos, col in enumerate(s['columns'])
                     if col['name'] not in keys]
 
         # key column indexes (right side)
@@ -229,28 +229,26 @@ class DataFrame(Relation):
         kx_l = key_ixs(self.schema)
         dx_l = data_ixs(self.schema)
         # key -> non-key cols
-        rtByKey = {tuple(row[kx] for kx in kx_r): [row[ix] for ix in dx_r]
+        rtByKey = {tuple(row[kx] for (_, kx) in kx_r): [row[ix] for (_, ix) in dx_r]
                    for row in rt._data}
 
         # key column indexes (self, i.e. left side)
         def lookup(row_lt: Row) -> Iterable[Row]:
-            key = tuple(row_lt[ix] for ix in kx_l)
+            key = tuple(row_lt[ix] for (_, ix) in kx_l)
             row_rt = rtByKey.get(key)
             if row_rt:
-                yield [row_lt[ix] for ix in kx_l + dx_l] + row_rt
+                yield [row_lt[ix] for (_, ix) in kx_l + dx_l] + row_rt
 
         data = [new for old in self._data for new in lookup(old)]
 
-        # renumber rt columns
+        # renumber columns: kx_l + dx_l + dx_r as in lookup()
         out_cols = []  # type: List[Column]
-        for col in self.schema['columns']:
-            col = col.copy()
+        for (pos, _) in kx_l + dx_l:
+            col = self.schema['columns'][pos].copy()
             col['number'] = len(out_cols) + 1
             out_cols.append(col)
-        for col in rt.schema['columns']:
-            if col['name'] in keys:
-                continue
-            col = col.copy()
+        for (pos, _) in dx_r:
+            col = rt.schema['columns'][pos].copy()
             col['number'] = len(out_cols) + 1
             out_cols.append(col)
 
