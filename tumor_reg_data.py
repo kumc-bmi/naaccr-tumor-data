@@ -1266,7 +1266,7 @@ class Account:
             records = json.load(proc.stdout)
             status = proc.wait()
             if status != 0:
-                raise IOError(proc.stderr.read())
+                raise IOError()
             return tab.DataFrame.from_records(records)
 
     def send(self, dest, table: str, data: tab.Relation):
@@ -1284,12 +1284,12 @@ class Account:
         args = ['java', '-cp', self.classpath, 'Loader',
                 '--account', self.name, '--load']
         log.info("Account subprocess: %s", args)
-        with self.__popen(args, env=self.__env, stdin=PIPE, stderr=PIPE, encoding='utf-8') as proc:
+        with self.__popen(args, env=self.__env, stdin=PIPE, encoding='utf-8') as proc:
             self.send(proc.stdin, table, data)
             proc.stdin.close()
             status = proc.wait()
             if status != 0:
-                raise IOError(proc.stderr.read())
+                raise IOError()
 
 
 DB_TESTING = IO_TESTING and 'ID_PASSWORD' in _environ
