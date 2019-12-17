@@ -18,8 +18,8 @@ select answer_code from loinc_naaccr_answer where 'dep' = 'loinc_naaccr_answer.c
 select lvl from who_topo where dep='WHO Oncology MetaFiles';
 select hlevel from seer_recode_terms where 'dep' = 'seer_recode_terms.csv';
 
-/* oh for bind parameters... */
-select task_id from current_task where 1=0;
+/* oh for bind parameters in Spark SQL... */
+select task_hash from current_task where 1=0;
 
 drop view if exists i2b2_path_concept;
 create view i2b2_path_concept as
@@ -43,10 +43,10 @@ create view naaccr_top_concept as
 select top.c_hlevel
      , top.c_fullname
      , top.c_name
-     , (select substr(task_id, 1, 50) from current_task) as c_basecode
+     , (select task_hash from current_task) as c_basecode
      , 'CA' as c_visualattributes
      , ('North American Association of Central Cancer Registries version 18.0' ||
-              '\n ' || (select task_id from current_task)) as c_tooltip
+              '\n ' || (select task_hash from current_task)) as c_tooltip
      , top.c_fullname as c_dimcode
      , i2b2.*
      , top.update_date

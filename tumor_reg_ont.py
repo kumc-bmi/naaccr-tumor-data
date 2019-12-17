@@ -2,7 +2,7 @@ r"""
     >>> from sys import stderr
     >>> logging.basicConfig(level=logging.WARNING, stream=stderr)
     >>> spark = SparkSession_T.in_memory()  # _T isn't appropriate here
-    >>> ont = NAACCR_I2B2.ont_view_in(spark, task_id='abc123',
+    >>> ont = NAACCR_I2B2.ont_view_in(spark, task_hash='abc123',
     ...                               update_date=dt.date(2001, 1, 1))
     >>> ont  # doctest: +ELLIPSIS
     DataFrame({'c_hlevel': 'number', 'c_fullname': 'string', ...})
@@ -604,7 +604,7 @@ class NAACCR_I2B2(object):
         ])
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: dt.date,
+    def ont_view_in(cls, spark: SparkSession_T, task_hash: str, update_date: dt.date,
                     who_cache: Opt[Path_T] = None) -> DataFrame:
         if who_cache:
             who_topo = OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info)
@@ -621,7 +621,7 @@ class NAACCR_I2B2(object):
             c_name=cls.c_name,
             update_date=update_date,
             sourcesystem_cd=cls.sourcesystem_cd)])
-        current_task = tab.DataFrame.from_records([dict(task_id=task_id)])
+        current_task = tab.DataFrame.from_records([dict(task_hash=task_hash)])
         views = create_objects(spark, cls.ont_script,
                                current_task=current_task,
                                naaccr_top=top,

@@ -399,7 +399,7 @@ def table_ddl(name: str, schema: tab.Schema) -> str:
 
 def insert_stmt(table: str, header: List[str]) -> str:
     return """
-      insert into "{table}" ({header})
+      insert into {table} ({header})
       values ({placeholders})""".format(
         table=table,
         header=', '.join(f'"{col}"' for col in header),

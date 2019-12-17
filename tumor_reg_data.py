@@ -716,7 +716,7 @@ class TumorTable:
     def load_flat_file(cls, spark: SparkSession_T, tr_file: Path_T):
         lines = TextFile.simple(tr_file)
         sql_objects = ont.create_objects(spark, cls.script,
-                                     naaccr_lines=lines)
+                                         naaccr_lines=lines)
         eav = spark.load_data_frame('tumor_item_value',
                                     TumorEAV(lambda: tr_file.open().readlines()))
         return dict(sql_objects, tumor_item_value=eav)
@@ -1269,21 +1269,23 @@ class Account:
                 raise IOError(proc.stderr.read())
             return tab.DataFrame.from_records(records)
 
+    def send(self, dest, table: str, data: tab.Relation):
+        stmt = insert_stmt(table, data.columns)
+        log.info('Account insert SQL: %s', stmt)
+        header = {'sql': stmt}
+        json.dump(header, dest)
+        dest.write('\n')
+        for _, record in data.iterrows():
+            json.dump(record, dest)
+            dest.write('\n')
+
     def wr(self, table: str, data: tab.Relation,
            mode: Opt[str] = None) -> None:
         args = ['java', '-cp', self.classpath, 'Loader',
                 '--account', self.name, '--load']
         log.info("Account subprocess: %s", args)
-        stmt = insert_stmt(table, data.columns)
-        log.info('Account insert SQL: %s', stmt)
-        header = {'sql': stmt}
         with self.__popen(args, env=self.__env, stdin=PIPE, stderr=PIPE, encoding='utf-8') as proc:
-            dest = proc.stdin
-            json.dump(header, dest)
-            dest.write('\n')
-            for _, record in data.iterrows():
-                json.dump(record, dest)
-                dest.write('\n')
+            self.send(proc.stdin, table, data)
             proc.stdin.close()
             status = proc.wait()
             if status != 0:
