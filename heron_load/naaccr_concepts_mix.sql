@@ -7,10 +7,14 @@ whenever sqlerror exit;
 
 create table naaccr_ontology_unpub compress as select * from naaccr_ontology where 1 = 0;
 
+/** un-published code values
+
+i.e. code values that occur in tumor registry data but not in published ontologies
+*/
 insert /*+ append */ into naaccr_ontology_unpub (
        c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecode
      , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
-     , c_dimcode, m_applied_path, update_date, sourcesystem_cd
+     , c_dimcode, m_applied_path, update_date, sourcesystem_cd, m_exclusion_cd
 )
 with item_concepts as (
 select *
@@ -71,7 +75,7 @@ select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_basecod
      , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
      , c_dimcode, m_applied_path
      , cast(update_date as date) update_date
-     , sourcesystem_cd
+     , sourcesystem_cd, '@' m_exclusion_cd
 from all_cols
 ;
 commit;
