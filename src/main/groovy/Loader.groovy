@@ -100,12 +100,25 @@ class Loader {
         productName
     }
 
+    static int batchSize = 100
+
+    int loadRaw(Reader input, String table) {
+        String stmt = "insert into ${table} (record) values (?)"
+        def qty = 0
+        _sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
+            new Scanner(input).useDelimiter("\n") each { String it ->
+                ps.addBatch([it as Object])
+                qty += 1
+            }
+        }
+        logger.info("inserted $qty records into $table")
+        qty
+    }
+
     JsonBuilder query(String sql) {
         def results = _sql.rows(sql)
         new JsonBuilder(results)
     }
-
-    static int batchSize = 100
 
     int load(Reader input) {
         def scanner = new Scanner(input)
@@ -174,6 +187,11 @@ class Loader {
             if (query) {
                 def json = loader.query(query)
                 System.out << json
+            }
+
+            String table = arg("--loadRaw")
+            if (table) {
+                loader.loadRaw(new java.io.InputStreamReader(System.in), table)
             }
 
             if (argIx("--load") >= 0) {
