@@ -2,10 +2,12 @@ import groovy.json.JsonOutput
 import groovy.sql.GroovyResultSet
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import junit.framework.TestCase
+import static groovy.test.GroovyAssert.shouldFail
 
 
 @CompileStatic
-class LoaderTest extends GroovyTestCase {
+class LoaderTest extends TestCase {
     Map<String, String> env1 = [A1_URL: 'jdbc:hsqldb:mem:A1', A1_DRIVER: 'org.hsqldb.jdbc.JDBCDriver', A1_USER: 'SA', A1_PASSWORD: '']
 
     void 'test DBConfig happy path'() {
