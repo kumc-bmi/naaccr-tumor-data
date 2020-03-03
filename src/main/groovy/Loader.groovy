@@ -1,25 +1,14 @@
 import groovy.json.JsonBuilder
-import groovy.json.JsonParserType
 import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
-import groovy.sql.GroovyResultSet
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.transform.Immutable
+
+import java.nio.file.Paths
+import java.sql.Connection
+import java.sql.SQLException
 import java.util.logging.Logger
-import java.io.Reader
-import java.io.BufferedReader
-import java.io.InputStreamReader
-
-@Immutable
-class Password {
-    final String value
-
-    @Override
-    String toString() {
-        return "...${value.length()}..."
-    }
-}
 
 
 @CompileStatic
@@ -27,7 +16,7 @@ class Loader {
     static Logger logger = Logger.getLogger("")
 
     @Immutable
-    public static class DBConfig {
+    static class DBConfig {
         final String url
         final String driver
         final String username
@@ -67,7 +56,7 @@ class Loader {
                 logger.fine("executing $input: $sql")
                 try {
                     _sql.execute sql
-                } catch (java.sql.SQLException oops) {
+                } catch (SQLException oops) {
                     if (sql.contains("drop table")) {
                         /* trundle on ... */
                     } else {
@@ -78,7 +67,7 @@ class Loader {
         }
     }
 
-    Closure<String> productSqlEdits(productName) {
+    static Closure<String> productSqlEdits(productName) {
         if (productName == "Oracle") {
             return { String sql -> sql.replaceAll("drop table if exists", "drop table") }
         } else {
@@ -93,8 +82,8 @@ class Loader {
     }
 
     String productName() {
-        String productName
-        _sql.cacheConnection { java.sql.Connection conn ->
+        String productName = '???'
+        _sql.cacheConnection { Connection conn ->
             productName = conn.metaData.databaseProductName
         }
         productName
@@ -135,7 +124,7 @@ class Loader {
             while (scanner.hasNextLine()) {
                 try {
                     record = parser.parseText(scanner.nextLine()) as List
-                } catch (EOFException) {
+                } catch (EOFException ignored) {
                     break
                 }
                 // logger.info("insert record: $record")
@@ -163,7 +152,7 @@ class Loader {
             logger.warning("Usage: java -jar loader.jar --account A [--run abc.sql]")
             System.exit(1)
         }
-        def config
+        DBConfig config = null
         try {
             config = DBConfig.fromEnv(account, { String name -> System.getenv(name) })
         } catch (IllegalStateException oops) {
@@ -179,23 +168,25 @@ class Loader {
 
             def script = arg("--run")
             if (script) {
-                def cwd = java.nio.file.Paths.get(".").toAbsolutePath().normalize().toString()
+                def cwd = Paths.get(".").toAbsolutePath().normalize().toString()
                 loader.runScript(new URL(new URL("file://$cwd/"), script))
             }
 
             def query = arg("--query")
             if (query) {
                 def json = loader.query(query)
-                System.out << json
+                System.out.withWriter {
+                    json.writeTo(it)
+                }
             }
 
             String table = arg("--loadRaw")
             if (table) {
-                loader.loadRaw(new java.io.InputStreamReader(System.in), table)
+                loader.loadRaw(new InputStreamReader(System.in), table)
             }
 
             if (argIx("--load") >= 0) {
-                loader.load(new java.io.InputStreamReader(System.in))
+                loader.load(new InputStreamReader(System.in))
             }
         }
     }

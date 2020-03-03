@@ -1,21 +1,13 @@
-import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.LayoutFactory
-import com.imsweb.naaccrxml.NaaccrOptions
-import com.imsweb.naaccrxml.PatientReader
-import com.imsweb.naaccrxml.PatientFlatReader
-import com.imsweb.naaccrxml.entity.Patient
-import com.imsweb.naaccrxml.NaaccrXmlUtils
+import com.imsweb.layout.LayoutInfo
 import com.imsweb.naaccrxml.NaaccrObserver
+import com.imsweb.naaccrxml.NaaccrOptions
+import com.imsweb.naaccrxml.NaaccrXmlUtils
+import com.imsweb.naaccrxml.entity.Patient
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import tech.tablesaw.api.DoubleColumn
-import tech.tablesaw.api.IntColumn
-import tech.tablesaw.api.NumericColumn
-import tech.tablesaw.api.Row
-import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
-import tech.tablesaw.columns.Column
-
 
 @CompileStatic
 class TumorFileTest extends TestCase{
@@ -25,29 +17,6 @@ class TumorFileTest extends TestCase{
         double[] numbers = [1, 2, 3, 4]
         DoubleColumn nc = DoubleColumn.create("nc", numbers)
         System.out.println(nc.print())
-    }
-
-    class TumorKeys {
-        static List<String> pat_ids = ['patientSystemIdHosp', 'patientIdNumber']
-        static List<String> pat_attrs = pat_ids + ['dateOfBirth', 'dateOfLastContact', 'sex', 'vitalStatus']
-        static List<String> report_ids = ['naaccrRecordVersion', 'npiRegistryId']
-        static List<String> report_attrs = report_ids + ['dateCaseReportExported']
-
-        static Table patients(Reader lines) {
-            List<String> attrs = pat_attrs + report_attrs
-            Collection<Column<?>> cols = (attrs.collect { it -> StringColumn.create(it, []) }) as Collection<Column<?>>;
-            Table patientData = Table.create("patient", cols)
-            PatientReader reader = new PatientFlatReader(lines)
-            Patient patient = reader.readPatient()
-            while (patient != null) {
-                Row patientRow = patientData.appendRow()
-                attrs.each { String naaccrId ->
-                    patientRow.setString(naaccrId, patient.getItemValue(naaccrId))
-                }
-                patient = reader.readPatient()
-            }
-            patientData
-        }
     }
 
     void testPatients() {
@@ -64,6 +33,7 @@ class TumorFileTest extends TestCase{
             println(patientData.first(5))
         }
     }
+
     void testLayout() {
         List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(new File(testDataPath));
         assert !possibleFormats.isEmpty()
