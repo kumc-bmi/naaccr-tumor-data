@@ -271,3 +271,11 @@ https://cwiki.apache.org/confluence/display/Hive/HiveServer2+Clients
 https://search.maven.org/artifact/org.apache.hive/hive-jdbc/3.1.1/jar
 standalone
 
+## groovy for single-jar deployment
+
+  - pro
+    - nice Sql, JSON APIs
+    - can prototype in unityped mode
+  - con
+    - IDE isn't as quick to spot type errors
+    - spread operator doesn't work with @CompileStatic

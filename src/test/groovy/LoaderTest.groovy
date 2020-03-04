@@ -8,10 +8,12 @@ import static groovy.test.GroovyAssert.shouldFail
 
 @CompileStatic
 class LoaderTest extends TestCase {
-    Map<String, String> env1 = [A1_URL: 'jdbc:hsqldb:mem:A1', A1_DRIVER: 'org.hsqldb.jdbc.JDBCDriver', A1_USER: 'SA', A1_PASSWORD: '']
+    static final Map<String, String> env1 = [A1_URL: 'jdbc:hsqldb:mem:A1', A1_DRIVER: 'org.hsqldb.jdbc.JDBCDriver', A1_USER: 'SA', A1_PASSWORD: '']
+
+    static final Loader.DBConfig config1 = Loader.DBConfig.fromEnv('A1', { String it -> env1[it] })
 
     void 'test DBConfig happy path'() {
-        def config = Loader.DBConfig.fromEnv('A1', { String it -> env1[it] })
+        def config = config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             sql.eachRow("select 1 as c from (values('x'))") { GroovyResultSet row ->
                 assert row.getAt('c') == 1
