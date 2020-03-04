@@ -29,12 +29,13 @@ select 'N' as c_synonym_cd
      , 'CONCEPT_PATH' as c_columnname
      , 'T' c_columndatatype
      , 'LIKE' c_operator
-     , cast(null as string) as c_comment
+     , cast(null as varchar(1000)) as c_comment
      , '@' m_applied_path
      , '@' m_exclusion_cd
      , cast(null as int) as c_totalnum
-     , cast(null as string) as valuetype_cd
-     , cast(null as string) as c_metadataxml
+     , cast(null as varchar(1000)) as valuetype_cd
+     , cast(null as varchar(1000)) as c_metadataxml
+from (values('X'))
 ;
 
 
@@ -57,21 +58,23 @@ cross join i2b2_path_concept i2b2
 ;
 -- select * from naaccr_top_concept;
 
+create function zpad (width decimal, n decimal) returns varchar(20)
+    return trim(lpad(cast(n as varchar(20)), width, '0'));
+
 drop view if exists section_concepts;
 create view section_concepts as
 with ea as (
 select nts.sectionId, nts.section
      , top.c_hlevel + 1 c_hlevel
      , top.c_fullname || 'S:' || nts.sectionid || ' ' || section || '\' as c_fullname
-     , trim(printf('%02d', nts.sectionid)) || ' ' || section as c_name
+     , zpad(2, nts.sectionid) || ' ' || section as c_name
      , null as c_basecode
      , 'FA' as c_visualattributes
-     , cast(null as string) as c_tooltip
+     , cast(null as varchar(1000)) as c_tooltip
 from section nts
 cross join naaccr_top_concept top
 )
-select sectionId, section
-     , ea.*
+select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
      , top.update_date
@@ -89,8 +92,8 @@ select sc.sectionId, ni.naaccrNum
      , sc.c_hlevel + 1 as c_hlevel
      , (sc.c_fullname ||
        -- ISSUE: migrate from naaccrName to naaccrId for path?
-              substr((trim(printf('%04d', ni.naaccrNum)) || ' ' || ni.naaccrName), 1, 40) || '\') as c_fullname
-     , (trim(printf('%04d', ni.naaccrNum)) || ' ' || ni.naaccrName) as c_name
+              substr((zpad(4, ni.naaccrNum) || ' ' || ni.naaccrName), 1, 40) || '\') as c_fullname
+     , (zpad(4, ni.naaccrNum) || ' ' || ni.naaccrName) as c_name
      , ('NAACCR|' || ni.naaccrNum || ':') as c_basecode
      , case
        when ni.valtype_cd = '@' then 'FA'
@@ -98,12 +101,11 @@ select sc.sectionId, ni.naaccrNum
                  -- TODO: hide Histology since '0420', '0522'
                  -- we already have Morph--Type/Behav
        end as c_visualattributes
-     , cast(null as string) as c_tooltip -- TODO
+     , cast(null as varchar(1000)) as c_tooltip -- TODO
 from tumor_item_type ni
 join section_concepts sc on sc.section = ni.section
 )
-select sectionId, naaccrNum
-     , ea.*
+select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
      , top.update_date
@@ -253,13 +255,14 @@ select lvl + 1 as c_hlevel
      , icdo.concept_name as c_name
      , ('NAACCR|400:' || icdo.concept_cd) as c_basecode
      , icdo.c_visualattributes
-     , cast(null as string) as c_tooltip
+     , cast(null as varchar(1000)) as c_tooltip
 from icd_o_topo icdo
 cross join (
   -- The DRY approach is somehow WAY slower:
   -- select * from item_concepts where naaccrNum = 400
   -- so let's try a hard-coded KLUDGE:
   select '\\i2b2\\naaccr\\S:1 Cancer Identification\\0400 Primary Site\\' as c_fullname
+  from (values('dual'))
 ) ic
 )
 select ea.*
@@ -308,7 +311,7 @@ select f.c_hlevel + s.hlevel + 1 as c_hlevel
      , case when basecode is null then null
        else ('SEER_SITE:' || basecode) end as concept_cd
      , visualattributes as c_visualattributes
-     , cast(null as string) as c_tooltip
+     , cast(null as varchar(1000)) as c_tooltip
 from seer_site_terms s
 cross join folder f
 ),
