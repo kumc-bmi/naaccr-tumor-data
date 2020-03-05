@@ -42,7 +42,8 @@ class TumorOntTest extends TestCase {
         Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
         Loader.DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            sql.execute("drop table if exists tumor_item_type")  // ISSUE: DB state shouldn't persist between tests
+            // ack: https://stackoverflow.com/a/4991969
+            sql.execute("DROP SCHEMA PUBLIC CASCADE")  // ISSUE: DB state shouldn't persist between tests
             TumorOnt.load_data_frame(sql, "tumor_item_type", aTable)
 
             Map rowMap = sql.firstRow("select * from tumor_item_type limit 1")
