@@ -4,7 +4,7 @@
     "columns": [
       {
         "name": "c_hlevel",
-        "datatype": "string",
+        "datatype": "number",
         "null": [
           ""
         ],
