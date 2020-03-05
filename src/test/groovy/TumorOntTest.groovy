@@ -1,6 +1,7 @@
 import groovy.sql.Sql
 import junit.framework.TestCase
 import tech.tablesaw.api.ColumnType
+import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
 
 import java.nio.file.Paths
@@ -15,6 +16,28 @@ class TumorOntTest extends TestCase {
         assert per_section
                 .where(per_section.stringColumn("section").isEqualTo("Record ID"))
                 .row(0).getInt("sectionid") == 9
+    }
+
+    void testLoinc() {
+        final Table answers = TumorOnt.LOINC_NAACCR.answer
+        assert answers.columnNames().size == 9
+        assert answers.columnNames().first() == 'LOINC_NUMBER'
+        assert answers.columnNames().last() == 'ANSWER_STRING'
+    }
+
+    void testR() {
+        final scheme = 'peritonealCytology'
+        final info = TumorOnt.NAACCR_R._code_labels.toURI().resolve(scheme + '.csv').toURL()
+        Table codes = TumorOnt.read_csv(info, TumorOnt.NAACCR_R.field_info_schema.columnTypes())
+        codes.addColumns(StringColumn.create('scheme', [scheme] * codes.rowCount()))
+        assert codes.columnNames() == ['code', 'label', 'means_missing', 'description', 'scheme']
+        final Table with_fields = codes.joinOn('scheme').inner(TumorOnt.NAACCR_R.field_code_scheme, 'scheme')
+        Table item_name = TumorOnt.NAACCR_R.field_info.select('item', 'name')
+        final Table with_field_info = with_fields.joinOn('name').inner(item_name, 'name')
+        assert with_field_info.columnCount() == 7
+
+        final Table labels = TumorOnt.NAACCR_R.code_labels()
+        assert labels.columnCount() == 7
     }
 
     void testOncologyMeta() {
@@ -64,11 +87,42 @@ class TumorOntTest extends TestCase {
 
 
     void testOnt() {
+        def update_date = LocalDate.of(2000, 1, 1)
+        def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
+        assert top.get(0, 0) == 1
+
         Loader.DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            final actual = TumorOnt.NAACCR_I2B2.ont_view_in(sql, "task123", LocalDate.of(2000, 1, 1), Paths.get(cache))
-            println(actual)
-            assert actual == "please print@@"
+            // ack: https://stackoverflow.com/a/4991969
+            sql.execute("DROP SCHEMA PUBLIC CASCADE")  // ISSUE: DB state shouldn't persist between tests
+
+            final Table actual = TumorOnt.NAACCR_I2B2.ont_view_in(sql, "task123", update_date, Paths.get(cache))
+            assert actual.columnCount() == 21
+            assert actual.columnNames().contains("C_FULLNAME")
+            // top concept
+            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(1)).rowCount() == 1
+            
+            // section concepts
+            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(2)
+                    .and(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:"))).rowCount() == 17
+            // item concepts
+            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(3)
+                    .and(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:"))).rowCount() > 500
+
+            // TODO: separate LOINC, R codes?
+            // code concepts
+            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(4)
+                    .and(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:"))).rowCount() > 5000
+
+            // TODO: separate SEER site table method?
+            // seer site
+            assert actual.where(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\SEER Site\\")).rowCount() == 103
+
+            // TODO: separate site-specific factor method?
+            // cancer staging site-specific terms
+            assert actual.where(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\csterms\\")).rowCount() > 10000
+
+            assert actual.rowCount() > 100
         }
     }
 
@@ -79,8 +133,8 @@ class TumorOntTest extends TestCase {
             sql.firstRow("select lpad('0', 4, cast(10 as varchar(4))) from (values(1))")[0] == "0010"
             final s1 = TumorOnt.NAACCR_I2B2.ont_script
             sql.execute(TumorOnt.SqlScript.find_ddl("zpad", s1.code))
-            sql.firstRow("select zpad(4, 10) from (values(1))")[0] == "0010"
-            sql.execute('drop function zpad')  // ISSUE: DB state shouldn't persist between tests.
+            assert sql.firstRow("select zpad(4, 10) from (values(1))")[0] == "0010"
+            assert sql.firstRow("select zpad(2, 9) || ' xyz' from (values(1))")[0] == "09 xyz"
         }
     }
 

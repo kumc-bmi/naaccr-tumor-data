@@ -19,6 +19,53 @@ import java.util.zip.ZipFile
 class TumorOnt {
     static Logger log = Logger.getLogger("")
 
+    static class NAACCR_R {
+        // Names assumed by naaccr_txform.sql
+
+        static final Table field_info = read_csv(TumorOnt.getResource('naaccr_r_raw/field_info.csv'))
+        static final Table field_info_schema = Table.create(
+                StringColumn.create("code"),
+                StringColumn.create("label"),
+                BooleanColumn.create("means_missing"),
+                StringColumn.create("description"))
+        static final Table field_code_scheme = read_csv(TumorOnt.getResource('naaccr_r_raw/field_code_scheme.csv'))
+
+        static final URL _code_labels = TumorOnt.getResource('naaccr_r_raw/code-labels/')
+
+        static Table code_labels(List<String> implicit = ['iso_country']) {
+            Table all_schemes = null
+            for (String scheme : field_code_scheme.stringColumn('scheme').unique()) {
+                if (implicit.contains(scheme)) {
+                    continue
+                }
+                final info = _code_labels.toURI().resolve(scheme + '.csv').toURL()
+                int skiprows = 0
+                info.withReader() { Reader it ->
+                    if (it.readLine().startsWith('#')) {
+                        skiprows = 1
+                    }
+                    null
+                }
+                final codes = read_csv(info, field_info_schema.columnTypes(), skiprows)
+                final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
+                codes.addColumns(constS('scheme', codes, Pathlib.stem(info)))
+                if (!codes.columnNames().contains('code') || !codes.columnNames().contains('label')) {
+                    throw new IllegalArgumentException([info, codes.columnNames()].toString())
+                }
+                if (all_schemes == null) {
+                    all_schemes = codes
+                } else {
+                    all_schemes = all_schemes.append(codes)
+                }
+            }
+            final Table with_fields = all_schemes.joinOn('scheme')
+                    .inner(field_code_scheme, 'scheme')
+            final Table with_field_info = with_fields.joinOn('name')
+                    .inner(field_info.select('item', 'name'), 'name')
+            with_field_info
+        }
+    }
+
     static class OncologyMeta {
         static Tuple morph3_info = new Tuple('ICD-O-2_CSV.zip', 'icd-o-3-morph.csv', ['code', 'label', 'notes'])
         static Tuple topo_info = new Tuple('ICD-O-2_CSV.zip', 'Topoenglish.txt', null)
@@ -123,6 +170,12 @@ class TumorOnt {
         }
     }
 
+    static class LOINC_NAACCR {
+        // TODO: static final measure = read_csv(TumorOnt.getResource('loinc_naaccr/loinc_naaccr.csv'))
+        static final Table answer = read_csv(TumorOnt.getResource('loinc_naaccr/loinc_naaccr_answer.csv'))
+        // TODO? static final answer_struct = answer.columns().collect { Column<?> it -> it.copy().setName(it.name().toLowerCase()) }
+    }
+
     static class NAACCR_I2B2 {
         static final String top_folder = "\\i2b2\\naaccr\\"
         static final String c_name = 'Cancer Cases (NAACCR Hierarchy)'
@@ -159,28 +212,31 @@ class TumorOnt {
                         new Tuple2('naaccr_ontology', []),
                 ])
 
-        static def ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache) {
+        static Table naaccr_top(LocalDate update_date) {
+            fromRecords([[c_hlevel       : 1,
+                          c_fullname     : top_folder,
+                          c_name         : c_name,
+                          update_date    : update_date,
+                          sourcesystem_cd: sourcesystem_cd] as Map])
+        }
+
+        static Table ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache) {
             // TODO: make who_cache optional
             final who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
             final icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
-            Table top = fromRecords([[c_hlevel       : 1,
-                                      c_fullname     : top_folder,
-                                      c_name         : c_name,
-                                      update_date    : update_date,
-                                      sourcesystem_cd: sourcesystem_cd] as Map])
             final current_task = fromRecords([[task_hash: task_hash] as Map]).setName("current_task")
             final tables = [
-                    current_task   : current_task,
-                    naaccr_top     : top,
-                    section        : per_section,
-                    tumor_item_type: tumor_item_type,
-                    // TODO loinc_naaccr_answer: LOINC_NAACCR.answer,
-                    // TODO code_labels: NAACCR_R.code_labels(),
-                    icd_o_topo     : icd_o_topo,
-                    cs_terms       : cs_terms,
-                    seer_site_terms: seer_recode_terms,
+                    current_task       : current_task,
+                    naaccr_top         : naaccr_top(update_date),
+                    section            : per_section,
+                    tumor_item_type    : tumor_item_type,
+                    loinc_naaccr_answer: LOINC_NAACCR.answer,
+                    code_labels        : NAACCR_R.code_labels(),
+                    icd_o_topo         : icd_o_topo,
+                    cs_terms           : cs_terms,
+                    seer_site_terms    : seer_recode_terms,
             ] as Map
-            sql.execute(TumorOnt.SqlScript.find_ddl("zpad", ont_script.code))
+            sql.execute(SqlScript.find_ddl("zpad", ont_script.code))
             final views = create_objects(sql, ont_script, tables)
             final String name = ont_script.objects.last().first
             views[name]
@@ -228,6 +284,9 @@ class TumorOnt {
                         case ColumnType.LOCAL_DATE:
                             params << java.sql.Date.valueOf(row.getDate((params.size())))
                             break
+                        case ColumnType.BOOLEAN:
+                            params << row.getBoolean(params.size())
+                            break
                         default:
                             throw new IllegalArgumentException(type.toString())
                     }
@@ -237,11 +296,11 @@ class TumorOnt {
         }
     }
 
-    static Table read_csv(URL url, ColumnType[] schema = null) {
-        if (schema == null) {
-            schema = tabularTypes(new JsonSlurper().parse(meta_path(url)))
-        }
-        Table.read().usingOptions(CsvReadOptions.builder(url.openStream()).columnTypes(schema))
+    static Table read_csv(URL url, ColumnType[] _schema = null, int skiprows = 0) {
+        ColumnType[] schema = _schema ? _schema : tabularTypes(new JsonSlurper().parse(meta_path(url)))
+        final BufferedReader input = new BufferedReader(new InputStreamReader(url.openStream()))
+        skiprows.times { input.readLine() }
+        Table.read().usingOptions(CsvReadOptions.builder(input).columnTypes(schema))
     }
 
     static ColumnType[] tabularTypes(Object meta) {
@@ -265,10 +324,16 @@ class TumorOnt {
     }
 
     static URL meta_path(URL path) {
-        final parent = path.toURI().resolve('./')
-        final String[] segments = path.path.split('/')
-        final stem = segments.last().replaceFirst('[.][^.]+$', "")
-        parent.resolve(stem + '-metadata.json').toURL()
+        Pathlib.parent(path).resolve(Pathlib.stem(path) + '-metadata.json').toURL()
+    }
+
+    static class Pathlib {
+        static URI parent(URL path) { path.toURI().resolve('./') }
+
+        static String stem(URL path) {
+            final String[] segments = path.path.split('/')
+            segments.last().replaceFirst('[.][^.]+$', "")
+        }
     }
 
     static Table fromRecords(List<Map<String, Object>> obj) {
@@ -277,7 +342,7 @@ class TumorOnt {
                 case String:
                     return StringColumn.create(k, v as String)
                 case Integer:
-                    return IntColumn.create(k, v as Integer)
+                    return IntColumn.create(k, [v] as Integer[])
                 case LocalDate:
                     return DateColumn.create(k, v as LocalDate)
                 default:
