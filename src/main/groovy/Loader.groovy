@@ -3,7 +3,6 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
-import groovy.transform.Immutable
 
 import java.nio.file.Paths
 import java.sql.Connection
@@ -15,31 +14,6 @@ import java.util.logging.Logger
 class Loader {
     static Logger logger = Logger.getLogger("")
 
-    @Immutable
-    static class DBConfig {
-        final String url
-        final String driver
-        final String username
-        final Password password
-
-        static Logger logger = Logger.getLogger("")
-
-        static DBConfig fromEnv(String account, Closure<String> getenv) {
-            logger.info("getting config for $account")
-            Closure<String> config = {
-                def name = "${account}_${it}"
-                def val = getenv(name)
-                if (val == null) {
-                    throw new IllegalStateException(name)
-                }
-                val
-            }
-            def driver = config("DRIVER")
-            Class.forName(driver)
-            new DBConfig(url: config("URL"), driver: driver,
-                    username: config("USER"), password: new Password(value: config("PASSWORD")))
-        }
-    }
 
     private final Sql _sql
 
@@ -137,42 +111,22 @@ class Loader {
     }
 
     static void main(String[] args) {
-        def argIx = { String target ->
-            args.findIndexOf({ it == target })
-        }
-        def arg = { String target ->
-            int ix = argIx(target)
-            if (ix < 0 || ix + 1 >= args.length) {
-                return null
-            }
-            args[ix + 1]
-        }
-        def account = arg("--account")
-        if (!account) {
-            logger.warning("Usage: java -jar loader.jar --account A [--run abc.sql]")
-            System.exit(1)
-        }
-        DBConfig config = null
-        try {
-            config = DBConfig.fromEnv(account, { String name -> System.getenv(name) })
-        } catch (IllegalStateException oops) {
-            logger.warning("Config missing from environment: $oops")
-            System.exit(1)
-        } catch (ClassNotFoundException oops) {
-            logger.warning("driver not found (fix CLASSPATH?): $oops")
-            System.exit(1)
-        }
-        logger.info("$account config: $config")
+        DBConfig.CLI cli = new DBConfig.CLI(args,
+                { String name -> System.getenv(name) },
+                { int it -> System.exit(it) }, )
+
+        DBConfig config = cli.account()
+
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             def loader = new Loader(sql)
 
-            def script = arg("--run")
+            def script = cli.arg("--run")
             if (script) {
                 def cwd = Paths.get(".").toAbsolutePath().normalize().toString()
                 loader.runScript(new URL(new URL("file://$cwd/"), script))
             }
 
-            def query = arg("--query")
+            def query = cli.arg("--query")
             if (query) {
                 def json = loader.query(query)
                 System.out.withWriter {
@@ -180,12 +134,12 @@ class Loader {
                 }
             }
 
-            String table = arg("--loadRaw")
+            String table = cli.arg("--loadRaw")
             if (table) {
                 loader.loadRaw(new InputStreamReader(System.in), table)
             }
 
-            if (argIx("--load") >= 0) {
+            if (cli.argIx("--load") >= 0) {
                 loader.load(new InputStreamReader(System.in))
             }
         }

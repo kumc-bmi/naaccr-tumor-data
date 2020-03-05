@@ -20,7 +20,7 @@ class TumorOntTest extends TestCase {
 
     void testLoinc() {
         final Table answers = TumorOnt.LOINC_NAACCR.answer
-        assert answers.columnNames().size == 9
+        assert answers.columnNames().size() == 9
         assert answers.columnNames().first() == 'LOINC_NUMBER'
         assert answers.columnNames().last() == 'ANSWER_STRING'
     }
@@ -59,7 +59,7 @@ class TumorOntTest extends TestCase {
 
     void testLoadTable() {
         Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
-        Loader.DBConfig config = LoaderTest.config1
+        DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             // ack: https://stackoverflow.com/a/4991969
             sql.execute("DROP SCHEMA PUBLIC CASCADE")  // ISSUE: DB state shouldn't persist between tests
@@ -83,6 +83,11 @@ class TumorOntTest extends TestCase {
         assert insert.contains("(naaccrNum, sectionId")
         assert insert.contains("phi_id_kind)")
         assert insert.contains("(?, ?, ?")
+
+        def update_date = LocalDate.of(2000, 1, 1)
+        def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
+        final create_top = TumorOnt.SqlScript.create_ddl("top", top.columns())
+        assert create_top.toLowerCase().contains("c_hlevel integer")
     }
 
 
@@ -91,7 +96,7 @@ class TumorOntTest extends TestCase {
         def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
         assert top.get(0, 0) == 1
 
-        Loader.DBConfig config = LoaderTest.config1
+        DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             // ack: https://stackoverflow.com/a/4991969
             sql.execute("DROP SCHEMA PUBLIC CASCADE")  // ISSUE: DB state shouldn't persist between tests
@@ -101,18 +106,18 @@ class TumorOntTest extends TestCase {
             assert actual.columnNames().contains("C_FULLNAME")
             // top concept
             assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(1)).rowCount() == 1
-            
+
             // section concepts
             assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(2)
-                    .and(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:"))).rowCount() == 17
+                    & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() == 17
             // item concepts
             assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(3)
-                    .and(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:"))).rowCount() > 500
+                    & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() > 500
 
             // TODO: separate LOINC, R codes?
             // code concepts
             assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(4)
-                    .and(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:"))).rowCount() > 5000
+                    & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() > 5000
 
             // TODO: separate SEER site table method?
             // seer site
@@ -127,7 +132,7 @@ class TumorOntTest extends TestCase {
     }
 
     void testSqlDialect() {
-        Loader.DBConfig config = LoaderTest.config1
+        DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             assert sql.firstRow("select 1 as x from (values('X'))  ")[0] == 1
             sql.firstRow("select lpad('0', 4, cast(10 as varchar(4))) from (values(1))")[0] == "0010"

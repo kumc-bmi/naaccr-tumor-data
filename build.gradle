@@ -18,6 +18,8 @@ dependencies {
     compile 'com.imsweb:naaccr-xml:6.6'
     compile 'com.imsweb:layout:2.0'
     compile 'tech.tablesaw:tablesaw-core:0.37.2'
+    // https://mvnrepository.com/artifact/org.hsqldb/hsqldb
+    compile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.2'
 
     // i2b2 JDBC drivers
     // https://github.com/i2b2/i2b2-core-server/tree/master/edu.harvard.i2b2.server-common/lib/jdbc
@@ -25,9 +27,6 @@ dependencies {
     runtime 'com.oracle.ojdbc:ojdbc8:19.3.0.0'
     runtime 'org.postgresql:postgresql:42.2.8.jre7'
     runtime 'com.microsoft.sqlserver:mssql-jdbc:8.1.0.jre13-preview'
-
-    // https://mvnrepository.com/artifact/org.hsqldb/hsqldb
-    testCompile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.2'
 
     testCompile 'junit:junit:4.12'
     testCompile 'org.codehaus.groovy:groovy-test:3.0.1'

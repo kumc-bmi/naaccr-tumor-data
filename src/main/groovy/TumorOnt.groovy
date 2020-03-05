@@ -11,6 +11,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.sql.ResultSet
+import java.sql.SQLException
 import java.time.LocalDate
 import java.util.logging.Logger
 import java.util.zip.ZipFile
@@ -18,6 +19,84 @@ import java.util.zip.ZipFile
 @CompileStatic
 class TumorOnt {
     static Logger log = Logger.getLogger("")
+
+    static void main(String[] args) {
+        DBConfig.CLI cli = new DBConfig.CLI(args,
+                { String name -> System.getenv(name) },
+                { int it -> System.exit(it) })
+
+        DBConfig cdw = cli.account()
+
+        Ontology1 work = new Ontology1(
+                cli.arg("--table-name", "NAACCR_ONTOLOGY"),
+                Integer.parseInt(cli.arg("--version", "18")),
+                cli.arg("--task-hash", "task123"),
+                // TODO: current calendar date
+                LocalDate.parse(cli.arg("--update-date", "2001-01-01")),
+                cdw, Paths.get(cli.arg("--who-cache", ",cache")))
+        if (!work.complete()) {
+            work.run()
+        }
+    }
+
+    static class Ontology1 {
+        final String table_name
+        final int version
+        final String task_hash
+        final LocalDate update_date
+        final Path who_cache
+        private final DBConfig cdw
+
+        Ontology1(String _table_name, int _version, String _task_hash, LocalDate _update_date,
+                  DBConfig _cdw, Path _who_cache) {
+            table_name = _table_name
+            version = _version
+            task_hash = _task_hash
+            update_date = _update_date
+            who_cache = _who_cache
+            cdw = _cdw
+        }
+
+        boolean complete() {
+            try {
+                Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+
+                    return sql.firstRow("""
+                        select 1 from ${table_name}
+                            where c_fullname = ?.fullname
+                            and c_basecode = ?.code
+                        """, [fullname: NAACCR_I2B2.top_folder, code: version + task_hash])[0] == 1
+                }
+            } catch (Exception problem) {
+                log.warning("not complete: $problem")
+            }
+            return false
+        }
+
+        void run() {
+            final DBConfig mem = memdb()
+            Table terms
+            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql sql ->
+                terms = NAACCR_I2B2.ont_view_in(sql, task_hash, update_date, who_cache)
+            }
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                try {
+                    sql.execute("drop table $table_name".toString())
+                } catch (SQLException problem) {
+                    log.warning("drop $table_name: $problem")
+                }
+                load_data_frame(sql, table_name, terms)
+            }
+        }
+
+        static DBConfig memdb() {
+            final Map<String, String> env1 = [MEM_URL : 'jdbc:hsqldb:mem:A1', MEM_DRIVER: 'org.hsqldb.jdbc.JDBCDriver',
+                                              MEM_USER: 'SA', MEM_PASSWORD: '']
+
+            DBConfig.fromEnv('MEM', { String it -> env1[it] })
+        }
+
+    }
 
     static class NAACCR_R {
         // Names assumed by naaccr_txform.sql
@@ -154,6 +233,8 @@ class TumorOnt {
                 switch (it) {
                     case ColumnType.STRING:
                         return "VARCHAR($varchars)"
+                    case ColumnType.DOUBLE:
+                        return "NUMERIC"
                     case ColumnType.LOCAL_DATE:
                         return "DATE"
                     default:
@@ -286,6 +367,9 @@ class TumorOnt {
                             break
                         case ColumnType.BOOLEAN:
                             params << row.getBoolean(params.size())
+                            break
+                        case ColumnType.DOUBLE:
+                            params << row.getDouble(params.size())
                             break
                         default:
                             throw new IllegalArgumentException(type.toString())

@@ -10,29 +10,29 @@ import static groovy.test.GroovyAssert.shouldFail
 class LoaderTest extends TestCase {
     static final Map<String, String> env1 = [A1_URL: 'jdbc:hsqldb:mem:A1', A1_DRIVER: 'org.hsqldb.jdbc.JDBCDriver', A1_USER: 'SA', A1_PASSWORD: '']
 
-    static final Loader.DBConfig config1 = Loader.DBConfig.fromEnv('A1', { String it -> env1[it] })
+    static final DBConfig config1 = DBConfig.fromEnv('A1', { String it -> env1[it] })
 
     void 'test DBConfig happy path'() {
         def config = config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             sql.eachRow("select 1 as c from (values('x'))") { GroovyResultSet row ->
-                assert row.getAt('c') == 1
+                assert row['c'] == 1
             }
         }
     }
 
     void 'test DBConfig misspelled env var'() {
         def env1 = [A1_URL: 'URL1', A1_DRIVER: 'java.sql.DriverManager', A1_USERNAME: 'U1', A1_PASSWORD: 'sekret']
-        shouldFail IllegalStateException, { -> Loader.DBConfig.fromEnv('A1', { String it -> env1[it] }) }
+        shouldFail IllegalStateException, { -> DBConfig.fromEnv('A1', { String it -> env1[it] }) }
     }
 
     void 'test missing driver'() {
         def env1 = [A1_URL: 'URL1', A1_DRIVER: 'sqlserver.Driver.Thingy', A1_USERNAME: 'U1', A1_PASSWORD: 'sekret']
-        shouldFail ClassNotFoundException, { -> Loader.DBConfig.fromEnv('A1', { String it -> env1[it] }) }
+        shouldFail ClassNotFoundException, { -> DBConfig.fromEnv('A1', { String it -> env1[it] }) }
     }
 
     void 'test Loader runScript'() {
-        def config = Loader.DBConfig.fromEnv('A1', { String it -> env1[it] })
+        def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             def input = getClass().getResource('naaccr_tables.sql')
             def loader = new Loader(sql)
@@ -41,7 +41,7 @@ class LoaderTest extends TestCase {
     }
 
     void 'test Loader query'() {
-        def config = Loader.DBConfig.fromEnv('A1', { String it -> env1[it] })
+        def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             def loader = new Loader(sql)
             loader.runScript(getClass().getResource('naaccr_tables.sql'))
@@ -68,7 +68,7 @@ class LoaderTest extends TestCase {
         }
         def input = new StringReader(buf.toString())
 
-        def config = Loader.DBConfig.fromEnv('A1', { String it -> env1[it] })
+        def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             sql.execute "delete from naaccr_tumors"
             def loader = new Loader(sql)
