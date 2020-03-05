@@ -39,6 +39,30 @@ class TumorOnt {
             }
             data
         }
+
+        static Table icd_o_topo(Table topo) {
+            final major = topo.where(topo.stringColumn('Lvl').isEqualTo('3'))
+            def minor = topo.where(topo.stringColumn('Lvl').isEqualTo('4'))
+            minor = minor.addColumns(
+                    minor.stringColumn('Kode').replaceAll('\\..*', '').setName('major'))
+            final constN = { String name, Table t, int val -> IntColumn.create(name, [val] * t.rowCount() as int[]) }
+            final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
+            final out3 = Table.create(
+                    constN('lvl', major, 3),
+                    major.stringColumn('Kode').copy().setName('concept_cd'),
+                    constS('c_visualattributes', major, 'FA'),
+                    major.stringColumn('Kode').map({ String it -> it + '\\' }).setName('path'),
+                    major.stringColumn('Title').copy().setName('concept_name'))
+            final out4 = Table.create(
+                    constN('lvl', minor, 4),
+                    minor.stringColumn('Kode').map({ String v -> v.replace('.', '') }).setName('concept_cd'),
+                    constS('c_visualattributes', minor, 'LA'),
+                    StringColumn.create('path',
+                            minor.iterator().collect({ Row it -> it.getString('major') + '\\' + it.getString('Kode') + '\\' })),
+                    minor.stringColumn('Title').copy().setName('concept_name'),
+            )
+            out3.append(out4)
+        }
     }
 
     static List listZip(List a, List b, Closure f) {
@@ -137,8 +161,8 @@ class TumorOnt {
 
         static def ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache) {
             // TODO: make who_cache optional
-            def who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
-            // TODO def icd_o_topo = OncologyMeta.read_table(who_cache, info.zip, info.items, info.names)
+            final who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
+            final icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
             Table top = fromRecords([[c_hlevel       : 1,
                                       c_fullname     : top_folder,
                                       c_name         : c_name,
@@ -152,7 +176,7 @@ class TumorOnt {
                     tumor_item_type: tumor_item_type,
                     // TODO loinc_naaccr_answer: LOINC_NAACCR.answer,
                     // TODO code_labels: NAACCR_R.code_labels(),
-                    // TODO icd_o_topo: icd_o_topo,
+                    icd_o_topo     : icd_o_topo,
                     cs_terms       : cs_terms,
                     seer_site_terms: seer_recode_terms,
             ] as Map

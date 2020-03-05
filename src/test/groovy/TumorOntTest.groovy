@@ -1,14 +1,9 @@
-import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import junit.framework.TestCase
 import tech.tablesaw.api.ColumnType
-import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
-import tech.tablesaw.columns.Column
 
 import java.nio.file.Paths
-import java.sql.Connection
-import java.sql.ResultSet
 import java.time.LocalDate
 
 class TumorOntTest extends TestCase {
@@ -29,12 +24,13 @@ class TumorOntTest extends TestCase {
 
         // test encoding
         final non_ascii = morph.where(morph.stringColumn("code").isEqualTo("M8950/3"))
-        println(non_ascii)
         assert non_ascii.get(0, 1) == "M\u009Fllerian mixed tumour"
 
         final topo = meta.read_table(Paths.get(cache), meta.topo_info)
-        println(topo.first(5))
         assert topo.columnNames() == ["Kode", "Lvl", "Title"]
+
+        final icd_o_topo = meta.icd_o_topo(topo)
+        assert icd_o_topo.columnNames() == ['lvl', 'concept_cd', 'c_visualattributes', 'path', 'concept_name']
     }
 
 
@@ -94,7 +90,7 @@ class TumorOntTest extends TestCase {
                 [c_facttablecolumn: "CONCEPT_CD", c_comment: null, c_totalnum: null]
         ]
         final actual = TumorOnt.fromRecords(records)
-        assert actual.columnTypes() == [ColumnType.STRING, ColumnType.STRING, ColumnType.INTEGER]
+        assert actual.columnTypes() == [ColumnType.STRING, ColumnType.STRING, ColumnType.INTEGER] as ColumnType[]
         assert actual.rowCount() == 2
     }
 
