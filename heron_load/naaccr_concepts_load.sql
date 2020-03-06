@@ -15,14 +15,14 @@ select sectionId from section where 'dep' = 'section.csv';
 select valtype_cd from tumor_item_type where 'dep' = 'tumor_item_type.csv';
 select label from code_labels where 'dep' = 'code-labels';
 select answer_code from loinc_naaccr_answer where 'dep' = 'loinc_naaccr_answer.csv';
-select lvl from who_topo where dep='WHO Oncology MetaFiles';
-select hlevel from seer_recode_terms where 'dep' = 'seer_recode_terms.csv';
+select lvl from icd_o_topo where 'dep'='WHO Oncology MetaFiles';
+select hlevel from seer_site_terms where 'dep' = 'seer_recode_terms.csv';
+
 
 /* oh for bind parameters in Spark SQL... */
 select task_hash from current_task where 1=0;
 
-drop view if exists i2b2_path_concept;
-create view i2b2_path_concept as
+create OR replace view i2b2_path_concept as
 select 'N' as c_synonym_cd
      , 'CONCEPT_CD' as c_facttablecolumn
      , 'CONCEPT_DIMENSION' as c_tablename
@@ -39,61 +39,55 @@ from (values('X'))
 ;
 
 
-drop view if exists naaccr_top_concept;
-create view naaccr_top_concept as
-select top.c_hlevel
-     , top.c_fullname
-     , top.c_name
+create OR replace view naaccr_top_concept as
+select t1.c_hlevel
+     , t1.c_fullname
+     , t1.c_name
      , (select task_hash from current_task) as c_basecode
      , 'CA' as c_visualattributes
      , ('North American Association of Central Cancer Registries version 18.0' ||
               '\n ' || (select task_hash from current_task)) as c_tooltip
-     , top.c_fullname as c_dimcode
+     , t1.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
+     , t1.update_date
      -- import_date
-     , top.sourcesystem_cd
-from naaccr_top top
+     , t1.sourcesystem_cd
+from naaccr_top t1
 cross join i2b2_path_concept i2b2
 ;
 -- select * from naaccr_top_concept;
 
-create function zpad (width decimal, n decimal) returns varchar(20)
-    return trim(lpad(cast(n as varchar(20)), width, '0'));
-
-drop view if exists section_concepts;
-create view section_concepts as
+create table section_concepts as
 with ea as (
 select nts.sectionId, nts.section
-     , top.c_hlevel + 1 c_hlevel
-     , top.c_fullname || 'S:' || nts.sectionid || ' ' || section || '\' as c_fullname
-     , zpad(2, nts.sectionid) || ' ' || section as c_name
-     , null as c_basecode
+     , t1.c_hlevel + 1 c_hlevel
+     , t1.c_fullname || 'S:' || nts.sectionid || ' ' || section || '\' as c_fullname
+     , lpad(nts.sectionid, 2, '0') || ' ' || section as c_name
+     , cast(null as varchar(50)) as c_basecode
      , 'FA' as c_visualattributes
      , cast(null as varchar(1000)) as c_tooltip
 from section nts
-cross join naaccr_top_concept top
+cross join naaccr_top_concept t1
 )
 select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
+     , t1.update_date
+     , t1.sourcesystem_cd
 from ea
-cross join naaccr_top top
+cross join naaccr_top t1
 cross join i2b2_path_concept i2b2;
 -- select * from section_concepts limit 10;
 
 
-drop view if exists item_concepts;
-create view item_concepts as
+create table item_concepts as
 with ea as (
 select sc.sectionId, ni.naaccrNum
      , sc.c_hlevel + 1 as c_hlevel
      , (sc.c_fullname ||
        -- ISSUE: migrate from naaccrName to naaccrId for path?
-              substr((zpad(4, ni.naaccrNum) || ' ' || ni.naaccrName), 1, 40) || '\') as c_fullname
-     , (zpad(4, ni.naaccrNum) || ' ' || ni.naaccrName) as c_name
+              substr((lpad(ni.naaccrNum, 4, '0') || ' ' || ni.naaccrName), 1, 40) || '\') as c_fullname
+     , (lpad(ni.naaccrNum, 4, '0') || ' ' || ni.naaccrName) as c_name
      , ('NAACCR|' || ni.naaccrNum || ':') as c_basecode
      , case
        when ni.valtype_cd = '@' then 'FA'
@@ -108,17 +102,17 @@ join section_concepts sc on sc.section = ni.section
 select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
+     , t1.update_date
+     , t1.sourcesystem_cd
 from ea
-cross join naaccr_top top
-cross join i2b2_path_concept i2b2;
+cross join naaccr_top t1
+cross join i2b2_path_concept i2b2
+;
 -- select * from item_concepts;
 
 
-drop view if exists code_concepts;
-create view code_concepts as
-with mix as (
+create table code_concepts AS
+with mixt as (
 select ty.naaccrNum
      , coalesce(rl.code, la.answer_code) as answer_code
      , coalesce(rl.label, la.answer_string) as answer_string
@@ -133,14 +127,13 @@ left join loinc_naaccr_answer la
 left join code_labels rl
        on rl.item = ty.naaccrNum
       and (la.answerlistid is null or rl.code = la.answer_code)
-),
-with_name as (
+)
+, with_name as (
 select substr((answer_code || ' ' || answer_string), 1, 200) as c_name
-     , mix.*
-from mix
-where answer_code is not null
-),
-ea as (
+     , mixt.*
+from mixt
+)
+, ea as (
 select ic.sectionId, ic.naaccrNum, answer_code
      , ic.c_hlevel + 1 c_hlevel
      , (ic.c_fullname ||
@@ -155,11 +148,11 @@ join item_concepts ic on ic.naaccrNum = v.naaccrNum
 select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
+     , t1.update_date
+     , t1.sourcesystem_cd
 from ea
-cross join naaccr_top top
-cross join i2b2_path_concept i2b2;
+cross join naaccr_top t1
+cross join i2b2_path_concept i2b2
 ;
 -- select * from code_concepts;
 
@@ -247,8 +240,7 @@ and label = 'title'
 ;
 
 
-drop view if exists primary_site_concepts;
-create view primary_site_concepts as
+create table primary_site_concepts as
 with ea as (
 select lvl + 1 as c_hlevel
      , (ic.c_fullname || icdo.path) as c_fullname
@@ -268,10 +260,10 @@ cross join (
 select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
+     , t1.update_date
+     , t1.sourcesystem_cd
 from ea
-cross join naaccr_top top
+cross join naaccr_top t1
 cross join i2b2_path_concept i2b2;
 
 
@@ -290,18 +282,18 @@ where tr.itemnbr in (419, 521)
 */
 
 
-create view seer_recode_concepts as
+create table seer_recode_concepts as
 with
 
 folder as (
-select top.c_hlevel + 1 c_hlevel
-     , (top.c_fullname || 'SEER Site\') as c_fullname
+select t1.c_hlevel + 1 c_hlevel
+     , (t1.c_fullname || 'SEER Site\') as c_fullname
      , 'SEER Site Summary' as c_name
      , null as c_basecode
      , 'FA' as c_visualattributes
      , 'SEER Site Recode ICD-O-3/WHO 2008 Definition' as c_tooltip
 from (values('X')) f
-cross join naaccr_top_concept top
+cross join naaccr_top_concept t1
 ),
 
 site as (
@@ -324,14 +316,14 @@ select * from site
 select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
+     , t1.update_date
+     , t1.sourcesystem_cd
 from ea
-cross join naaccr_top top
+cross join naaccr_top t1
 cross join i2b2_path_concept i2b2;
 ;
 
-create view site_schema_concepts as
+create OR replace view site_schema_concepts as
 with
 ea as (
 select c_hlevel, c_fullname, c_name, c_basecode, c_visualattributes, c_tooltip from cs_terms
@@ -339,15 +331,15 @@ select c_hlevel, c_fullname, c_name, c_basecode, c_visualattributes, c_tooltip f
 select ea.*
      , ea.c_fullname as c_dimcode
      , i2b2.*
-     , top.update_date
-     , top.sourcesystem_cd
+     , t1.update_date
+     , t1.sourcesystem_cd
 from ea
-cross join naaccr_top top
+cross join naaccr_top t1
 cross join i2b2_path_concept i2b2;
 ;
 
 
-create view naaccr_ontology as
+create OR replace view naaccr_ontology as
 
 select c_hlevel, c_fullname, c_name, c_synonym_cd, c_visualattributes, c_totalnum, c_basecode
      , c_facttablecolumn, c_tablename, c_columnname, c_columndatatype, c_operator
@@ -464,8 +456,7 @@ and ti.codenbr not like '% %'
 drop table icd_o_topo;
 drop table icd_o_morph;
 
-drop view if exists pcornet_tumor_fields;
-create view pcornet_tumor_fields as
+create OR replace view pcornet_tumor_fields as
 select 'TUMOR' as TABLE_NAME
      , ty.naaccrNum as item
      , upper_snake_case(naaccrId) as FIELD_NAME
