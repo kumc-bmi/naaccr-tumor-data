@@ -1,11 +1,7 @@
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
-import com.imsweb.naaccrxml.NaaccrObserver
-import com.imsweb.naaccrxml.NaaccrOptions
-import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
-import com.imsweb.naaccrxml.NaaccrXmlUtils
-import com.imsweb.naaccrxml.entity.Patient
-import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
+import com.imsweb.layout.record.fixed.FixedColumnsLayout
+import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import tech.tablesaw.api.DoubleColumn
@@ -52,23 +48,39 @@ class TumorFileTest extends TestCase {
     void testLayout() {
         List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(new File(testDataPath));
         assert !possibleFormats.isEmpty()
-        println(possibleFormats)
+        assert possibleFormats.first().layoutId == 'naaccr-18-incidence'
+
+        assert LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE == 'naaccr-18-incidence'
+        final FixedColumnsLayout v18 = LayoutFactory.getLayout('naaccr-18-incidence') as FixedColumnsLayout
+        assert v18.getFieldByNaaccrItemNumber(400).start == 554
+        assert v18.allFields.take(3).collect {
+            [('long-label')     : it.longLabel,
+             start              : it.start,
+             ('naaccr-item-num'): it.naaccrItemNum,
+             section            : it.section,
+             grouped            : it.subFields != null && it.subFields.size() > 0
+            ]
+        } == [['long-label': 'Record Type', 'start': 1, 'naaccr-item-num': 10, 'section': 'Record ID', 'grouped': false],
+              ['long-label': 'Registry Type', 'start': 2, 'naaccr-item-num': 30, 'section': 'Record ID', 'grouped': false],
+              ['long-label': 'Reserved 00', 'start': 3, 'naaccr-item-num': 37, 'section': 'Record ID', 'grouped': false]]
     }
 
-    class EachPatient implements NaaccrObserver {
-        void patientRead(Patient patient) {
-            //System.err.println(patient)
-            //println(patient.getItem("patientIdNumber"))
-            //patient.getItems() each { println(it.naaccrId + "=" + it.value) }
-        }
-
-        void patientWritten(Patient patient) {
-            // skip
+    void testStats() {
+        DBConfig config = LoaderTest.config1
+        new File(testDataPath).withReader { naaccr_text_lines ->
+            final Table dd = TumorFile.ddictDF()
+            final Table extract = TumorFile.read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+            Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+                Table actual = TumorFile.DataSummary.stats(extract, sql)
+                assert actual.first(10).print() == "abc@@"
+            }
         }
     }
 
-    void testReadFlatFile() {
-        System.err.println(System.getProperty("user.dir"))
-        NaaccrXmlUtils.flatToXml(new File(testDataPath), new File('/tmp/XXX.xml'), new NaaccrOptions(), [], new EachPatient())
+    /**
+     * _stable_hash uses a published algorithm (CRC32)
+     */
+    void testStableHash() {
+        assert TumorFile._stable_hash("abc") == 891568578
     }
 }

@@ -76,18 +76,18 @@ class TumorOntTest extends TestCase {
 
         final create = TumorOnt.SqlScript.create_ddl("tumor_item_type", aTable.columns())
         assert create.startsWith("create table tumor_item_type (")
-        assert create.contains("length INTEGER")
-        assert create.endsWith("phi_id_kind VARCHAR(1024))")
+        assert create.contains("\"LENGTH\" INTEGER")
+        assert create.endsWith("\"PHI_ID_KIND\" VARCHAR(1024))")
 
         final insert = TumorOnt.SqlScript.insert_dml("tumor_item_type", aTable.columns())
-        assert insert.contains("(naaccrNum, sectionId")
-        assert insert.contains("phi_id_kind)")
+        assert insert.contains("(\"NAACCRNUM\", \"SECTIONID\"")
+        assert insert.contains("\"PHI_ID_KIND\")")
         assert insert.contains("(?, ?, ?")
 
         def update_date = LocalDate.of(2000, 1, 1)
         def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
         final create_top = TumorOnt.SqlScript.create_ddl("top", top.columns())
-        assert create_top.toLowerCase().contains("c_hlevel integer")
+        assert create_top.contains("\"C_HLEVEL\" INTEGER")
     }
 
 

@@ -241,12 +241,12 @@ class TumorOnt {
                         return it.toString()
                 }
             }
-            final coldefs = schema.collect { Column it -> "${it.name()} ${sqlName(it.type())}" }
+            final coldefs = schema.collect { Column it -> "\"${it.name().toUpperCase()}\" ${sqlName(it.type())}" }
             "create table $name (${sql_list(coldefs)})"
         }
 
         static String insert_dml(String name, List<Column<?>> schema) {
-            final colnames = schema.collect { col -> col.name() }
+            final colnames = schema.collect { col -> "\"${col.name().toUpperCase()}\"" }
             "insert into ${name} (${sql_list(colnames)}) values (${sql_list(schema.collect { '?' })})"
         }
     }
@@ -262,11 +262,10 @@ class TumorOnt {
         static final String c_name = 'Cancer Cases (NAACCR Hierarchy)'
         static final String sourcesystem_cd = 'heron-admin@kumc.edu'
 
-        static final tumor_item_type = read_csv(TumorOnt.getResource('heron_load/tumor_item_type.csv'))
-        static final seer_recode_terms = read_csv(TumorOnt.getResource('heron_load/seer_recode_terms.csv'))
+        static final Table tumor_item_type = read_csv(TumorOnt.getResource('heron_load/tumor_item_type.csv'))
+        static final Table seer_recode_terms = read_csv(TumorOnt.getResource('heron_load/seer_recode_terms.csv'))
 
-        static final cs_terms = read_csv(TumorOnt.getResource('heron_load/cs-terms.csv'))
-                .removeColumns('update_date', 'sourcesystem_cd')
+        static final Table cs_terms = read_csv(TumorOnt.getResource('heron_load/cs-terms.csv'))
 
         /* obsolete
         static final tx_script = new SqlScript(
@@ -275,7 +274,7 @@ class TumorOnt {
         */
 
         static final String per_item_view = 'tumor_item_type'
-        static final per_section = read_csv(TumorOnt.getResource('heron_load/section.csv'))
+        static final Table per_section = read_csv(TumorOnt.getResource('heron_load/section.csv'))
 
         static SqlScript ont_script = new SqlScript(
                 'naaccr_concepts_load.sql',
@@ -306,6 +305,7 @@ class TumorOnt {
             final who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
             final icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
             final current_task = fromRecords([[task_hash: task_hash] as Map]).setName("current_task")
+            cs_terms.removeColumns('update_date', 'sourcesystem_cd') // KLUDGE: mutable. at least it's idempotent.
             final tables = [
                     current_task       : current_task,
                     naaccr_top         : naaccr_top(update_date),
@@ -429,6 +429,8 @@ class TumorOnt {
                     return IntColumn.create(k, [v] as Integer[])
                 case LocalDate:
                     return DateColumn.create(k, v as LocalDate)
+                case Boolean:
+                    return BooleanColumn.create(k, v as Boolean[])
                 default:
                     throw new IllegalArgumentException("Expected String or Int in 1st record, not:" + v)
             }
@@ -447,11 +449,14 @@ class TumorOnt {
                     case LocalDate:
                         row.setDate(it.key, it.value as LocalDate)
                         break
+                    case Boolean:
+                        row.setBoolean(it.key, it.value as boolean)
+                        break
                     case null:
                         row.setMissing(it.key)
                         break
                     default:
-                        throw new IllegalArgumentException("not supported" + it.value)
+                        throw new IllegalArgumentException("not supported " + it.value)
                 }
             }
         }
