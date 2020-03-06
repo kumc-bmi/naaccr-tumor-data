@@ -129,7 +129,6 @@ class TumorFileTest extends TestCase {
     }
 
     void testStats() {
-        _spark.execute("DROP SCHEMA PUBLIC CASCADE")  // KLUDGE
         TumorFile.DataSummary.stats(_extract, _spark)
 
         Table actual = _SQL("select * from data_char_naaccr limit 10")

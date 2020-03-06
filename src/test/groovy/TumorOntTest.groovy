@@ -61,8 +61,6 @@ class TumorOntTest extends TestCase {
         Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
         DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            // ack: https://stackoverflow.com/a/4991969
-            sql.execute("DROP SCHEMA PUBLIC CASCADE")  // ISSUE: DB state shouldn't persist between tests
             TumorOnt.load_data_frame(sql, "tumor_item_type", aTable)
 
             Map rowMap = sql.firstRow("select * from tumor_item_type limit 1")
@@ -98,25 +96,22 @@ class TumorOntTest extends TestCase {
 
         DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            // ack: https://stackoverflow.com/a/4991969
-            sql.execute("DROP SCHEMA PUBLIC CASCADE")  // ISSUE: DB state shouldn't persist between tests
-
             final Table actual = TumorOnt.NAACCR_I2B2.ont_view_in(sql, "task123", update_date, Paths.get(cache))
             assert actual.columnCount() == 21
             assert actual.columnNames().contains("C_FULLNAME")
             // top concept
-            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(1)).rowCount() == 1
+            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(1)).rowCount() == 1
 
             // section concepts
-            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(2)
+            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(2)
                     & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() == 17
             // item concepts
-            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(3)
+            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(3)
                     & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() > 500
 
             // TODO: separate LOINC, R codes?
             // code concepts
-            assert actual.where(actual.doubleColumn("C_HLEVEL").isEqualTo(4)
+            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(4)
                     & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() > 5000
 
             // TODO: separate SEER site table method?
@@ -135,11 +130,8 @@ class TumorOntTest extends TestCase {
         DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
             assert sql.firstRow("select 1 as x from (values('X'))  ")[0] == 1
-            sql.firstRow("select lpad('0', 4, cast(10 as varchar(4))) from (values(1))")[0] == "0010"
-            final s1 = TumorOnt.NAACCR_I2B2.ont_script
-            sql.execute(TumorOnt.SqlScript.find_ddl("zpad", s1.code))
-            assert sql.firstRow("select zpad(4, 10) from (values(1))")[0] == "0010"
-            assert sql.firstRow("select zpad(2, 9) || ' xyz' from (values(1))")[0] == "09 xyz"
+            sql.firstRow("select lpad(10, 4, '0') from (values(1))")[0] == "0010"
+            assert sql.firstRow("select lpad(9, 2, '0') || ' xyz' from (values(1))")[0] == "09 xyz"
         }
     }
 

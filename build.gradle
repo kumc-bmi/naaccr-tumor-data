@@ -18,8 +18,8 @@ dependencies {
     compile 'com.imsweb:naaccr-xml:6.6'
     compile 'com.imsweb:layout:2.0'
     compile 'tech.tablesaw:tablesaw-core:0.37.2'
-    // https://mvnrepository.com/artifact/org.hsqldb/hsqldb
-    compile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.2'
+    // https://mvnrepository.com/artifact/com.h2database/h2/1.4.200
+    compile 'com.h2database:h2:1.4.200'
 
     // i2b2 JDBC drivers
     // https://github.com/i2b2/i2b2-core-server/tree/master/edu.harvard.i2b2.server-common/lib/jdbc

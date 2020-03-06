@@ -271,6 +271,13 @@ https://cwiki.apache.org/confluence/display/Hive/HiveServer2+Clients
 https://search.maven.org/artifact/org.apache.hive/hive-jdbc/3.1.1/jar
 standalone
 
+## h2 vs hsqldb vs derby
+    // https://mvnrepository.com/artifact/org.hsqldb/hsqldb
+    // compile group: 'org.hsqldb', name: 'hsqldb', version: '2.3.2'
+    // https://mvnrepository.com/artifact/org.apache.derby/derby
+    // compile group: 'org.apache.derby', name: 'derby', version: '10.14.2.0'
+    // https://mvnrepository.com/artifact/com.h2database/h2/1.4.200
+
 ## groovy for single-jar deployment
 
   - pro

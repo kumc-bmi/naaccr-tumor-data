@@ -90,7 +90,7 @@ class TumorOnt {
         }
 
         static DBConfig memdb() {
-            final Map<String, String> env1 = [MEM_URL : 'jdbc:hsqldb:mem:A1', MEM_DRIVER: 'org.hsqldb.jdbc.JDBCDriver',
+            final Map<String, String> env1 = [MEM_URL : 'jdbc:h2:mem:A1;create=true', MEM_DRIVER: 'org.h2.Driver',
                                               MEM_USER: 'SA', MEM_PASSWORD: '']
 
             DBConfig.fromEnv('MEM', { String it -> env1[it] })
@@ -317,7 +317,6 @@ class TumorOnt {
                     cs_terms           : cs_terms,
                     seer_site_terms    : seer_recode_terms,
             ] as Map
-            sql.execute(SqlScript.find_ddl("zpad", ont_script.code))
             final views = create_objects(sql, ont_script, tables)
             final String name = ont_script.objects.last().first
             views[name]
@@ -339,14 +338,24 @@ class TumorOnt {
                 throw new IllegalArgumentException(missing.toString())
             }
             log.info("${script.name}: create $name")
-            sql.execute("drop view if exists $name".toString())
+            try {
+                sql.execute("drop table if exists $name".toString())
+            } catch (SQLException ignored) {}
+            try {
+                sql.execute("drop view if exists $name".toString())
+            } catch (SQLException ignored) {}
             sql.execute(it.second)
-            def dft = null
+            Table dft = null
             sql.query("select * from $name".toString()) { ResultSet results ->
                 dft = Table.read().db(results, name)
             }
             [(name): dft]
         }
+    }
+
+    static String _logged(String txt) {
+        log.info(txt)
+        txt
     }
 
     static void load_data_frame(Sql sql, String name, Table data) {

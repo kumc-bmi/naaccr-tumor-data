@@ -8,7 +8,7 @@ import static groovy.test.GroovyAssert.shouldFail
 
 @CompileStatic
 class LoaderTest extends TestCase {
-    static final Map<String, String> env1 = [A1_URL: 'jdbc:hsqldb:mem:A1', A1_DRIVER: 'org.hsqldb.jdbc.JDBCDriver', A1_USER: 'SA', A1_PASSWORD: '']
+    static final Map<String, String> env1 = [A1_URL: 'jdbc:h2:mem:A1;create=true', A1_DRIVER: 'org.h2.Driver', A1_USER: 'SA', A1_PASSWORD: '']
 
     static final DBConfig config1 = DBConfig.fromEnv('A1', { String it -> env1[it] })
 
@@ -70,8 +70,9 @@ class LoaderTest extends TestCase {
 
         def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            sql.execute "delete from naaccr_tumors"
             def loader = new Loader(sql)
+            loader.runScript(getClass().getResource('naaccr_tables.sql'))
+            sql.execute "delete from naaccr_tumors"
             loader.load(input)
 
             def results = new StringWriter()
