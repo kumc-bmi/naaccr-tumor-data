@@ -12,6 +12,10 @@ import groovy.transform.CompileStatic
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 
+import java.nio.file.Paths
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.logging.Logger
 import java.util.zip.CRC32
 
@@ -21,6 +25,32 @@ import static TumorOnt.load_data_frame
 class TumorFile {
     static Logger log = Logger.getLogger("")
 
+    static void main(String[] args) {
+        DBConfig.CLI cli = new DBConfig.CLI(args,
+                { String name -> System.getenv(name) },
+                { int it -> System.exit(it) })
+
+        DBConfig cdw = cli.account()
+
+        URL flat_file = Paths.get(cli.arg("--flat-file")).toUri().toURL()
+        flat_file.openStream().withReader { Reader it ->
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                sql.execute("DROP SCHEMA PUBLIC CASCADE")
+                Table data = NAACCR_Summary._data(sql, it)
+            }
+        }
+
+        if (false) { // TODO
+            NAACCR_Summary work = new NAACCR_Summary(
+                    cdw,
+                    flat_file,
+                    cli.arg("--task-hash", "task123"))
+            if (!work.complete()) {
+                work.run()
+            }
+        }
+    }
+
     static class NAACCR_Summary {
         final String task_id
         final String table_name = "NAACCR_EXPORT_STATS"
@@ -28,7 +58,7 @@ class TumorFile {
         private final URL flat_file
         private final DBConfig cdw
 
-        NAACCR_Summary(String _task_id, DBConfig _cdw, URL _flat_file) {
+        NAACCR_Summary(DBConfig _cdw, URL _flat_file, String _task_id) {
             cdw = _cdw
             task_id = _task_id
             flat_file = _flat_file
@@ -139,14 +169,46 @@ class TumorFile {
                 ] as Map
             })
 
+    static Table naaccr_dates(Table df, List<String> date_cols,
+                              boolean keep = false) {
+        final orig_cols = df.columnNames()
+        for (String dtname: date_cols) {
+            final strname = dtname + '_'
+            final StringColumn strcol = df.stringColumn(dtname).copy().setName(strname)
+            df = df.replaceColumn(dtname, strcol)
+            df.addColumns(naaccr_date_col(strcol).setName(dtname))
+        }
+        if (!keep) {
+            // ISSUE: df.select(*orig_cols) uses spread which doesn't work with CompileStatic
+            df = Table.create(df.columns().findAll { Column it -> orig_cols.contains(it.name()) })
+        }
+        df
+    }
+    static DateColumn naaccr_date_col(StringColumn sc) {
+        String name = sc.name()
+        sc = sc.trim().concatenate('01019999').substring(0, 8)
+        // type of StringColumn.map(fun, creator) is too fancy for groovy CompileStatic
+        final data = sc.asList().collect { String txt ->
+            LocalDate value
+            try {
+                value = LocalDate.parse(txt, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
+            } catch (DateTimeParseException ignored) {
+                value = null
+            }
+            value
+        }
+        DateColumn.create(name, data)
+    }
+
     static class DataSummary {
         static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('data_char_sim.sql',
                 TumorOnt.resourceText(TumorFile.getResource('heron_load/data_char_sim.sql')),
-                [new Tuple2('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type'])])
+                [new Tuple2('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type']),
+                 new Tuple2('data_char_naaccr', ['record_layout'])])
 
-        static Table stats(Table tumors, Sql sql) {
-            // TODO: tumors_raw -> naaccr_dates
+        static Table stats(Table tumors_raw, Sql sql) {
             final Table ty = TumorOnt.NAACCR_I2B2.tumor_item_type
+            final Table tumors = naaccr_dates(tumors_raw, ['dateOfDiagnosis'], false)
             final Map<String, Table> views = TumorOnt.create_objects(sql, script, [
                     section        : TumorOnt.NAACCR_I2B2.per_section,
                     naaccr_extract : tumors,
@@ -156,7 +218,7 @@ class TumorFile {
             ])
             Table out = views.values().last()
             DoubleColumn sd = out.doubleColumn('sd')
-            // TODO: sd.set(sd.isMissing(), 0 as Double)
+            sd.set((sd as NumericColumn).isMissing(), 0 as Double)
             out
         }
 
