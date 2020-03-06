@@ -2,15 +2,17 @@ import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
 import com.imsweb.naaccrxml.NaaccrObserver
 import com.imsweb.naaccrxml.NaaccrOptions
+import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
 import com.imsweb.naaccrxml.NaaccrXmlUtils
 import com.imsweb.naaccrxml.entity.Patient
+import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import tech.tablesaw.api.DoubleColumn
 import tech.tablesaw.api.Table
 
 @CompileStatic
-class TumorFileTest extends TestCase{
+class TumorFileTest extends TestCase {
     String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
     void testDF() {
@@ -19,12 +21,25 @@ class TumorFileTest extends TestCase{
         System.out.println(nc.print())
     }
 
+    void testDDict() {
+        final dd = TumorFile.ddictDF()
+        assert dd.rowCount() > 700
+
+        final primarySite = dd.where(dd.intColumn("naaccrNum").isEqualTo(400))
+
+        assert primarySite[0].getString("naaccrId") == "primarySite"
+        assert primarySite[0].getString("naaccrName") == 'Primary Site'
+        assert primarySite[0].getInt("startColumn") == 554
+        assert primarySite[0].getInt("length") == 4
+        assert primarySite[0].getString("parentXmlElement") == 'Tumor'
+    }
+
     void testPatients() {
         new File(testDataPath).withReader { reader ->
-            Table patientData = TumorKeys.patients(reader)
+            Table patientData = TumorFile.TumorKeys.patients(reader)
 
             // got expected columns?
-            assert patientData.columnNames() == TumorKeys.pat_attrs + TumorKeys.report_attrs
+            assert patientData.columnNames() == TumorFile.TumorKeys.pat_attrs + TumorFile.TumorKeys.report_attrs
 
             // count patient records. Note: 6 tumors were on existing patients
             assert patientData.rowCount() == 94
@@ -46,10 +61,12 @@ class TumorFileTest extends TestCase{
             //println(patient.getItem("patientIdNumber"))
             //patient.getItems() each { println(it.naaccrId + "=" + it.value) }
         }
+
         void patientWritten(Patient patient) {
             // skip
         }
     }
+
     void testReadFlatFile() {
         System.err.println(System.getProperty("user.dir"))
         NaaccrXmlUtils.flatToXml(new File(testDataPath), new File('/tmp/XXX.xml'), new NaaccrOptions(), [], new EachPatient())
