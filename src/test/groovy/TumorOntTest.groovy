@@ -154,7 +154,6 @@ class TumorOntTest extends TestCase {
     }
 
     void testSqlScript() {
-        // TODO: commit symlink from src/main/resources to heron_load
         URL url = getClass().getResource('heron_load/naaccr_concepts_load.sql')
         String sql = TumorOnt.resourceText(url)
         assert sql.indexOf('select') > 0
