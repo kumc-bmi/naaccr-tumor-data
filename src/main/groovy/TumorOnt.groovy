@@ -421,22 +421,22 @@ class TumorOnt {
     }
 
     static Table fromRecords(List<Map<String, Object>> obj) {
-        Collection<Column<?>> cols = ((obj[0].collect { k, v ->
+        Collection<Column<?>> cols = ((obj.first().collect { k, v ->
             switch (v) {
                 case String:
-                    return StringColumn.create(k, v as String)
+                    return StringColumn.create(k)
                 case Integer:
-                    return IntColumn.create(k, [v] as Integer[])
+                    return IntColumn.create(k)
                 case LocalDate:
-                    return DateColumn.create(k, v as LocalDate)
+                    return DateColumn.create(k)
                 case Boolean:
-                    return BooleanColumn.create(k, v as Boolean[])
+                    return BooleanColumn.create(k)
                 default:
                     throw new IllegalArgumentException("Expected String or Int in 1st record, not:" + v)
             }
         }) as Collection<Column<?>>)
         Table data = Table.create("t1", cols)
-        obj.tail().each { Map<String, Object> m ->
+        obj.each { Map<String, Object> m ->
             Row row = data.appendRow()
             for (it in m) {
                 switch (it.value) {
