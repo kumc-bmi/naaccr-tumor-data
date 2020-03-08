@@ -301,9 +301,17 @@ class TumorOnt {
         }
 
         static Table ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache) {
-            // TODO: make who_cache optional
-            final who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
-            final icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
+            Table icd_o_topo
+            if (who_cache.toFile().exists()) {
+                final Table who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
+                icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
+            } else {
+                log.warning('skipping WHO Topology terms')
+                icd_o_topo = fromRecords([[
+                        lvl: 3, concept_cd: 'C00', c_visualattributes: 'FA',
+                        path: 'abc', concept_path: 'LIP', concept_name: 'x'] as Map])
+            }
+
             final current_task = fromRecords([[task_hash: task_hash] as Map]).setName("current_task")
             cs_terms.removeColumns('update_date', 'sourcesystem_cd') // KLUDGE: mutable. at least it's idempotent.
             final tables = [

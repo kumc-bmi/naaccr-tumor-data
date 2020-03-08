@@ -4,11 +4,14 @@ import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
 
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
+import java.util.logging.Logger
 
 class TumorOntTest extends TestCase {
     static final cache = ',cache/'
+    static final Logger log = Logger.getLogger("")
 
     void testLoadCSV() {
         final Table per_section = TumorOnt.read_csv(TumorOnt.getResource('heron_load/section.csv'))
@@ -41,8 +44,13 @@ class TumorOntTest extends TestCase {
     }
 
     void testOncologyMeta() {
+        Path cachePath = Paths.get(cache)
+        if (!cachePath.toFile().exists()) {
+            log.warning('skipping OncologyMeta test. cache does not exist: ' + cache)
+            return
+        }
         final meta = TumorOnt.OncologyMeta
-        final morph = meta.read_table(Paths.get(cache), meta.morph3_info)
+        final morph = meta.read_table(cachePath, meta.morph3_info)
         assert morph.columnNames() == ["code", "label", "notes"]
 
         // test encoding
