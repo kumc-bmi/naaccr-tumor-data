@@ -74,7 +74,7 @@ class TumorOnt {
         }
 
         void run() {
-            final DBConfig mem = memdb()
+            final DBConfig mem = DBConfig.memdb()
             Table terms
             Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql sql ->
                 terms = NAACCR_I2B2.ont_view_in(sql, task_hash, update_date, who_cache)
@@ -88,14 +88,6 @@ class TumorOnt {
                 load_data_frame(sql, table_name, terms)
             }
         }
-
-        static DBConfig memdb() {
-            final Map<String, String> env1 = [MEM_URL : 'jdbc:h2:mem:A1;create=true', MEM_DRIVER: 'org.h2.Driver',
-                                              MEM_USER: 'SA', MEM_PASSWORD: '']
-
-            DBConfig.fromEnv('MEM', { String it -> env1[it] })
-        }
-
     }
 
     static class NAACCR_R {

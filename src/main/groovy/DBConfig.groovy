@@ -34,6 +34,13 @@ class DBConfig {
                 username: config("USER"), password: new Password(value: config("PASSWORD")))
     }
 
+    static DBConfig memdb() {
+        final Map<String, String> env1 = [MEM_URL : 'jdbc:h2:mem:A1;create=true', MEM_DRIVER: 'org.h2.Driver',
+                                          MEM_USER: 'SA', MEM_PASSWORD: '']
+
+        DBConfig.fromEnv('MEM', { String it -> env1[it] })
+    }
+
     static class CLI {
         protected final String[] args
         private final Closure<String> getenv
