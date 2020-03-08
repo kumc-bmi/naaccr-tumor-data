@@ -85,7 +85,7 @@ class TumorFileTest extends TestCase {
         Sql.newInstance(config.url, config.username, config.password.value, config.driver)
     })(LoaderTest.config1)
 
-    static Table _SQL(String query, int limit=100) {
+    static Table _SQL(String query, int limit = 100) {
         Table out
         _spark.query(query) { results ->
             out = Table.read().db(results).first(limit)

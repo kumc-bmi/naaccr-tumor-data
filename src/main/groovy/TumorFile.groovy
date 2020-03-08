@@ -172,7 +172,7 @@ class TumorFile {
     static Table naaccr_dates(Table df, List<String> date_cols,
                               boolean keep = false) {
         final orig_cols = df.columnNames()
-        for (String dtname: date_cols) {
+        for (String dtname : date_cols) {
             final strname = dtname + '_'
             final StringColumn strcol = df.stringColumn(dtname).copy().setName(strname)
             df = df.replaceColumn(dtname, strcol)
@@ -229,7 +229,7 @@ class TumorFile {
                                String id_col = 'recordId') {
             final StringColumn value_vars = ty
                     .where(ty.stringColumn('valtype_cd').isIn(valtype_cds)
-                    & ty.stringColumn('naaccrId').isNotIn(id_vars)).stringColumn('naaccrId')
+                            & ty.stringColumn('naaccrId').isNotIn(id_vars)).stringColumn('naaccrId')
             data = data.copy().addColumns(IntColumn.indexColumn(id_col, data.rowCount(), 0))
             final Table df = melt(data, value_vars.asList(), [id_col] + id_vars, var_name)
             df.where(df.stringColumn('value').isLongerThan(0))

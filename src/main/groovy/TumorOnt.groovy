@@ -300,8 +300,8 @@ class TumorOnt {
             } else {
                 log.warning('skipping WHO Topology terms')
                 icd_o_topo = fromRecords([[
-                        lvl: 3, concept_cd: 'C00', c_visualattributes: 'FA',
-                        path: 'abc', concept_path: 'LIP', concept_name: 'x'] as Map])
+                                                  lvl : 3, concept_cd: 'C00', c_visualattributes: 'FA',
+                                                  path: 'abc', concept_path: 'LIP', concept_name: 'x'] as Map])
             }
 
             final current_task = fromRecords([[task_hash: task_hash] as Map]).setName("current_task")
@@ -340,10 +340,12 @@ class TumorOnt {
             log.info("${script.name}: create $name")
             try {
                 sql.execute("drop table if exists $name".toString())
-            } catch (SQLException ignored) {}
+            } catch (SQLException ignored) {
+            }
             try {
                 sql.execute("drop view if exists $name".toString())
-            } catch (SQLException ignored) {}
+            } catch (SQLException ignored) {
+            }
             sql.execute(it.second)
             Table dft = null
             sql.query("select * from $name".toString()) { ResultSet results ->
