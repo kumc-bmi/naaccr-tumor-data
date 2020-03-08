@@ -69,6 +69,7 @@ class TumorOntTest extends TestCase {
         Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
         DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+            sql.execute('DROP ALL OBJECTS')
             TumorOnt.load_data_frame(sql, "tumor_item_type", aTable)
 
             Map rowMap = sql.firstRow("select * from tumor_item_type limit 1")
@@ -104,6 +105,7 @@ class TumorOntTest extends TestCase {
 
         DBConfig config = LoaderTest.config1
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+            sql.execute('DROP ALL OBJECTS')
             final Table actual = TumorOnt.NAACCR_I2B2.ont_view_in(sql, "task123", update_date, Paths.get(cache))
             assert actual.columnCount() == 21
             assert actual.columnNames().contains("C_FULLNAME")
