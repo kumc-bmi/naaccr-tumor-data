@@ -32,6 +32,24 @@ dependencies {
     testCompile 'org.codehaus.groovy:groovy-test:3.0.1'
 }
 
+
+task localDBStatsTest(type: JavaExec) {
+    description = 'Integration tests: stats on 100 records of test data with local disk h2 DB.'
+    group = 'verification'
+
+    main = "TumorFile"
+    environment = [DB1_URL: "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true",
+                   DB1_DRIVER: 'org.h2.Driver',
+                   DB1_USER: 'SA', DB1_PASSWORD: '']
+
+    args '--account', 'DB1', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    classpath = sourceSets.main.runtimeClasspath
+    // TODO: shouldRunAfter test
+}
+
+// TODO: check.dependsOn integrationTest
+
+
 task fatjar(type: Jar) {
     manifest {
         attributes 'Main-Class': 'Loader'

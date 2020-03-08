@@ -365,10 +365,17 @@ class TumorOnt {
         sql.withBatch(SqlScript.insert_dml(name, data.columns())) { BatchingPreparedStatementWrapper ps ->
             for (Row row : data) {
                 final params = []
-                for (ColumnType type : data.columnTypes()) {
-                    switch (type) {
+                for (Column col : data.columns()) {
+                    if (row.isMissing(col.name())) {
+                        params << null
+                        continue
+                    }
+                    switch (col.type()) {
                         case ColumnType.INTEGER:
                             params << row.getInt(params.size())
+                            break
+                        case ColumnType.LONG:
+                            params << row.getLong(params.size())
                             break
                         case ColumnType.STRING:
                             params << row.getString(params.size())
@@ -383,7 +390,7 @@ class TumorOnt {
                             params << row.getDouble(params.size())
                             break
                         default:
-                            throw new IllegalArgumentException(type.toString())
+                            throw new IllegalArgumentException(col.type().toString())
                     }
                 }
                 ps.addBatch(params)

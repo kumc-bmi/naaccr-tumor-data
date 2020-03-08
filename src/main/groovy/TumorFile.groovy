@@ -33,21 +33,14 @@ class TumorFile {
         DBConfig cdw = cli.account()
 
         URL flat_file = Paths.get(cli.arg("--flat-file")).toUri().toURL()
-        flat_file.openStream().withReader { Reader it ->
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
-                sql.execute("DROP SCHEMA PUBLIC CASCADE")
-                Table data = NAACCR_Summary._data(sql, it)
-            }
-        }
 
-        if (false) { // TODO
-            NAACCR_Summary work = new NAACCR_Summary(
-                    cdw,
-                    flat_file,
-                    cli.arg("--task-hash", "task123"))
-            if (!work.complete()) {
-                work.run()
-            }
+        // IDEA: support disk DB in place of memdb
+        NAACCR_Summary work = new NAACCR_Summary(
+                cdw,
+                flat_file,
+                cli.arg("--task-hash", "task123"))
+        if (!work.complete()) {
+            work.run()
         }
     }
 
@@ -79,10 +72,15 @@ class TumorFile {
         }
 
         void run() {
+            final DBConfig mem = DBConfig.memdb()
+            Table data
+            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql memdb ->
+                data = _data(memdb, new InputStreamReader(flat_file.openStream()))
+            }
+            final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
+            data.addColumns(constS('task_id', data, task_id))
             Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
-                Table data = _data(sql, new InputStreamReader(flat_file.openStream()))
-                final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
-                data.addColumns(constS('task_id', data, task_id))
+                sql.execute("drop table if exists ${table_name}".toString())
                 // TODO: case fold?
                 load_data_frame(sql, table_name, data)
             }
