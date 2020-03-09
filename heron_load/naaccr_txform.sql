@@ -62,61 +62,6 @@ POSTPONED: Cause of Death. ICD7-10 codes.
 
  */
 
-
-/*****
- * Date parsing. Ugh.
-
-Please excuse the copy-and-paste coding here; a p-sql function would
-probably let us factor out the redundancy but we haven't crossed into
-that territory yet.
-
- p. 97:
- "Below are the common formats to handle the situation where only
-  certain components of date are known.
-  YYYYMMDD - when complete date is known and valid
-  YYYYMM - when year and month are known and valid, and day is unknown
-  YYYY - when year is known and valid, and month and day are unknown
-  Blank - when no known date applies"
-
-But we also see wierdness such as '    2009' and '19719999'; see
-test cases below.
-
-In Date of Last Contact, we've also seen 19919999
-*/
-select itemname,  value
-     , case
-       when value in ('00000000', '99999999', '99990')
-       then null
-       when regexp_like(value, '^(17|18|19|20|21|22)[0-9]{2}(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9]$')
-       then to_date(value, 'YYYYMMDD')
-       when regexp_like(value, '^(01|02|03|04|05|06|07|08|09|10|11|12)[0-3][0-9](17|18|19|20|21|22)[0-9]{2}$')
-       then to_date(value, 'MMDDYYYY')
-       when regexp_like(value, '^[1-2][0-9]{3}(01|02|03|04|05|06|07|08|09|10|11|12)$')
-       then to_date(value, 'YYYYMM')
-       when regexp_like(value, '^[1-2][0-9]{3}$')
-       then to_date(value, 'YYYY')
-       end start_date
-from (
-select 'normal' as itemname, '19700101' as value from dual
-union all
-select 'no day' as itemname, '197001' as value from dual
-union all
-select 'no month' as itemname, '1970' as value from dual
-union all
-select 'leading space' as itemname, '    1970' as value from dual
-union all
-select 'no month, variation' as itemname, '19709999' as value from dual
-union all
-select 'all 9s' as itemname, '99999999' as value from dual
-union all
-select 'all 0s' as itemname, '00000000' as value from dual
-union all
-select 'almost all 9s' as itemname, '99990' as value from dual
-union all
-select 'inscruitable', '12001024' from dual
-)
-;
-
 /* Hunt down "not a valid month"
 select min(to_date(ne."Date of Last Contact", 'yyyymmdd'))
 from (

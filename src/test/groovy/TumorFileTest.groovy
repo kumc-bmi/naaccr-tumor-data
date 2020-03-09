@@ -95,6 +95,22 @@ class TumorFileTest extends TestCase {
     }
 
 
+    /*****
+     * Date parsing. Ugh.
+
+     p. 97:
+     "Below are the common formats to handle the situation where only
+     certain components of date are known.
+     YYYYMMDD - when complete date is known and valid
+     YYYYMM - when year and month are known and valid, and day is unknown
+     YYYY - when year is known and valid, and month and day are unknown
+     Blank - when no known date applies"
+
+     But we also see wierdness such as '    2009' and '19719999'; see
+     test cases below.
+
+     In Date of Last Contact, we've also seen 19919999
+     */
     void testDates() {
         def cases = [[label: 'normal', text: '19700101',
                       date : LocalDate.of(1970, 1, 1)],
