@@ -11,8 +11,10 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
+import tech.tablesaw.columns.strings.StringFilters
 
 import java.nio.file.Paths
+import java.sql.SQLException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -35,62 +37,134 @@ class TumorFile {
         URL flat_file = Paths.get(cli.arg("--flat-file")).toUri().toURL()
 
         // IDEA: support disk DB in place of memdb
-        NAACCR_Summary work = new NAACCR_Summary(
-                cdw,
-                flat_file,
-                cli.arg("--task-hash", "task123"))
+        Task work
+        String task_id = cli.arg("--task-hash", "task123")
+        if (cli.arg('--summary')) {
+            work = new NAACCR_Summary(cdw, flat_file, task_id)
+        } else if (cli.arg('--visits')) {
+            work = new NAACCR_Visits(cdw, flat_file, task_id)
+        } else {
+            throw new IllegalArgumentException('which task???')
+        }
+
         if (!work.complete()) {
             work.run()
         }
     }
 
-    static class NAACCR_Summary {
-        final String task_id
-        final String table_name = "NAACCR_EXPORT_STATS"
-        final String z_design_id = "fill NaN (${_stable_hash(DataSummary.script.code)})"
-        private final URL flat_file
-        private final DBConfig cdw
+    interface Task {
+        boolean complete()
 
-        NAACCR_Summary(DBConfig _cdw, URL _flat_file, String _task_id) {
-            cdw = _cdw
-            task_id = _task_id
-            flat_file = _flat_file
-        }
+        void run()
+    }
 
-        boolean complete() {
+    static class TableBuilder {
+        String table_name
+        String task_id
+
+        boolean complete(Sql sql) {
             try {
-                Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
-                    return sql.firstRow("""
-                        select 1 from ${table_name}
-                        where task_id = ?.task_id)
-                        """, [task_id: task_id])[0] == 1
-                }
-            } catch (Exception problem) {
+                final row = sql.firstRow("select 1 from ${table_name} where task_id = ?.task_id)",
+                        [task_id: task_id])
+                row && row[0] == 1
+            } catch (SQLException problem) {
                 log.warning("not complete: $problem")
             }
             return false
         }
 
-        void run() {
-            final DBConfig mem = DBConfig.memdb()
-            Table data
-            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql memdb ->
-                data = _data(memdb, new InputStreamReader(flat_file.openStream()))
-            }
-            final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
+        void build(Sql sql, Table data) {
             data.addColumns(constS('task_id', data, task_id))
+            try {
+                sql.execute("drop table ${table_name}".toString())
+            } catch (SQLException ignored) {
+            }
+            // TODO: case fold?
+            load_data_frame(sql, table_name, data)
+        }
+    }
+
+    static StringColumn constS(String name, Table t, String val) {
+        StringColumn.create(name, [val] * t.rowCount() as String[])
+    }
+
+    static class NAACCR_Summary implements Task {
+        final String table_name = "NAACCR_EXPORT_STATS"
+        final String z_design_id = "fill NaN (${_stable_hash(DataSummary.script.code)})"
+        final TableBuilder tb
+        final DBConfig cdw
+        final URL flat_file  // TODO: serializable?
+
+        NAACCR_Summary(DBConfig _cdw, URL _flat_file, String _task_id) {
+            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
+            flat_file = _flat_file
+            cdw = _cdw
+        }
+
+        // TODO: ISSUE: Sql.withInstance is ambient
+        // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
+        boolean complete() {
+            boolean done = false
             Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
-                sql.execute("drop table if exists ${table_name}".toString())
-                // TODO: case fold?
-                load_data_frame(sql, table_name, data)
+                done = tb.complete(sql)
+            }
+            done
+        }
+
+        void run() {
+            final Table dd = ddictDF()
+            final DBConfig mem = DBConfig.memdb()
+            Table data = null
+            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql memdb ->
+                Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
+                final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+                data = DataSummary.stats(extract, memdb)
+            }
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                tb.build(sql, data)
+            }
+        }
+    }
+
+    /** Make a per-tumor table for use in encounter_mapping etc.
+     */
+    static class NAACCR_Visits implements Task {
+        static final String design_id = 'patient_num'
+        static final String table_name = "NAACCR_TUMORS"
+        static final int encounter_num_start
+
+        final TableBuilder tb
+        private final DBConfig cdw
+        private final URL flat_file
+
+        NAACCR_Visits(DBConfig _cdw, URL _flat_file, String _task_id) {
+            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
+            flat_file = _flat_file
+            cdw = _cdw
+        }
+
+        boolean complete() {
+            boolean done = false
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                done = tb.complete(sql)
+            }
+            done
+        }
+
+        void run() {
+            Table tumors = _data(flat_file)
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                tb.build(sql, tumors)
             }
         }
 
-        static Table _data(Sql sql,
-                           Reader naaccr_text_lines) {
-            final Table dd = ddictDF()
-            final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
-            DataSummary.stats(extract, sql)
+        static Table _data(URL flat_file) {
+            Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream()) // TODO try, close
+            Table tumors = TumorKeys.with_tumor_id(
+                    TumorKeys.pat_tmr(naaccr_text_lines))
+            tumors = TumorKeys.with_rownum(
+                    tumors, encounter_num_start)
+            tumors
         }
     }
 
@@ -99,6 +173,7 @@ class TumorFile {
         final byte[] bs = text.getBytes('UTF-8')
         out.update(bs, 0, bs.size())
         out.value
+
     }
 
     static Table ddictDF(String version = "180") {
@@ -135,23 +210,67 @@ class TumorFile {
     static class TumorKeys {
         static List<String> pat_ids = ['patientSystemIdHosp', 'patientIdNumber']
         static List<String> pat_attrs = pat_ids + ['dateOfBirth', 'dateOfLastContact', 'sex', 'vitalStatus']
+        static final List<String> tmr_ids = ['tumorRecordNumber']
+        static final List<String> tmr_attrs = tmr_ids + [
+                'dateOfDiagnosis',
+                'sequenceNumberCentral', 'sequenceNumberHospital', 'primarySite',
+                'ageAtDiagnosis', 'dateOfInptAdm', 'dateOfInptDisch', 'classOfCase',
+                'dateCaseInitiated', 'dateCaseCompleted', 'dateCaseLastChanged',
+        ]
         static List<String> report_ids = ['naaccrRecordVersion', 'npiRegistryId']
         static List<String> report_attrs = report_ids + ['dateCaseReportExported']
 
-        static Table patients(Reader lines) {
-            List<String> attrs = pat_attrs + report_attrs
+        static Table pat_tmr(Reader naaccr_text_lines) {
+            _pick_cols(tmr_attrs + pat_attrs + report_attrs, naaccr_text_lines)
+        }
+
+        static Table patients(Reader naaccr_text_lines) {
+            _pick_cols(pat_attrs + report_attrs, naaccr_text_lines)
+        }
+
+        private static Table _pick_cols(List<String> attrs, Reader lines) {
             Collection<Column<?>> cols = (attrs.collect { it -> StringColumn.create(it, []) }) as Collection<Column<?>>;
-            Table patientData = Table.create("patient", cols)
+            Table pat_tmr = Table.create(cols)
             PatientReader reader = new PatientFlatReader(lines)
             Patient patient = reader.readPatient()
             while (patient != null) {
-                Row patientRow = patientData.appendRow()
+                Row patientRow = pat_tmr.appendRow()
                 attrs.each { String naaccrId ->
                     patientRow.setString(naaccrId, patient.getItemValue(naaccrId))
                 }
                 patient = reader.readPatient()
             }
-            patientData
+            pat_tmr = naaccr_dates(pat_tmr, pat_tmr.columnNames().findAll { it.startsWith('date') })
+            pat_tmr
+        }
+
+        static Table with_tumor_id(Table data,
+                                   String name = 'recordId',
+                                   List<String> extra = ['dateOfDiagnosis',
+                                                         'dateCaseCompleted'],
+                                   // keep recordId length consistent
+                                   String extra_default = null) {
+            // ISSUE: performance: add encounter_num column here?
+            if (extra_default == null) {
+                extra_default = '0000-00-00'
+            }
+            StringColumn id_col = data.stringColumn('patientIdNumber')
+                    .join('', data.stringColumn('tumorRecordNumber'))
+            extra.forEach { String it ->
+                StringColumn sc = data.column(it).asStringColumn()
+                sc.set((sc as StringFilters).isMissing(), extra_default)
+                id_col = id_col.join('', sc)
+            }
+            data.addColumns(id_col.setName(name))
+            data
+        }
+
+        static Table with_rownum(Table tumors, int start,
+                                 String new_col = 'encounter_num',
+                                 String key_col = 'recordId') {
+            tumors.sortOn(key_col)
+            tumors.addColumns(IntColumn.indexColumn(new_col, tumors.rowCount(), 0))
+            tumors
         }
     }
 
@@ -178,10 +297,11 @@ class TumorFile {
         }
         if (!keep) {
             // ISSUE: df.select(*orig_cols) uses spread which doesn't work with CompileStatic
-            df = Table.create(df.columns().findAll { Column it -> orig_cols.contains(it.name()) })
+            df = Table.create(orig_cols.collect { String it -> df.column(it) })
         }
         df
     }
+
     static DateColumn naaccr_date_col(StringColumn sc) {
         String name = sc.name()
         sc = sc.trim().concatenate('01019999').substring(0, 8)

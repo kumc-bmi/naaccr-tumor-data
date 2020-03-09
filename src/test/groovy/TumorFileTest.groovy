@@ -10,6 +10,7 @@ import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
 import tech.tablesaw.columns.dates.DateFilters
 
+import java.nio.file.Paths
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -134,6 +135,12 @@ class TumorFileTest extends TestCase {
         Table actual = _SQL("select * from data_char_naaccr limit 10")
         // println(actual)
         assert actual.columnCount() == 12
+    }
+
+    void testVisits() {
+        URL flat_file = Paths.get(testDataPath).toUri().toURL()
+        Table tumors = TumorFile.NAACCR_Visits._data(flat_file)
+        assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
     }
 
     /**

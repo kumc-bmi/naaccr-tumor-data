@@ -42,7 +42,7 @@ task localDBStatsTest(type: JavaExec) {
                    DB1_DRIVER: 'org.h2.Driver',
                    DB1_USER: 'SA', DB1_PASSWORD: '']
 
-    args '--account', 'DB1', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args '--account', 'DB1', '--summary', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }
