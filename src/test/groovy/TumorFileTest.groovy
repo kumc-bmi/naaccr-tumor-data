@@ -1,19 +1,19 @@
+import TumorFile.DataSummary
+import TumorFile.TumorKeys
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
-import tech.tablesaw.api.DateColumn
+import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.DoubleColumn
-import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
 import tech.tablesaw.columns.dates.DateFilters
+import tech.tablesaw.columns.strings.StringFilters
 
 import java.nio.file.Paths
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import java.util.logging.Logger
 
 @CompileStatic
@@ -43,10 +43,10 @@ class TumorFileTest extends TestCase {
 
     void testPatients() {
         new File(testDataPath).withReader { reader ->
-            Table patientData = TumorFile.TumorKeys.patients(reader)
+            Table patientData = TumorKeys.patients(reader)
 
             // got expected columns?
-            assert patientData.columnNames() == TumorFile.TumorKeys.pat_attrs + TumorFile.TumorKeys.report_attrs
+            assert patientData.columnNames() == TumorKeys.pat_attrs + TumorKeys.report_attrs
 
             // count patient records. Note: 6 tumors were on existing patients
             assert patientData.rowCount() == 94
@@ -87,7 +87,7 @@ class TumorFileTest extends TestCase {
     })(LoaderTest.config1)
 
     static Table _SQL(String query, int limit = 100) {
-        Table out
+        Table out = null
         _spark.query(query) { results ->
             out = Table.read().db(results).first(limit)
         }
@@ -146,7 +146,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testStats() {
-        TumorFile.DataSummary.stats(_extract, _spark)
+        DataSummary.stats(_extract, _spark)
 
         Table actual = _SQL("select * from data_char_naaccr limit 10")
         // println(actual)
@@ -158,6 +158,38 @@ class TumorFileTest extends TestCase {
         Table tumors = TumorFile.NAACCR_Visits._data(flat_file, 12345)
         assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
         assert tumors.intColumn('encounter_num').min() == 12345
+    }
+
+    void testObsRaw() {
+        Table _ty = TumorOnt.NAACCR_I2B2.tumor_item_type
+        Table _raw_obs = DataSummary.stack_obs(_extract, _ty, TumorKeys.key4 + TumorKeys.dtcols)
+        _raw_obs = TumorFile.naaccr_dates(_raw_obs, TumorKeys.dtcols)
+
+        assert _raw_obs.columnNames() == [
+                'recordId', 'patientSystemIdHosp', 'tumorRecordNumber', 'patientIdNumber', 'abstractedBy',
+                'dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact', 'dateCaseCompleted', 'dateCaseLastChanged',
+                'naaccrId', 'value']
+        assert _raw_obs.intColumn('recordId').countUnique() == _extract.rowCount()
+        assert _raw_obs.stringColumn('naaccrId').countUnique() > 100
+        // at least 1 in 20 fields populated
+        assert _raw_obs.rowCount() >= _ty.rowCount() * _extract.rowCount() / 20
+    }
+
+    void testItemObs() {
+        _spark.execute('DROP ALL OBJECTS')  // TODO: hmm...
+        final Table actual = TumorFile.ItemObs.make(_spark, _extract)
+        assert actual.columnNames() == [
+                'RECORDID', 'PATIENTIDNUMBER', 'NAACCRID',
+                'CONCEPT_CD', 'PROVIDER_ID', 'START_DATE', 'MODIFIER_CD', 'INSTANCE_NUM',
+                'VALTYPE_CD', 'TVAL_CHAR', 'NVAL_NUM', 'VALUEFLAG_CD', 'UNITS_CD',
+                'END_DATE', 'LOCATION_CD', 'UPDATE_DATE']
+        assert actual.columnTypes() as List == [
+                ColumnType.INTEGER, ColumnType.STRING, ColumnType.STRING,
+                ColumnType.STRING, ColumnType.STRING, ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.INTEGER,
+                ColumnType.STRING, ColumnType.STRING, ColumnType.DOUBLE, ColumnType.STRING, ColumnType.STRING,
+                ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.LOCAL_DATE]
+        assert actual.rowCount() >= 300
+        assert actual.where((actual.stringColumn('CONCEPT_CD') as StringFilters).isMissing()).rowCount() == 0
     }
 
     /**

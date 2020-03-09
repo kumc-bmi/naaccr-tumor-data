@@ -4,6 +4,7 @@ import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
 import com.imsweb.naaccrxml.PatientFlatReader
 import com.imsweb.naaccrxml.PatientReader
+import com.imsweb.naaccrxml.entity.Item
 import com.imsweb.naaccrxml.entity.Patient
 import com.imsweb.naaccrxml.entity.Tumor
 import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
@@ -167,6 +168,44 @@ class TumorFile {
         }
     }
 
+    static class NAACCR_Facts /* TODO: implements Task */ {
+        static Table _data(Sql sql, Reader naaccr_text_lines) {
+            final Table dd = ddictDF()
+            final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+            Table item = ItemObs.make(sql, extract)
+            // TODO: Table seer = SEER_Recode.make(sql, extract)
+            // TODO: Table ssf = SiteSpecificFactors.make(sql, extract)
+            // TODO: item.append(seer).append(ssf)
+            item
+        }
+    }
+
+    static class ItemObs {
+        static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('naaccr_txform.sql',
+                TumorOnt.resourceText(TumorFile.getResource('heron_load/naaccr_txform.sql')),
+                [
+                        new Tuple2('tumor_item_value', ['naaccr_obs_raw', 'tumor_item_type']),
+                        new Tuple2('tumor_reg_facts', ['record_layout', 'section']),
+                ])
+
+        static Table make(Sql sql, Table extract) {
+            final item_ty = TumorOnt.NAACCR_I2B2.tumor_item_type
+
+            Table raw_obs = DataSummary.stack_obs(extract, item_ty, TumorKeys.key4 + TumorKeys.dtcols)
+            raw_obs = naaccr_dates(raw_obs, TumorKeys.dtcols)
+
+            final views = TumorOnt.create_objects(
+                    sql, script, [
+                    naaccr_obs_raw : raw_obs,
+                    tumor_item_type: item_ty,
+                    record_layout  : record_layout,
+                    section        : TumorOnt.NAACCR_I2B2.per_section,
+            ])
+
+            return views.values().last()
+        }
+    }
+
     static long _stable_hash(String text) {
         final CRC32 out = new CRC32()
         final byte[] bs = text.getBytes('UTF-8')
@@ -225,6 +264,14 @@ class TumorFile {
         ]
         static List<String> report_ids = ['naaccrRecordVersion', 'npiRegistryId']
         static List<String> report_attrs = report_ids + ['dateCaseReportExported']
+        static List<String> dtcols = ['dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
+                                      'dateCaseCompleted', 'dateCaseLastChanged']
+        static List<String> key4 = [
+                'patientSystemIdHosp',  // NAACCR stable patient ID
+                'tumorRecordNumber',    // NAACCR stable tumor ID
+                'patientIdNumber',      // patient_mapping
+                'abstractedBy',         // IDEA/YAGNI?: provider_id
+        ]
 
         static Table pat_tmr(Reader naaccr_text_lines) {
             _pick_cols(tmr_attrs + pat_attrs + report_attrs, naaccr_text_lines)
@@ -263,10 +310,11 @@ class TumorFile {
             StringColumn id_col = data.stringColumn('patientIdNumber')
                     .join('', data.stringColumn('tumorRecordNumber'))
             extra.forEach { String it ->
-                StringColumn sc = data.column(it).asStringColumn()
+                StringColumn sc = data.column(it).copy().asStringColumn()
                 sc.set((sc as StringFilters).isMissing(), extra_default)
                 id_col = id_col.join('', sc)
             }
+            data = data.copy()
             data.addColumns(id_col.setName(name))
             data
         }
@@ -286,6 +334,7 @@ class TumorFile {
             layout18.getAllFields().collect { FixedColumnsField it ->
                 [('long-label')     : it.longLabel,
                  start              : it.start,
+                 length             : it.length,
                  ('naaccr-item-num'): it.naaccrItemNum,
                  section            : it.section,
                  grouped            : it.subFields != null && it.subFields.size() > 0
@@ -297,7 +346,7 @@ class TumorFile {
         final orig_cols = df.columnNames()
         for (String dtname : date_cols) {
             final strname = dtname + '_'
-            final StringColumn strcol = df.stringColumn(dtname).copy().setName(strname)
+            final StringColumn strcol = df.column(dtname).copy().asStringColumn().setName(strname)
             df = df.replaceColumn(dtname, strcol)
             df.addColumns(naaccr_date_col(strcol).setName(dtname))
         }
