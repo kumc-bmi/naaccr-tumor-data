@@ -190,15 +190,22 @@ class TumorFile {
     }
 
     static Table read_fwf(Reader lines, List<String> items) {
-        Collection<Column<?>> cols = (items.collect { it -> StringColumn.create(it, []) }) as Collection<Column<?>>;
+        Collection<Column<?>> cols = (items.collect { it -> StringColumn.create(it) }) as Collection<Column<?>>;
         Table data = Table.create(cols)
         PatientReader reader = new PatientFlatReader(lines)
         Patient patient = reader.readPatient()
         while (patient != null) {
-            patient.getTumors().each { Tumor it ->
+            patient.getTumors().each { Tumor tumor ->
                 Row tumorRow = data.appendRow()
-                items.each { String naaccrId ->
-                    tumorRow.setString(naaccrId, it.getItemValue(naaccrId))
+                patient.items.each { Item item ->
+                    if (items.contains(item.naaccrId)) {
+                        tumorRow.setString(item.naaccrId, item.value)
+                    }
+                }
+                tumor.items.each { Item item ->
+                    if (items.contains(item.naaccrId)) {
+                        tumorRow.setString(item.naaccrId, item.value)
+                    }
                 }
 
             }
