@@ -42,7 +42,7 @@ class TumorFile {
         if (cli.arg('--summary')) {
             work = new NAACCR_Summary(cdw, flat_file, task_id)
         } else if (cli.arg('--visits')) {
-            work = new NAACCR_Visits(cdw, flat_file, task_id)
+            work = new NAACCR_Visits(cdw, flat_file, task_id, 2000000)
         } else {
             throw new IllegalArgumentException('which task???')
         }
@@ -131,16 +131,17 @@ class TumorFile {
     static class NAACCR_Visits implements Task {
         static final String design_id = 'patient_num'
         static final String table_name = "NAACCR_TUMORS"
-        static final int encounter_num_start
+        int encounter_num_start
 
         final TableBuilder tb
         private final DBConfig cdw
         private final URL flat_file
 
-        NAACCR_Visits(DBConfig _cdw, URL _flat_file, String _task_id) {
+        NAACCR_Visits(DBConfig _cdw, URL _flat_file, String _task_id, int start) {
             tb = new TableBuilder(task_id: _task_id, table_name: table_name)
             flat_file = _flat_file
             cdw = _cdw
+            encounter_num_start = start
         }
 
         boolean complete() {
@@ -152,13 +153,13 @@ class TumorFile {
         }
 
         void run() {
-            Table tumors = _data(flat_file)
+            Table tumors = _data(flat_file, encounter_num_start)
             Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
                 tb.build(sql, tumors)
             }
         }
 
-        static Table _data(URL flat_file) {
+        static Table _data(URL flat_file, int encounter_num_start) {
             Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream()) // TODO try, close
             Table tumors = TumorKeys.with_tumor_id(
                     TumorKeys.pat_tmr(naaccr_text_lines))
@@ -276,7 +277,7 @@ class TumorFile {
                                  String new_col = 'encounter_num',
                                  String key_col = 'recordId') {
             tumors.sortOn(key_col)
-            tumors.addColumns(IntColumn.indexColumn(new_col, tumors.rowCount(), 0))
+            tumors.addColumns(IntColumn.indexColumn(new_col, tumors.rowCount(), start))
             tumors
         }
     }

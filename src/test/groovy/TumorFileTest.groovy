@@ -155,8 +155,9 @@ class TumorFileTest extends TestCase {
 
     void testVisits() {
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Table tumors = TumorFile.NAACCR_Visits._data(flat_file)
+        Table tumors = TumorFile.NAACCR_Visits._data(flat_file, 12345)
         assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
+        assert tumors.intColumn('encounter_num').min() == 12345
     }
 
     /**
