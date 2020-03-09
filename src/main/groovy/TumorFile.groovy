@@ -90,7 +90,6 @@ class TumorFile {
 
     static class NAACCR_Summary implements Task {
         final String table_name = "NAACCR_EXPORT_STATS"
-        final String z_design_id = "fill NaN (${_stable_hash(DataSummary.script.code)})"
         final TableBuilder tb
         final DBConfig cdw
         final URL flat_file  // TODO: serializable?
@@ -129,7 +128,6 @@ class TumorFile {
     /** Make a per-tumor table for use in encounter_mapping etc.
      */
     static class NAACCR_Visits implements Task {
-        static final String design_id = 'patient_num'
         static final String table_name = "NAACCR_TUMORS"
         int encounter_num_start
 
