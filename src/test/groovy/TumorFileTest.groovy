@@ -22,6 +22,14 @@ class TumorFileTest extends TestCase {
 
     static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
+    void testCLI() {
+        Map env = LoaderTest.env1
+        DBConfig.CLI cli = new DBConfig.CLI(['--facts', '--account', 'A1', '--flat-file', testDataPath] as String[],
+                { String name -> env[name] },
+                { int it -> throw new RuntimeException() })
+        TumorFile.run_cli(cli)
+    }
+
     void testDF() {
         double[] numbers = [1, 2, 3, 4]
         DoubleColumn nc = DoubleColumn.create("nc", numbers)
@@ -146,6 +154,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testStats() {
+        _spark.execute('drop all objects')
         DataSummary.stats(_extract, _spark)
 
         Table actual = _SQL("select * from data_char_naaccr limit 10")

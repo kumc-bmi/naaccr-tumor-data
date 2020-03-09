@@ -33,17 +33,24 @@ class TumorFile {
                 { String name -> System.getenv(name) },
                 { int it -> System.exit(it) })
 
+        run_cli(cli)
+    }
+
+    static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
         URL flat_file = Paths.get(cli.arg("--flat-file")).toUri().toURL()
 
         // IDEA: support disk DB in place of memdb
-        Task work
+        //noinspection GroovyUnusedAssignment -- avoids weird cast error
+        Task work = null
         String task_id = cli.arg("--task-hash", "task123")
         if (cli.arg('--summary')) {
             work = new NAACCR_Summary(cdw, flat_file, task_id)
         } else if (cli.arg('--visits')) {
             work = new NAACCR_Visits(cdw, flat_file, task_id, 2000000)
+        } else if (cli.arg('--facts')) {
+            work = new NAACCR_Facts(cdw, flat_file, task_id)
         } else {
             throw new IllegalArgumentException('which task???')
         }
@@ -168,7 +175,40 @@ class TumorFile {
         }
     }
 
-    static class NAACCR_Facts /* TODO: implements Task */ {
+    static class NAACCR_Facts implements Task {
+        static final String table_name = "NAACCR_OBSERVATIONS"
+
+        final TableBuilder tb
+        private final DBConfig cdw
+        private final URL flat_file
+
+        NAACCR_Facts(DBConfig _cdw, URL _flat_file, String _task_id) {
+            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
+            flat_file = _flat_file
+            cdw = _cdw
+        }
+
+        boolean complete() {
+            boolean done = false
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                done = tb.complete(sql)
+            }
+            done
+        }
+
+        void run() {
+            final DBConfig mem = DBConfig.memdb()
+            Table data = null
+            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql memdb ->
+                Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
+                data = _data(memdb, naaccr_text_lines)
+            }
+
+            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                tb.build(sql, data)
+            }
+        }
+
         static Table _data(Sql sql, Reader naaccr_text_lines) {
             final Table dd = ddictDF()
             final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
