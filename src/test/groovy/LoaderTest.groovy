@@ -34,6 +34,7 @@ class LoaderTest extends TestCase {
     void 'test Loader runScript'() {
         def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
         Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+            sql.execute('drop all objects')
             def input = getClass().getResource('naaccr_tables.sql')
             def loader = new Loader(sql)
             loader.runScript(input)
