@@ -362,7 +362,7 @@ class TumorFile {
 
         static Table melt(Table data, List<String> value_vars, List<String> id_vars,
                           String var_name, String value_col = 'value') {
-            final Table entity = Table.create(data.columns().findAll { Column it -> id_vars.contains(it.name()) })
+            final Table entity = Table.create(id_vars.collect { String it -> data.column(it) })
             final List<Column> dataCols = value_vars.collect { String it -> data.column(it) }
             Table out = null
             dataCols.forEach { Column valueColumn ->
