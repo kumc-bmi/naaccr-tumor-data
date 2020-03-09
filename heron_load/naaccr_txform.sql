@@ -103,31 +103,33 @@ left join tumor_item_type ty
 
 /* This is the main big flat view. */
 
-create or replace temporary view tumor_item_value as
+create or replace view tumor_item_value as
 select raw.*
-     , case when valtype_cd in ('Ni', 'Ti')
+     , ty.valtype_cd, ty.naaccrNum
+     , case when ty.valtype_cd in ('Ni', 'Ti')
        then true
        else false
        end as identified_only
-     , case when valtype_cd = '@'
-       then raw_value  -- TODO: trim
+     , case when ty.valtype_cd = '@'
+       then trim(value)
        end as code_value
      , case
-       when valtype_cd in ('N', 'Ni')
-       then cast(raw_value as float)
+       when ty.valtype_cd in ('N', 'Ni')
+       then cast(value as float)
        end as numeric_value
      , case
-       when valtype_cd = 'D'
+       when ty.valtype_cd = 'D'
        -- TODO: length 14 datetime
-       then to_date(substring(concat(raw_value, '0101'), 1, 8),
+       then parseDateTime(substring(concat(value, '0101'), 1, 8),
                     'yyyyMMdd')
        end as date_value
-     , case when valtype_cd in ('T', 'Ti')
-       then raw_value
+     , case when ty.valtype_cd in ('T', 'Ti')
+       then value
        end as text_value
 from naaccr_obs_raw raw
+join tumor_item_type ty
+  on raw.naaccrId = ty.naaccrId
 ;
-
 
 /**
 IDEA: quality check:
@@ -147,7 +149,7 @@ and concept_cd not like 'NAACCR|31%';
  * i2b2 style facts
  */
 
-create or replace temporary view tumor_reg_facts as
+create or replace view tumor_reg_facts as
 with obs_w_section as (
   select tiv.*, rl.length as field_length, s.sectionId
   from tumor_item_value tiv
@@ -170,7 +172,7 @@ obs_detail as (
          -- POSTPONED: Ti de-identification
          when valtype_cd = 'T' then text_value
          when valtype_cd = 'D' then
-           date_format(date_value,
+           to_char(date_value,
                        case
                        when field_length = 14 then 'yyyy-MM-dd HH:mm:ss'
                        else 'yyyy-MM-dd'
@@ -200,8 +202,8 @@ select recordId         -- becomes patient_num via patient_mapping
      , valtype_cd
      , tval_char
      , nval_num
-     , cast(null as string) valueflag_cd
-     , cast(null as string) units_cd
+     , cast(null as varchar(2)) valueflag_cd
+     , cast(null as varchar(2)) units_cd
      , start_date as end_date
      , '@' location_cd
      , update_date
