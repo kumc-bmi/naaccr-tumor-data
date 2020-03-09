@@ -189,7 +189,7 @@ class TumorOnt {
         result
     }
 
-    static class SqlScript {
+    static class SqlScript { // TODO: refactor: move SqlScript out of TumorOnt
         final String name
         final String code
         final List<Tuple3<String, String, List<String>>> objects
@@ -201,7 +201,7 @@ class TumorOnt {
         }
 
         static String find_ddl(String name, String script) {
-            String comment_pattern = '((--[^\\n]*(?:\\n|$))|(?:/\\*(?:[^*]|(\\*(?!/)))*\\*/))*'
+            String comment_pattern = '((--[^\\n]*(?:\\n|$))\\s*|(?:/\\*(?:[^*]|(\\*(?!/)))*\\*/)\\s*)*'
             Scanner stmts = new Scanner(script).useDelimiter(';\n\\s*' + comment_pattern)
             while (stmts.hasNext()) {
                 String stmt = stmts.next().trim()
