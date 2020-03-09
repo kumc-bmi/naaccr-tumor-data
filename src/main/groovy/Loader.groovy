@@ -6,6 +6,7 @@ import groovy.transform.CompileStatic
 
 import java.nio.file.Paths
 import java.sql.Connection
+import java.sql.DriverManager
 import java.sql.SQLException
 import java.util.logging.Logger
 
@@ -113,11 +114,12 @@ class Loader {
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(args,
                 { String name -> System.getenv(name) },
-                { int it -> System.exit(it) }, )
+                { int it -> System.exit(it) },
+                { String url, Properties ps -> DriverManager.getConnection(url, ps)})
 
-        DBConfig config = cli.account()
+        DBConfig account = cli.account()
 
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+        account.withSql { Sql sql ->
             def loader = new Loader(sql)
 
             def script = cli.arg("--run")
@@ -142,6 +144,7 @@ class Loader {
             if (cli.argIx("--load") >= 0) {
                 loader.load(new InputStreamReader(System.in))
             }
+            null
         }
     }
 }

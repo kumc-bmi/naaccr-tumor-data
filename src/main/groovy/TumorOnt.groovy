@@ -10,6 +10,7 @@ import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.time.LocalDate
@@ -23,7 +24,8 @@ class TumorOnt {
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(args,
                 { String name -> System.getenv(name) },
-                { int it -> System.exit(it) })
+                { int it -> System.exit(it) },
+                { String url, Properties ps -> DriverManager.getConnection(url, ps)})
 
         DBConfig cdw = cli.account()
 
@@ -59,7 +61,7 @@ class TumorOnt {
 
         boolean complete() {
             try {
-                Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+                cdw.withSql { Sql sql ->
 
                     return sql.firstRow("""
                         select 1 from ${table_name}
@@ -74,12 +76,12 @@ class TumorOnt {
         }
 
         void run() {
-            final DBConfig mem = DBConfig.memdb()
+            final DBConfig mem = DBConfig.inMemoryDB("Ontology")
             Table terms
-            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql sql ->
+            mem.withSql { Sql sql ->
                 terms = NAACCR_I2B2.ont_view_in(sql, task_hash, update_date, who_cache)
             }
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 try {
                     sql.execute("drop table $table_name".toString())
                 } catch (SQLException problem) {

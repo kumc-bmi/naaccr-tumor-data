@@ -15,6 +15,8 @@ import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
 import java.nio.file.Paths
+import java.sql.DriverManager
+import java.sql.ResultSet
 import java.sql.SQLException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -31,7 +33,8 @@ class TumorFile {
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(args,
                 { String name -> System.getenv(name) },
-                { int it -> System.exit(it) })
+                { int it -> System.exit(it) },
+                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
 
         run_cli(cli)
     }
@@ -51,6 +54,8 @@ class TumorFile {
             work = new NAACCR_Visits(cdw, flat_file, task_id, 2000000)
         } else if (cli.arg('--facts')) {
             work = new NAACCR_Facts(cdw, flat_file, task_id)
+        } else if (cli.arg('--patients')) {
+            work = new NAACCR_Patients(cdw, flat_file, task_id)
         } else {
             throw new IllegalArgumentException('which task???')
         }
@@ -108,11 +113,10 @@ class TumorFile {
             cdw = _cdw
         }
 
-        // TODO: ISSUE: Sql.withInstance is ambient
         // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
         boolean complete() {
             boolean done = false
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 done = tb.complete(sql)
             }
             done
@@ -120,14 +124,14 @@ class TumorFile {
 
         void run() {
             final Table dd = ddictDF()
-            final DBConfig mem = DBConfig.memdb()
+            final DBConfig mem = DBConfig.inMemoryDB("Stats")
             Table data = null
-            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql memdb ->
+            mem.withSql { Sql memdb ->
                 Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
                 final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
                 data = DataSummary.stats(extract, memdb)
             }
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 tb.build(sql, data)
             }
         }
@@ -152,7 +156,7 @@ class TumorFile {
 
         boolean complete() {
             boolean done = false
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 done = tb.complete(sql)
             }
             done
@@ -160,7 +164,7 @@ class TumorFile {
 
         void run() {
             Table tumors = _data(flat_file, encounter_num_start)
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 tb.build(sql, tumors)
             }
         }
@@ -172,6 +176,45 @@ class TumorFile {
             tumors = TumorKeys.with_rownum(
                     tumors, encounter_num_start)
             tumors
+        }
+    }
+
+    /** Make a per-patient table for use in patient_mapping etc.
+    */
+    static class NAACCR_Patients implements Task {
+        static String table_name = "NAACCR_PATIENTS"
+        static String patient_ide_source = 'SMS@kumed.com'
+        static String schema = 'NIGHTHERONDATA'
+
+        final TableBuilder tb
+        private final DBConfig cdw
+        private final URL flat_file
+
+        NAACCR_Patients(DBConfig _cdw, URL _flat_file, String _task_id) {
+            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
+            flat_file = _flat_file
+            cdw = _cdw
+        }
+
+        boolean complete() {
+            boolean done = false
+            cdw.withSql { Sql sql ->
+                done = tb.complete(sql)
+            }
+            done
+        }
+
+        void run() {
+            cdw.withSql { Sql sql ->
+                Table patients = _data(sql, flat_file)
+                tb.build(sql, patients)
+            }
+        }
+
+        static Table _data(Sql cdwdb, URL flat_file) {
+            Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream()) // TODO try, close
+            Table patients = TumorKeys.patients(naaccr_text_lines)
+            TumorKeys.with_patient_num(patients, cdwdb, schema, patient_ide_source)
         }
     }
 
@@ -190,21 +233,21 @@ class TumorFile {
 
         boolean complete() {
             boolean done = false
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 done = tb.complete(sql)
             }
             done
         }
 
         void run() {
-            final DBConfig mem = DBConfig.memdb()
+            final DBConfig mem = DBConfig.inMemoryDB("Facts")
             Table data = null
-            Sql.withInstance(mem.url, mem.username, mem.password.value, mem.driver) { Sql memdb ->
+            mem.withSql { Sql memdb ->
                 Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
                 data = _data(memdb, naaccr_text_lines)
             }
 
-            Sql.withInstance(cdw.url, cdw.username, cdw.password.value, cdw.driver) { Sql sql ->
+            cdw.withSql { Sql sql ->
                 tb.build(sql, data)
             }
         }
@@ -365,6 +408,34 @@ class TumorFile {
             tumors.sortOn(key_col)
             tumors.addColumns(IntColumn.indexColumn(new_col, tumors.rowCount(), start))
             tumors
+        }
+
+        static void export_patient_ids(Table df, Sql cdw,
+                               String tmp_table = 'NAACCR_PMAP',
+                               String id_col = 'patientIdNumber') {
+            log.info("writing $id_col to $tmp_table")
+            Table pat_ids = df.select(id_col).dropDuplicateRows()
+            load_data_frame(cdw, tmp_table, pat_ids)
+        }
+
+        static Table with_patient_num(Table df, Sql cdw, String schema,
+                                      String source,
+                                      String tmp_table = 'NAACCR_PMAP',
+                                      String id_col = 'patientIdNumber') {
+            export_patient_ids(df, cdw, tmp_table, id_col)
+            Table src_map = null
+            cdw.query("""(
+                select ea."${id_col}", pmap.PATIENT_NUM as "patient_num"
+                from ${tmp_table} ea
+                join ${schema}.PATIENT_MAPPING pmap
+                on pmap.patient_ide_source = ?.source
+                and ltrim(pmap.patient_ide, '0') = ltrim(ea."${id_col}", '0')
+                )""", [source: source]) { ResultSet results ->
+                src_map = Table.read().db(results)
+            }
+            Table out = df.joinOn(id_col).leftOuter(src_map)
+            out.removeColumns(id_col)
+            out
         }
     }
 

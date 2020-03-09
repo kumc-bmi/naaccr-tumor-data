@@ -3,23 +3,22 @@ import groovy.sql.GroovyResultSet
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
-import static groovy.test.GroovyAssert.shouldFail
 
+import static groovy.test.GroovyAssert.shouldFail
 
 @CompileStatic
 class LoaderTest extends TestCase {
-    static final Map<String, String> env1 = [A1_URL: 'jdbc:h2:mem:A1;create=true', A1_DRIVER: 'org.h2.Driver', A1_USER: 'SA', A1_PASSWORD: '']
-
-    static final DBConfig config1 = DBConfig.fromEnv('A1', { String it -> env1[it] })
-
-    void 'test DBConfig happy path'() {
-        def config = config1
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+    void 'inMemoryDB supports select'() {
+        def account = DBConfig.inMemoryDB("A1")
+        account.withSql { Sql sql ->
             sql.eachRow("select 1 as c from (values('x'))") { GroovyResultSet row ->
                 assert row['c'] == 1
             }
         }
     }
+
+    static final Map<String, String> env1 = [A1_URL: 'jdbc:h2:mem:A1;create=true', A1_DRIVER: 'org.h2.Driver',
+                                             A1_USER: 'SA', A1_PASSWORD: '']
 
     void 'test DBConfig misspelled env var'() {
         def env1 = [A1_URL: 'URL1', A1_DRIVER: 'java.sql.DriverManager', A1_USERNAME: 'U1', A1_PASSWORD: 'sekret']
@@ -32,8 +31,8 @@ class LoaderTest extends TestCase {
     }
 
     void 'test Loader runScript'() {
-        def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+        def account = DBConfig.inMemoryDB("A1")
+        account.withSql { Sql sql ->
             sql.execute('drop all objects')
             def input = getClass().getResource('naaccr_tables.sql')
             def loader = new Loader(sql)
@@ -42,8 +41,8 @@ class LoaderTest extends TestCase {
     }
 
     void 'test Loader query'() {
-        def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+        def account = DBConfig.inMemoryDB("A1")
+        account.withSql { Sql sql ->
             def loader = new Loader(sql)
             loader.runScript(getClass().getResource('naaccr_tables.sql'))
             loader.runScript(getClass().getResource('naaccr_query_data.sql'))
@@ -69,8 +68,8 @@ class LoaderTest extends TestCase {
         }
         def input = new StringReader(buf.toString())
 
-        def config = DBConfig.fromEnv('A1', { String it -> env1[it] })
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+        def account = DBConfig.inMemoryDB("A1")
+        account.withSql { Sql sql ->
             def loader = new Loader(sql)
             loader.runScript(getClass().getResource('naaccr_tables.sql'))
             sql.execute "delete from naaccr_tumors"

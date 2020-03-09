@@ -1,19 +1,37 @@
+import groovy.sql.Sql
 import groovy.transform.CompileStatic
-import groovy.transform.Immutable
 
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.SQLException
 import java.util.logging.Logger
 
 @CompileStatic
-@Immutable
 class DBConfig {
-    final String url
-    final String driver
-    final String username
-    final Password password
-
     static Logger logger = Logger.getLogger("")
 
-    static DBConfig fromEnv(String account, Closure<String> getenv) {
+    final String url
+    final Properties connectionProperties
+    private final Closure<Connection> connect
+
+    DBConfig(String url, Properties connectionProperties, Closure<Connection> connect) {
+        this.url = url
+        this.connectionProperties = connectionProperties
+        this.connect = connect
+    }
+
+    def <V> V withSql(Closure<V> thunk) throws SQLException {
+        Connection conn = connect(url, connectionProperties)
+        Sql sql = new Sql(conn)
+        try {
+            thunk(sql)
+        } finally {
+            sql.close()
+            conn.close()
+        }
+    }
+
+    static Properties fromEnv(String account, Closure<String> getenv) {
         logger.info("getting config for $account")
         Closure<String> config = {
             def name = "${account}_${it}"
@@ -30,26 +48,34 @@ class DBConfig {
             logger.exiting("cannot load driver", driver, noDriver)
             throw noDriver
         }
-        new DBConfig(url: config("URL"), driver: driver,
-                username: config("USER"), password: new Password(value: config("PASSWORD")))
+        Properties properties = new Properties()
+        properties.setProperty('url', config("URL"))
+        properties.setProperty('user', config("USER"))
+        properties.setProperty('password', config('PASSWORD'))
+        properties
     }
 
-    static DBConfig memdb() {
-        final Map<String, String> env1 = [MEM_URL : 'jdbc:h2:mem:A1;create=true', MEM_DRIVER: 'org.h2.Driver',
-                                          MEM_USER: 'SA', MEM_PASSWORD: '']
-
-        DBConfig.fromEnv('MEM', { String it -> env1[it] })
+    static DBConfig inMemoryDB(String databaseName, boolean reset=false) {
+        String url = "jdbc:h2:mem:${databaseName};create=true"
+        DBConfig it = new DBConfig(url, new Properties(),
+                { String ignored, Properties _ -> DriverManager.getConnection(url) })
+        if (reset) {
+            it.withSql({ Sql sql -> sql.execute('drop all objects') })
+        }
+        it
     }
 
     static class CLI {
         protected final String[] args
         private final Closure<String> getenv
         private final Closure exit
+        private final Closure<Connection> getConnection
 
-        CLI(String[] _args, Closure<String> _getenv, Closure _exit) {
-            args = _args
-            getenv = _getenv
-            exit = _exit
+        CLI(String[] args, Closure<String> getenv, Closure exit, Closure<Connection> getConnection) {
+            this.args = args
+            this.getenv = getenv
+            this.exit = exit
+            this.getConnection = getConnection
         }
 
         int argIx(String target) {
@@ -70,7 +96,7 @@ class DBConfig {
                 logger.warning("Usage: java -jar JAR --account A [--run abc.sql]")
                 exit(1)
             }
-            DBConfig config = null
+            Properties config = null
             try {
                 config = fromEnv(account, getenv)
             } catch (IllegalStateException oops) {
@@ -80,18 +106,9 @@ class DBConfig {
                 logger.warning("driver not found (fix CLASSPATH?): $oops")
                 exit(1)
             }
-            logger.info("$account config: $config")
-            config
-        }
-    }
-
-    @Immutable
-    static class Password {
-        final String value
-
-        @Override
-        String toString() {
-            return "...${value.length()}..."
+            String url = config.getProperty('url')
+            logger.info("$account: $url")
+            new DBConfig(url, config, getConnection)
         }
     }
 }

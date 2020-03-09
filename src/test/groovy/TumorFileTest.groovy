@@ -13,6 +13,7 @@ import tech.tablesaw.columns.dates.DateFilters
 import tech.tablesaw.columns.strings.StringFilters
 
 import java.nio.file.Paths
+import java.sql.DriverManager
 import java.time.LocalDate
 import java.util.logging.Logger
 
@@ -23,10 +24,10 @@ class TumorFileTest extends TestCase {
     static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
     void testCLI() {
-        Map env = LoaderTest.env1
         DBConfig.CLI cli = new DBConfig.CLI(['--facts', '--account', 'A1', '--flat-file', testDataPath] as String[],
-                { String name -> env[name] },
-                { int it -> throw new RuntimeException() })
+                { String name -> LoaderTest.env1[name] },
+                { int it -> throw new RuntimeException() },
+                { String url, Properties ps -> DriverManager.getConnection(url, ps) } )
         TumorFile.run_cli(cli)
     }
 
@@ -90,18 +91,27 @@ class TumorFileTest extends TestCase {
         TumorFile.read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
     }
 
-    static final Sql _spark = ({ DBConfig config ->
-        Sql.newInstance(config.url, config.username, config.password.value, config.driver)
-    })(LoaderTest.config1)
-
-    static Table _SQL(String query, int limit = 100) {
+    static Table _SQL(Sql sql, String query, int limit = 100) {
         Table out = null
-        _spark.query(query) { results ->
+        sql.query(query) { results ->
             out = Table.read().db(results).first(limit)
         }
         out
     }
 
+    void testPatientsTask() {
+        final cdw = DBConfig.inMemoryDB("PT", true)
+        URL flat_file = Paths.get(testDataPath).toUri().toURL()
+        TumorFile.Task work = new TumorFile.NAACCR_Patients(cdw, flat_file,
+                "task123456")
+        if (!work.complete()) {
+            work.run()
+        }
+
+        Table actual = cdw.withSql { Sql sql -> _SQL(sql, 'select * from NAACCR_PATIENTS limit 20') }
+        println(actual)
+        assert 1 == 0
+    }
 
     /*****
      * Date parsing. Ugh.
@@ -154,12 +164,14 @@ class TumorFileTest extends TestCase {
     }
 
     void testStats() {
-        _spark.execute('drop all objects')
-        DataSummary.stats(_extract, _spark)
+        DBConfig acct1 = DBConfig.inMemoryDB("stats", true)
+        acct1.withSql { Sql sql ->
+            DataSummary.stats(_extract, sql)
 
-        Table actual = _SQL("select * from data_char_naaccr limit 10")
-        // println(actual)
-        assert actual.columnCount() == 12
+            Table actual = _SQL(sql, "select * from data_char_naaccr limit 10")
+            // println(actual)
+            assert actual.columnCount() == 12
+        }
     }
 
     void testVisits() {
@@ -185,20 +197,21 @@ class TumorFileTest extends TestCase {
     }
 
     void testItemObs() {
-        _spark.execute('DROP ALL OBJECTS')  // TODO: hmm...
-        final Table actual = TumorFile.ItemObs.make(_spark, _extract)
-        assert actual.columnNames() == [
-                'RECORDID', 'PATIENTIDNUMBER', 'NAACCRID',
-                'CONCEPT_CD', 'PROVIDER_ID', 'START_DATE', 'MODIFIER_CD', 'INSTANCE_NUM',
-                'VALTYPE_CD', 'TVAL_CHAR', 'NVAL_NUM', 'VALUEFLAG_CD', 'UNITS_CD',
-                'END_DATE', 'LOCATION_CD', 'UPDATE_DATE']
-        assert actual.columnTypes() as List == [
-                ColumnType.INTEGER, ColumnType.STRING, ColumnType.STRING,
-                ColumnType.STRING, ColumnType.STRING, ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.INTEGER,
-                ColumnType.STRING, ColumnType.STRING, ColumnType.DOUBLE, ColumnType.STRING, ColumnType.STRING,
-                ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.LOCAL_DATE]
-        assert actual.rowCount() >= 300
-        assert actual.where((actual.stringColumn('CONCEPT_CD') as StringFilters).isMissing()).rowCount() == 0
+        DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
+            final Table actual = TumorFile.ItemObs.make(memdb, _extract)
+            assert actual.columnNames() == [
+                    'RECORDID', 'PATIENTIDNUMBER', 'NAACCRID',
+                    'CONCEPT_CD', 'PROVIDER_ID', 'START_DATE', 'MODIFIER_CD', 'INSTANCE_NUM',
+                    'VALTYPE_CD', 'TVAL_CHAR', 'NVAL_NUM', 'VALUEFLAG_CD', 'UNITS_CD',
+                    'END_DATE', 'LOCATION_CD', 'UPDATE_DATE']
+            assert actual.columnTypes() as List == [
+                    ColumnType.INTEGER, ColumnType.STRING, ColumnType.STRING,
+                    ColumnType.STRING, ColumnType.STRING, ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.INTEGER,
+                    ColumnType.STRING, ColumnType.STRING, ColumnType.DOUBLE, ColumnType.STRING, ColumnType.STRING,
+                    ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.LOCAL_DATE]
+            assert actual.rowCount() >= 300
+            assert actual.where((actual.stringColumn('CONCEPT_CD') as StringFilters).isMissing()).rowCount() == 0
+        }
     }
 
     /**

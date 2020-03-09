@@ -67,9 +67,7 @@ class TumorOntTest extends TestCase {
 
     void testLoadTable() {
         Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
-        DBConfig config = LoaderTest.config1
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            sql.execute('DROP ALL OBJECTS')
+        DBConfig.inMemoryDB("load", true).withSql { Sql sql ->
             TumorOnt.load_data_frame(sql, "tumor_item_type", aTable)
 
             Map rowMap = sql.firstRow("select * from tumor_item_type limit 1")
@@ -103,9 +101,7 @@ class TumorOntTest extends TestCase {
         def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
         assert top.get(0, 0) == 1
 
-        DBConfig config = LoaderTest.config1
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
-            sql.execute('DROP ALL OBJECTS')
+        DBConfig.inMemoryDB("ont", true).withSql { Sql sql ->
             final Table actual = TumorOnt.NAACCR_I2B2.ont_view_in(sql, "task123", update_date, Paths.get(cache))
             assert actual.columnCount() == 21
             assert actual.columnNames().contains("C_FULLNAME")
@@ -137,8 +133,7 @@ class TumorOntTest extends TestCase {
     }
 
     void testSqlDialect() {
-        DBConfig config = LoaderTest.config1
-        Sql.withInstance(config.url, config.username, config.password.value, config.driver) { Sql sql ->
+        DBConfig.inMemoryDB("dialect").withSql { Sql sql ->
             assert sql.firstRow("select 1 as x from (values('X'))  ")[0] == 1
             sql.firstRow("select lpad(10, 4, '0') from (values(1))")[0] == "0010"
             assert sql.firstRow("select lpad(9, 2, '0') || ' xyz' from (values(1))")[0] == "09 xyz"
