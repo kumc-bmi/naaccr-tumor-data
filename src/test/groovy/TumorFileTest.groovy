@@ -57,7 +57,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testLayout() {
-        List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(new File(testDataPath));
+        List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(new File(testDataPath))
         assert !possibleFormats.isEmpty()
         assert possibleFormats.first().layoutId == 'naaccr-18-incidence'
 

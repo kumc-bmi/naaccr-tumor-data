@@ -189,8 +189,8 @@ class TumorFile {
     }
 
     static Table read_fwf(Reader lines, List<String> items) {
-        Collection<Column<?>> cols = (items.collect { it -> StringColumn.create(it) }) as Collection<Column<?>>;
-        Table data = Table.create(cols)
+        Table data = Table.create(items.collect { it -> StringColumn.create(it) }
+                as Collection<Column<?>>)
         PatientReader reader = new PatientFlatReader(lines)
         Patient patient = reader.readPatient()
         while (patient != null) {
@@ -235,8 +235,8 @@ class TumorFile {
         }
 
         private static Table _pick_cols(List<String> attrs, Reader lines) {
-            Collection<Column<?>> cols = (attrs.collect { it -> StringColumn.create(it, []) }) as Collection<Column<?>>;
-            Table pat_tmr = Table.create(cols)
+            Table pat_tmr = Table.create(attrs.collect { it -> StringColumn.create(it, []) }
+                    as Collection<Column<?>>)
             PatientReader reader = new PatientFlatReader(lines)
             Patient patient = reader.readPatient()
             while (patient != null) {
