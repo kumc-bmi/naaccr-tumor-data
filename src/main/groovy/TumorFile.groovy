@@ -77,9 +77,12 @@ class TumorFile {
 
         boolean complete(Sql sql) {
             try {
-                final row = sql.firstRow("select 1 from ${table_name} where task_id = ?.task_id)",
+                final row = sql.firstRow("select 1 from ${table_name} where task_id = ?.task_id",
                         [task_id: task_id])
-                row && row[0] == 1
+                if (row && row[0] == 1) {
+                    log.info("complete: $task_id")
+                    return true
+                }
             } catch (SQLException problem) {
                 log.warning("not complete: $problem")
             }
