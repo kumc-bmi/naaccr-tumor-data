@@ -97,19 +97,21 @@ cite:
 
 ## NAACCR File ETL: Example
 
-Configure database access using environment variables:
+Configure database access as in section
+[3.4.2 Set Database Properties](https://community.i2b2.org/wiki/display/getstarted/3.4.2+Set+Database+Properties)
+of the [i2b2 installation guide](https://community.i2b2.org/wiki/display/getstarted/i2b2+Installation+Guide).
 
-```shell script
-setenv CDW_URL=jdbc:h2:file:/tmp/DB1;create=true
-setenv CDW_DRIVER=org.h2.Driver
-setenv CDW_USER=SA
-setenv CDW_PASSWORD=
+```properties
+db.username=SA
+db.password=
+db.driver=org.h2.Driver
+db.url=jdbc:h2:file:/tmp/DB1;create=true
 ```
 
 Then, to create `NAACCR_OBSERVATIONS`, run:
 
 ```shell script
-java -jar naaccr-tumor-data-HHHH.jar facts --account=CDW --flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
+java -jar naaccr-tumor-data-HHHH.jar facts --flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
 ```
 
 _Note: adding these observations to the i2b2 star schema requires running `naaccr_facts_load.sql`; porting
@@ -121,18 +123,17 @@ that script to othere databases / environments is still in-progress._
 
 ```
 Usage:
-  naaccr-tumor-data summary  --account=A --flat-file=F
-  naaccr-tumor-data tumors   --account=A --flat-file=F
-  naaccr-tumor-data facts    --account=A --flat-file=F
+  naaccr-tumor-data summary  [options] --flat-file=F
+  naaccr-tumor-data tumors   [options] --flat-file=F
+  naaccr-tumor-data facts    [options] --flat-file=F
 
 Options:
-  --account=A1   clinical data warehouse account:
-                 prefix of environment variables for JDB connection info:
-                 A1_URL, A1_DRIVER, A1_USER, A1_PASSWORD
+  --db=PROPS     database properties file [default: db.properties]
   --flat-file=F  NAACCR file (flat file format)
-  patients     build NAACCR_PATIENTS table
-  tumors       build NAACCR_TUMORS table
-  facts        build NAACCR_OBSERVATIONS table
+  --task-id=ID   version / completion marker [default: task123]
+  tumors         build NAACCR_TUMORS table
+  facts          build NAACCR_OBSERVATIONS table
+  summary        build NAACCR_EXTRACT_STATS table
 
 ```
 

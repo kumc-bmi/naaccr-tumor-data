@@ -115,9 +115,11 @@ class Loader {
     static void main(String[] args) {
         String usage = "Usage: --run=FILE | --query=SQL | --loadRaw=TABLE | --load"
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name -> System.getenv(name) },
+                { String name ->
+                    Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
+                },
                 { int it -> System.exit(it) },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps)})
+                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
 
         DBConfig account = cli.account()
 

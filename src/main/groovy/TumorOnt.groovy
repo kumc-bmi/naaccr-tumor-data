@@ -25,7 +25,9 @@ class TumorOnt {
     static void main(String[] args) {
         String usage = "Usage: [--table-name=T | --version=NNN | --task-hash=H | --update-date=YYYY-MM-DD | --who-cache=DIR]*"
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name -> System.getenv(name) },
+                { String name ->
+                    Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
+                },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps)})
 

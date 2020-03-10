@@ -17,17 +17,23 @@ class LoaderTest extends TestCase {
         }
     }
 
-    static final Map<String, String> env1 = [A1_URL: 'jdbc:h2:mem:A1;create=true', A1_DRIVER: 'org.h2.Driver',
-                                             A1_USER: 'SA', A1_PASSWORD: '']
+    static final Properties dbProps1 = ({ ->
+        Properties ps = new Properties()
+        ps.putAll(["db.url" : 'jdbc:h2:mem:A1;create=true', "db.driver": 'org.h2.Driver',
+                   "db.user": 'SA', "db.password": ''])
+        ps
+    })()
 
     void 'test DBConfig misspelled env var'() {
-        def env1 = [A1_URL: 'URL1', A1_DRIVER: 'java.sql.DriverManager', A1_USERNAME: 'U1', A1_PASSWORD: 'sekret']
-        shouldFail IllegalStateException, { -> DBConfig.fromEnv('A1', { String it -> env1[it] }) }
+        def ps = new Properties()
+        ps.putAll(["db.url": 'URL1', "db.driver": 'java.sql.DriverManager', "db.user": 'U1', "db.pssword": 'sekret'])
+        shouldFail IllegalStateException, { -> DBConfig.jdbcProperties(ps) }
     }
 
     void 'test missing driver'() {
-        def env1 = [A1_URL: 'URL1', A1_DRIVER: 'sqlserver.Driver.Thingy', A1_USERNAME: 'U1', A1_PASSWORD: 'sekret']
-        shouldFail ClassNotFoundException, { -> DBConfig.fromEnv('A1', { String it -> env1[it] }) }
+        def ps = new Properties()
+        ps.putAll(["db.url": 'URL1', "db.driver": 'sqlserver.Driver.Thingy', "db.user": 'U1', "db.password": 'sekret'])
+        shouldFail ClassNotFoundException, { -> DBConfig.jdbcProperties(ps) }
     }
 
     void 'test Loader runScript'() {

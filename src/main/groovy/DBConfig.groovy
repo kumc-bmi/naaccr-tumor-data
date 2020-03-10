@@ -31,17 +31,16 @@ class DBConfig {
         }
     }
 
-    static Properties fromEnv(String account, Closure<String> getenv) {
-        logger.info("getting config for $account")
+    static Properties jdbcProperties(Properties dbProperties) {
         Closure<String> config = {
-            def name = "${account}_${it}"
-            def val = getenv(name)
+            def name = "db.${it}"
+            def val = dbProperties.getProperty(name)
             if (val == null) {
                 throw new IllegalStateException(name)
             }
             val
         }
-        def driver = config("DRIVER")
+        def driver = config("driver")
         try {
             Class.forName(driver)
         } catch (Exception noDriver) {
@@ -49,9 +48,9 @@ class DBConfig {
             throw noDriver
         }
         Properties properties = new Properties()
-        properties.setProperty('url', config("URL"))
-        properties.setProperty('user', config("USER"))
-        properties.setProperty('password', config('PASSWORD'))
+        properties.setProperty('url', config("url"))
+        properties.setProperty('user', config("user"))
+        properties.setProperty('password', config('password'))
         properties
     }
 
@@ -67,13 +66,13 @@ class DBConfig {
 
     static class CLI {
         protected final Map opts
-        private final Closure<String> getenv
-        private final Closure exit
+        private final Closure<Properties> getProperties
+        private final Closure<Void> exit
         private final Closure<Connection> getConnection
 
-        CLI(Map opts, Closure<String> getenv, Closure exit, Closure<Connection> getConnection) {
+        CLI(Map opts, Closure<Properties> getProperties, Closure exit, Closure<Connection> getConnection) {
             this.opts = opts
-            this.getenv = getenv
+            this.getProperties = getProperties
             this.exit = exit
             this.getConnection = getConnection
         }
@@ -90,24 +89,25 @@ class DBConfig {
         }
 
         DBConfig account() {
-            String account = arg("--account")
-            if (!account) {
-                logger.warning("expected --account=A")
+            String db = arg("--db")
+            if (!db) {
+                logger.warning("expected --db=PROPS")
                 exit(1)
             }
             Properties config = null
+            logger.info("getting config from $db")
             try {
-                config = fromEnv(account, getenv)
+                config = getProperties(db)
             } catch (IllegalStateException oops) {
-                logger.warning("Config missing from environment: $oops")
+                logger.warning("Config missing property: $oops")
                 exit(1)
             } catch (ClassNotFoundException oops) {
                 logger.warning("driver not found (fix CLASSPATH?): $oops")
                 exit(1)
             }
-            String url = config.getProperty('url')
-            logger.info("$account: $url")
-            new DBConfig(url, config, getConnection)
+            String url = config.getProperty('db.url')
+            logger.info("$db: $url")
+            new DBConfig(url, jdbcProperties(config), getConnection)
         }
     }
 }

@@ -36,7 +36,9 @@ class TumorFile {
 
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name -> System.getenv(name) },
+                { String name ->
+                    Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
+                },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) })
 
@@ -51,7 +53,7 @@ class TumorFile {
         // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
-        String task_id = cli.arg("--task-hash", "task123")
+        String task_id = cli.arg("--task-id", "task123")
         if (cli.arg('summary')) {
             work = new NAACCR_Summary(cdw, flat_file, task_id)
         } else if (cli.arg('tumors')) {
@@ -187,7 +189,7 @@ class TumorFile {
     }
 
     /** Make a per-patient table for use in patient_mapping etc.
-    */
+     */
     static class NAACCR_Patients implements Task {
         static String table_name = "NAACCR_PATIENTS"
         static String patient_ide_source = 'SMS@kumed.com'
@@ -418,8 +420,8 @@ class TumorFile {
         }
 
         static void export_patient_ids(Table df, Sql cdw,
-                               String tmp_table = 'NAACCR_PMAP',
-                               String id_col = 'patientIdNumber') {
+                                       String tmp_table = 'NAACCR_PMAP',
+                                       String id_col = 'patientIdNumber') {
             log.info("writing $id_col to $tmp_table")
             Table pat_ids = df.select(id_col).dropDuplicateRows()
             load_data_frame(cdw, tmp_table, pat_ids)

@@ -44,10 +44,12 @@ task buildUsageDoc() {
 }
 compileGroovy.dependsOn buildUsageDoc
 
-def db1() {
-    [DB1_URL: "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true",
-     DB1_DRIVER: 'org.h2.Driver',
-     DB1_USER: 'SA', DB1_PASSWORD: '']
+Properties db1() {
+    Properties ps = new Properties()
+    ps.putAll(["db.url"   : "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true".toString(),
+               "db.driver": 'org.h2.Driver',
+               "db.user"  : 'SA', "db.password": ''])
+    ps
 }
 
 task localDBStatsTest(type: JavaExec) {
@@ -55,9 +57,9 @@ task localDBStatsTest(type: JavaExec) {
     group = 'verification'
 
     main = "TumorFile"
-    environment = db1()
+    db1().store(new File('db.properties').newWriter(), null)
 
-    args 'summary', '--account', 'DB1', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args 'summary', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }
@@ -67,9 +69,9 @@ task localDBTumorsTest(type: JavaExec) {
     group = 'verification'
 
     main = "TumorFile"
-    environment = db1()
+    db1().store(new File('db.properties').newWriter(), null)
 
-    args  'tumors', '--account', 'DB1','--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args  'tumors','--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }
@@ -79,9 +81,9 @@ task localDBFactsTest(type: JavaExec) {
     group = 'verification'
 
     main = "TumorFile"
-    environment = db1()
+    db1().store(new File('db.properties').newWriter(), null)
 
-    args 'facts', '--account', 'DB1', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args 'facts', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }

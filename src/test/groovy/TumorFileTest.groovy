@@ -26,9 +26,9 @@ class TumorFileTest extends TestCase {
 
     void testCLI() {
         final String doc = TumorFile.usage
-        final args = ['facts', '--account', 'A1', '--flat-file', testDataPath]
+        final args = ['facts', '--flat-file', testDataPath]
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
-                { String name -> LoaderTest.env1[name] },
+                { String name -> LoaderTest.dbProps1 },
                 { int it -> throw new RuntimeException('unexpected exit') },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) } )
         TumorFile.run_cli(cli)
@@ -37,11 +37,11 @@ class TumorFileTest extends TestCase {
     void testDocOpt() {
         final String doc = TumorFile.usage
         assert doc.startsWith('Usage:')
-        final args = ['visits', '--account', 'DB1', '--flat-file', testDataPath]
+        final args = ['tumors', '--flat-file', testDataPath]
         final actual = new Docopt(doc).withExit(false).parse(args)
-        assert actual['--account'] == 'DB1'
-        assert actual['visits'] == true
-        assert actual['patients'] == false
+        assert actual['--db'] == 'db.properties'
+        assert actual['tumors'] == true
+        assert actual['facts'] == false
     }
 
     void testDF() {
