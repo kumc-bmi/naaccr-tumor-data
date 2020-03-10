@@ -3,6 +3,7 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import org.docopt.Docopt
 
 import java.nio.file.Paths
 import java.sql.Connection
@@ -112,7 +113,8 @@ class Loader {
     }
 
     static void main(String[] args) {
-        DBConfig.CLI cli = new DBConfig.CLI(args,
+        String usage = "Usage: --run=FILE | --query=SQL | --loadRaw=TABLE | --load"
+        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
                 { String name -> System.getenv(name) },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps)})
@@ -141,7 +143,7 @@ class Loader {
                 loader.loadRaw(new InputStreamReader(System.in), table)
             }
 
-            if (cli.argIx("--load") >= 0) {
+            if (cli.flag("--load")) {
                 loader.load(new InputStreamReader(System.in))
             }
             null

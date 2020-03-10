@@ -283,6 +283,7 @@ standalone
   - pro
     - nice Sql, JSON APIs
     - can prototype in unityped mode
+    - easy porting from python
   - con
     - IDE isn't as quick to spot type errors
     - spread operator doesn't work with @CompileStatic

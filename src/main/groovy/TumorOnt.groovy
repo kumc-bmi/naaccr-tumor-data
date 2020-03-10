@@ -2,6 +2,7 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import org.docopt.Docopt
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.io.csv.CsvReadOptions
@@ -22,7 +23,8 @@ class TumorOnt {
     static Logger log = Logger.getLogger("")
 
     static void main(String[] args) {
-        DBConfig.CLI cli = new DBConfig.CLI(args,
+        String usage = "Usage: [--table-name=T | --version=NNN | --task-hash=H | --update-date=YYYY-MM-DD | --who-cache=DIR]*"
+        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
                 { String name -> System.getenv(name) },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps)})

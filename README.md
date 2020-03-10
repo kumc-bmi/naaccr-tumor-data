@@ -79,24 +79,63 @@ cite:
 
 ---
 
-## Platform for v18: Spark SQL, PySpark, and luigi
+### Related work: NAACCR XML
 
- - **Spark SQL**
-   - lets us leverage the **working knowledge of SQL** in our community
-     - HERON ETL: 30KLOC of SQL
-   - portable: **same JVM platform as i2b2**; **JDBC** connectivity to datamarts
- - **PySpark** to fill in gaps where SQL is awkward, such as
-   - iterating over columns or tables
- - **luigi**
-   - While Spark automatically breaks down work in a resilient manner, jobs
-     fail completely when they fail.
-   - luigi tasks **preserve partial results**
+ - [naaccr-xml][ims] - NAACCR XML reader in Java by F. Depry of IMS for SEER
+   - first release: v0.5 (beta) Apr 20, 2015
+   - frequent release:
+     - v5.4 Jun 13, 2019
+     - v5.3 May 21, 2019
+     - v1.0 Feb 7, 2016
+ - XML replaces flat file in 2020 (*IOU citation*)
+ - Reading XML with Spark is straightforward
+ - NAACCR XML WG meets alternate Fridays 11amET (e.g. Aug 2)
+ - [imsweb/layout](https://github.com/imsweb/layout) has sections, codes, etc.
 
-
-**IDEA:** move more pyspark logic to User-Defined Functions (UDFs) and
-          drive more of the work from .sql scripts.
 
 ---
+
+## NAACCR File ETL: Example
+
+Configure database access using environment variables:
+
+```shell script
+setenv CDW_URL=jdbc:h2:file:/tmp/DB1;create=true
+setenv CDW_DRIVER=org.h2.Driver
+setenv CDW_USER=SA
+setenv CDW_PASSWORD=
+```
+
+Then, to create `NAACCR_OBSERVATIONS`, run:
+
+```shell script
+java -jar naaccr-tumor-data-HHHH.jar facts --account=CDW --flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
+```
+
+_Note: adding these observations to the i2b2 star schema requires running `naaccr_facts_load.sql`; porting
+that script to othere databases / environments is still in-progress._
+
+---
+
+## NAACCR File ETL: Usage Reference
+
+```
+Usage:
+  naaccr-tumor-data summary  --account=A --flat-file=F
+  naaccr-tumor-data tumors   --account=A --flat-file=F
+  naaccr-tumor-data facts    --account=A --flat-file=F
+
+Options:
+  --account=A1   clinical data warehouse account:
+                 prefix of environment variables for JDB connection info:
+                 A1_URL, A1_DRIVER, A1_USER, A1_PASSWORD
+  --flat-file=F  NAACCR file (flat file format)
+  patients     build NAACCR_PATIENTS table
+  tumors       build NAACCR_TUMORS table
+  facts        build NAACCR_OBSERVATIONS table
+
+```
+
 
 ## NAACCR Ontology for i2b2: Usage
 
@@ -139,21 +178,6 @@ Metadata for coded values is also work in progress.
 
 ---
 
-### Related work: NAACCR XML
-
- - [naaccr-xml][ims] - NAACCR XML reader in Java by F. Depry of IMS for SEER
-   - first release: v0.5 (beta) Apr 20, 2015
-   - frequent release:
-     - v5.4 Jun 13, 2019
-     - v5.3 May 21, 2019
-     - v1.0 Feb 7, 2016
- - XML replaces flat file in 2020 (*IOU citation*)
- - Reading XML with Spark is straightforward
- - NAACCR XML WG meets alternate Fridays 11amET (e.g. Aug 2)
- - [imsweb/layout](https://github.com/imsweb/layout) has sections, codes, etc.
-
----
-
 ### Primary sites, morphologies from WHO
 
 Maintained by the World Health Organization (WHO)
@@ -181,6 +205,24 @@ Obsolete in 2018, but to capture data from older cases...
    -  added to HERON March 2016; see [GPC ticket 150](https://informatics.gpcnetwork.org/trac/Project/ticket/150)
    - These are obsolete in cases abstracted per v18 but still used in older cases.
    - [WerthPADOH][PADOH] issue: [​Handle site-specific codes in fields #35](https://github.com/WerthPADOH/naaccr/issues/35) opened Apr 24 2019
+
+---
+
+## Platform for v18: JVM, JDBC, H2 DB, tablesaw, groovy, (and luigi)
+
+ - **JDBC**
+   - lets us leverage the **working knowledge of SQL** in our community
+     - HERON ETL: 30KLOC of SQL
+   - portable: **same JVM platform as i2b2**
+   - **JDBC** connectivity to datamarts
+   - **[H2](https://www.h2database.com/html/main.html)** for in-memory DB
+ - **groovy** to fill in gaps where SQL is awkward, such as
+   - iterating over columns or tables
+   - [tablesaw](https://jtablesaw.github.io/tablesaw/) Dataframe library
+     a la python pandas, Spark
+   - _difference from Java worthwhile? see [CONTRIBUTING](CONTRIBUTING.md)_
+ - **luigi** (optional)
+   - luigi tasks **preserve partial results**
 
 ---
 

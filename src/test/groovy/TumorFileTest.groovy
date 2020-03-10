@@ -6,6 +6,7 @@ import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
+import org.docopt.Docopt
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.DoubleColumn
 import tech.tablesaw.api.Table
@@ -24,11 +25,23 @@ class TumorFileTest extends TestCase {
     static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
     void testCLI() {
-        DBConfig.CLI cli = new DBConfig.CLI(['--facts', '--account', 'A1', '--flat-file', testDataPath] as String[],
+        final String doc = TumorFile.usage
+        final args = ['facts', '--account', 'A1', '--flat-file', testDataPath]
+        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
                 { String name -> LoaderTest.env1[name] },
-                { int it -> throw new RuntimeException() },
+                { int it -> throw new RuntimeException('unexpected exit') },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) } )
         TumorFile.run_cli(cli)
+    }
+
+    void testDocOpt() {
+        final String doc = TumorFile.usage
+        assert doc.startsWith('Usage:')
+        final args = ['visits', '--account', 'DB1', '--flat-file', testDataPath]
+        final actual = new Docopt(doc).withExit(false).parse(args)
+        assert actual['--account'] == 'DB1'
+        assert actual['visits'] == true
+        assert actual['patients'] == false
     }
 
     void testDF() {

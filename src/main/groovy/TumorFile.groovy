@@ -10,6 +10,7 @@ import com.imsweb.naaccrxml.entity.Tumor
 import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import org.docopt.Docopt
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
@@ -30,8 +31,11 @@ import static TumorOnt.load_data_frame
 class TumorFile {
     static Logger log = Logger.getLogger("")
 
+    // see also: buildUsageDoc groovy task
+    static final String usage = TumorOnt.resourceText(TumorFile.getResource('usage.txt'))
+
     static void main(String[] args) {
-        DBConfig.CLI cli = new DBConfig.CLI(args,
+        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
                 { String name -> System.getenv(name) },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) })
@@ -48,13 +52,13 @@ class TumorFile {
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-hash", "task123")
-        if (cli.arg('--summary')) {
+        if (cli.arg('summary')) {
             work = new NAACCR_Summary(cdw, flat_file, task_id)
-        } else if (cli.arg('--visits')) {
+        } else if (cli.arg('tumors')) {
             work = new NAACCR_Visits(cdw, flat_file, task_id, 2000000)
-        } else if (cli.arg('--facts')) {
+        } else if (cli.arg('facts')) {
             work = new NAACCR_Facts(cdw, flat_file, task_id)
-        } else if (cli.arg('--patients')) {
+        } else if (cli.arg('patients')) {
             work = new NAACCR_Patients(cdw, flat_file, task_id)
         } else {
             throw new IllegalArgumentException('which task???')

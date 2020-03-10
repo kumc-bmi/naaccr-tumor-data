@@ -21,6 +21,9 @@ dependencies {
     // https://mvnrepository.com/artifact/com.h2database/h2/1.4.200
     compile 'com.h2database:h2:1.4.200'
 
+    // https://mvnrepository.com/artifact/com.offbytwo/docopt
+    compile group: 'com.offbytwo', name: 'docopt', version: '0.6.0.20150202'
+
     // i2b2 JDBC drivers
     // https://github.com/i2b2/i2b2-core-server/tree/master/edu.harvard.i2b2.server-common/lib/jdbc
     // mssql-jdbc-7.4.1.jre8.jar, ojdbc8.jar, postgresql-42.2.8.jar
@@ -32,6 +35,14 @@ dependencies {
     testCompile 'org.codehaus.groovy:groovy-test:3.0.1'
 }
 
+task buildUsageDoc() {
+    group = 'documentation'
+    doLast {
+        final usage = new File('README.md').text.split('```\n').find { it.startsWith('Usage:') }
+        new File(projectDir, 'src/main/resources/usage.txt').text = usage
+    }
+}
+compileGroovy.dependsOn buildUsageDoc
 
 def db1() {
     [DB1_URL: "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true",
@@ -46,19 +57,19 @@ task localDBStatsTest(type: JavaExec) {
     main = "TumorFile"
     environment = db1()
 
-    args '--account', 'DB1', '--summary', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args 'summary', '--account', 'DB1', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }
 
-task localDBVistsTest(type: JavaExec) {
+task localDBTumorsTest(type: JavaExec) {
     description = 'Integration tests: visits from 100 records of test data with local disk h2 DB.'
     group = 'verification'
 
     main = "TumorFile"
     environment = db1()
 
-    args '--account', 'DB1', '--visits', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args  'tumors', '--account', 'DB1','--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }
@@ -70,7 +81,7 @@ task localDBFactsTest(type: JavaExec) {
     main = "TumorFile"
     environment = db1()
 
-    args '--account', 'DB1', '--facts', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    args 'facts', '--account', 'DB1', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
     classpath = sourceSets.main.runtimeClasspath
     // TODO: shouldRunAfter test
 }
@@ -79,6 +90,8 @@ task localDBFactsTest(type: JavaExec) {
 
 
 task fatjar(type: Jar) {
+    group = 'build'
+
     manifest {
         attributes 'Main-Class': 'Loader'
     }

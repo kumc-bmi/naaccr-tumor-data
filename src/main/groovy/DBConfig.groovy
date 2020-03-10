@@ -66,34 +66,33 @@ class DBConfig {
     }
 
     static class CLI {
-        protected final String[] args
+        protected final Map opts
         private final Closure<String> getenv
         private final Closure exit
         private final Closure<Connection> getConnection
 
-        CLI(String[] args, Closure<String> getenv, Closure exit, Closure<Connection> getConnection) {
-            this.args = args
+        CLI(Map opts, Closure<String> getenv, Closure exit, Closure<Connection> getConnection) {
+            this.opts = opts
             this.getenv = getenv
             this.exit = exit
             this.getConnection = getConnection
         }
 
-        int argIx(String target) {
-            args.findIndexOf({ it == target })
+        boolean flag(String target) {
+            opts[target] == true
         }
 
         String arg(String target, String fallback=null) {
-            int ix = argIx(target)
-            if (ix < 0 || ix + 1 >= args.length) {
+            if (!opts.containsKey(target)) {
                 return fallback
             }
-            args[ix + 1]
+            opts[target]
         }
 
         DBConfig account() {
             String account = arg("--account")
             if (!account) {
-                logger.warning("Usage: java -jar JAR --account A [--run abc.sql]")
+                logger.warning("expected --account=A")
                 exit(1)
             }
             Properties config = null
