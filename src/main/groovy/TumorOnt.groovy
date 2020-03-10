@@ -8,9 +8,7 @@ import tech.tablesaw.columns.Column
 import tech.tablesaw.io.csv.CsvReadOptions
 
 import java.nio.charset.Charset
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.nio.file.*
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -29,7 +27,7 @@ class TumorOnt {
                     Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
                 },
                 { int it -> System.exit(it) },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps)})
+                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
 
         DBConfig cdw = cli.account()
 
@@ -276,7 +274,7 @@ class TumorOnt {
 
         static SqlScript ont_script = new SqlScript(
                 'naaccr_concepts_load.sql',
-                resourceText(NAACCR_I2B2.getResource('heron_load/naaccr_concepts_load.sql')),
+                resourceText('heron_load/naaccr_concepts_load.sql'),
                 [
                         new Tuple2('i2b2_path_concept', []),
                         new Tuple2('naaccr_top_concept', ['naaccr_top', 'current_task']),
@@ -427,8 +425,8 @@ class TumorOnt {
         } as ColumnType[]
     }
 
-    static String resourceText(URL url) {
-        new String(Files.readAllBytes(Paths.get(url.toURI())))
+    static String resourceText(String s) {
+        TumorOnt.getResourceAsStream(s).text
     }
 
     static URL meta_path(URL path) {

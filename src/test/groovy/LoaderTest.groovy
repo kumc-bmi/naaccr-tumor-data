@@ -8,6 +8,7 @@ import static groovy.test.GroovyAssert.shouldFail
 
 @CompileStatic
 class LoaderTest extends TestCase {
+    @SuppressWarnings("GrMethodMayBeStatic")
     void 'inMemoryDB supports select'() {
         def account = DBConfig.inMemoryDB("A1")
         account.withSql { Sql sql ->

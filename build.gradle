@@ -44,58 +44,11 @@ task buildUsageDoc() {
 }
 compileGroovy.dependsOn buildUsageDoc
 
-Properties db1() {
-    Properties ps = new Properties()
-    ps.putAll(["db.url"   : "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true".toString(),
-               "db.driver": 'org.h2.Driver',
-               "db.user"  : 'SA', "db.password": ''])
-    ps
-}
-
-task localDBStatsTest(type: JavaExec) {
-    description = 'Integration tests: stats on 100 records of test data with local disk h2 DB.'
-    group = 'verification'
-
-    main = "TumorFile"
-    db1().store(new File('db.properties').newWriter(), null)
-
-    args 'summary', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
-    classpath = sourceSets.main.runtimeClasspath
-    // TODO: shouldRunAfter test
-}
-
-task localDBTumorsTest(type: JavaExec) {
-    description = 'Integration tests: visits from 100 records of test data with local disk h2 DB.'
-    group = 'verification'
-
-    main = "TumorFile"
-    db1().store(new File('db.properties').newWriter(), null)
-
-    args  'tumors','--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
-    classpath = sourceSets.main.runtimeClasspath
-    // TODO: shouldRunAfter test
-}
-
-task localDBFactsTest(type: JavaExec) {
-    description = 'Integration tests: facts from 100 records of test data with local disk h2 DB.'
-    group = 'verification'
-
-    main = "TumorFile"
-    db1().store(new File('db.properties').newWriter(), null)
-
-    args 'facts', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
-    classpath = sourceSets.main.runtimeClasspath
-    // TODO: shouldRunAfter test
-}
-
-// TODO: check.dependsOn integrationTest
-
-
 task fatjar(type: Jar) {
     group = 'build'
 
     manifest {
-        attributes 'Main-Class': 'Loader'
+        attributes 'Main-Class': 'TumorFile'
     }
     from {
         configurations
@@ -107,5 +60,44 @@ task fatjar(type: Jar) {
     // avoid: Error: Could not find or load main class
     // https://stackoverflow.com/a/51456080
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-
 }
+
+fatjar.dependsOn build
+
+Properties db1() {
+    Properties ps = new Properties()
+    ps.putAll(["db.url"   : "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true".toString(),
+               "db.driver": 'org.h2.Driver',
+               "db.user"  : 'SA', "db.password": ''])
+    ps
+}
+
+task localDBStatsTest(type: Exec) {
+    description = 'Integration tests: stats on 100 records of test data with local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'summary', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+}
+
+task localDBTumorsTest(type: Exec) {
+    description = 'Integration tests: visits from 100 records of test data with local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'tumors', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+}
+
+task localDBFactsTest(type: Exec) {
+    description = 'Integration tests: facts from 100 records of test data with local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'facts', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+}
+localDBFactsTest.dependsOn fatjar
+
+// TODO: check.dependsOn integrationTest

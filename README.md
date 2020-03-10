@@ -126,6 +126,10 @@ Usage:
   naaccr-tumor-data summary  [options] --flat-file=F
   naaccr-tumor-data tumors   [options] --flat-file=F
   naaccr-tumor-data facts    [options] --flat-file=F
+  naaccr-tumor-data load
+  naaccr-tumor-data run SCRIPT
+  naaccr-tumor-data query SQL
+  naaccr-tumor-data loadRaw TABLE
 
 Options:
   --db=PROPS     database properties file [default: db.properties]

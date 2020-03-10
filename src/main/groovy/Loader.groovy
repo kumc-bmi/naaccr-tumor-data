@@ -3,14 +3,11 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
-import org.docopt.Docopt
 
 import java.nio.file.Paths
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.SQLException
 import java.util.logging.Logger
-
 
 @CompileStatic
 class Loader {
@@ -112,41 +109,30 @@ class Loader {
         qty
     }
 
-    static void main(String[] args) {
-        String usage = "Usage: --run=FILE | --query=SQL | --loadRaw=TABLE | --load"
-        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name ->
-                    Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
-                },
-                { int it -> System.exit(it) },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
 
+    static void run_cli(DBConfig.CLI cli) {
         DBConfig account = cli.account()
 
         account.withSql { Sql sql ->
             def loader = new Loader(sql)
 
-            def script = cli.arg("--run")
+            def script = cli.arg("SCRIPT")
+            def query = cli.arg("SQL")
+            String table = cli.arg("TABLE")
             if (script) {
                 def cwd = Paths.get(".").toAbsolutePath().normalize().toString()
                 loader.runScript(new URL(new URL("file://$cwd/"), script))
-            }
-
-            def query = cli.arg("--query")
-            if (query) {
+            } else if (query) {
                 def json = loader.query(query)
                 System.out.withWriter {
                     json.writeTo(it)
                 }
-            }
-
-            String table = cli.arg("--loadRaw")
-            if (table) {
+            } else if (table) {
                 loader.loadRaw(new InputStreamReader(System.in), table)
-            }
-
-            if (cli.flag("--load")) {
+            } else if (cli.flag("load")) {
                 loader.load(new InputStreamReader(System.in))
+            } else {
+                throw new IllegalArgumentException(cli.opts.toString())
             }
             null
         }

@@ -151,8 +151,7 @@ class TumorOntTest extends TestCase {
     }
 
     void testSqlScript() {
-        URL url = getClass().getResource('heron_load/naaccr_concepts_load.sql')
-        String sql = TumorOnt.resourceText(url)
+        String sql = TumorOnt.resourceText('heron_load/naaccr_concepts_load.sql')
         assert sql.indexOf('select') > 0
         final script = TumorOnt.NAACCR_I2B2.ont_script
         assert script.objects.last().first == 'naaccr_ontology'

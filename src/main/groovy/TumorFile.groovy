@@ -32,7 +32,7 @@ class TumorFile {
     static Logger log = Logger.getLogger("")
 
     // see also: buildUsageDoc groovy task
-    static final String usage = TumorOnt.resourceText(TumorFile.getResource('usage.txt'))
+    static final String usage = TumorOnt.resourceText('usage.txt')
 
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
@@ -63,7 +63,7 @@ class TumorFile {
         } else if (cli.arg('patients')) {
             work = new NAACCR_Patients(cdw, flat_file, task_id)
         } else {
-            throw new IllegalArgumentException('which task???')
+            Loader.run_cli(cli)
         }
 
         if (!work.complete()) {
@@ -274,7 +274,7 @@ class TumorFile {
 
     static class ItemObs {
         static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('naaccr_txform.sql',
-                TumorOnt.resourceText(TumorFile.getResource('heron_load/naaccr_txform.sql')),
+                TumorOnt.resourceText('heron_load/naaccr_txform.sql'),
                 [
                         new Tuple2('tumor_item_value', ['naaccr_obs_raw', 'tumor_item_type']),
                         new Tuple2('tumor_reg_facts', ['record_layout', 'section']),
@@ -495,7 +495,7 @@ class TumorFile {
 
     static class DataSummary {
         static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('data_char_sim.sql',
-                TumorOnt.resourceText(TumorFile.getResource('heron_load/data_char_sim.sql')),
+                TumorOnt.resourceText('heron_load/data_char_sim.sql'),
                 [new Tuple2('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type']),
                  new Tuple2('data_char_naaccr', ['record_layout'])])
 
