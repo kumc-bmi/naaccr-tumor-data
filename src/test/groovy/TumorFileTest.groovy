@@ -35,6 +35,7 @@ class TumorFileTest extends TestCase {
         TumorFile.run_cli(cli)
     }
 
+    // NOTE: if you rename this, update CONTRIBUTING.md
     void testDocOpt() {
         final String doc = TumorFile.usage
         assert doc.startsWith('Usage:')
