@@ -54,10 +54,10 @@ class LoaderTest extends TestCase {
             loader.runScript(getClass().getResource('naaccr_tables.sql'))
             loader.runScript(getClass().getResource('naaccr_query_data.sql'))
 
-            // query for each datatype
+            // query for each datatype... except dates; due to ambient timezone access, it's not portable somehow
             def tumors = new StringWriter()
-            tumors << loader.query('select tumor_id, dateOfDiagnosis, primarySite, ageAtDiagnosis from naaccr_tumors')
-            assert tumors.toString() == '[{"TUMOR_ID":11,"DATEOFDIAGNOSIS":"2010-01-01T06:00:00+0000","PRIMARYSITE":"650","AGEATDIAGNOSIS":60}]'
+            tumors << loader.query("select tumor_id, to_char(dateOfDiagnosis, 'YYYY-MM-DD') as dateOfDiagnosis, primarySite, ageAtDiagnosis from naaccr_tumors")
+            assert tumors.toString() == '[{"TUMOR_ID":11,"DATEOFDIAGNOSIS":"2010-01-01","PRIMARYSITE":"650","AGEATDIAGNOSIS":60}]'
 
             def stats = new StringWriter()
             stats << loader.query('select sectionId, dx_yr, naaccrId, mean from naaccr_export_stats')
