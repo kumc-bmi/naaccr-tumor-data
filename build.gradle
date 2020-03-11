@@ -35,14 +35,24 @@ dependencies {
     testCompile 'org.codehaus.groovy:groovy-test:3.0.1'
 }
 
-task buildUsageDoc() {
-    group = 'documentation'
-    doLast {
-        final usage = new File('README.md').text.split('```\n').find { it.startsWith('Usage:') }
-        new File(projectDir, 'src/main/resources/usage.txt').text = usage
+class UsageDoc extends DefaultTask {
+    @InputFile
+    File readme = project.file('README.md')
+
+    @OutputFile
+    File doc = project.file('src/main/resources/usage.txt')
+
+    @TaskAction
+    void perform() {
+        final usage = readme.text.split('```\n').find { it.startsWith('Usage:') }
+        doc.text = usage
     }
 }
-compileGroovy.dependsOn buildUsageDoc
+
+task buildUsageDoc(type: UsageDoc) {
+    group = 'documentation'
+}
+processResources.dependsOn buildUsageDoc
 
 task fatjar(type: Jar) {
     group = 'build'
