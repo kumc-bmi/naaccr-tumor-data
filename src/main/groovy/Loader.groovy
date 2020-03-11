@@ -116,8 +116,8 @@ class Loader {
         account.withSql { Sql sql ->
             def loader = new Loader(sql)
 
-            def script = cli.arg("SCRIPT")
-            def query = cli.arg("SQL")
+            String script = cli.arg("SCRIPT")
+            String query = cli.arg("SQL")
             String table = cli.arg("TABLE")
             if (script) {
                 def cwd = Paths.get(".").toAbsolutePath().normalize().toString()

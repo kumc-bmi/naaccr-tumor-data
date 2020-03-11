@@ -20,24 +20,16 @@ import java.util.zip.ZipFile
 class TumorOnt {
     static Logger log = Logger.getLogger("")
 
-    static void main(String[] args) {
-        String usage = "Usage: [--table-name=T | --version=NNN | --task-hash=H | --update-date=YYYY-MM-DD | --who-cache=DIR]*"
-        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name ->
-                    Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
-                },
-                { int it -> System.exit(it) },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
-
+    static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
         Ontology1 work = new Ontology1(
-                cli.arg("--table-name", "NAACCR_ONTOLOGY"),
-                Integer.parseInt(cli.arg("--version", "18")),
-                cli.arg("--task-hash", "task123"),
+                cli.arg("--table-name"),
+                Integer.parseInt(cli.arg("--version")),
+                cli.arg("--task-hash", "???"),
                 // TODO: current calendar date
                 LocalDate.parse(cli.arg("--update-date", "2001-01-01")),
-                cdw, Paths.get(cli.arg("--who-cache", ",cache")))
+                cdw, cli.arg("--who-cache") ? Paths.get(cli.arg("--who-cache")) : null)
         if (!work.complete()) {
             work.run()
         }
@@ -64,14 +56,14 @@ class TumorOnt {
         boolean complete() {
             try {
                 cdw.withSql { Sql sql ->
-
-                    return sql.firstRow("""
+                    final row = sql.firstRow("""
                         select 1 from ${table_name}
                             where c_fullname = ?.fullname
                             and c_basecode = ?.code
-                        """, [fullname: NAACCR_I2B2.top_folder, code: version + task_hash])[0] == 1
+                        """, [fullname: NAACCR_I2B2.top_folder, code: version + task_hash])
+                    return row && row[0] == 1
                 }
-            } catch (Exception problem) {
+            } catch (SQLException problem) {
                 log.warning("not complete: $problem")
             }
             return false
@@ -113,7 +105,7 @@ class TumorOnt {
                 if (implicit.contains(scheme)) {
                     continue
                 }
-                final info = _code_labels.toURI().resolve(scheme + '.csv').toURL()
+                final info = new URL(_code_labels.toString() + scheme + '.csv')  // ugh.
                 int skiprows = 0
                 info.withReader() { Reader it ->
                     if (it.readLine().startsWith('#')) {
@@ -298,7 +290,7 @@ class TumorOnt {
 
         static Table ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache) {
             Table icd_o_topo
-            if (who_cache.toFile().exists()) {
+            if (who_cache != null && who_cache.toFile().exists()) {
                 final Table who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
                 icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
             } else {
@@ -430,12 +422,10 @@ class TumorOnt {
     }
 
     static URL meta_path(URL path) {
-        Pathlib.parent(path).resolve(Pathlib.stem(path) + '-metadata.json').toURL()
+        new URL(path.toString().replace('.csv', '-metadata.json'))
     }
 
     static class Pathlib {
-        static URI parent(URL path) { path.toURI().resolve('./') }
-
         static String stem(URL path) {
             final String[] segments = path.path.split('/')
             segments.last().replaceFirst('[.][^.]+$', "")

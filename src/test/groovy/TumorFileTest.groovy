@@ -37,11 +37,21 @@ class TumorFileTest extends TestCase {
     void testDocOpt() {
         final String doc = TumorFile.usage
         assert doc.startsWith('Usage:')
-        final args = ['tumors', '--flat-file', testDataPath]
+        final args = ['tumors', '--flat-file', testDataPath, '--task-id', 'abc123']
         final actual = new Docopt(doc).withExit(false).parse(args)
         assert actual['--db'] == 'db.properties'
         assert actual['tumors'] == true
         assert actual['facts'] == false
+
+        final both = new Docopt(doc).withExit(false).parse(
+                ['tumors', '--flat-file', testDataPath, '--task-id', 'abc123', '--db', 'deid.properties'])
+        assert both['--db'] == 'deid.properties'
+        assert both["--update-date"] == null
+
+        final more = new Docopt(doc).withExit(false).parse(
+                ['ontology', '--task-hash=1234', '--update-date=2002-02-02', '--who-cache=,cache'])
+        assert more['--task-hash'] == '1234'
+        assert LocalDate.parse(more["--update-date"] as String) == LocalDate.of(2002, 2, 2)
     }
 
     void testDF() {
@@ -179,7 +189,8 @@ class TumorFileTest extends TestCase {
     void testStats() {
         DBConfig acct1 = DBConfig.inMemoryDB("stats", true)
         acct1.withSql { Sql sql ->
-            DataSummary.stats(_extract, sql)
+            final Table faster = _extract.first(20)
+            DataSummary.stats(faster, sql)
 
             Table actual = _SQL(sql, "select * from data_char_naaccr limit 10")
             // println(actual)

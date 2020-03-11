@@ -110,4 +110,14 @@ task localDBFactsTest(type: Exec) {
 }
 localDBFactsTest.dependsOn fatjar
 
+task localDBOntologyTest(type: Exec) {
+    description = 'Integration tests: build NAACCR_ONTOLOGY in a local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'ontology'
+}
+localDBOntologyTest.dependsOn fatjar
+
 // TODO: check.dependsOn integrationTest

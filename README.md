@@ -123,21 +123,32 @@ that script to othere databases / environments is still in-progress._
 
 ```
 Usage:
-  naaccr-tumor-data summary  [options] --flat-file=F
-  naaccr-tumor-data tumors   [options] --flat-file=F
-  naaccr-tumor-data facts    [options] --flat-file=F
-  naaccr-tumor-data load
-  naaccr-tumor-data run SCRIPT
-  naaccr-tumor-data query SQL
-  naaccr-tumor-data loadRaw TABLE
+  naaccr-tumor-data summary  --flat-file=F [--db=F] [--task-id=ID]
+  naaccr-tumor-data tumors   --flat-file=F [--db=F] [--task-id=ID]
+  naaccr-tumor-data facts    --flat-file=F [--db=F] [--task-id=ID]
+  naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
+  naaccr-tumor-data load [--db=F]
+  naaccr-tumor-data run SCRIPT [--db=F]
+  naaccr-tumor-data query SQL [--db=F]
+  naaccr-tumor-data loadRaw TABLE [--db=F]
 
 Options:
-  --db=PROPS     database properties file [default: db.properties]
-  --flat-file=F  NAACCR file (flat file format)
-  --task-id=ID   version / completion marker [default: task123]
-  tumors         build NAACCR_TUMORS table
-  facts          build NAACCR_OBSERVATIONS table
-  summary        build NAACCR_EXTRACT_STATS table
+  tumors             build NAACCR_TUMORS table
+  facts              build NAACCR_OBSERVATIONS table
+  summary            build NAACCR_EXTRACT_STATS table
+  --db=PROPS         database properties file [default: db.properties]
+  --flat-file=F      NAACCR file (flat file format)
+  --task-id=ID       version / completion marker [default: task123]
+  ontology           build NAACCR_ONTOLOGY table
+  --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]
+  --version=NNN      ontology version [default: 180]
+  --task-hash=H      ontology completion marker
+  --update-date=D    ontology update_date in YYYY-MM-DD format
+  --who-cache=DIR    where to find WHO oncology metadata
+  load               load data from stdin using JSON (details TODO)
+  loadRaw            load lines (e.g. NAACCR records) into a column of a DB table
+  run                run SQL script
+  query              run SQL query and write results to stdout in JSON
 
 ```
 

@@ -48,25 +48,27 @@ class TumorFile {
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        URL flat_file = Paths.get(cli.arg("--flat-file")).toUri().toURL()
+        Closure<URL> flat_file = { -> Paths.get(cli.arg("--flat-file")).toUri().toURL() }
 
         // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-id", "task123")
-        if (cli.arg('summary')) {
-            work = new NAACCR_Summary(cdw, flat_file, task_id)
-        } else if (cli.arg('tumors')) {
-            work = new NAACCR_Visits(cdw, flat_file, task_id, 2000000)
-        } else if (cli.arg('facts')) {
-            work = new NAACCR_Facts(cdw, flat_file, task_id)
-        } else if (cli.arg('patients')) {
-            work = new NAACCR_Patients(cdw, flat_file, task_id)
+        if (cli.flag('summary')) {
+            work = new NAACCR_Summary(cdw, flat_file(), task_id)
+        } else if (cli.flag('tumors')) {
+            work = new NAACCR_Visits(cdw, flat_file(), task_id, 2000000)
+        } else if (cli.flag('facts')) {
+            work = new NAACCR_Facts(cdw, flat_file(), task_id)
+        } else if (cli.flag('patients')) {
+            work = new NAACCR_Patients(cdw, flat_file(), task_id)
+        } else if (cli.flag('ontology')) {
+            TumorOnt.run_cli(cli)
         } else {
             Loader.run_cli(cli)
         }
 
-        if (!work.complete()) {
+        if (work && !work.complete()) {
             work.run()
         }
     }

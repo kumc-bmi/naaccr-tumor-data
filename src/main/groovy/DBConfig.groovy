@@ -82,7 +82,7 @@ class DBConfig {
         }
 
         String arg(String target, String fallback=null) {
-            if (!opts.containsKey(target)) {
+            if (!opts.containsKey(target) || opts[target] == null) {
                 return fallback
             }
             opts[target]
