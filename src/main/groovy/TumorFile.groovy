@@ -1,3 +1,4 @@
+import DBConfig.Task
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.record.fixed.FixedColumnsField
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
@@ -62,7 +63,7 @@ class TumorFile {
             work = new NAACCR_Facts(cdw, flat_file(), task_id)
         } else if (cli.flag('patients')) {
             work = new NAACCR_Patients(cdw, flat_file(), task_id)
-        } else if (cli.flag('ontology')) {
+        } else if (cli.flag('ontology') || cli.flag('import')) {
             TumorOnt.run_cli(cli)
         } else {
             Loader.run_cli(cli)
@@ -71,12 +72,6 @@ class TumorFile {
         if (work && !work.complete()) {
             work.run()
         }
-    }
-
-    interface Task {
-        boolean complete()
-
-        void run()
     }
 
     static class TableBuilder {

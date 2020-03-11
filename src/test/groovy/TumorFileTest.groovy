@@ -1,3 +1,4 @@
+import DBConfig.Task
 import TumorFile.DataSummary
 import TumorFile.TumorKeys
 import com.imsweb.layout.LayoutFactory
@@ -48,10 +49,15 @@ class TumorFileTest extends TestCase {
         assert both['--db'] == 'deid.properties'
         assert both["--update-date"] == null
 
+        def args2 = ['ontology', '--task-hash=1234', '--update-date=2002-02-02', '--who-cache=,cache']
         final more = new Docopt(doc).withExit(false).parse(
-                ['ontology', '--task-hash=1234', '--update-date=2002-02-02', '--who-cache=,cache'])
+                args2)
         assert more['--task-hash'] == '1234'
         assert LocalDate.parse(more["--update-date"] as String) == LocalDate.of(2002, 2, 2)
+
+        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args2),
+                null, null, null)
+        assert cli.url('--who-cache').toString().endsWith(',cache')
     }
 
     void testDF() {
@@ -125,7 +131,7 @@ class TumorFileTest extends TestCase {
     void notYettestPatientsTask() {
         final cdw = DBConfig.inMemoryDB("PT", true)
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        TumorFile.Task work = new TumorFile.NAACCR_Patients(cdw, flat_file,
+        Task work = new TumorFile.NAACCR_Patients(cdw, flat_file,
                 "task123456")
         if (!work.complete()) {
             work.run()

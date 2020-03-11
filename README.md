@@ -127,6 +127,7 @@ Usage:
   naaccr-tumor-data tumors   --flat-file=F [--db=F] [--task-id=ID]
   naaccr-tumor-data facts    --flat-file=F [--db=F] [--task-id=ID]
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
+  naaccr-tumor-data import [--db=F] TABLE DATA META
   naaccr-tumor-data load [--db=F]
   naaccr-tumor-data run SCRIPT [--db=F]
   naaccr-tumor-data query SQL [--db=F]
@@ -145,6 +146,10 @@ Options:
   --task-hash=H      ontology completion marker
   --update-date=D    ontology update_date in YYYY-MM-DD format
   --who-cache=DIR    where to find WHO oncology metadata
+  import             import CSV
+  TABLE              target table name
+  DATA               CSV file
+  META               W3C tabular data metadata (JSON)
   load               load data from stdin using JSON (details TODO)
   loadRaw            load lines (e.g. NAACCR records) into a column of a DB table
   run                run SQL script

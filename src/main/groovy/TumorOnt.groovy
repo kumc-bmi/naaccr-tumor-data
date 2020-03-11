@@ -1,15 +1,15 @@
+import DBConfig.Task
 import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
-import org.docopt.Docopt
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.io.csv.CsvReadOptions
 
 import java.nio.charset.Charset
-import java.nio.file.*
-import java.sql.DriverManager
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.time.LocalDate
@@ -23,19 +23,25 @@ class TumorOnt {
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        Ontology1 work = new Ontology1(
-                cli.arg("--table-name"),
-                Integer.parseInt(cli.arg("--version")),
-                cli.arg("--task-hash", "???"),
-                // TODO: current calendar date
-                LocalDate.parse(cli.arg("--update-date", "2001-01-01")),
-                cdw, cli.arg("--who-cache") ? Paths.get(cli.arg("--who-cache")) : null)
-        if (!work.complete()) {
-            work.run()
+        if (cli.flag("ontology")) {
+            Task work = new Ontology1(
+                    cli.arg("--table-name"),
+                    Integer.parseInt(cli.arg("--version")),
+                    cli.arg("--task-hash", "???"),
+                    // TODO: current calendar date
+                    LocalDate.parse(cli.arg("--update-date", "2001-01-01")),
+                    cdw, cli.arg("--who-cache") ? Paths.get(cli.arg("--who-cache")) : null)
+            if (!work.complete()) {
+                work.run()
+            }
+        } else if (cli.flag("import")) {
+            cdw.withSql { Sql sql ->
+                TumorOnt.importCSV(sql, cli.arg("TABLE"), cli.url("DATA"), cli.url("META"))
+            }
         }
     }
 
-    static class Ontology1 {
+    static class Ontology1 implements Task {
         final String table_name
         final int version
         final String task_hash
@@ -225,6 +231,8 @@ class TumorOnt {
                         return "NUMERIC"
                     case ColumnType.LOCAL_DATE:
                         return "DATE"
+                    case ColumnType.LOCAL_DATE_TIME:
+                        return "TIMESTAMP"
                     default:
                         return it.toString()
                 }
@@ -288,7 +296,7 @@ class TumorOnt {
                           sourcesystem_cd: sourcesystem_cd] as Map])
         }
 
-        static Table ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache) {
+        static Table ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache = null) {
             Table icd_o_topo
             if (who_cache != null && who_cache.toFile().exists()) {
                 final Table who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
@@ -379,6 +387,9 @@ class TumorOnt {
                         case ColumnType.LOCAL_DATE:
                             params << java.sql.Date.valueOf(row.getDate((params.size())))
                             break
+                        case ColumnType.LOCAL_DATE_TIME:
+                            params << java.sql.Timestamp.valueOf(row.getDateTime((params.size())))
+                            break
                         case ColumnType.BOOLEAN:
                             params << row.getBoolean(params.size())
                             break
@@ -392,6 +403,13 @@ class TumorOnt {
                 ps.addBatch(params)
             }
         }
+    }
+
+    static Table importCSV(Sql sql, String name, URL data, URL meta) {
+        ColumnType[] schema = tabularTypes(new JsonSlurper().parse(meta))
+        final Table df = read_csv(data, schema)
+        load_data_frame(sql, name, df)
+        df
     }
 
     static Table read_csv(URL url, ColumnType[] _schema = null, int skiprows = 0) {
@@ -411,6 +429,8 @@ class TumorOnt {
                     return ColumnType.STRING
                 case "date":
                     return ColumnType.LOCAL_DATE
+                case "datetime":
+                    return ColumnType.LOCAL_DATE_TIME
                 default:
                     throw new IllegalAccessException(name)
             }

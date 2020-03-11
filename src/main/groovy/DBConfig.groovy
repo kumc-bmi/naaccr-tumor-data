@@ -64,6 +64,12 @@ class DBConfig {
         it
     }
 
+    interface Task {
+        boolean complete()
+
+        void run()
+    }
+
     static class CLI {
         protected final Map opts
         private final Closure<Properties> getProperties
@@ -86,6 +92,10 @@ class DBConfig {
                 return fallback
             }
             opts[target]
+        }
+
+        URL url(String target) {
+            new File(System.getProperty('user.dir')).toURI().resolve(arg(target)).toURL() // ISSUE: ambient; constructor should take makeURL()
         }
 
         DBConfig account() {

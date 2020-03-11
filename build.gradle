@@ -120,4 +120,14 @@ task localDBOntologyTest(type: Exec) {
 }
 localDBOntologyTest.dependsOn fatjar
 
+task localDBImportTest(type: Exec) {
+    description = 'Integration tests: import 2017 ontology into local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'import', 'ONT_2017', 'heron_load/shrine_ont.naaccr_ontology.csv', 'heron_load/shrine_ont.naaccr_ontology-metadata.json'
+}
+localDBImportTest.dependsOn fatjar
+
 // TODO: check.dependsOn integrationTest
