@@ -21,3 +21,9 @@ jobs:
         java-version: 1.11
     - name: Build with Gradle
       run: ./gradlew build
+      continue-on-error: true
+    - name: Archive test report
+      uses: actions/upload-artifact@v1
+      with:
+        name: test-report
+        path: build/reports/tests/test/
