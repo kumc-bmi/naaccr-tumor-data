@@ -141,18 +141,21 @@ class TumorFile {
         String table_name
         String task_id
 
-        boolean complete(Sql sql) {
-            try {
-                final row = sql.firstRow("select 1 from ${table_name} where task_id = ?.task_id",
-                        [task_id: task_id])
-                if (row && row[0] == 1) {
-                    log.info("complete: $task_id")
-                    return true
+        boolean complete(DBConfig account) {
+            boolean done = false
+            account.withSql { Sql sql ->
+                try {
+                    final row = sql.firstRow("select 1 from ${table_name} where task_id = ?.task_id",
+                            [task_id: task_id])
+                    if (row != null && row[0] == 1) {
+                        log.info("complete: $task_id")
+                        done = true
+                    }
+                } catch (SQLException problem) {
+                    log.warn("not complete: $problem")
                 }
-            } catch (SQLException problem) {
-                log.warn("not complete: $problem")
             }
-            return false
+            done
         }
 
         void build(Sql sql, Table data) {
@@ -183,22 +186,15 @@ class TumorFile {
         }
 
         // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
-        boolean complete() {
-            boolean done = false
-            cdw.withSql { Sql sql ->
-                done = tb.complete(sql)
-            }
-            done
-        }
+        boolean complete() { tb.complete(cdw) }
 
         void run() {
             final Table dd = ddictDF()
             final DBConfig mem = DBConfig.inMemoryDB("Stats")
-            Table data = null
-            mem.withSql { Sql memdb ->
+            Table data = mem.withSql { Sql memdb ->
                 Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
                 final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
-                data = DataSummary.stats(extract, memdb)
+                DataSummary.stats(extract, memdb)
             }
             cdw.withSql { Sql sql ->
                 tb.build(sql, data)
@@ -223,13 +219,7 @@ class TumorFile {
             encounter_num_start = start
         }
 
-        boolean complete() {
-            boolean done = false
-            cdw.withSql { Sql sql ->
-                done = tb.complete(sql)
-            }
-            done
-        }
+        boolean complete() { tb.complete(cdw) }
 
         void run() {
             Table tumors = _data(flat_file, encounter_num_start)
@@ -265,13 +255,7 @@ class TumorFile {
             cdw = _cdw
         }
 
-        boolean complete() {
-            boolean done = false
-            cdw.withSql { Sql sql ->
-                done = tb.complete(sql)
-            }
-            done
-        }
+        boolean complete() { tb.complete(cdw) }
 
         void run() {
             cdw.withSql { Sql sql ->
@@ -300,13 +284,7 @@ class TumorFile {
             cdw = _cdw
         }
 
-        boolean complete() {
-            boolean done = false
-            cdw.withSql { Sql sql ->
-                done = tb.complete(sql)
-            }
-            done
-        }
+        boolean complete() { tb.complete(cdw) }
 
         void run() {
             final DBConfig mem = DBConfig.inMemoryDB("Facts")
