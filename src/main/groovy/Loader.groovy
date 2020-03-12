@@ -112,6 +112,7 @@ class Loader {
                 System.out.withWriter {
                     json.writeTo(it)
                 }
+                System.out.println()
             } else if (cli.flag("load")) {
                 loader.load(new InputStreamReader(System.in))
             } else {
