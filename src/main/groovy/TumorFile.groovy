@@ -9,6 +9,7 @@ import com.imsweb.naaccrxml.entity.Item
 import com.imsweb.naaccrxml.entity.Patient
 import com.imsweb.naaccrxml.entity.Tumor
 import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
+import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import org.docopt.Docopt
@@ -16,7 +17,6 @@ import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
-import java.nio.file.Paths
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -38,7 +38,13 @@ class TumorFile {
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
                 { String name ->
-                    Properties ps = new Properties(); new File(name).withInputStream { ps.load(it) }; ps
+                    println("@@@" + name)
+                    Properties ps = new Properties()
+                    new File(name).withInputStream { ps.load(it) }
+                    if (ps.containsKey('db.passkey')) {
+                        ps.setProperty('db.password', System.getenv(ps.getProperty('db.passkey')))
+                    }
+                    ps
                 },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) })
@@ -49,13 +55,15 @@ class TumorFile {
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        Closure<URL> flat_file = { -> Paths.get(cli.arg("--flat-file")).toUri().toURL() }
+        Closure<URL> flat_file = { -> cli.urlProperty("naaccr.flat-file") }
 
         // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-id", "task123")
-        if (cli.flag('summary')) {
+        if (cli.flag('load-records')) {
+            work = new NAACCR_Records(cdw, flat_file(), cli.property("naaccr.records-table"))
+        } else if (cli.flag('summary')) {
             work = new NAACCR_Summary(cdw, flat_file(), task_id)
         } else if (cli.flag('tumors')) {
             work = new NAACCR_Visits(cdw, flat_file(), task_id, 2000000)
@@ -72,6 +80,63 @@ class TumorFile {
         if (work && !work.complete()) {
             work.run()
         }
+    }
+
+    static class NAACCR_Records implements Task {
+        static int batchSize = 1000
+        private final DBConfig cdw
+        private final URL flat_file
+        final String table_name
+
+        NAACCR_Records(DBConfig cdw, URL flat_file, String table) {
+            this.cdw = cdw
+            this.flat_file = flat_file
+            this.table_name = table
+        }
+
+        boolean complete() {
+            boolean done = false
+            cdw.withSql { Sql sql ->
+                try {
+                    sql.execute("create table ${table_name} (line int, record clob)" as String)
+                } catch (SQLException problem) {
+                    log.warning("cannot create ${table_name}: ${problem}")
+                }
+                try {
+                    final row = sql.firstRow("select count(*) from ${table_name}" as String)
+                    if (row == null || row.size() == 0) {
+                        return null
+                    }
+                    int rowCount = row[0] as int
+                    if (rowCount > 0) {
+                        log.info("complete: table ${table_name} already has ${rowCount} records.")
+                        done = true
+                    }
+                } catch (SQLException problem) {
+                    log.warning("not complete: $problem")
+                }
+                null
+            }
+            done
+        }
+
+        void run() {
+            String stmt = "insert into ${table_name} (line, record) values (?, ?)"
+            log.info("loading ${flat_file}: $stmt")
+            flat_file.withInputStream { InputStream naaccr_text_lines ->
+                cdw.withSql { Sql sql ->
+                    int line = 0
+                    sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
+                        new Scanner(naaccr_text_lines).useDelimiter("\n") each { String record ->
+                            line += 1
+                            ps.addBatch([line as Object, record as Object])
+                        }
+                    }
+                    log.info("inserted ${line} records into $table_name")
+                }
+            }
+        }
+
     }
 
     static class TableBuilder {

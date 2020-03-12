@@ -22,12 +22,15 @@ db.username=SA
 db.password=
 db.driver=org.h2.Driver
 db.url=jdbc:h2:file:/tmp/DB1;create=true
+
+naaccr.flat-file=naaccr-xml-sample-v180-incidence-100.txt
+naaccr.records-table: NAACCR_RECORDS
 ```
 
 Then, to create `NAACCR_OBSERVATIONS`, run:
 
 ```shell script
-java -jar naaccr-tumor-data.jar facts --flat-file=naaccr-xml-sample-v180-incidence-100.txt
+java -jar naaccr-tumor-data.jar facts
 ```
 
 _Please excuse / ignore `WARNING: An illegal reflective access ...`;
@@ -44,22 +47,22 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 
 ```
 Usage:
-  naaccr-tumor-data summary  --flat-file=F [--db=F] [--task-id=ID]
-  naaccr-tumor-data tumors   --flat-file=F [--db=F] [--task-id=ID]
-  naaccr-tumor-data facts    --flat-file=F [--db=F] [--task-id=ID]
+  naaccr-tumor-data load-records [--db=PF]
+  naaccr-tumor-data summary  [--db=F] [--task-id=ID]
+  naaccr-tumor-data tumors   [--db=F] [--task-id=ID]
+  naaccr-tumor-data facts    [--db=F] [--task-id=ID]
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
   naaccr-tumor-data load [--db=F]
   naaccr-tumor-data run SCRIPT [--db=F]
   naaccr-tumor-data query SQL [--db=F]
-  naaccr-tumor-data loadRaw TABLE [--db=F]
 
 Options:
+  loadRaw            load lines (e.g. NAACCR records) into a (CLOB) column of a DB table
   tumors             build NAACCR_TUMORS table
   facts              build NAACCR_OBSERVATIONS table
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
-  --flat-file=F      NAACCR file (flat file format)
   --task-id=ID       version / completion marker [default: task123]
   ontology           build NAACCR_ONTOLOGY table
   --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]
@@ -72,7 +75,6 @@ Options:
   DATA               CSV file
   META               W3C tabular data metadata (JSON)
   load               load data from stdin using JSON (details TODO)
-  loadRaw            load lines (e.g. NAACCR records) into a column of a DB table
   run                run SQL script
   query              run SQL query and write results to stdout in JSON
 

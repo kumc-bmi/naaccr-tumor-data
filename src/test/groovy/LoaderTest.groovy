@@ -18,10 +18,11 @@ class LoaderTest extends TestCase {
         }
     }
 
+    static final Map dbInfo1 = ["db.url" : 'jdbc:h2:mem:A1;create=true', "db.driver": 'org.h2.Driver',
+                                "db.username": 'SA', "db.password": '']
     static final Properties dbProps1 = ({ ->
         Properties ps = new Properties()
-        ps.putAll(["db.url" : 'jdbc:h2:mem:A1;create=true', "db.driver": 'org.h2.Driver',
-                   "db.user": 'SA', "db.password": ''])
+        ps.putAll(dbInfo1)
         ps
     })()
 

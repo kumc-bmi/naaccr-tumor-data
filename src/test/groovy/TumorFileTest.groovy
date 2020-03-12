@@ -27,9 +27,11 @@ class TumorFileTest extends TestCase {
 
     void testCLI() {
         final String doc = TumorFile.usage
-        final args = ['facts', '--flat-file', testDataPath]
+        final args = ['facts']
+        final Properties config = new Properties()
+        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): testDataPath])
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
-                { String name -> LoaderTest.dbProps1 },
+                { String name -> config  },
                 { int it -> throw new RuntimeException('unexpected exit') },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) } )
         TumorFile.run_cli(cli)
@@ -39,14 +41,14 @@ class TumorFileTest extends TestCase {
     void testDocOpt() {
         final String doc = TumorFile.usage
         assert doc.startsWith('Usage:')
-        final args = ['tumors', '--flat-file', testDataPath, '--task-id', 'abc123']
+        final args = ['tumors']
         final actual = new Docopt(doc).withExit(false).parse(args)
         assert actual['--db'] == 'db.properties'
         assert actual['tumors'] == true
         assert actual['facts'] == false
 
         final both = new Docopt(doc).withExit(false).parse(
-                ['tumors', '--flat-file', testDataPath, '--task-id', 'abc123', '--db', 'deid.properties'])
+                ['tumors', '--task-id', 'abc123', '--db', 'deid.properties'])
         assert both['--db'] == 'deid.properties'
         assert both["--update-date"] == null
 
@@ -56,9 +58,12 @@ class TumorFileTest extends TestCase {
         assert more['--task-hash'] == '1234'
         assert LocalDate.parse(more["--update-date"] as String) == LocalDate.of(2002, 2, 2)
 
+        final Properties config = new Properties()
+        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): testDataPath, ('naaccr.records-table'): 'T1'])
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args2),
-                null, null, null)
-        assert cli.url('--who-cache').toString().endsWith(',cache')
+                { String ignored -> config }, null, null)
+        assert cli.urlArg('--who-cache').toString().endsWith(',cache')
+        assert cli.property("naaccr.records-table") == "T1"
     }
 
     void testDF() {

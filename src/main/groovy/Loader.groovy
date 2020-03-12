@@ -64,18 +64,6 @@ class Loader {
 
     static int batchSize = 100
 
-    int loadRaw(Reader input, String table) {
-        String stmt = "insert into ${table} (record) values (?)"
-        def qty = 0
-        _sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
-            new Scanner(input).useDelimiter("\n") each { String it ->
-                ps.addBatch([it as Object])
-                qty += 1
-            }
-        }
-        logger.info("inserted $qty records into $table")
-        qty
-    }
 
     JsonBuilder query(String sql) {
         def results = _sql.rows(sql)
@@ -118,7 +106,6 @@ class Loader {
 
             String script = cli.arg("SCRIPT")
             String query = cli.arg("SQL")
-            String table = cli.arg("TABLE")
             if (script) {
                 def cwd = Paths.get(".").toAbsolutePath().normalize().toString()
                 loader.runScript(new URL(new URL("file://$cwd/"), script))
@@ -127,8 +114,6 @@ class Loader {
                 System.out.withWriter {
                     json.writeTo(it)
                 }
-            } else if (table) {
-                loader.loadRaw(new InputStreamReader(System.in), table)
             } else if (cli.flag("load")) {
                 loader.load(new InputStreamReader(System.in))
             } else {

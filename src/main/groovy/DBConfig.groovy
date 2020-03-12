@@ -49,7 +49,7 @@ class DBConfig {
         }
         Properties properties = new Properties()
         properties.setProperty('url', config("url"))
-        properties.setProperty('user', config("user"))
+        properties.setProperty('user', config("username"))
         properties.setProperty('password', config('password'))
         properties
     }
@@ -72,13 +72,14 @@ class DBConfig {
 
     static class CLI {
         protected final Map opts
-        private final Closure<Properties> getProperties
+        private final Closure<Properties> fetchProperties
+        private Properties configCache = null
         private final Closure<Void> exit
         private final Closure<Connection> getConnection
 
         CLI(Map opts, Closure<Properties> getProperties, Closure exit, Closure<Connection> getConnection) {
             this.opts = opts
-            this.getProperties = getProperties
+            this.fetchProperties = getProperties
             this.exit = exit
             this.getConnection = getConnection
         }
@@ -94,20 +95,30 @@ class DBConfig {
             opts[target]
         }
 
-        URL url(String target) {
-            new File(System.getProperty('user.dir')).toURI().resolve(arg(target)).toURL() // ISSUE: ambient; constructor should take makeURL()
+        // ISSUE: ambient; constructor should take makeURL()
+        URL urlArg(String target) {
+            URI cwd = new File(System.getProperty('user.dir')).toURI()
+            cwd.resolve(arg(target)).toURL()
+        }
+
+        String property(String target) {
+            String value = getConfig().getProperty(target)
+            if (value == null) {
+                throw new IllegalArgumentException(target)
+            }
+            value
+        }
+
+        // ISSUE: ambient; constructor should take makeURL()
+        URL urlProperty(String target) {
+            URI cwd = new File(System.getProperty('user.dir')).toURI()
+            cwd.resolve(property(target)).toURL()
         }
 
         DBConfig account() {
-            String db = arg("--db")
-            if (!db) {
-                logger.warning("expected --db=PROPS")
-                exit(1)
-            }
-            Properties config = null
-            logger.info("getting config from $db")
+            Properties config = getConfig()
             try {
-                config = getProperties(db)
+                config = jdbcProperties(config)
             } catch (IllegalStateException oops) {
                 logger.warning("Config missing property: $oops")
                 exit(1)
@@ -115,9 +126,28 @@ class DBConfig {
                 logger.warning("driver not found (fix CLASSPATH?): $oops")
                 exit(1)
             }
-            String url = config.getProperty('db.url')
-            logger.info("$db: $url")
-            new DBConfig(url, jdbcProperties(config), getConnection)
+            String url = config.getProperty('url')
+            logger.info("DB: $url")
+            new DBConfig(url, config, getConnection)
+        }
+
+        // a bit of a kludge
+        private Properties getConfig() {
+            if (configCache != null) {
+                return configCache
+            }
+            String db = arg("--db")
+            if (!db) {
+                logger.warning("expected --db=PROPS")
+                exit(1)
+            }
+            logger.info("getting config from $db")
+            try {
+                configCache = fetchProperties(db)
+            } catch (IOException oops) {
+                logger.warning("cannot load properties from ${db}: $oops")
+            }
+            configCache
         }
     }
 }

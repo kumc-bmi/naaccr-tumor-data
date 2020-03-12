@@ -76,9 +76,12 @@ fatjar.dependsOn build
 
 Properties db1() {
     Properties ps = new Properties()
-    ps.putAll(["db.url"   : "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true".toString(),
-               "db.driver": 'org.h2.Driver',
-               "db.user"  : 'SA', "db.password": ''])
+    ps.putAll(["db.url"              : "jdbc:h2:file:${System.getProperty('user.dir')}/DB1;create=true".toString(),
+               "db.driver"           : 'org.h2.Driver',
+               "db.username"         : 'SA',
+               "db.password"         : '',
+               "naaccr.flat-file"    : 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt',
+               "naaccr.records-table": "NAACCR_RECORDS"])
     ps
 }
 
@@ -88,8 +91,9 @@ task localDBStatsTest(type: Exec) {
 
     db1().store(new File('db.properties').newWriter(), null)
 
-    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'summary', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'summary'
 }
+localDBStatsTest.dependsOn fatjar
 
 task localDBTumorsTest(type: Exec) {
     description = 'Integration tests: visits from 100 records of test data with local disk h2 DB.'
@@ -97,8 +101,9 @@ task localDBTumorsTest(type: Exec) {
 
     db1().store(new File('db.properties').newWriter(), null)
 
-    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'tumors', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'tumors'
 }
+localDBTumorsTest.dependsOn fatjar
 
 task localDBFactsTest(type: Exec) {
     description = 'Integration tests: facts from 100 records of test data with local disk h2 DB.'
@@ -106,7 +111,7 @@ task localDBFactsTest(type: Exec) {
 
     db1().store(new File('db.properties').newWriter(), null)
 
-    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'facts', '--flat-file', 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'facts'
 }
 localDBFactsTest.dependsOn fatjar
 
@@ -119,6 +124,16 @@ task localDBOntologyTest(type: Exec) {
     commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'ontology'
 }
 localDBOntologyTest.dependsOn fatjar
+
+task localDBRecordsTest(type: Exec) {
+    description = 'Integration tests: build NAACCR_ONTOLOGY in a local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'load-records', 'NAACCR_RECORDS'
+}
+localDBRecordsTest.dependsOn fatjar
 
 task localDBImportTask(type: Exec) {
     description = 'Integration tests: import 2017 ontology into local disk h2 DB.'
@@ -138,3 +153,5 @@ integrationTest.dependsOn localDBTumorsTest
 integrationTest.dependsOn localDBFactsTest
 integrationTest.dependsOn localDBStatsTest
 integrationTest.dependsOn localDBOntologyTest
+integrationTest.dependsOn localDBRecordsTest
+
