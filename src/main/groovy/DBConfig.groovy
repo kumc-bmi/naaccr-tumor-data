@@ -1,15 +1,14 @@
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
-import java.util.logging.Logger
 
 @CompileStatic
+@Slf4j
 class DBConfig {
-    static Logger logger = Logger.getLogger("")
-
     final String url
     final Properties connectionProperties
     private final Closure<Connection> connect
@@ -44,7 +43,7 @@ class DBConfig {
         try {
             Class.forName(driver)
         } catch (Exception noDriver) {
-            logger.exiting("cannot load driver", driver, noDriver)
+            log.error("cannot load driver", driver, noDriver)
             throw noDriver
         }
         Properties properties = new Properties()
@@ -120,14 +119,14 @@ class DBConfig {
             try {
                 config = jdbcProperties(config)
             } catch (IllegalStateException oops) {
-                logger.warning("Config missing property: $oops")
+                log.warn("Config missing property: $oops")
                 exit(1)
             } catch (ClassNotFoundException oops) {
-                logger.warning("driver not found (fix CLASSPATH?): $oops")
+                log.warn("driver not found (fix CLASSPATH?): $oops")
                 exit(1)
             }
             String url = config.getProperty('url')
-            logger.info("DB: $url")
+            log.info("DB: $url")
             new DBConfig(url, config, getConnection)
         }
 
@@ -138,14 +137,14 @@ class DBConfig {
             }
             String db = arg("--db")
             if (!db) {
-                logger.warning("expected --db=PROPS")
+                log.warn("expected --db=PROPS")
                 exit(1)
             }
-            logger.info("getting config from $db")
+            log.info("getting config from $db")
             try {
                 configCache = fetchProperties(db)
             } catch (IOException oops) {
-                logger.warning("cannot load properties from ${db}: $oops")
+                log.warn("cannot load properties from ${db}: $oops")
             }
             configCache
         }

@@ -6,6 +6,7 @@ import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import org.docopt.Docopt
 import tech.tablesaw.api.ColumnType
@@ -17,12 +18,10 @@ import tech.tablesaw.columns.strings.StringFilters
 import java.nio.file.Paths
 import java.sql.DriverManager
 import java.time.LocalDate
-import java.util.logging.Logger
 
 @CompileStatic
+@Slf4j
 class TumorFileTest extends TestCase {
-    static Logger log = Logger.getLogger("")
-
     static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
     void testCLI() {
@@ -121,7 +120,7 @@ class TumorFileTest extends TestCase {
     }
 
     static final Table _extract = new File(testDataPath).withReader { naaccr_text_lines ->
-        log.info("tr_file: ${testDataPath}")
+        // log.info("tr_file: ${testDataPath}")
         final Table dd = TumorFile.ddictDF()
         TumorFile.read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
     }

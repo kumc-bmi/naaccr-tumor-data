@@ -12,6 +12,7 @@ import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import org.docopt.Docopt
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
@@ -23,22 +24,19 @@ import java.sql.SQLException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
-import java.util.logging.Logger
 import java.util.zip.CRC32
 
 import static TumorOnt.load_data_frame
 
 @CompileStatic
+@Slf4j
 class TumorFile {
-    static Logger log = Logger.getLogger("")
-
     // see also: buildUsageDoc groovy task
     static final String usage = TumorOnt.resourceText('usage.txt')
 
     static void main(String[] args) {
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
                 { String name ->
-                    println("@@@" + name)
                     Properties ps = new Properties()
                     new File(name).withInputStream { ps.load(it) }
                     if (ps.containsKey('db.passkey')) {
@@ -100,7 +98,7 @@ class TumorFile {
                 try {
                     sql.execute("create table ${table_name} (line int, record clob)" as String)
                 } catch (SQLException problem) {
-                    log.warning("cannot create ${table_name}: ${problem}")
+                    log.warn("cannot create ${table_name}: ${problem}")
                 }
                 try {
                     final row = sql.firstRow("select count(*) from ${table_name}" as String)
@@ -113,7 +111,7 @@ class TumorFile {
                         done = true
                     }
                 } catch (SQLException problem) {
-                    log.warning("not complete: $problem")
+                    log.warn("not complete: $problem")
                 }
                 null
             }
@@ -152,7 +150,7 @@ class TumorFile {
                     return true
                 }
             } catch (SQLException problem) {
-                log.warning("not complete: $problem")
+                log.warn("not complete: $problem")
             }
             return false
         }

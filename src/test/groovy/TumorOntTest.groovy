@@ -1,4 +1,5 @@
 import groovy.sql.Sql
+import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.StringColumn
@@ -7,11 +8,10 @@ import tech.tablesaw.api.Table
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
-import java.util.logging.Logger
 
+@Slf4j
 class TumorOntTest extends TestCase {
     static final cache = ',cache/'
-    static final Logger log = Logger.getLogger("")
 
     void testLoadCSV() {
         final Table per_section = TumorOnt.read_csv(TumorOnt.getResource('heron_load/section.csv'))
@@ -46,7 +46,7 @@ class TumorOntTest extends TestCase {
     void testOncologyMeta() {
         Path cachePath = Paths.get(cache)
         if (!cachePath.toFile().exists()) {
-            log.warning('skipping OncologyMeta test. cache does not exist: ' + cache)
+            log.warn('skipping OncologyMeta test. cache does not exist: ' + cache)
             return
         }
         final meta = TumorOnt.OncologyMeta

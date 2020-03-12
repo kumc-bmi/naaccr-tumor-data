@@ -3,17 +3,15 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 
 import java.nio.file.Paths
 import java.sql.Connection
 import java.sql.SQLException
-import java.util.logging.Logger
 
 @CompileStatic
+@Slf4j
 class Loader {
-    static Logger logger = Logger.getLogger("")
-
-
     private final Sql _sql
 
     Loader(Sql sql) {
@@ -26,7 +24,7 @@ class Loader {
         input.withInputStream { stream ->
             new Scanner(stream).useDelimiter(";\n") each {
                 String sql = edited(it)
-                logger.fine("executing $input: $sql")
+                log.debug("executing $input: $sql")
                 try {
                     _sql.execute sql
                 } catch (SQLException oops) {
@@ -75,7 +73,7 @@ class Loader {
         def parser = new JsonSlurper()
         def header = parser.parseText(scanner.nextLine())
         String stmt = header['sql']
-        logger.info("batch insert: $stmt")
+        log.info("batch insert: $stmt")
 
         setSessionDateFormat()
 
@@ -93,7 +91,7 @@ class Loader {
                 qty += 1
             }
         }
-        logger.info("inserted $qty records")
+        log.info("inserted $qty records")
         qty
     }
 

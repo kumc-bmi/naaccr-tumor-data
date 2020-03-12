@@ -3,6 +3,7 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.io.csv.CsvReadOptions
@@ -13,13 +14,11 @@ import java.nio.file.Paths
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.time.LocalDate
-import java.util.logging.Logger
 import java.util.zip.ZipFile
 
 @CompileStatic
+@Slf4j
 class TumorOnt {
-    static Logger log = Logger.getLogger("")
-
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
@@ -70,7 +69,7 @@ class TumorOnt {
                     return row && row[0] == 1
                 }
             } catch (SQLException problem) {
-                log.warning("not complete: $problem")
+                log.warn("not complete: $problem")
             }
             return false
         }
@@ -85,7 +84,7 @@ class TumorOnt {
                 try {
                     sql.execute("drop table $table_name".toString())
                 } catch (SQLException problem) {
-                    log.warning("drop $table_name: $problem")
+                    log.warn("drop $table_name: $problem")
                 }
                 load_data_frame(sql, table_name, terms)
             }
@@ -302,7 +301,7 @@ class TumorOnt {
                 final Table who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
                 icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
             } else {
-                log.warning('skipping WHO Topology terms')
+                log.warn('skipping WHO Topology terms')
                 icd_o_topo = fromRecords([[
                                                   lvl : 3, concept_cd: 'C00', c_visualattributes: 'FA',
                                                   path: 'abc', concept_path: 'LIP', concept_name: 'x'] as Map])
