@@ -90,15 +90,25 @@ Properties db1() {
     ps
 }
 
+task localDBRecordsTest(type: Exec) {
+    description = 'Integration tests: build NAACCR_ONTOLOGY in a local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'load-records'
+}
+localDBRecordsTest.dependsOn fatjar
+
 task localDBStatsTest(type: Exec) {
     description = 'Integration tests: stats on 100 records of test data with local disk h2 DB.'
     group = 'verification'
 
     db1().store(new File('db.properties').newWriter(), null)
 
-    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'summary'
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'summary', '--no-file'
 }
-localDBStatsTest.dependsOn fatjar
+localDBStatsTest.dependsOn localDBRecordsTest
 
 task localDBTumorsTest(type: Exec) {
     description = 'Integration tests: visits from 100 records of test data with local disk h2 DB.'
@@ -129,16 +139,6 @@ task localDBOntologyTest(type: Exec) {
     commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'ontology'
 }
 localDBOntologyTest.dependsOn fatjar
-
-task localDBRecordsTest(type: Exec) {
-    description = 'Integration tests: build NAACCR_ONTOLOGY in a local disk h2 DB.'
-    group = 'verification'
-
-    db1().store(new File('db.properties').newWriter(), null)
-
-    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'load-records', 'NAACCR_RECORDS'
-}
-localDBRecordsTest.dependsOn fatjar
 
 task localDBImportTask(type: Exec) {
     description = 'Integration tests: import 2017 ontology into local disk h2 DB.'

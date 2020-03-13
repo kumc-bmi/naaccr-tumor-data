@@ -48,9 +48,9 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 ```
 Usage:
   naaccr-tumor-data load-records [--db=PF]
-  naaccr-tumor-data summary  [--db=F] [--task-id=ID]
-  naaccr-tumor-data tumors   [--db=F] [--task-id=ID]
-  naaccr-tumor-data facts    [--db=F] [--task-id=ID]
+  naaccr-tumor-data summary  [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data tumors   [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data facts    [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
   naaccr-tumor-data load [--db=F]
@@ -58,11 +58,12 @@ Usage:
   naaccr-tumor-data query SQL [--db=F]
 
 Options:
-  loadRaw            load lines (e.g. NAACCR records) into a (CLOB) column of a DB table
+  load-records       load NAACCR records into a (CLOB) column of a DB table
   tumors             build NAACCR_TUMORS table
   facts              build NAACCR_OBSERVATIONS table
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
+  --no-file          use loaded records rather than file as input
   --task-id=ID       version / completion marker [default: task123]
   ontology           build NAACCR_ONTOLOGY table
   --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]

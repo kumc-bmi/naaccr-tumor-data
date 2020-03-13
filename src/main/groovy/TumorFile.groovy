@@ -18,6 +18,8 @@ import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
+import java.nio.charset.Charset
+import java.sql.Clob
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -53,7 +55,9 @@ class TumorFile {
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        Closure<URL> flat_file = { -> cli.urlProperty("naaccr.flat-file") }
+        Closure<URL> flat_file = { ->
+            cli.flag('--no-file') ? null : cli.urlProperty("naaccr.flat-file")
+        }
 
         // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
@@ -175,26 +179,42 @@ class TumorFile {
 
     static class NAACCR_Summary implements Task {
         final String table_name = "NAACCR_EXPORT_STATS"
+        final String records_table = "NAACCR_RECORDS"
         final TableBuilder tb
         final DBConfig cdw
-        final URL flat_file  // TODO: serializable?
+        final URL flat_file
 
-        NAACCR_Summary(DBConfig _cdw, URL _flat_file, String _task_id) {
-            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
-            flat_file = _flat_file
-            cdw = _cdw
+        NAACCR_Summary(DBConfig cdw, URL flat_file = null, String task_id) {
+            tb = new TableBuilder(task_id: task_id, table_name: table_name)
+            this.flat_file = flat_file
+            this.cdw = cdw
         }
 
         // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
         boolean complete() { tb.complete(cdw) }
 
+        def <V> V withRecords(Closure<V> thunk) {
+            V result = null
+            if (flat_file == null) {
+                result = cdw.withSql { Sql sql ->
+                    withClobReader(sql, "select record from $records_table order by line" as String) { Reader lines ->
+                        thunk(lines)
+                    }
+                }
+            } else {
+                result = thunk(new InputStreamReader(flat_file.openStream()))
+            }
+            result
+        }
+
         void run() {
             final Table dd = ddictDF()
             final DBConfig mem = DBConfig.inMemoryDB("Stats")
             Table data = mem.withSql { Sql memdb ->
-                Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
-                final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
-                DataSummary.stats(extract, memdb)
+                withRecords() { Reader naaccr_text_lines ->
+                    final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+                    DataSummary.stats(extract, memdb)
+                }
             }
             cdw.withSql { Sql sql ->
                 tb.build(sql, data)
@@ -486,6 +506,34 @@ class TumorFile {
         }
     }
 
+    static <V> V withClobReader(Sql sql, String query, Closure<V> thunk) {
+        final PipedOutputStream wr = new PipedOutputStream()
+        PipedInputStream rd = new PipedInputStream(wr)
+        Reader lines = new InputStreamReader(rd)
+        byte CR = 13
+        byte LF = 10
+
+        Thread worker = new Thread({ ->
+            sql.eachRow(query) { row ->
+                // println("clob length: ${(row.getClob(1)).length()}")
+                Clob text = row.getClob(1)
+                String str = text.getSubString(1L, text.length() as int)
+                wr.write(str.getBytes(Charset.forName("UTF-8")))
+                wr.write(CR)
+                wr.write(LF)
+            }
+            wr.close()
+        })
+        worker.start()
+        V result = null
+        try {
+            result = thunk(lines)
+        } finally {
+            lines.close()
+            worker.join()
+        }
+        result
+    }
 
     static final FixedColumnsLayout layout18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
     static final Table record_layout = TumorOnt.fromRecords(

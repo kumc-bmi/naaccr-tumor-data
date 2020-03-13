@@ -4,6 +4,9 @@ import TumorFile.TumorKeys
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
+import com.imsweb.naaccrxml.PatientFlatReader
+import com.imsweb.naaccrxml.PatientReader
+import com.imsweb.naaccrxml.entity.Patient
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -97,6 +100,47 @@ class TumorFileTest extends TestCase {
             assert patientData.select('patientIdNumber').dropDuplicateRows().rowCount() == 94
             println(patientData.first(5))
         }
+    }
+
+    void testReadTumorsFromDB() {
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        final String table_name = "NAACCR_RECORDS"
+
+        int cksum = cdw.withSql { Sql sql ->
+            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), table_name)
+            load.run()
+            TumorFile.withClobReader(sql, "select record from $table_name order by line" as String) { Reader lines ->
+                int accum = 0
+                PatientReader reader = new PatientFlatReader(lines)
+                Patient patient = reader.readPatient()
+                while (patient != null) {
+                    int num = Integer.parseInt(patient.getItemValue('patientIdNumber'))
+                    accum += num
+                    patient = reader.readPatient()
+                }
+                accum
+            }
+        }
+        assert cksum == 5311
+    }
+
+    void testStatsFromDB() {
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        final String table_name = "NAACCR_RECORDS"
+
+        int cksum
+        cdw.withSql() { Sql sql ->
+            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), table_name)
+            load.run()
+            sql.execute("delete from naaccr_records where line > 10") // stats for 100 is a boring wait
+            Task work = new TumorFile.NAACCR_Summary(cdw, null, "task123")
+            work.run()
+            sql.query("select * from naaccr_export_stats") { results ->
+                Table stats = Table.read().db(results, "stats")
+                cksum = stats.longColumn('TUMOR_QTY').countUnique()
+            }
+        }
+        assert cksum == 3
     }
 
     void testLayout() {
