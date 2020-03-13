@@ -96,11 +96,6 @@ class TumorFile {
             boolean done = false
             cdw.withSql { Sql sql ->
                 try {
-                    sql.execute("create table ${table_name} (line int, record clob)" as String)
-                } catch (SQLException problem) {
-                    log.warn("cannot create ${table_name}: ${problem}")
-                }
-                try {
                     final row = sql.firstRow("select count(*) from ${table_name}" as String)
                     if (row == null || row.size() == 0) {
                         return null
@@ -123,6 +118,11 @@ class TumorFile {
             log.info("loading ${flat_file}: $stmt")
             flat_file.withInputStream { InputStream naaccr_text_lines ->
                 cdw.withSql { Sql sql ->
+                    try {
+                        sql.execute("create table ${table_name} (line int, record clob)" as String)
+                    } catch (SQLException problem) {
+                        log.warn("cannot create ${table_name}: ${problem}")
+                    }
                     int line = 0
                     sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
                         new Scanner(naaccr_text_lines).useDelimiter("\n") each { String record ->
@@ -412,7 +412,7 @@ class TumorFile {
         }
 
         private static Table _pick_cols(List<String> attrs, Reader lines) {
-            Table pat_tmr = Table.create(attrs.collect { it -> StringColumn.create(it, []) }
+            Table pat_tmr = Table.create(attrs.collect { it -> StringColumn.create(it) }
                     as Collection<Column<?>>)
             PatientReader reader = new PatientFlatReader(lines)
             Patient patient = reader.readPatient()
