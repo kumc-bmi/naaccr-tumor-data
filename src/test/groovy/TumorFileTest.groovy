@@ -132,7 +132,7 @@ class TumorFileTest extends TestCase {
         final String extract_table = "TR_DATA"
         final String stats_table = "TR_STATS"
 
-        int cksum
+        int cksum = -1
         cdw.withSql() { Sql sql ->
             Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), records_table)
             load.run()

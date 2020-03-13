@@ -169,6 +169,7 @@ class TumorFile {
                 } catch (SQLException problem) {
                     log.warn("not complete: $problem")
                 }
+                null
             }
             done
         }
@@ -239,8 +240,8 @@ class TumorFile {
          * @return records, after mutating column names
          */
         static Table to_db_ids(Table records,
-                               int max_length=30,
-                               int max_digits=7) {
+                               int max_length = 30,
+                               int max_digits = 7) {
             final Map<String, Integer> byId = ddictDF().iterator().collectEntries { Row row ->
                 [(row.getString('naaccrId')): row.getInt('naaccrNum')]
             }
@@ -254,8 +255,8 @@ class TumorFile {
         }
 
         static Table from_db_ids(Table records,
-                                 int max_length=30,
-                                 int max_digits=7) {
+                                 int max_length = 30,
+                                 int max_digits = 7) {
             final Map<String, String> toId = ddictDF().iterator().collectEntries { Row row ->
                 String naaccrId = row.getString('naaccrId')
                 int naaccrNum = row.getInt('naaccrNum')
@@ -298,7 +299,7 @@ class TumorFile {
         }
 
         def <V> V withRecords(Closure<V> thunk) {
-            V result = null
+            V result
             if (flat_file == null) {
                 log.info("reading records from table ${records_table}")
                 result = cdw.withSql { Sql sql ->
@@ -459,8 +460,7 @@ class TumorFile {
     /**
      * @param max_length - avoid ORA-00972: identifier is too long
      */
-    static Table ddictDF(String version = "180",
-                         int max_length=30) {
+    static Table ddictDF(String version = "180") {
         NaaccrDictionary baseDictionary = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version)
         final items = baseDictionary.items
         Table.create(
