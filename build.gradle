@@ -87,6 +87,7 @@ Properties db1() {
                "db.password"         : '',
                "naaccr.flat-file"    : 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt',
                "naaccr.records-table": "NAACCR_RECORDS",
+               "naaccr.extract-table": "NAACCR_DISCRETE",
                "naaccr.stats-table"  : "NAACCR_EXPORT_STATS",
     ])
     ps
@@ -102,6 +103,16 @@ task localDBRecordsTest(type: Exec) {
 }
 localDBRecordsTest.dependsOn fatjar
 
+task localDBExtractTest(type: Exec) {
+    description = 'Integration tests: discrete data on 100 records of test data with local disk h2 DB.'
+    group = 'verification'
+
+    db1().store(new File('db.properties').newWriter(), null)
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'discrete-data', '--no-file'
+}
+localDBExtractTest.dependsOn localDBRecordsTest
+
 task localDBStatsTest(type: Exec) {
     description = 'Integration tests: stats on 100 records of test data with local disk h2 DB.'
     group = 'verification'
@@ -110,7 +121,7 @@ task localDBStatsTest(type: Exec) {
 
     commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'summary', '--no-file'
 }
-localDBStatsTest.dependsOn localDBRecordsTest
+localDBStatsTest.dependsOn localDBExtractTest
 
 task localDBTumorsTest(type: Exec) {
     description = 'Integration tests: visits from 100 records of test data with local disk h2 DB.'

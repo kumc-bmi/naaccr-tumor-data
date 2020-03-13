@@ -25,7 +25,8 @@ db.url=jdbc:h2:file:/tmp/DB1;create=true
 
 naaccr.flat-file=naaccr-xml-sample-v180-incidence-100.txt
 naaccr.records-table: NAACCR_RECORDS
-naaccr.stats-table: NAACCR_EXPORT_STATS
+naaccr.extract-table: NAACCR_DATA
+naaccr.stats-table: NAACCR_STATS
 ```
 
 Then, to create `NAACCR_OBSERVATIONS`, run:
@@ -49,6 +50,7 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 ```
 Usage:
   naaccr-tumor-data load-records [--db=PF]
+  naaccr-tumor-data discrete-data [--no-file] [--db=PF]
   naaccr-tumor-data summary  [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data tumors   [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data facts    [--no-file] [--db=F] [--task-id=ID]
@@ -60,6 +62,7 @@ Usage:
 
 Options:
   load-records       load NAACCR records into a (CLOB) column of a DB table
+  discrete-data      split NAACCR records into a wide table of discrete data
   tumors             build NAACCR_TUMORS table
   facts              build NAACCR_OBSERVATIONS table
   summary            build NAACCR_EXTRACT_STATS table

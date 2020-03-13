@@ -65,11 +65,19 @@ class TumorFile {
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
         if (cli.flag('load-records')) {
             work = new NAACCR_Records(cdw, flat_file(), cli.property("naaccr.records-table"))
+        } else if (cli.flag('discrete-data')) {
+            work = new NAACCR_Extract(cdw, task_id,
+                    flat_file(),
+                    cli.property("naaccr.records-table"),
+                    cli.property("naaccr.extract-table"),
+            )
         } else if (cli.flag('summary')) {
             work = new NAACCR_Summary(cdw, task_id,
                     flat_file(),
                     cli.property("naaccr.records-table"),
-                    cli.property("naaccr.stats-table"),)
+                    cli.property("naaccr.extract-table"),
+                    cli.property("naaccr.stats-table"),
+            )
         } else if (cli.flag('tumors')) {
             work = new NAACCR_Visits(cdw, flat_file(), task_id, 2000000)
         } else if (cli.flag('facts')) {
@@ -144,7 +152,7 @@ class TumorFile {
 
     }
 
-    static class TableBuilder {
+    private static class TableBuilder {
         String table_name
         String task_id
 
@@ -173,30 +181,93 @@ class TumorFile {
             }
             // TODO: case fold?
             load_data_frame(sql, table_name, data)
+            log.info("inserted ${data.rowCount()} rows into ${table_name}")
         }
     }
 
-    static StringColumn constS(String name, Table t, String val) {
+    private static StringColumn constS(String name, Table t, String val) {
         StringColumn.create(name, [val] * t.rowCount() as String[])
     }
 
     static class NAACCR_Summary implements Task {
-        final String table_name
-        final String records_table
         final TableBuilder tb
         final DBConfig cdw
-        final URL flat_file
+        final NAACCR_Extract extract_task
 
-        NAACCR_Summary(DBConfig cdw, String task_id, URL flat_file = null, String records_table, String table_name) {
-            tb = new TableBuilder(task_id: task_id, table_name: table_name)
+        NAACCR_Summary(DBConfig cdw, String task_id,
+                       URL flat_file = null, String records_table, String extract_table, String stats_table) {
+            tb = new TableBuilder(task_id: task_id, table_name: stats_table)
             this.cdw = cdw
-            this.flat_file = flat_file
-            this.records_table = records_table
-            this.table_name = table_name
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
         }
 
         // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
         boolean complete() { tb.complete(cdw) }
+
+        void run() {
+            final DBConfig mem = DBConfig.inMemoryDB("Stats")
+
+            final Table extract = extract_task.results()
+
+            Table data = mem.withSql { Sql memdb ->
+                DataSummary.stats(extract, memdb)
+            }
+            cdw.withSql { Sql sql ->
+                tb.build(sql, data)
+            }
+        }
+    }
+
+    static class NAACCR_Extract implements Task {
+        final TableBuilder tb
+        final DBConfig cdw
+        final URL flat_file
+        final String records_table
+
+        NAACCR_Extract(DBConfig cdw, String task_id, URL flat_file = null, String records_table, String extract_table) {
+            this.cdw = cdw
+            tb = new TableBuilder(task_id: task_id, table_name: extract_table)
+            this.flat_file = flat_file
+            this.records_table = records_table
+        }
+
+        @Override
+        boolean complete() { tb.complete(cdw) }
+
+        Table results() {
+            if (!complete()) {
+                run()
+            }
+            cdw.withSql { Sql sql ->
+                Table from_db = null
+                sql.query("select * from ${tb.table_name}" as String) { ResultSet results ->
+                    from_db = Table.read().db(results)
+
+                    // DB likely case-folded the names: RECORDTYPE; so rename to naaccrId that equalsIgnoreCase
+                    final naaccrIds = ddictDF().collect { it.getString('naaccrId') }
+                    from_db.columns().forEach { Column column ->
+                        final String naaccrId = naaccrIds.find { it.equalsIgnoreCase(column.name()) }
+                        if (naaccrId != null) {
+                            column.setName(naaccrId)  // recordType
+                        }
+                    }
+                }
+                from_db
+            }
+        }
+
+        @Override
+        void run() {
+            final Table dd = ddictDF()
+            Table extract = withRecords() { Reader naaccr_text_lines ->
+                log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
+                read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+            }
+            cdw.withSql { Sql sql ->
+                log.info("inserting ${extract.rowCount()} records into ${tb.table_name}")
+                tb.build(sql, extract)
+            }
+        }
 
         def <V> V withRecords(Closure<V> thunk) {
             V result = null
@@ -212,20 +283,6 @@ class TumorFile {
                 result = thunk(new InputStreamReader(flat_file.openStream()))
             }
             result
-        }
-
-        void run() {
-            final Table dd = ddictDF()
-            final DBConfig mem = DBConfig.inMemoryDB("Stats")
-            Table data = mem.withSql { Sql memdb ->
-                withRecords() { Reader naaccr_text_lines ->
-                    final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
-                    DataSummary.stats(extract, memdb)
-                }
-            }
-            cdw.withSql { Sql sql ->
-                tb.build(sql, data)
-            }
         }
     }
 

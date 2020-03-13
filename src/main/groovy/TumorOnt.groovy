@@ -365,7 +365,9 @@ class TumorOnt {
 
     static void load_data_frame(Sql sql, String name, Table data) {
         assert name
+        log.debug("creating table ${name}")
         sql.execute(SqlScript.create_ddl(name, data.columns()))
+        log.debug("inserting ${data.rowCount()} rows into ${name}")
         sql.withBatch(SqlScript.insert_dml(name, data.columns())) { BatchingPreparedStatementWrapper ps ->
             for (Row row : data) {
                 final params = []
@@ -402,6 +404,7 @@ class TumorOnt {
                 }
                 ps.addBatch(params)
             }
+            log.debug("inserted ${data.rowCount()} rows into ${name}")
         }
     }
 

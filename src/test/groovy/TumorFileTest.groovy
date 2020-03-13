@@ -127,6 +127,7 @@ class TumorFileTest extends TestCase {
     void testStatsFromDB() {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final String records_table = "TR_RECORDS"
+        final String extract_table = "TR_DATA"
         final String stats_table = "TR_STATS"
 
         int cksum
@@ -135,7 +136,7 @@ class TumorFileTest extends TestCase {
             load.run()
             sql.execute("delete from ${records_table} where line > 10" as String) // stats for 100 is a boring wait
             Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
-                    null, records_table, stats_table)
+                    null, records_table, extract_table, stats_table)
             work.run()
             sql.query("select * from ${stats_table}" as String) { results ->
                 Table stats = Table.read().db(results, "stats")
