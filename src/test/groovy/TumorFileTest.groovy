@@ -14,7 +14,9 @@ import junit.framework.TestCase
 import org.docopt.Docopt
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.DoubleColumn
+import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
+import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.dates.DateFilters
 import tech.tablesaw.columns.strings.StringFilters
 
@@ -144,6 +146,20 @@ class TumorFileTest extends TestCase {
             }
         }
         assert cksum == 3
+    }
+
+    void testDBIds() {
+        Table dd = TumorFile.ddictDF()
+        final longNames = dd.where(dd.stringColumn('naaccrId').isLongerThan((30))).stringColumn('naaccrId').asList()
+        Table naaccrIds = Table.create("t1", longNames.collect { String id -> StringColumn.create(id) }
+                as Collection<Column<?>>)
+        println(naaccrIds)
+        Table dbnames = TumorFile.NAACCR_Extract.to_db_ids(naaccrIds.copy())
+        println(dbnames)
+        Table inverted = TumorFile.NAACCR_Extract.from_db_ids(dbnames.copy())
+        println(inverted)
+        assert dbnames.columnNames().findAll { it.length() > 30 } == []
+        assert inverted.columnNames() == naaccrIds.columnNames()
     }
 
     void testLayout() {

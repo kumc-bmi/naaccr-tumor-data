@@ -234,6 +234,43 @@ class TumorFile {
         @Override
         boolean complete() { tb.complete(cdw) }
 
+        /**
+         * avoid ORA-00972: identifier is too long
+         * @return records, after mutating column names
+         */
+        static Table to_db_ids(Table records,
+                               int max_length=30,
+                               int max_digits=7) {
+            final Map<String, Integer> byId = ddictDF().iterator().collectEntries { Row row ->
+                [(row.getString('naaccrId')): row.getInt('naaccrNum')]
+            }
+            records.columns().forEach { Column column ->
+                final String naaccrId = column.name()
+                final naaccrNum = byId[naaccrId]
+                final String slug = naaccrId.substring(0, Math.min(naaccrId.length(), max_length - max_digits - 1))
+                column.setName("${slug.toUpperCase()}_${naaccrNum}")
+            }
+            records
+        }
+
+        static Table from_db_ids(Table records,
+                                 int max_length=30,
+                                 int max_digits=7) {
+            final Map<String, String> toId = ddictDF().iterator().collectEntries { Row row ->
+                String naaccrId = row.getString('naaccrId')
+                int naaccrNum = row.getInt('naaccrNum')
+                final String slug = naaccrId.substring(0, Math.min(naaccrId.length(), max_length - max_digits - 1))
+                [("${slug.toUpperCase()}_${naaccrNum}" as String): naaccrId]
+            }
+            records.columns().forEach { Column column ->
+                String naaccrId = toId[column.name()]
+                if (naaccrId != null) {
+                    column.setName(toId[column.name()])
+                }
+            }
+            records
+        }
+
         Table results() {
             if (!complete()) {
                 run()
@@ -242,17 +279,8 @@ class TumorFile {
                 Table from_db = null
                 sql.query("select * from ${tb.table_name}" as String) { ResultSet results ->
                     from_db = Table.read().db(results)
-
-                    // DB likely case-folded the names: RECORDTYPE; so rename to naaccrId that equalsIgnoreCase
-                    final naaccrIds = ddictDF().collect { it.getString('naaccrId') }
-                    from_db.columns().forEach { Column column ->
-                        final String naaccrId = naaccrIds.find { it.equalsIgnoreCase(column.name()) }
-                        if (naaccrId != null) {
-                            column.setName(naaccrId)  // recordType
-                        }
-                    }
                 }
-                from_db
+                from_db_ids(from_db)
             }
         }
 
@@ -265,7 +293,7 @@ class TumorFile {
             }
             cdw.withSql { Sql sql ->
                 log.info("inserting ${extract.rowCount()} records into ${tb.table_name}")
-                tb.build(sql, extract)
+                tb.build(sql, to_db_ids(extract))
             }
         }
 
@@ -428,7 +456,11 @@ class TumorFile {
 
     }
 
-    static Table ddictDF(String version = "180") {
+    /**
+     * @param max_length - avoid ORA-00972: identifier is too long
+     */
+    static Table ddictDF(String version = "180",
+                         int max_length=30) {
         NaaccrDictionary baseDictionary = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version)
         final items = baseDictionary.items
         Table.create(
@@ -459,7 +491,7 @@ class TumorFile {
                         tumorRow.setString(item.naaccrId, item.value)
                     }
                 }
-
+                // TODO: get items from NAACCR Data?
             }
             patient = reader.readPatient()
         }
