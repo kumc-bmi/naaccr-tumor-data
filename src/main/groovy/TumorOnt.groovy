@@ -364,6 +364,7 @@ class TumorOnt {
     }
 
     static void load_data_frame(Sql sql, String name, Table data) {
+        assert name
         sql.execute(SqlScript.create_ddl(name, data.columns()))
         sql.withBatch(SqlScript.insert_dml(name, data.columns())) { BatchingPreparedStatementWrapper ps ->
             for (Row row : data) {

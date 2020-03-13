@@ -25,6 +25,7 @@ db.url=jdbc:h2:file:/tmp/DB1;create=true
 
 naaccr.flat-file=naaccr-xml-sample-v180-incidence-100.txt
 naaccr.records-table: NAACCR_RECORDS
+naaccr.stats-table: NAACCR_EXPORT_STATS
 ```
 
 Then, to create `NAACCR_OBSERVATIONS`, run:

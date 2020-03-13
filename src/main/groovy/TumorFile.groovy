@@ -62,11 +62,14 @@ class TumorFile {
         // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
-        String task_id = cli.arg("--task-id", "task123")
+        String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
         if (cli.flag('load-records')) {
             work = new NAACCR_Records(cdw, flat_file(), cli.property("naaccr.records-table"))
         } else if (cli.flag('summary')) {
-            work = new NAACCR_Summary(cdw, flat_file(), task_id)
+            work = new NAACCR_Summary(cdw, task_id,
+                    flat_file(),
+                    cli.property("naaccr.records-table"),
+                    cli.property("naaccr.stats-table"),)
         } else if (cli.flag('tumors')) {
             work = new NAACCR_Visits(cdw, flat_file(), task_id, 2000000)
         } else if (cli.flag('facts')) {
@@ -178,16 +181,18 @@ class TumorFile {
     }
 
     static class NAACCR_Summary implements Task {
-        final String table_name = "NAACCR_EXPORT_STATS"
-        final String records_table = "NAACCR_RECORDS"
+        final String table_name
+        final String records_table
         final TableBuilder tb
         final DBConfig cdw
         final URL flat_file
 
-        NAACCR_Summary(DBConfig cdw, URL flat_file = null, String task_id) {
+        NAACCR_Summary(DBConfig cdw, String task_id, URL flat_file = null, String records_table, String table_name) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
-            this.flat_file = flat_file
             this.cdw = cdw
+            this.flat_file = flat_file
+            this.records_table = records_table
+            this.table_name = table_name
         }
 
         // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
@@ -196,12 +201,14 @@ class TumorFile {
         def <V> V withRecords(Closure<V> thunk) {
             V result = null
             if (flat_file == null) {
+                log.info("reading records from table ${records_table}")
                 result = cdw.withSql { Sql sql ->
                     withClobReader(sql, "select record from $records_table order by line" as String) { Reader lines ->
                         thunk(lines)
                     }
                 }
             } else {
+                log.info("reading records from ${flat_file}")
                 result = thunk(new InputStreamReader(flat_file.openStream()))
             }
             result

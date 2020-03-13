@@ -126,16 +126,18 @@ class TumorFileTest extends TestCase {
 
     void testStatsFromDB() {
         final cdw = DBConfig.inMemoryDB("TR", true)
-        final String table_name = "NAACCR_RECORDS"
+        final String records_table = "TR_RECORDS"
+        final String stats_table = "TR_STATS"
 
         int cksum
         cdw.withSql() { Sql sql ->
-            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), table_name)
+            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), records_table)
             load.run()
-            sql.execute("delete from naaccr_records where line > 10") // stats for 100 is a boring wait
-            Task work = new TumorFile.NAACCR_Summary(cdw, null, "task123")
+            sql.execute("delete from ${records_table} where line > 10" as String) // stats for 100 is a boring wait
+            Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
+                    null, records_table, stats_table)
             work.run()
-            sql.query("select * from naaccr_export_stats") { results ->
+            sql.query("select * from ${stats_table}" as String) { results ->
                 Table stats = Table.read().db(results, "stats")
                 cksum = stats.longColumn('TUMOR_QTY').countUnique()
             }

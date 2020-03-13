@@ -86,7 +86,9 @@ Properties db1() {
                "db.username"         : 'SA',
                "db.password"         : '',
                "naaccr.flat-file"    : 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt',
-               "naaccr.records-table": "NAACCR_RECORDS"])
+               "naaccr.records-table": "NAACCR_RECORDS",
+               "naaccr.stats-table"  : "NAACCR_EXPORT_STATS",
+    ])
     ps
 }
 
