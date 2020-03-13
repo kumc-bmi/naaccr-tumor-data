@@ -41,6 +41,7 @@ class DBConfig {
         }
         def driver = config("driver")
         try {
+            log.info("looking up JDBC driver: $driver")
             Class.forName(driver)
         } catch (Exception noDriver) {
             log.error("cannot load driver", driver, noDriver)
@@ -55,6 +56,9 @@ class DBConfig {
 
     static DBConfig inMemoryDB(String databaseName, boolean reset=false) {
         String url = "jdbc:h2:mem:${databaseName};create=true"
+        String driver = 'org.h2.Driver'
+        log.debug("looking up in-memory JDBC driver: $driver")
+        Class.forName(driver)
         DBConfig it = new DBConfig(url, new Properties(),
                 { String ignored, Properties _ -> DriverManager.getConnection(url) })
         if (reset) {
