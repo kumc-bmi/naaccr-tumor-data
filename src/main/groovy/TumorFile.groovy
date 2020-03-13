@@ -514,15 +514,18 @@ class TumorFile {
         byte LF = 10
 
         Thread worker = new Thread({ ->
-            sql.eachRow(query) { row ->
-                // println("clob length: ${(row.getClob(1)).length()}")
-                Clob text = row.getClob(1)
-                String str = text.getSubString(1L, text.length() as int)
-                wr.write(str.getBytes(Charset.forName("UTF-8")))
-                wr.write(CR)
-                wr.write(LF)
+            try {
+                sql.eachRow(query) { row ->
+                    // println("clob length: ${(row.getClob(1)).length()}")
+                    Clob text = row.getClob(1)
+                    String str = text.getSubString(1L, text.length() as int)
+                    wr.write(str.getBytes(Charset.forName("UTF-8")))
+                    wr.write(CR)
+                    wr.write(LF)
+                }
+            } finally {
+                wr.close()
             }
-            wr.close()
         })
         worker.start()
         V result = null
