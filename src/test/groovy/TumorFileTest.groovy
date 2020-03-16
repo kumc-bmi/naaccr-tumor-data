@@ -14,6 +14,7 @@ import junit.framework.TestCase
 import org.docopt.Docopt
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.DoubleColumn
+import tech.tablesaw.api.Row
 import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
 import tech.tablesaw.columns.Column
@@ -227,31 +228,19 @@ class TumorFileTest extends TestCase {
      In Date of Last Contact, we've also seen 19919999
      */
     void testDates() {
-        def cases = [[label: 'normal', text: '19700101',
-                      date : LocalDate.of(1970, 1, 1)],
-                     [label: 'no day', text: '197001',
-                      date : LocalDate.of(1970, 1, 1)],
-                     [label: 'no month', text: '1970',
-                      date : LocalDate.of(1970, 1, 1)],
-                     [label: 'leading space', text: '    1970',
-                      date : LocalDate.of(1970, 1, 1)],
-                     [label: 'no month, variation', text: '19709999',
-                      date : null],
-                     [label: 'all 9s', text: '99999999',
-                      date : null],
-                     [label: 'all 0s', text: '00000000',
-                      date : null],
-                     [label: 'almost all 9s', text: '99990',
-                      date : null],
-                     [label: 'empty', text: '',
-                      date : null],
-                     [label: 'inscruitable', text: '12001024',
-                      date : LocalDate.of(1200, 10, 24)]
-        ]
-        def caseTable = TumorOnt.fromRecords(cases as List<Map>)
-        def results = TumorFile.naaccr_date_col(caseTable.stringColumn('text'))
-        assert caseTable.column('date').asList() == results.asList()
+        final Table caseTable = TumorOnt.read_csv(TumorFileTest.getResource('date_cases.csv'))
+        List<LocalDate> expected = caseTable.iterator().collect { Row it ->
+            it.isMissing('year') ?
+                    null : LocalDate.of(
+                    it.getInt('year'),
+                    it.getInt('month'),
+                    it.getInt('day'))
+        }
+        def actual = TumorFile.naaccr_date_col(caseTable.stringColumn('text'))
+        assert expected == actual.asList()
+    }
 
+    void testItemDates() {
         Table actual = TumorFile.naaccr_dates(
                 _extract.select('dateOfDiagnosis', 'dateOfLastContact'),
                 ['dateOfDiagnosis', 'dateOfLastContact'],
