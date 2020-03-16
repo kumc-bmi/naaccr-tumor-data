@@ -30,7 +30,7 @@ We find [https://dbeaver.io/ DBeaver] a handy SQL development environment.
 ## Groovy is a smooth transition from python, but Java is catching up
 
   - pro
-    - nice Sql, JSON APIs
+    - nice [Sql](https://groovy-lang.org/databases.html), JSON APIs
     - easy porting from python
       - can prototype in unityped mode
   - con

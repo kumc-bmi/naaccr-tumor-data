@@ -5,6 +5,8 @@ import groovy.util.logging.Slf4j
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
+import java.text.SimpleDateFormat
+import java.time.LocalDate
 
 @CompileStatic
 @Slf4j
@@ -65,6 +67,26 @@ class DBConfig {
             it.withSql({ Sql sql -> sql.execute('drop all objects') })
         }
         it
+    }
+
+    static parseDateExInstall(Sql sql) {
+        Class.forName("DBConfig")
+        sql.execute("create alias parseDateEx for \"DBConfig.parseDateEx\" ")
+    }
+
+    static java.sql.Date parseDateEx(String text, String formatString) {
+        SimpleDateFormat std
+        Date dt = null
+        try {
+            final fmt = new SimpleDateFormat(formatString)
+            std = new SimpleDateFormat('yyyy-MM-dd')
+            dt = fmt.parse(text)
+            String iso = std.format(dt)
+            return java.sql.Date.valueOf(iso)
+        } catch (Exception oops) {
+            log.warn("bad date: $text $oops")
+            return null
+        }
     }
 
     interface Task {

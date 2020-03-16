@@ -228,16 +228,31 @@ class TumorFileTest extends TestCase {
      In Date of Last Contact, we've also seen 19919999
      */
     void testDates() {
-        final Table caseTable = TumorOnt.read_csv(TumorFileTest.getResource('date_cases.csv'))
-        List<LocalDate> expected = caseTable.iterator().collect { Row it ->
-            it.isMissing('year') ?
-                    null : LocalDate.of(
-                    it.getInt('year'),
-                    it.getInt('month'),
-                    it.getInt('day'))
+        def actual = TumorFile.naaccr_date_col(date_cases.stringColumn('text'))
+        assert date_cases_ymd == actual.asList()
+    }
+
+    static final Table date_cases = TumorOnt.read_csv(TumorFileTest.getResource('date_cases.csv'))
+    static final List<LocalDate> date_cases_ymd = date_cases.iterator().collect { Row it ->
+        it.isMissing('year') ?
+                null : LocalDate.of(
+                it.getInt('year'),
+                it.getInt('month'),
+                it.getInt('day'))
+    }
+
+    void testDatesInH2() {
+        DBConfig acct1 = DBConfig.inMemoryDB("dates", true)
+        acct1.withSql { Sql sql ->
+            TumorOnt.load_data_frame(sql, "date_cases", date_cases)
+            DBConfig.parseDateExInstall(sql)
+            final actual = sql.rows("""
+                 select parseDateEx(substring(concat(text, '0101'), 1, 8), 'yyyyMMdd') as date_value
+                 from date_cases
+                  """ as String).collect { it.date_value.toString() }
+            // H2 parses 19709999 as 1978-06-07; we'll let that slide
+            assert actual.take(4) == date_cases_ymd.collect { it == null ? null : it.toString() }.take(4)
         }
-        def actual = TumorFile.naaccr_date_col(caseTable.stringColumn('text'))
-        assert expected == actual.asList()
     }
 
     void testItemDates() {

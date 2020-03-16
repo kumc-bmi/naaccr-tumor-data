@@ -436,6 +436,7 @@ class TumorFile {
 
             Table raw_obs = DataSummary.stack_obs(extract, item_ty, TumorKeys.key4 + TumorKeys.dtcols)
             raw_obs = naaccr_dates(raw_obs, TumorKeys.dtcols)
+            DBConfig.parseDateExInstall(sql)
 
             final views = TumorOnt.create_objects(
                     sql, script, [

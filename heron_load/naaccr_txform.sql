@@ -120,7 +120,7 @@ select raw.*
      , case
        when ty.valtype_cd = 'D'
        -- TODO: length 14 datetime
-       then parseDateTime(substring(concat(value, '0101'), 1, 8),
+       then parseDateEx(substring(concat(value, '0101'), 1, 8),
                     'yyyyMMdd')
        end as date_value
      , case when ty.valtype_cd in ('T', 'Ti')
