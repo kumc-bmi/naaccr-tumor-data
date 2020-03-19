@@ -84,7 +84,9 @@ class DBConfig {
             String iso = std.format(dt)
             return java.sql.Date.valueOf(iso)
         } catch (Exception oops) {
-            log.warn("bad date: $text $oops")
+            if (text.replace("9", "") != "") {
+                log.warn("bad date: $text $oops")
+            }
             return null
         }
     }
