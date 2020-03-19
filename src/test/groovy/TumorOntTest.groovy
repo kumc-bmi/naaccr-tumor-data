@@ -135,8 +135,9 @@ class TumorOntTest extends TestCase {
     void testSqlDialect() {
         DBConfig.inMemoryDB("dialect").withSql { Sql sql ->
             assert sql.firstRow("select 1 as x from (values('X'))  ")[0] == 1
-            sql.firstRow("select lpad(10, 4, '0') from (values(1))")[0] == "0010"
+            assert sql.firstRow("select lpad(10, 4, '0') from (values(1))")[0] == "0010"
             assert sql.firstRow("select lpad(9, 2, '0') || ' xyz' from (values(1))")[0] == "09 xyz"
+            assert sql.firstRow("select 1 from (values('X')) where not regexp_like('XXXX.9', '^[0-9].*')")[0] == 1
         }
     }
 

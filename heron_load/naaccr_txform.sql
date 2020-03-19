@@ -115,6 +115,7 @@ select raw.*
        end as code_value
      , case
        when ty.valtype_cd in ('N', 'Ni')
+       and regexp_like(value, '^[0-9].*')
        then cast(value as float)
        end as numeric_value
      , case
