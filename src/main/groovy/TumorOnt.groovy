@@ -322,13 +322,12 @@ class TumorOnt {
             ] as Map
             final views = create_objects(sql, ont_script, tables)
             final String name = ont_script.objects.last().first
-            views[name]
+            views[name](sql)
         }
     }
 
-    static Map<String, Table> create_objects(Sql sql, SqlScript script,
+    static Map<String, Closure<Table>> create_objects(Sql sql, SqlScript script,
                                              Map<String, Table> tables) {
-        // IDEA: use a contextmanager for temp views
         final Set provided = tables.keySet()
         tables.each { key, df ->
             log.info("${script.name}: $key = ${df.columnNames()}")
@@ -350,11 +349,14 @@ class TumorOnt {
             } catch (SQLException ignored) {
             }
             sql.execute(it.second)
-            Table dft = null
-            sql.query("select * from $name".toString()) { ResultSet results ->
-                dft = Table.read().db(results, name)
+            Closure<Table> getDF = { Sql sql2 ->
+                Table dft = null
+                sql2.query("select * from $name".toString()) { ResultSet results ->
+                    dft = Table.read().db(results, name)
+                }
+                dft
             }
-            [(name): dft]
+            [(name): getDF]
         }
     }
 

@@ -446,7 +446,7 @@ class TumorFile {
                     section        : TumorOnt.NAACCR_I2B2.per_section,
             ])
 
-            return views.values().last()
+            return views.values().last()(sql)
         }
     }
 
@@ -688,14 +688,14 @@ class TumorFile {
         static Table stats(Table tumors_raw, Sql sql) {
             final Table ty = TumorOnt.NAACCR_I2B2.tumor_item_type
             final Table tumors = naaccr_dates(tumors_raw, ['dateOfDiagnosis'], false)
-            final Map<String, Table> views = TumorOnt.create_objects(sql, script, [
+            final Map<String, Closure<Table>> views = TumorOnt.create_objects(sql, script, [
                     section        : TumorOnt.NAACCR_I2B2.per_section,
                     naaccr_extract : tumors,
                     record_layout  : record_layout,
                     tumor_item_type: ty,
                     tumors_eav     : stack_obs(tumors, ty, ['dateOfDiagnosis']),
             ])
-            Table out = views.values().last()
+            Table out = views.values().last()(sql)
             DoubleColumn sd = out.doubleColumn('sd')
             sd.set((sd as NumericColumn).isMissing(), 0 as Double)
             out
