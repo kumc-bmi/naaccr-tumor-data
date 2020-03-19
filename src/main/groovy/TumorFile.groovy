@@ -79,11 +79,21 @@ class TumorFile {
                     cli.property("naaccr.stats-table"),
             )
         } else if (cli.flag('tumors')) {
-            work = new NAACCR_Visits(cdw, flat_file(), task_id, 2000000)
+            work = new NAACCR_Visits(cdw, task_id,
+                    flat_file(),
+                    cli.property("naaccr.records-table"),
+                    cli.property("naaccr.extract-table"),
+                    2000000)
         } else if (cli.flag('facts')) {
-            work = new NAACCR_Facts(cdw, flat_file(), task_id)
+            work = new NAACCR_Facts(cdw, task_id,
+                    flat_file(),
+                    cli.property("naaccr.records-table"),
+                    cli.property("naaccr.extract-table"))
         } else if (cli.flag('patients')) {
-            work = new NAACCR_Patients(cdw, flat_file(), task_id)
+            work = new NAACCR_Patients(cdw, task_id,
+                    flat_file(),
+                    cli.property("naaccr.records-table"),
+                    cli.property("naaccr.extract-table"))
         } else if (cli.flag('ontology') || cli.flag('import')) {
             TumorOnt.run_cli(cli)
         } else {
@@ -323,31 +333,32 @@ class TumorFile {
 
         final TableBuilder tb
         private final DBConfig cdw
-        private final URL flat_file
+        private final NAACCR_Extract extract_task
 
-        NAACCR_Visits(DBConfig _cdw, URL _flat_file, String _task_id, int start) {
-            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
-            flat_file = _flat_file
-            cdw = _cdw
+        NAACCR_Visits(DBConfig cdw, String task_id, URL flat_file, String records_table, String extract_table, int start) {
+            tb = new TableBuilder(task_id: task_id, table_name: table_name)
+            this.cdw = cdw
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
             encounter_num_start = start
         }
 
         boolean complete() { tb.complete(cdw) }
 
         void run() {
-            Table tumors = _data(flat_file, encounter_num_start)
+            Table tumors = _data(encounter_num_start)
             cdw.withSql { Sql sql ->
                 tb.build(sql, tumors)
             }
         }
 
-        static Table _data(URL flat_file, int encounter_num_start) {
-            Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream()) // TODO try, close
-            Table tumors = TumorKeys.with_tumor_id(
-                    TumorKeys.pat_tmr(naaccr_text_lines))
-            tumors = TumorKeys.with_rownum(
-                    tumors, encounter_num_start)
-            tumors
+        Table _data(int encounter_num_start) {
+            extract_task.withRecords { Reader naaccr_text_lines ->
+                Table tumors = TumorKeys.with_tumor_id(
+                        TumorKeys.pat_tmr(naaccr_text_lines))
+                tumors = TumorKeys.with_rownum(
+                        tumors, encounter_num_start)
+                tumors
+            }
         }
     }
 
@@ -360,27 +371,29 @@ class TumorFile {
 
         final TableBuilder tb
         private final DBConfig cdw
-        private final URL flat_file
+        private final NAACCR_Extract extract_task
 
-        NAACCR_Patients(DBConfig _cdw, URL _flat_file, String _task_id) {
-            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
-            flat_file = _flat_file
-            cdw = _cdw
+        NAACCR_Patients(DBConfig cdw, String task_id, URL flat_file, String records_table, String extract_table) {
+            tb = new TableBuilder(task_id: task_id, table_name: table_name)
+            this.cdw = cdw
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
+
         }
 
         boolean complete() { tb.complete(cdw) }
 
         void run() {
             cdw.withSql { Sql sql ->
-                Table patients = _data(sql, flat_file)
+                Table patients = _data(sql)
                 tb.build(sql, patients)
             }
         }
 
-        static Table _data(Sql cdwdb, URL flat_file) {
-            Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream()) // TODO try, close
-            Table patients = TumorKeys.patients(naaccr_text_lines)
-            TumorKeys.with_patient_num(patients, cdwdb, schema, patient_ide_source)
+        Table _data(Sql cdwdb) {
+            extract_task.withRecords { Reader naaccr_text_lines ->
+                Table patients = TumorKeys.patients(naaccr_text_lines)
+                TumorKeys.with_patient_num(patients, cdwdb, schema, patient_ide_source)
+            }
         }
     }
 
@@ -390,11 +403,13 @@ class TumorFile {
         final TableBuilder tb
         private final DBConfig cdw
         private final URL flat_file
+        private final NAACCR_Extract extract_task
 
-        NAACCR_Facts(DBConfig _cdw, URL _flat_file, String _task_id) {
-            tb = new TableBuilder(task_id: _task_id, table_name: table_name)
-            flat_file = _flat_file
-            cdw = _cdw
+        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_file, String records_table, String extract_table) {
+            tb = new TableBuilder(task_id: task_id, table_name: table_name)
+            this.flat_file = flat_file
+            this.cdw = cdw
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
         }
 
         boolean complete() { tb.complete(cdw) }
@@ -403,8 +418,7 @@ class TumorFile {
             final DBConfig mem = DBConfig.inMemoryDB("Facts")
             Table data = null
             mem.withSql { Sql memdb ->
-                Reader naaccr_text_lines = new InputStreamReader(flat_file.openStream())
-                data = _data(memdb, naaccr_text_lines)
+                data = _data(memdb)
             }
 
             cdw.withSql { Sql sql ->
@@ -412,14 +426,16 @@ class TumorFile {
             }
         }
 
-        static Table _data(Sql sql, Reader naaccr_text_lines) {
+        Table _data(Sql sql) {
             final Table dd = ddictDF()
-            final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
-            Table item = ItemObs.make(sql, extract)
-            // TODO: Table seer = SEER_Recode.make(sql, extract)
-            // TODO: Table ssf = SiteSpecificFactors.make(sql, extract)
-            // TODO: item.append(seer).append(ssf)
-            item
+            extract_task.withRecords { Reader naaccr_text_lines ->
+                final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+                Table item = ItemObs.make(sql, extract)
+                // TODO: Table seer = SEER_Recode.make(sql, extract)
+                // TODO: Table ssf = SiteSpecificFactors.make(sql, extract)
+                // TODO: item.append(seer).append(ssf)
+                item
+            }
         }
     }
 

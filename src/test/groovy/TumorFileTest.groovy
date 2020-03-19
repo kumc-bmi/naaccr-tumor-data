@@ -34,7 +34,9 @@ class TumorFileTest extends TestCase {
         final String doc = TumorFile.usage
         final args = ['facts']
         final Properties config = new Properties()
-        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): testDataPath])
+        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): testDataPath,
+                                            ('naaccr.records-table'): 'TR_REC',
+                                            ('naaccr.extract-table'): 'TR_EX'])
         DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
                 { String name -> config  },
                 { int it -> throw new RuntimeException('unexpected exit') },
@@ -200,8 +202,7 @@ class TumorFileTest extends TestCase {
     void notYettestPatientsTask() {
         final cdw = DBConfig.inMemoryDB("PT", true)
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Task work = new TumorFile.NAACCR_Patients(cdw, flat_file,
-                "task123456")
+        Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", flat_file, "TR_REC", "TR_EX")
         if (!work.complete()) {
             work.run()
         }
@@ -278,7 +279,7 @@ class TumorFileTest extends TestCase {
 
     void testVisits() {
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Table tumors = TumorFile.NAACCR_Visits._data(flat_file, 12345)
+        Table tumors = new TumorFile.NAACCR_Visits(null, "task123", flat_file, "TR_REC", "TR_EX", 12345)._data(12345)
         assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
         assert tumors.intColumn('encounter_num').min() == 12345
     }
