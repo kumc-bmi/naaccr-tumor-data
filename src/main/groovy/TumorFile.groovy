@@ -140,7 +140,7 @@ class TumorFile {
                     }
                     int line = 0
                     sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
-                        new Scanner(naaccr_text_lines).useDelimiter("\n") each { String record ->
+                        new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String record ->
                             line += 1
                             ps.addBatch([line as Object, record as Object])
                         }
