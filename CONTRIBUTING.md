@@ -9,7 +9,13 @@ The groovy code is typically developed with IDEA, but `build.gradle` works anywh
 especially with `./gradlew` or `./gradlew.bat`. IDEA's "optimize imports" and "reformat code" are
 handy; here's hoping we can teach gradle to check style.
 
-The `fatjar` task bundles JDBC drivers used in i2b2: postgres, MS SQL Server, and Oracle.
+To bundle the code along with JDBC drivers used in i2b2: postgres, MS SQL Server, and Oracle:
+
+```
+./gradlew fatjar
+```
+
+and out comes `build/libs/naaccr-tumor-data.jar`.
 
 
 ## H2 Database Engine for portable ETL
