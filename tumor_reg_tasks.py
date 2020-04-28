@@ -188,6 +188,9 @@ class JDBCTask(luigi.Task):
                 conn = jvm.java.sql.DriverManager.getConnection(
                     self.db_url, self.user, self.__password)
                 try:
+                    # avoid: JdbcUtils: Requested isolation level 1 is not supported;
+                    #        falling back to default isolation level 2
+                    conn.setTransactionIsolation(2)
                     yield conn
                 finally:
                     conn.close()
@@ -282,6 +285,10 @@ class SparkJDBCTask(PySparkTask, JDBCTask):
     """
     driver_memory = pv.StrParam(default='4g', significant=False)
     executor_memory = pv.StrParam(default='4g', significant=False)
+    max_result_size = pv.StrParam(default='4g', significant=False)
+
+    def setup(self, conf):
+        conf.set("spark.driver.maxResultSize", self.max_result_size)
 
     @abstractmethod
     def output(self) -> luigi.Target: pass
