@@ -1,19 +1,97 @@
-# NAACCR Tumor Registry v18 Data in i2b2 etc.
+# NAACCR Tumor Registry v18 Data in i2b2 etc.: Beta Testing
+
+_While various issues remain, KUMC put a version of this code
+in production in the [Sep 2019
+HERON Great Salt Lake
+release](https://bmi-work.kumc.edu/work/blog/2019/09/slug)._
+
+---
+
+## NAACCR File ETL: Getting Started
+
+We suppose you have access to your NAACCR v18 file; for testing,
+you can use [naaccr-xml-sample-v180-incidence-100.txt](https://raw.githubusercontent.com/kumc-bmi/naaccr-tumor-data/onejar/naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt).
+
+For integration testing, we use the [H2 Database Engine](https://www.h2database.com/),
+but when you are ready, you should configure access to Postgres, SQL Server, or Oracle as in section
+[3.4.2 Set Database Properties](https://community.i2b2.org/wiki/display/getstarted/3.4.2+Set+Database+Properties)
+of the [i2b2 installation guide](https://community.i2b2.org/wiki/display/getstarted/i2b2+Installation+Guide).
+
+```properties
+db.username=SA
+db.password=
+db.driver=org.h2.Driver
+db.url=jdbc:h2:file:/tmp/DB1;create=true
+
+naaccr.flat-file=naaccr-xml-sample-v180-incidence-100.txt
+naaccr.records-table: NAACCR_RECORDS
+naaccr.extract-table: NAACCR_DATA
+naaccr.stats-table: NAACCR_STATS
+```
+
+Then, to create `NAACCR_OBSERVATIONS`, run:
+
+```shell script
+java -jar naaccr-tumor-data.jar facts
+```
+
+_Please excuse / ignore `WARNING: An illegal reflective access ...`;
+see [issue 30](https://github.com/kumc-bmi/naaccr-tumor-data/issues/30)._
+
+_Note: adding these observations to the i2b2 star schema requires running `naaccr_facts_load.sql`; porting
+that script to othere databases / environments is still in-progress._
+
+---
+
+### naaccr-tumor-data.jar Usage Reference
+
+_The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`._
+
+```
+Usage:
+  naaccr-tumor-data load-records [--db=PF]
+  naaccr-tumor-data discrete-data [--no-file] [--db=PF]
+  naaccr-tumor-data summary  [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data tumors   [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data facts    [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
+  naaccr-tumor-data import [--db=F] TABLE DATA META
+  naaccr-tumor-data load [--db=F]
+  naaccr-tumor-data run SCRIPT [--db=F]
+  naaccr-tumor-data query SQL [--db=F]
+
+Options:
+  load-records       load NAACCR records into a (CLOB) column of a DB table
+  discrete-data      split NAACCR records into a wide table of discrete data
+  tumors             build NAACCR_TUMORS table
+  facts              build NAACCR_OBSERVATIONS table
+  summary            build NAACCR_EXTRACT_STATS table
+  --db=PROPS         database properties file [default: db.properties]
+  --no-file          use loaded records rather than file as input
+  --task-id=ID       version / completion marker [default: task123]
+  ontology           build NAACCR_ONTOLOGY table
+  --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]
+  --version=NNN      ontology version [default: 180]
+  --task-hash=H      ontology completion marker
+  --update-date=D    ontology update_date in YYYY-MM-DD format
+  --who-cache=DIR    where to find WHO oncology metadata
+  import             import CSV
+  TABLE              target table name
+  DATA               CSV file
+  META               W3C tabular data metadata (JSON)
+  load               load data from stdin using JSON (details TODO)
+  run                run SQL script
+  query              run SQL query and write results to stdout in JSON
+
+```
+
+---
+
+## NAACCR Record Layout Version 18
 
 The [NAACCR_ETL][gpc] process used at KUMC and other GPC sites to load
 tumor registry data into [i2b2][] is **outdated by version 18** of the
-[NAACCR standard][dno]. We are taking this opportunity to reconsider
-our platform and approach:
-
-  - Portable to database engines other than Oracle
-  - Explicit tracking of data flow to facilitate parallelism
-  - Rich test data to facilitate development without access to private data
-  - Separate repository from HERON EMR ETL to avoid
-    *information blocking* friction
-
-While various issues remain, it is in production as of the [Sep 2019
-HERON Great Salt Lake
-release](https://bmi-work.kumc.edu/work/blog/2019/09/slug).
+[NAACCR standard][dno].
 
 ref:
 
@@ -79,53 +157,23 @@ cite:
 
 ---
 
-## Platform for v18: Spark SQL, PySpark, and luigi
+## Building on NAACCR XML from SEER
 
- - **Spark SQL**
-   - lets us leverage the **working knowledge of SQL** in our community
-     - HERON ETL: 30KLOC of SQL
-   - portable: **same JVM platform as i2b2**; **JDBC** connectivity to datamarts
- - **PySpark** to fill in gaps where SQL is awkward, such as
-   - iterating over columns or tables
- - **luigi**
-   - While Spark automatically breaks down work in a resilient manner, jobs
-     fail completely when they fail.
-   - luigi tasks **preserve partial results**
-
-
-**IDEA:** move more pyspark logic to User-Defined Functions (UDFs) and
-          drive more of the work from .sql scripts.
+ - [naaccr-xml][ims] - NAACCR XML reader in Java by F. Depry of IMS for SEER
+   - first release: v0.5 (beta) Apr 20, 2015; v1.0 Feb 7, 2016
+   - frequent release:
+     - v6.6 Feb 6, 2020
+     - ...
+     - v5.4 Jun 13, 2019
+     - v5.3 May 21, 2019
+ - XML replaces flat file in 2020 (*IOU citation*)
+ - also supports flat files
+ - [imsweb/layout](https://github.com/imsweb/layout) has sections, codes, etc.
+ - NAACCR XML WG meets alternate Fridays 11amET (e.g. Aug 2)
 
 ---
 
-## NAACCR Ontology for i2b2: Usage
-
-
-The `NAACCR_Ontology1` task creates a `NAACCR_ONTOLOGY` table:
-
-```
-$ luigi --module tumor_reg_tasks NAACCR_Ontology1
-DEBUG: Checking if NAACCR_Ontology1(design_id=upper, naaccr_version=18, naaccr_ch10_bytes=3078052) is complete
-15:48:09 INFO: ...status   PENDING
-15:48:09 INFO: Running Worker with 1 processes
-...
-15:48:20 ===== Luigi Execution Summary =====
-15:48:20 
-15:48:20 Scheduled 1 tasks of which:
-15:48:20 * 1 ran successfully:
-15:48:20     - 1 NAACCR_Ontology1(...)
-```
-
-
-If you're interested in luigi usage, see `client.cfg` for details. If not, see:
-
-  - `tumor_reg_ont.py`
-  - `heron_load/tumor_item_value.csv`, and
-  - `heron_load/naaccr_concepts_load.sql`
-
----
-
-### Coded concepts
+## Coded concepts
 
 Metadata for coded values is also work in progress.
 
@@ -136,21 +184,6 @@ Metadata for coded values is also work in progress.
     - well curated code-labels: [naaccr][PADOH] NAACCR reader in R by
       N. Werth of PA Dept. of Health
   - hope to incorporate codes from [imsweb/layout](https://github.com/imsweb/layout)
-
----
-
-### Related work: NAACCR XML
-
- - [naaccr-xml][ims] - NAACCR XML reader in Java by F. Depry of IMS for SEER
-   - first release: v0.5 (beta) Apr 20, 2015
-   - frequent release:
-     - v5.4 Jun 13, 2019
-     - v5.3 May 21, 2019
-     - v1.0 Feb 7, 2016
- - XML replaces flat file in 2020 (*IOU citation*)
- - Reading XML with Spark is straightforward
- - NAACCR XML WG meets alternate Fridays 11amET (e.g. Aug 2)
- - [imsweb/layout](https://github.com/imsweb/layout) has sections, codes, etc.
 
 ---
 
@@ -165,7 +198,7 @@ Maintained by the World Health Organization (WHO)
 
 ---
 
-### SEER Site Recode
+## SEER Site Recode
 
  - combines primary site and histology
  - e.g. `20010` for **Lip**
@@ -173,7 +206,7 @@ Maintained by the World Health Organization (WHO)
 
 ---
 
-### site-specific factors
+## site-specific factors
 
 Obsolete in 2018, but to capture data from older cases...
 
@@ -181,6 +214,61 @@ Obsolete in 2018, but to capture data from older cases...
    -  added to HERON March 2016; see [GPC ticket 150](https://informatics.gpcnetwork.org/trac/Project/ticket/150)
    - These are obsolete in cases abstracted per v18 but still used in older cases.
    - [WerthPADOH][PADOH] issue: [​Handle site-specific codes in fields #35](https://github.com/WerthPADOH/naaccr/issues/35) opened Apr 24 2019
+
+---
+
+## Platform for v18: JVM, JDBC, H2 DB, tablesaw, groovy, (and luigi)
+
+We are taking this opportunity to reconsider
+our platform and approach:
+
+  - Portable to database engines other than Oracle
+  - Explicit tracking of data flow to facilitate parallelism
+  - Rich test data to facilitate development without access to private data
+  - Separate repository from HERON EMR ETL to avoid
+    *information blocking* friction
+
+See [CONTRIBUTING](CONTRIBUTING.md) for details.
+
+ - **JDBC**
+   - lets us leverage the **working knowledge of SQL** in our community
+     - HERON ETL: 30KLOC of SQL
+   - portable: **same JVM platform as i2b2**
+   - **JDBC** connectivity to datamarts
+   - **[H2](https://www.h2database.com/html/main.html)** for in-memory DB
+ - **groovy** to fill in gaps where SQL is awkward, such as
+   - iterating over columns or tables
+   - [tablesaw](https://jtablesaw.github.io/tablesaw/) Dataframe library
+     a la python pandas, Spark
+   - _difference from Java worthwhile? see [CONTRIBUTING](CONTRIBUTING.md)_
+ - **luigi** (optional)
+   - luigi tasks **preserve partial results**
+
+---
+
+## NAACCR Ontology for i2b2: Luigi Usage
+
+The `NAACCR_Ontology1` task creates a `NAACCR_ONTOLOGY` table:
+
+```
+$ luigi --module tumor_reg_tasks NAACCR_Ontology1
+DEBUG: Checking if NAACCR_Ontology1(design_id=upper, naaccr_version=18, naaccr_ch10_bytes=3078052) is complete
+15:48:09 INFO: ...status   PENDING
+15:48:09 INFO: Running Worker with 1 processes
+...
+15:48:20 ===== Luigi Execution Summary =====
+15:48:20
+15:48:20 Scheduled 1 tasks of which:
+15:48:20 * 1 ran successfully:
+15:48:20     - 1 NAACCR_Ontology1(...)
+```
+
+
+If you're interested in luigi usage, see `client.cfg` for details. If not, see:
+
+  - `tumor_reg_ont.py`
+  - `heron_load/tumor_item_value.csv`, and
+  - `heron_load/naaccr_concepts_load.sql`
 
 ---
 

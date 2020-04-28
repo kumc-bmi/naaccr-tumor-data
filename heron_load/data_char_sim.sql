@@ -8,15 +8,16 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 
 -- Check that NAACCR data dictionary and data is available.
 select sectionid from section where 1=0;
-select recordId, dateOfDiagnosis from naaccr_extract where 1=0;
-select recordId, naaccrNum from tumors_eav where 1=0;
+select tumor_id, dateOfDiagnosis from naaccr_extract where 1=0;
+select tumor_id, naaccrNum from tumors_eav where 1=0;
 select `naaccr-item-num`, section from record_layout;
 
 -- Check that tumor_item_type from naaccr_txform.sql is available (esp. for valtype_cd)
 select valtype_cd from tumor_item_type where 1=0;
 
 
-create or replace temporary view data_agg_naaccr as
+drop view if exists data_agg_naaccr;
+create view data_agg_naaccr as
 with
 cases as (
   select year(dateOfDiagnosis) as dx_yr, count(*) as tumor_qty
@@ -44,7 +45,6 @@ cases as (
          then to_date(substring(concat(value, '0101'), 1, 8),
                       'yyyyMMdd')
          end as date_value
-       , ty.valtype_cd
        , ty.naaccrNum
        , ty.naaccrId
   from with_yr
@@ -73,22 +73,21 @@ by_val as (
 ,
 -- normalize date variables to the reference date: diagnosis
 event as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, datediff(e.date_value, e.dateOfDiagnosis) as mag
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, datediff('day', e.dateOfDiagnosis, e.date_value)  as mag
   from with_ty e where valtype_cd = 'D'
 )
 ,
 measurement as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, numeric_value as mag
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, 0+numeric_value as mag /*ISSUE: fix numeric when building EAV*/
   from with_ty where valtype_cd = 'N'
 )
 ,
 -- assuming normal distribution, characterize continuous data
 stats as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, avg(mag) mean, stddev(mag) sd
+  select dx_yr, naaccrNum, naaccrId, valtype_cd, avg(mag) mean, stddev_pop(mag) sd
   from (select * from event union all select * from measurement)
   group by dx_yr, naaccrNum, naaccrId, valtype_cd
 )
-
 -- For nominal data, save the frequency of each value
 select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
      , cast(null as float) mean, cast(null as float) sd
@@ -97,9 +96,7 @@ select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
      , cases.tumor_qty
 from by_val
 join cases on cases.dx_yr = by_val.dx_yr
-
 union all
-
 select stats.dx_yr, by_item.naaccrId, stats.naaccrNum, stats.valtype_cd
      , mean, sd
      , null value, null freq, by_item.present, cases.tumor_qty
@@ -108,7 +105,19 @@ join by_item_yr by_item on stats.naaccrId = by_item.naaccrId and stats.dx_yr = b
 join cases on stats.dx_yr = cases.dx_yr
 ;
 
-create or replace temporary view nominal_cdf as
+
+drop view if exists data_char_naaccr;
+create view data_char_naaccr as
+select s.sectionId, rl.section, nom.*
+from data_agg_naaccr nom
+join record_layout rl
+  on rl."NAACCR-ITEM-NUM" = nom.naaccrNum
+join section s
+  on s.section = rl.section
+;
+
+drop view if exists nominal_cdf;
+create view nominal_cdf as
 -- Compute cumulative distribution function for each value of each nominal item.
 select dx_yr, naaccrNum, naaccrId, value, freq
      , sum(freq)
@@ -119,7 +128,8 @@ select dx_yr, naaccrNum, naaccrId, value, freq
 from data_agg_naaccr
 ;
 
-create or replace temporary view simulated_case_year as
+drop view if exists simulated_case_year;
+create view simulated_case_year as
 with by_yr as (
 select distinct dx_yr, tumor_qty
 from data_agg_naaccr
@@ -139,9 +149,17 @@ select dx_yr
             as qty_cum
 from by_yr
 ),
+	golden_ratio as (
+	select 1.61803398875 as phi
+),
+	rand_per_entity as (
+	select phi * case_index - cast(phi * case_index as int) rand01
+	     , case_index
+	from simulated_entity cross join golden_ratio
+),
 pick as (
-select case_index, cast(rand() * all_yr.qty as int) as x
-from simulated_entity
+select case_index, cast(rand01 * all_yr.qty as int) as x
+from rand_per_entity
 cross join all_yr
 )
 select pick.*, yr_cum.*
@@ -151,7 +169,8 @@ and pick.x < yr_cum.qty_cum
 ;
 
 
-create or replace temporary view simulated_naaccr_nom as
+drop view if exists simulated_naaccr_nom;
+create view simulated_naaccr_nom as
 with
 by_item as (
   select dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd
@@ -161,13 +180,17 @@ by_item as (
   group by dx_yr, sectionId, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
 )
 ,
--- for each item of each case, pick a uniformly random number
+-- for each item of each case, choose "randomly" (using the golden ratio)
+golden_ratio as (
+select 1.61803398875 as phi
+),
 ea as (
   select cy.case_index, cy.dx_yr, sectionId, by_item.naaccrNum, by_item.naaccrId, by_item.valtype_cd
        , by_item.present, by_item.tumor_qty
-       , rand() * denominator as x
+       , (phi * case_index * naaccrNum - cast(phi * case_index * naaccrNum as int)) * denominator as x
   from simulated_case_year cy
   join by_item on cy.dx_yr = by_item.dx_yr
+  cross join golden_ratio
 )
 select ea.case_index, sectionId, ea.dx_yr, ea.naaccrNum, ea.naaccrId, by_val.value
      , ea.x, by_val.cum_freq
@@ -180,16 +203,17 @@ where ea.x >= by_val.cum_freq - by_val.freq
 ;
 
 
-create or replace temporary view simulated_naaccr as
+drop view if exists simulated_naaccr;
+create view simulated_naaccr as
 with
 by_item as (
-  select distinct naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
+  select distinct dx_yr, naaccrNum, naaccrId, valtype_cd, mean, sd, present, tumor_qty
   from data_agg_naaccr d
 )
 ,
 -- for each item of each case, pick a uniformly random percentage and a normally distributed magnitude
 ea as (
-  select e.case_index, by_item.naaccrNum, by_item.valtype_cd
+  select by_item.dx_yr, e.case_index, by_item.naaccrNum, by_item.valtype_cd
        , by_item.present, by_item.tumor_qty
        , (e.case_index * 1017 + by_item.naaccrNum) % 100 as x  -- kludge; random() and CTEs don't work
        , ((e.case_index * 1017 + by_item.naaccrNum) % 100) / 100.0 * sd + mean as mag
@@ -200,7 +224,7 @@ ea as (
 -- compute reference event date
 -- TODO: consider distributing these uniformly rather than normally
 e0 as (
-  select case_index, naaccrNum, tumor_qty, date(current_date, '-' || mag || ' days') t
+  select dx_yr, case_index, naaccrNum, tumor_qty, date(current_date, mag, 'days') t
        , ea.x, ea.mag
   from ea
   where naaccrNum = 390 -- Date of Diagnosis
@@ -208,14 +232,14 @@ e0 as (
 ,
 -- compute dates of other events, with the same percentage of nulls
 e2 as (
-  select ea.case_index, ea.naaccrNum, ea.tumor_qty
+  select ea.dx_yr, ea.case_index, ea.naaccrNum, ea.tumor_qty
        , case when ea.x > ea.present / e0.tumor_qty * 100
          then date(e0.t, ea.mag || ' days')
          else null
          end t
        , ea.x, ea.mag
   from ea
-  join e0 on e0.case_index = ea.case_index
+  join e0 on e0.case_index = ea.case_index and e0.dx_yr = ea.dx_yr
   where e0.naaccrNum <> ea.naaccrNum
   and ea.valtype_cd = 'D'
 )
@@ -225,20 +249,17 @@ event as (
   union all
   select * from e2
 )
-
 -- Correlate the random percentage with the relevant value
-select ea.case_index, ea.naaccrNum, by_val.value
-     , ea.x, by_val.cdf, by_val.pct
+select ea.dx_yr, ea.case_index, ea.naaccrNum, by_val.value
+     , ea.x, by_val.cum_freq, by_val.freq
 from ea
 join nominal_cdf by_val
-  on by_val.naaccrNum = ea.naaccrNum
-where ea.x >= by_val.cdf
-  and ea.x < by_val.cdf + by_val.pct
-
+  on by_val.naaccrNum = ea.naaccrNum and by_val.dx_yr = ea.dx_yr
+where ea.x >= by_val.cum_freq - by_val.freq
+  and ea.x < by_val.cum_freq
 union all
-
 -- Convert dates to strings
-select event.case_index, event.naaccrNum
+select dx_yr, event.case_index, event.naaccrNum
      , substr(event.t, 1, 4) ||
        substr(event.t, 5, 2) ||
        substr(event.t, 7, 2) value
@@ -248,9 +269,11 @@ from event
 
 /* Eyeball simulated_naaccr:
 
-select d.case_index, ty.sectionid, ty.section, ty.naaccrNum, ty.itemname, ty.valtype_cd, d.value
+create table sim1 as
+select d.dx_yr, d.case_index, ty.sectionid, ty.section, ty.naaccrNum, ty.naaccrName, ty.valtype_cd, d.value
 from simulated_naaccr d
 join tumor_item_type ty on ty.naaccrNum = d.naaccrNum
-order by d.case_index, ty.sectionid, ty.naaccrNum;
+order by dx_yr desc, d.case_index, ty.sectionid, ty.naaccrNum;
 */
 
+select count(*) from sim1;

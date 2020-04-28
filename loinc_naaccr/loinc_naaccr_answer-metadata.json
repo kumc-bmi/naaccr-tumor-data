@@ -1,0 +1,69 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "LOINC_NUMBER",
+        "datatype": "string",
+        "number": 1,
+        "null": []
+      },
+      {
+        "name": "COMPONENT",
+        "datatype": "string",
+        "number": 2,
+        "null": []
+      },
+      {
+        "name": "CODE_SYSTEM",
+        "datatype": "string",
+        "number": 3,
+        "null": [
+          ""
+        ]
+      },
+      {
+        "name": "CODE_VALUE",
+        "datatype": "string",
+        "number": 4,
+        "null": [
+          ""
+        ]
+      },
+      {
+        "name": "AnswerListId",
+        "datatype": "string",
+        "number": 5,
+        "null": []
+      },
+      {
+        "name": "AnswerListName",
+        "datatype": "string",
+        "number": 6,
+        "null": [
+          ""
+        ]
+      },
+      {
+        "name": "ANSWER_CODE",
+        "datatype": "string",
+        "number": 7,
+        "null": []
+      },
+      {
+        "name": "SEQUENCE_NO",
+        "datatype": "number",
+        "number": 8,
+        "null": []
+      },
+      {
+        "name": "ANSWER_STRING",
+        "datatype": "string",
+        "number": 9,
+        "null": [
+          ""
+        ]
+      }
+    ]
+  }
+}

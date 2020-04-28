@@ -1,8 +1,20 @@
+r"""
+    >>> from sys import stderr
+    >>> logging.basicConfig(level=logging.WARNING, stream=stderr)
+    >>> spark = SparkSession_T.in_memory()  # _T isn't appropriate here
+    >>> ont = NAACCR_I2B2.ont_view_in(spark, task_hash='abc123',
+    ...                               update_date=dt.date(2001, 1, 1))
+    >>> ont  # doctest: +ELLIPSIS
+    DataFrame({'c_hlevel': 'number', 'c_fullname': 'string', ...})
+
+    # TODO: test ont.iterrows()
+"""
+
 from importlib import resources as res
 from pathlib import Path as Path_T  # for type only
 from typing import (
     Callable, ContextManager, Dict, Iterator, List, Optional as Opt,
-    Tuple, Union, NoReturn,
+    Sequence, Tuple, Union,
     cast,
 )
 from xml.etree import ElementTree as XML
@@ -10,14 +22,10 @@ import datetime as dt
 import logging
 import zipfile
 
-from mypy_extensions import TypedDict  # ISSUE: dependency?
-from pyspark.sql import SparkSession as SparkSession_T
-from pyspark.sql import types as ty
-from pyspark.sql.dataframe import DataFrame
-import pandas as pd  # type: ignore
-import numpy as np   # type: ignore
+from typing_extensions import TypedDict
 
-from sql_script import SqlScript
+from sql_script import create_objects, SqlScript, DataFrame, DBSession as SparkSession_T
+import tabular as tab
 import heron_load
 import loinc_naaccr  # included with permission
 import naaccr_layout
@@ -28,6 +36,21 @@ import naaccr_xml_xsd
 log = logging.getLogger(__name__)
 
 
+class XPath:
+    @classmethod
+    def the(cls, elt: XML.Element, path: str,
+            ns: Dict[str, str]) -> XML.Element:
+        """Get _the_ match for an XPath expression on an Element.
+
+        The XML.Element.find() method may return None, but when
+        we're dealing with static data that we know matches,
+        we can refine the type by asserting that there's a match.
+        """
+        found = elt.find(path, ns)
+        assert found is not None, (elt, path)
+        return found
+
+
 class XSD:
     uri = 'http://www.w3.org/2001/XMLSchema'
     ns = {'xsd': uri}
@@ -35,17 +58,7 @@ class XSD:
     @classmethod
     def the(cls, elt: XML.Element, path: str,
             ns: Dict[str, str] = ns) -> XML.Element:
-        """Get _the_ match for an XPath expression on an Element.
-
-        The XML.Element.find() method may return None, but when
-        we're dealing with static data that we know matches,
-        we can refine the type by asserting that there's a match.
-
-        IDEA: move this to an XPath class
-        """
-        found = elt.find(path, ns)
-        assert found is not None, (elt, path)
-        return found
+        return XPath.the(elt, path, ns)
 
     types: Dict[str, Callable[[str], Union[int, bool]]] = {
         'xsd:integer': int,
@@ -53,6 +66,7 @@ class XSD:
     }
 
 
+"""naaccr_layout fields"""
 Field0 = TypedDict('Field0', {
     'long-label': str,
     'start': int, 'end': int,
@@ -102,9 +116,6 @@ class NAACCR_Layout:
     ref https://github.com/imsweb/naaccr-xml/issues/156
     https://github.com/imsweb/layout/blob/master/src/main/resources/layout/fixed/naaccr/naaccr-18-layout.xml
 
-    IDEA: specify column types for CSV data with
-          https://www.w3.org/TR/tabular-data-primer/#datatypes
-
     >>> NAACCR_Layout.fields[:3]
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     [{'long-label': 'Record Type', 'start': 1, 'end': 1, 'length': 1, ...},
@@ -120,9 +131,9 @@ class NAACCR_Layout:
 
     >>> list(NAACCR_Layout.iter_codes())[:3]
     ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    [(70, 'addrAtDxCity', 'UNKNOWN', 'City at diagnosis unknown'),
-     (102, 'addrAtDxCountry', 'ZZN', 'North America NOS'),
-     (102, 'addrAtDxCountry', 'ZZC', 'Central America NOS')]
+    [[70, 'addrAtDxCity', 'UNKNOWN', 'City at diagnosis unknown'],
+     [102, 'addrAtDxCountry', 'ZZN', 'North America NOS'],
+     [102, 'addrAtDxCountry', 'ZZC', 'Central America NOS']]
 
     >>> def check_fkey(src, k, dest):
     ...    range = set(dest)
@@ -158,13 +169,17 @@ class NAACCR_Layout:
     fields: List[Field] = [to_field(f) for f in fields_raw]
 
     @classmethod
-    def item_codes(cls) -> pd.DataFrame:
+    def item_codes(cls) -> tab.DataFrame:
         ea = cls.iter_codes()
-        return pd.DataFrame(ea,
-                            columns=['naaccrNum', 'naaccrId', 'code', 'desc'])
+        schema: tab.Schema = {'columns': [
+            {'number': 1, 'name': 'naaccrNum', 'datatype': 'number', 'null': []},
+            {'number': 2, 'name': 'naaccrId', 'datatype': 'string', 'null': []},
+            {'number': 3, 'name': 'code', 'datatype': 'string', 'null': []},
+            {'number': 4, 'name': 'desc', 'datatype': 'string', 'null': ['']}]}
+        return tab.DataFrame(ea, schema=schema)
 
     @classmethod
-    def iter_codes(cls) -> Iterator[Tuple[int, str, str, str]]:
+    def iter_codes(cls) -> Iterator[List[Opt[tab.Value]]]:
         for path, doc in cls._field_docs():
             qname = cls._xmlId(doc)
             if not qname:
@@ -173,7 +188,7 @@ class NAACCR_Layout:
             info = cls._field_info(doc)
             naaccrNum = int(info['Item #'])
             for code, desc in cls._item_codes(doc):
-                yield naaccrNum, xmlId, code, desc
+                yield [naaccrNum, xmlId, code, desc]
 
     @classmethod
     def _item_codes(cls, doc: XML.Element) -> List[Tuple[str, str]]:
@@ -363,43 +378,50 @@ class NAACCR1:
 
 
 def eltSchema(xsd_complex_type: XML.Element,
-              simpleContent: bool = False) -> ty.StructType:
+              simpleContent: bool = False) -> tab.Schema:
     decls = xsd_complex_type.findall('xsd:attribute', XSD.ns)
-    fields = [
-        ty.StructField(
-            name=d.attrib['name'],
-            dataType=ty.IntegerType() if d.attrib['type'] == 'xsd:integer'
-            else ty.BooleanType() if d.attrib['type'] == 'xsd:boolean'
-            else ty.StringType(),
-            nullable=d.attrib.get('use') != 'required',
+    xlate: Dict[str, tab.DataType] = {
+        'xsd:integer': 'number',
+        'xsd:boolean': 'boolean',
+    }
+
+    fields: List[tab.Column] = [
+        {
+            'number': ix + 1,
+            'name': d.attrib['name'],
+            'datatype': xlate.get(d.attrib['type'], 'string'),
             # IDEA/YAGNI?: use pd.Categorical for xsd:enumeration
             # e.g. tns:parentType
-            metadata=d.attrib)
-        for d in decls]
+            # IDEA: metadata=d.attrib
+            'null': [] if d.attrib.get('use') == 'required' else ['']
+        }
+        for (ix, d) in enumerate(decls)]
     if simpleContent:
-        fields = fields + [ty.StructField('value', ty.StringType(), False)]
-    return ty.StructType(fields)
+        v: tab.Column = {'number': len(fields) + 2, 'name': 'value', 'datatype': 'string', 'null': []}
+        fields = fields + [v]
+    out: tab.Schema = {'columns': fields}
+    return out
 
 
 RawRecordMaker = Callable[[XML.Element, bool],
                           Iterator[Dict[str, str]]]
 
-RecordMaker = Callable[[XML.Element, ty.StructType, bool],
-                       Iterator[Dict[str, object]]]
+RecordMaker = Callable[[XML.Element, tab.Schema, bool],
+                       Iterator[Dict[str, Opt[tab.Value]]]]
 
 
-def xmlDF(spark: SparkSession_T, schema: ty.StructType,
+def xmlDF(schema: tab.Schema,
           doc: XML.ElementTree, path: str, ns: Dict[str, str],
           eltRecords: Opt[RecordMaker] = None,
-          simpleContent: bool = False) -> DataFrame:
+          simpleContent: bool = False) -> tab.DataFrame:
     data = xmlRecords(schema, doc, path, ns, eltRecords, simpleContent)
-    return spark.createDataFrame(data, schema)  # type: ignore
+    return tab.DataFrame.from_records(data)
 
 
-def xmlRecords(schema: ty.StructType,
+def xmlRecords(schema: tab.Schema,
                doc: XML.ElementTree, path: str, ns: Dict[str, str],
                eltRecords: Opt[RecordMaker] = None,
-               simpleContent: bool = False) -> Iterator[Dict[str, object]]:
+               simpleContent: bool = False) -> Iterator[Dict[str, Opt[tab.Value]]]:
     """
     >>> schema = eltSchema(XSD.the(NAACCR1.ItemDef, '*'))
     >>> ea = xmlRecords(doc=NAACCR1.ndd180, schema=schema,
@@ -418,12 +440,10 @@ def xmlRecords(schema: ty.StructType,
     return data
 
 
-def eltDict(elt: XML.Element, schema: ty.StructType,
-            simpleContent: bool = False) -> Iterator[Dict[str, object]]:
-    # ISSUE: schema should be replace by function decode(k, v)
-    out = {k: int(v) if isinstance(schema[k].dataType, ty.IntegerType)
-           else bool(v) if isinstance(schema[k].dataType, ty.BooleanType)
-           else v
+def eltDict(elt: XML.Element, schema: tab.Schema,
+            simpleContent: bool = False) -> Iterator[Dict[str, Opt[tab.Value]]]:
+    byName = {col['name']: col for col in schema['columns']}
+    out = {k: tab.Seq.decoder(byName[k])(v)
            for (k, v) in elt.attrib.items()}
     if simpleContent:
         out['value'] = elt.text
@@ -431,79 +451,70 @@ def eltDict(elt: XML.Element, schema: ty.StructType,
     yield out
 
 
-def ddictDF(spark: SparkSession_T) -> DataFrame:
-    return xmlDF(spark,
-                 schema=eltSchema(XSD.the(NAACCR1.ItemDef, '*')),
+def ddictDF() -> tab.DataFrame:
+    return xmlDF(schema=eltSchema(XSD.the(NAACCR1.ItemDef, '*')),
                  doc=NAACCR1.ndd180,
                  path='./n:ItemDefs/n:ItemDef',
                  ns=NAACCR1.ns)
 
 
-def fixna(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    avoid string + double errors from spark.createDataFrame(pd.read_csv())
-    """
-    return df.where(df.notnull(), None)
+def _with_path(gen: ContextManager[Path_T], f: Callable[[Path_T], tab.DataFrame]) -> tab.DataFrame:
+    with gen as p:
+        return f(p)
 
 
 class LOINC_NAACCR:
-    measure = fixna(pd.read_csv(res.open_text(
-        loinc_naaccr, 'loinc_naaccr.csv')))
-    measure_cols = ['LOINC_NUM', 'CODE_VALUE', 'SCALE_TYP', 'AnswerListId']
-    measure_struct = ty.StructType([
-        ty.StructField(n, ty.StringType()) for n in measure_cols])
+    measure = _with_path(res.path(loinc_naaccr, 'loinc_naaccr.csv'),
+                         tab.read_csv)
 
-    answer = fixna(pd.read_csv(res.open_text(
-        loinc_naaccr, 'loinc_naaccr_answer.csv')))
-    answer_struct = ty.StructType([
-        ty.StructField(n.lower(),
-                       ty.IntegerType() if n.lower() == 'sequence_no'
-                       else ty.StringType())
-        for n in answer.columns
-    ])
+    answer = _with_path(res.path(loinc_naaccr, 'loinc_naaccr_answer.csv'),
+                        tab.read_csv)
+    answer_struct: tab.Schema = {'columns': [
+        {'number': ix + 1,
+         'name': n.lower(),
+         'datatype': 'number' if n.lower() == 'sequence_no' else 'string',
+         'null': []}
+        for (ix, n) in enumerate(answer.columns)
+    ]}
 
 
 class NAACCR_R:
     # Names assumed by naaccr_txform.sql
 
-    field_info = pd.read_csv(res.open_text(
-        naaccr_r_raw, 'field_info.csv'))
-    field_code_scheme = pd.read_csv(res.open_text(
-        naaccr_r_raw, 'field_code_scheme.csv'))
+    field_info = _with_path(res.path(naaccr_r_raw, 'field_info.csv'),
+                            tab.read_csv)
+    field_code_scheme = _with_path(res.path(naaccr_r_raw, 'field_code_scheme.csv'),
+                                   tab.read_csv)
 
     @classmethod
     def _code_labels(cls) -> ContextManager[Path_T]:
         return res.path(naaccr_r_raw, 'code-labels')
 
     @classmethod
-    def field_info_in(cls, spark: SparkSession_T) -> None:
-        info = spark.createDataFrame(cls.field_info)
-        info.createOrReplaceTempView(NAACCR_I2B2_Mix.r_field_info)
-        to_scheme = spark.createDataFrame(cls.field_code_scheme)
-        to_scheme.createOrReplaceTempView(NAACCR_I2B2_Mix.r_code_scheme)
-
-    @classmethod
     def code_labels(cls,
-                    implicit: List[str] = ['iso_country']) -> pd.DataFrame:
+                    implicit: List[str] = ['iso_country']) -> tab.DataFrame:
         found = []
+        schema: tab.Schema = {'columns': [
+            {'number': 1, 'name': "code", 'datatype': 'string', 'null': []},
+            {'number': 2, 'name': "label", 'datatype': 'string', 'null': []},
+            {'number': 3, 'name': "means_missing", 'datatype': 'boolean', 'null': []},
+            {'number': 4, 'name': "description", 'datatype': 'string', 'null': ['']}]}
         with cls._code_labels() as cl_dir:
             for scheme in cls.field_code_scheme.scheme.unique():
                 if scheme in implicit:
                     continue
-                info = (cl_dir / scheme).with_suffix('.csv')
+                info = (cl_dir / str(scheme)).with_suffix('.csv')
                 skiprows = 0
                 if info.open().readline().startswith('#'):
                     skiprows = 1
-                codes = pd.read_csv(info, skiprows=skiprows,
-                                    na_filter=False,
-                                    dtype={'code': str, 'label': str})
-                codes['scheme'] = info.stem
+                codes = tab.read_csv(info, schema=schema, skiprows=skiprows)
+                codes = codes.withColumn('scheme', codes.code.const(info.stem))
                 if 'code' not in codes.columns or 'label' not in codes.columns:
                     raise ValueError((info, codes.columns))
                 found.append(codes)
-        all_schemes = pd.concat(found)
-        with_fields = cls.field_code_scheme.merge(all_schemes)
-        with_field_info = cls.field_info[['item', 'name']].merge(with_fields)
+        all_schemes = tab.concat(found)
+        with_fields = all_schemes.merge(cls.field_code_scheme)
+        with_field_info = with_fields.merge(cls.field_info.select('item', 'name'))
         return with_field_info
 
 
@@ -514,34 +525,42 @@ class OncologyMeta:
 
     @classmethod
     def read_table(cls, cache: Path_T,
-                   zip: str, item: str, names: Opt[List[str]]) -> pd.DataFrame:
+                   zip: str, item: str, names: Opt[Sequence[str]]) -> tab.DataFrame:
+        import csv
+
         archive = zipfile.ZipFile(cache / zip)
 
-        return pd.read_csv(archive.open(item),
-                           header=None if names else 0,
-                           delimiter=',' if item.endswith('.csv') else '\t',
-                           encoding=cls.encoding, names=names)
+        with archive.open(item) as infp:
+            rows = csv.reader(
+                (line.decode(cls.encoding) for line in infp),
+                delimiter=',' if item.endswith('.csv') else '\t')
+            if names is None:
+                names = next(rows)
+            schema: tab.Schema = {'columns': [
+                {'number': ix + 1, 'name': name, 'datatype': 'string', 'null': ['']}
+                for (ix, name) in enumerate(names)]}
+            return tab.DataFrame((row for row in rows), schema)
 
     @classmethod
-    def icd_o_topo(cls, topo: pd.DataFrame) -> pd.DataFrame:
+    def icd_o_topo(cls, topo: tab.DataFrame) -> tab.DataFrame:
         major = topo[topo.Lvl == '3']
-        minor = topo[(topo.Lvl == '4')].copy()
-        minor['major'] = minor.Kode.apply(lambda s: s.split('.')[0])
-        out3 = pd.DataFrame(dict(
-            lvl=3,
+        minor = topo[(topo.Lvl == '4')]
+        minor = minor.withColumn('major', minor.Kode.apply(lambda s: str(s).split('.')[0]))
+        out3 = tab.DataFrame.from_columns(dict(
+            lvl=major.Kode.const(3),
             concept_cd=major.Kode,
-            c_visualattributes='FA',
-            path=major.Kode + '\\',
+            c_visualattributes=major.Kode.const('FA'),
+            path=major.Kode.apply(lambda s: str(s) + '\\'),
             concept_name=major.Title
         ))
-        out4 = pd.DataFrame(dict(
-            lvl=4,
-            concept_cd=minor.Kode.str.replace('.', ''),
-            c_visualattributes='LA',
-            path=minor.major + '\\' + minor.Kode + '\\',
+        out4 = tab.DataFrame.from_columns(dict(
+            lvl=minor.Kode.const(4),
+            concept_cd=minor.Kode.apply(lambda v: str(v).replace('.', '')),
+            c_visualattributes=minor.Kode.const('LA'),
+            path=minor.apply('string', lambda major, Kode, **_: major + '\\' + Kode + '\\'),
             concept_name=minor.Title
         ))
-        return pd.concat([out3, out4], sort=False)
+        return tab.concat([out3, out4])
 
 
 class NAACCR_I2B2(object):
@@ -549,18 +568,14 @@ class NAACCR_I2B2(object):
     c_name = 'Cancer Cases (NAACCR Hierarchy)'
     sourcesystem_cd = 'heron-admin@kumc.edu'
 
-    tumor_item_type = fixna(pd.read_csv(res.open_text(
-        heron_load, 'tumor_item_type.csv')))
+    tumor_item_type = _with_path(res.path(heron_load, 'tumor_item_type.csv'),
+                                 tab.read_csv)
 
-    # Make sure basecode loads as string, not double.
-    seer_recode_terms = fixna(pd.read_csv(
-        res.open_text(
-            heron_load, 'seer_recode_terms.csv'),
-        dtype={'basecode': str},
-    ))
+    seer_recode_terms = _with_path(res.path(heron_load, 'seer_recode_terms.csv'),
+                                   tab.read_csv)
 
-    cs_terms = fixna(pd.read_csv(res.open_text(
-        heron_load, 'cs-terms.csv'))).drop(['update_date', 'sourcesystem_cd'], axis=1)
+    cs_terms = _with_path(res.path(heron_load, 'cs-terms.csv'),
+                          tab.read_csv).drop(['update_date', 'sourcesystem_cd'])
 
     tx_script = SqlScript(
         'naaccr_txform.sql',
@@ -569,8 +584,8 @@ class NAACCR_I2B2(object):
 
     per_item_view = 'tumor_item_type'
 
-    per_section = pd.read_csv(res.open_text(
-        heron_load, 'section.csv'))
+    per_section = _with_path(res.path(heron_load, 'section.csv'),
+                             tab.read_csv)
 
     ont_script = SqlScript(
         'naaccr_concepts_load.sql',
@@ -580,7 +595,7 @@ class NAACCR_I2B2(object):
             ('naaccr_top_concept', ['naaccr_top', 'current_task']),
             ('section_concepts', ['section', 'naaccr_top']),
             ('item_concepts', [per_item_view]),
-            ('code_concepts', [per_item_view, 'loinc_naaccr_answers', 'code_labels']),
+            ('code_concepts', [per_item_view, 'loinc_naaccr_answer', 'code_labels']),
             ('primary_site_concepts', ['icd_o_topo']),
             # TODO: morphology
             ('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
@@ -589,196 +604,34 @@ class NAACCR_I2B2(object):
         ])
 
     @classmethod
-    def ont_view_in(cls, spark: SparkSession_T, task_id: str, update_date: dt.date,
+    def ont_view_in(cls, spark: SparkSession_T, task_hash: str, update_date: dt.date,
                     who_cache: Opt[Path_T] = None) -> DataFrame:
-        to_df = spark.createDataFrame
         if who_cache:
             who_topo = OncologyMeta.read_table(who_cache, *OncologyMeta.topo_info)
-            icd_o_topo = to_df(OncologyMeta.icd_o_topo(who_topo))
+            icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
         else:
             log.warn('skipping WHO Topology terms')
-            icd_o_topo = spark.sql('''
-              select 3 lvl, 'C00' concept_cd, 'FA' c_visualattributes
-                   , 'abc' path, 'LIP' concept_path, 'x' concept_name
-            ''')
+            icd_o_topo = tab.DataFrame.from_records([dict(
+                lvl=3, concept_cd='C00', c_visualattributes='FA',
+                path='abc', concept_path='LIP', concept_name='x')])
 
-        top = pd.DataFrame([dict(c_hlevel=1,
-                                 c_fullname=cls.top_folder,
-                                 c_name=cls.c_name,
-                                 update_date=update_date,
-                                 sourcesystem_cd=cls.sourcesystem_cd)])
-        answers = to_df(LOINC_NAACCR.answer,
-                        LOINC_NAACCR.answer_struct).cache()
+        top = tab.DataFrame.from_records([dict(
+            c_hlevel=1,
+            c_fullname=cls.top_folder,
+            c_name=cls.c_name,
+            update_date=update_date,
+            sourcesystem_cd=cls.sourcesystem_cd)])
+        current_task = tab.DataFrame.from_records([dict(task_hash=task_hash)])
         views = create_objects(spark, cls.ont_script,
-                               current_task=to_df([dict(task_id=task_id)]),
-                               naaccr_top=to_df(top),
-                               section=to_df(cls.per_section).cache(),
-                               tumor_item_type=to_df(cls.tumor_item_type),
-                               loinc_naaccr_answers=answers,
-                               code_labels=to_df(NAACCR_R.code_labels()),
+                               current_task=current_task,
+                               naaccr_top=top,
+                               section=cls.per_section,
+                               tumor_item_type=cls.tumor_item_type,
+                               loinc_naaccr_answer=LOINC_NAACCR.answer,
+                               code_labels=NAACCR_R.code_labels(),
                                icd_o_topo=icd_o_topo,
-                               cs_terms=to_df(cls.cs_terms),
-                               seer_site_terms=to_df(cls.seer_recode_terms))
+                               cs_terms=cls.cs_terms,
+                               seer_site_terms=cls.seer_recode_terms)
 
         name, _, _ = cls.ont_script.objects[-1]
         return views[name]
-
-
-class NAACCR_I2B2_Mix(NAACCR_I2B2):
-    # ISSUE: this code is out of date; it's only needed when upstream
-    # standards change.
-
-    txform_script = res.read_text(heron_load, 'naaccr_txform.sql')
-    # script inputs:
-    v18_dict_view_name = 'ndd180'
-    r_field_info = 'field_info'
-    r_code_scheme = 'field_code_scheme'
-    r_code_labels = 'code_labels'
-    # outputs
-
-    @classmethod
-    def tumor_item_type_mix(cls, spark: SparkSession_T) -> DataFrame:
-        ddictDF(spark).createOrReplaceTempView(cls.v18_dict_view_name)
-        # @@ LOINC_NAACCR.measure_in(spark)
-        # @@ LOINC_NAACCR.answers_in(spark)
-
-        sec = spark.createDataFrame(cls.per_section)
-        rl = (spark.createDataFrame(NAACCR_Layout.fields)
-              .withColumnRenamed('naaccr-item-num', 'item'))
-        desc = spark.createDataFrame([dict(item=item, source=source)
-                                      for (item, _, source)
-                                      in NAACCR_Layout.fields_source()])
-        for name, data in [
-                ('record_layout', rl),
-                ('item_description', desc),
-                ('section', sec),
-        ]:
-            data.createOrReplaceTempView(name)
-
-        NAACCR_R.field_info_in(spark)
-
-        # create_object(cls.per_item_view,
-        #               cls.txform_script,
-        #               spark)
-        spark.catalog.cacheTable(cls.per_item_view)
-        return spark.table(cls.per_item_view)
-
-
-def create_objects(spark: SparkSession_T, script: SqlScript,
-                   **kwargs: DataFrame) -> Dict[str, DataFrame]:
-    """Run SQL create ... statements given DFs for input views.
-
-    >>> spark = MockCTX()
-    >>> create_objects(spark, NAACCR_I2B2.ont_script,
-    ...     current_task=MockDF(spark, 'current_task'),
-    ...     naaccr_top=MockDF(spark, 'naaccr_top'),
-    ...     section=MockDF(spark, 'section'),
-    ...     loinc_naaccr_answers=MockDF(spark, 'lna'),
-    ...     code_labels=MockDF(spark, 'code_labels'),
-    ...     icd_o_topo=MockDF(spark, 'icd_o_topo'),
-    ...     seer_site_terms=MockDF(spark, 'site_terms'),
-    ...     cs_terms=MockDF(spark, 'cs_terms'),
-    ...     tumor_item_type=MockDF(spark, 'ty'))
-    ... # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-    {'i2b2_path_concept': MockDF(i2b2_path_concept),
-     'naaccr_top_concept': MockDF(naaccr_top_concept),
-     'section_concepts': MockDF(section_concepts),
-     ...}
-    """
-    # IDEA: use a contextmanager for temp views
-    for key, df in kwargs.items():
-        df = kwargs[key]
-        log.info('%s: %s = %s', script.name, key, df)
-        df.createOrReplaceTempView(key)  # ISSUE: don't replace?
-    provided = set(kwargs.keys())
-    out = {}
-    for name, ddl, inputs in script.objects:
-        missing = set(inputs) - provided
-        if missing:
-            raise TypeError(missing)
-        log.info('%s: create %s', script.name, name)
-        spark.sql(ddl)
-        df = spark.table(name)
-        df.createOrReplaceTempView(name)  # ISSUE: don't replace?
-        out[name] = df
-    return out
-
-
-def csv_view(spark: SparkSession_T, path: Path_T,
-             name: Opt[str] = None) -> DataFrame:
-    df = spark.read.csv(str(path),
-                        header=True, escape='"', multiLine=True,
-                        inferSchema=True, mode='FAILFAST')
-    df.createOrReplaceTempView(name or path.stem)
-    return df
-
-
-def csv_meta(dtypes: Dict[str, np.dtype], path: str,
-             context: str = 'http://www.w3.org/ns/csvw') -> Dict[str, object]:
-    # ISSUE: dead code? obsolete in favor of fixna()?
-    def xlate(dty: np.dtype) -> str:
-        if dty.kind == 'i':
-            return 'number'
-        elif dty.kind == 'O':
-            return 'string'
-        raise NotImplementedError(dty.kind)
-
-    cols = [
-        {"titles": name,
-         "datatype": xlate(dty)}
-        for name, dty in dtypes.items()
-    ]
-    return {"@context": context,
-            "url": path,
-            "tableSchema": {
-                "columns": cols
-            }}
-
-
-def csv_spark_schema(columns: List[Dict[str, str]]) -> ty.StructType:
-    """
-    Note: limited to exactly 1 titles per column
-    IDEA: expand to boolean
-    IDEA: nullable / required
-    """
-    def oops(what: object) -> NoReturn:
-        raise NotImplementedError(what)
-    fields = [
-        ty.StructField(
-            name=col['titles'],
-            dataType=ty.IntegerType() if col['datatype'] == 'number'
-            else ty.StringType() if col['datatype'] == 'string'
-            else oops(col))
-        for col in columns]
-    return ty.StructType(fields)
-
-# IDEA: csv_spark_schema(csv_meta(x.dtypes, 'tumor_item_type.csv')['tableSchema']['columns'])
-
-
-class MockCTX(SparkSession_T):
-    def __init__(self) -> None:
-        self._tables = {}  # type: Dict[str, DataFrame]
-
-    def __setitem__(self, k: str, v: DataFrame) -> None:
-        self._tables[k] = v
-
-    def table(self, k: str) -> DataFrame:
-        return self._tables[k]
-
-    def sql(self, code: str) -> DataFrame:
-        _c, _o, _r, _t, _v, name, _ = code.split(None, 6)
-        df = MockDF(self, name)
-        self._tables[name] = df
-        return df
-
-
-class MockDF(DataFrame):
-    def __init__(self, ctx: MockCTX, label: str) -> None:
-        self.__ctx = ctx
-        self.label = label
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.label})'
-
-    def createOrReplaceTempView(self, name: str) -> None:
-        self.__ctx[name] = self

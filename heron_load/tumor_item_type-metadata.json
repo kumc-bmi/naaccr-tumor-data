@@ -1,0 +1,111 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "naaccrNum",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "sectionId",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 2
+      },
+      {
+        "name": "section",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 3
+      },
+      {
+        "name": "naaccrId",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 4
+      },
+      {
+        "name": "naaccrName",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 5
+      },
+      {
+        "name": "length",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 6
+      },
+      {
+        "name": "source",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 7
+      },
+      {
+        "name": "loinc_num",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 8
+      },
+      {
+        "name": "scale_typ",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 9
+      },
+      {
+        "name": "AnswerListId",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 10
+      },
+      {
+        "name": "scheme",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 11
+      },
+      {
+        "name": "valtype_cd",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 12
+      },
+      {
+        "name": "phi_id_kind",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 13
+      }
+    ]
+  }
+}

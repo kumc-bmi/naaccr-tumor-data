@@ -1,7 +1,117 @@
 # Design, development notes for contributors
 
-To get started, make sure you can run the unit tests: `python -m doctest
-$MODULE.py` for each of the main modules:
+After exploring Apache Spark and PySpark, we've decided to stay close to the JVM / JDBC platform used by i2b2.
+
+
+## build.gradle and IntelliJ IDEA
+
+The groovy code is typically developed with IDEA, but `build.gradle` works anywhere that Java does,
+especially with `./gradlew` or `./gradlew.bat`. IDEA's "optimize imports" and "reformat code" are
+handy; here's hoping we can teach gradle to check style.
+
+To bundle the code along with JDBC drivers used in i2b2: postgres, MS SQL Server, and Oracle:
+
+```
+./gradlew fatjar
+```
+
+and out comes `build/libs/naaccr-tumor-data.jar`.
+
+
+## H2 Database Engine for portable ETL
+
+Much of the Oracle-specific ETL code from HERON has been ported to H2. We expect an in-memory DB to suffice
+for production use, though we often use a local on-disk DB for integration testing.
+
+We used [HSQLDB](https://mvnrepository.com/artifact/org.hsqldb/hsqldb) until we ran into trouble
+and switched to H2. We evaluated [Apache Derby](https://mvnrepository.com/artifact/org.apache.derby/derby) but
+it was pretty much a non-starter.
+
+
+## Open Source SQL IDE: dbeaver
+
+We find [https://dbeaver.io/ DBeaver] a handy SQL development environment.
+
+
+## Groovy is a smooth transition from python, but Java is catching up
+
+  - pro
+    - nice [Sql](https://groovy-lang.org/databases.html), JSON APIs
+    - easy porting from python
+      - can prototype in unityped mode
+  - con
+    - IDE isn't as quick to spot type errors
+    - spread operator doesn't work with @CompileStatic
+    - @CompileStatic requires `Table t = new Table()` stutter,
+      which is mitigated in recent Java versions.
+    - recent Java versions also have lambdas, which mitigates
+      the advantage of groovy's `{ x -> x + 1}` closure syntax
+      (which is only typesafe in the return value, not the arguments).
+
+
+## docopt: Usage documentation in README.d is code
+
+Note the [docopt](https://mvnrepository.com/artifact/com.offbytwo/docopt) dependency in `build.gradle`
+and `TumorFileTest.testDocOpt`. The `buildUsageDoc` gradle task extracts the usage doc from `README.md`
+and puts it in `src/main/resources/usage.txt`.
+
+
+---
+
+## OCap discipline
+
+For **robust composition** and **cooperation without vulnerability**,
+we use [object capability (ocap) discipline][ocap]:
+
+  - **Memory safety and encapsulation**
+    - There is no way to get a reference to an object except by
+      creating one or being given one at creation or via a message; no
+      casting integers to pointers, for example.
+    - From outside an object, there is no way to access the internal
+      state of the object without the object's consent (where consent
+      is expressed by responding to messages).
+
+  - **Primitive effects only via references**
+    - The only way an object can affect the world outside itself is
+      via references to other objects. All primitives for interacting
+      with the external world are embodied by primitive objects and
+      **anything globally accessible is immutable data**. There must
+      be no `open(filename)` function in the global namespace, nor may
+      such a function be imported.
+
+[ocap]: http://erights.org/elib/capability/ode/ode-capabilities.html
+
+OCap discipline is consistent with the "don't call us, we'll call you"
+style that facilitates unit testing with mocks.
+
+
+---
+
+### OCap discipline in groovy
+
+  - **Memory safety and encapsulation**
+      - Groovy, like all JVM languages, is memory-safe (aside from JNI)
+      - Groovy can enforce encapsulation with `private`
+        (`protected` is awkward; though python inheritance habits die
+          hard, composition is usually cleaner than inheritance anyway.)
+  - **Primitive effects only via references**
+      - Groovy doesn't enforce this; it's a coding convention.
+        The Java standard library is rife with ambient authority.
+        In fact, groovy makes it worse: every string has
+        [`.execute`](https://docs.groovy-lang.org/latest/html/groovy-jdk/java/lang/String.html#execute())
+        i.e. it carries authority to launch subprocesses!
+      - Only access powerful functions inside `main()`
+         - I/O:
+           - pass around `URL` or `Path` objects instead of using `open(str)`,
+             which is like casting an int to a pointer
+        - other sources of non-determinism: random numbers, global mutable state
+
+---
+
+## Transitioning from python
+
+Each of the main modules has unit tests: `python -m doctest
+$MODULE.py` for:
 
  - `tumor_reg_ont.py`
  - `tumor_reg_data.py`
@@ -17,7 +127,7 @@ discussed below. Use `make` or `make code_check` to check all three.
 
 ## PySpark and jupyter notebooks vs. sqldeveloper
 
-Exploratory design is done using pyspark and jupyter notebook.
+Exploratory design was done using pyspark and jupyter notebook.
 
   - jupyter notebooks are great for exploration, visualization
   - A `local` spark session makes a `metastore_db` in the current
@@ -126,34 +236,6 @@ export PATH=~/.conda/envs/pytr3/bin:$PATH; && \
 
 ---
 
-## OCap discipline
-
-For **robust composition** and **cooperation without vulnerability**,
-we use [object capability (ocap) discipline][ocap]:
-
-  - **Memory safety and encapsulation**
-    - There is no way to get a reference to an object except by
-      creating one or being given one at creation or via a message; no
-      casting integers to pointers, for example.
-    - From outside an object, there is no way to access the internal
-      state of the object without the object's consent (where consent
-      is expressed by responding to messages).
-
-  - **Primitive effects only via references**
-    - The only way an object can affect the world outside itself is
-      via references to other objects. All primitives for interacting
-      with the external world are embodied by primitive objects and
-      **anything globally accessible is immutable data**. There must
-      be no `open(filename)` function in the global namespace, nor may
-      such a function be imported.
-
-[ocap]: http://erights.org/elib/capability/ode/ode-capabilities.html
-
-OCap discipline is consistent with the "don't call us, we'll call you"
-style that facilitates unit testing with mocks.
-
----
-
 ### OCap discipline in python
 
   - **Memory safety and encapsulation**
@@ -201,7 +283,9 @@ style that facilitates unit testing with mocks.
 
 ---
 
-### Wish: docker for integration testing
+### Wish: integration testing with an i2b2 front-end
+
+using docker?
 
   - spin up a complete i2b2 DB anywhere
   - middle tier, web client are mostly done already
@@ -249,25 +333,4 @@ Then run `pyspark` to launch a jupyter notebook web server.
 
 Notebooks start with `spark` bound to a spark context. By default, a
 derby `metastore_db` is created in the current working directory.
-
-
-## SQL IDE: Oracle Sql Developer with Hive JDBC
-
-
-https://www.cloudera.com/downloads/connectors/hive/jdbc/2-5-15.html
-https://community.cloudera.com/t5/Community-Articles/Connect-Oracle-SQL-Developer-to-Hive/ta-p/244491
-
-
-### open source SQL IDE? sql-squirrel?
-
-I hoped IntelliJ IDEA might provide nice support, but it's only in the
-Ultimate edition; I might as well use Oracle's tool, which I'm
-familiar with, if I'm not going to use an open source IDE.
-https://www.jetbrains.com/help/idea/relational-databases.html
-
-I looked at sql-squirrel and such... it might work, but it's less mature.
-http://squirrel-sql.sourceforge.net/
-https://cwiki.apache.org/confluence/display/Hive/HiveServer2+Clients
-https://search.maven.org/artifact/org.apache.hive/hive-jdbc/3.1.1/jar
-standalone
 

@@ -1,0 +1,4 @@
+{"sql": "insert into naaccr_tumors (tumor_id, dateOfDiagnosis, primarySite) values (?, ?, ?)"}
+[1, "2001-01-01", "C650"]
+[2, "2002-02-02", "C650"]
+[3, "2003-02-02", "C650"]

@@ -19,6 +19,7 @@ from binascii import crc32
 from contextlib import contextmanager
 from importlib import resources as res
 from pathlib import Path as Path_T
+from sqlite3 import connect as connect_mem, PARSE_COLNAMES
 from typing import Any, TypeVar, Union, cast, overload
 from typing import Callable, Dict, Iterator, List, Optional as Opt, Tuple
 import datetime as dt
@@ -34,7 +35,7 @@ import eliot as el
 import luigi
 
 from sql_script import SQL, Environment, BindValue, Params
-from sql_script import SqlScript, SqlScriptError, to_qmark
+from sql_script import DBSession, SqlScript, SqlScriptError, to_qmark
 import heron_load
 import param_val as pv
 import tumor_reg_data as td
@@ -356,18 +357,19 @@ def _stable_hash(*code: str) -> int:
     return crc32(data)
 
 
-class NAACCR_Ontology1(SparkJDBCTask):
+class NAACCR_Ontology1(JDBCTask):
     table_name = pv.StrParam(default="NAACCR_ONTOLOGY")
     who_cache = pv.PathParam()
     z_design_id = pv.StrParam(
-        default='2019-09-19 recode not double %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
+        default='2019-12-16 pystdlib %s' % _stable_hash(tr_ont.NAACCR_I2B2.ont_script.code),
         description='''
         mnemonic for latest visible change to output.
         Changing this causes task_id to change, which
         ensures the ontology gets rebuilt if necessary.
         '''.strip(),
     )
-    naaccr_version = pv.IntParam(default=18)
+    naaccr_version = pv.IntParam(default=18)  # ISSUE: ignored?
+    jdbc_driver_jar = pv.StrParam(significant=False)
 
     # based on custom_meta
     col_to_type = dict(
@@ -375,6 +377,7 @@ class NAACCR_Ontology1(SparkJDBCTask):
         c_fullname='varchar(700)',
         c_name='varchar(2000)',
         c_visualattributes='varchar(3)',
+        c_totalnum='int',
         c_basecode='varchar(50)',
         c_dimcode='varchar(700)',
         c_tooltip='varchar(900)',
@@ -393,6 +396,10 @@ class NAACCR_Ontology1(SparkJDBCTask):
         task_hash = self.task_id.split('_')[-1]  # hmm... luigi doesn't export this
         return f'v{self.naaccr_version}-{task_hash}'
 
+    @property
+    def task_hash(self) -> str:
+        return self.task_id.split('_')[-1]  # hmm... luigi doesn't export this
+
     def output(self) -> JDBCTableTarget:
         query = fr"""
           (select 1 from {self.table_name}
@@ -401,19 +408,28 @@ class NAACCR_Ontology1(SparkJDBCTask):
         """
         return JDBCTableTarget(self, query)
 
-    def main_action(self, sparkContext: SparkContext_T, *_args: Any) -> None:
-        quiet_logs(sparkContext)
-        spark = SparkSession(sparkContext)
+    @property
+    def classpath(self) -> str:
+        return self.jdbc_driver_jar
 
+    @property
+    def __password(self) -> str:
+        from os import environ  # ISSUE: ambient
+        return environ[self.passkey]
+
+    def account(self) -> td.Account:
+        from subprocess import Popen  # ISSUE: AMBIENT
+        return td.Account('DEID', self.user, self.__password, Popen,
+                          url=self.db_url, driver=self.driver)
+
+    def run(self) -> None:
+        conn = connect_mem(':memory:', detect_types=PARSE_COLNAMES)
+        spark = DBSession(conn)
         update_date = dt.datetime.strptime(self.z_design_id[:10], '%Y-%m-%d').date()
-        ont = tr_ont.NAACCR_I2B2.ont_view_in(
-            spark, self.version_name, who_cache=self.who_cache,
-            update_date=update_date)
-
-        self.account().wr(td.case_fold(ont).write
-                          .options(createTableColumnTypes=self.coltypes),
-                          self.table_name,
-                          mode='overwrite')
+        terms = tr_ont.NAACCR_I2B2.ont_view_in(
+            spark, who_cache=self.who_cache, task_hash=self.task_hash, update_date=update_date)
+        cdw = self.account()
+        cdw.wr(self.table_name, td.case_fold(terms))
 
 
 class ManualTask(luigi.Task):

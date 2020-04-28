@@ -1,0 +1,47 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "label",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "text",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 2
+      },
+      {
+        "name": "year",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 3
+      },
+      {
+        "name": "month",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 4
+      },
+      {
+        "name": "day",
+        "datatype": "number",
+        "null": [
+          ""
+        ],
+        "number": 5
+      }
+    ]
+  }
+}
