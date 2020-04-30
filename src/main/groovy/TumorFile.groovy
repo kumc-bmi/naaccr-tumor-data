@@ -625,6 +625,8 @@ class TumorFile {
         Reader lines = new InputStreamReader(rd)
         byte CR = 13
         byte LF = 10
+        int progress = 0
+        int report_interval = 1000
 
         Thread worker = new Thread({ ->
             try {
@@ -635,6 +637,10 @@ class TumorFile {
                     wr.write(str.getBytes(Charset.forName("UTF-8")))
                     wr.write(CR)
                     wr.write(LF)
+                    progress++
+                    if (progress % report_interval == 0) {
+                        log.info("processed ${progress} records of: ${query}")
+                    }
                 }
             } finally {
                 wr.close()
