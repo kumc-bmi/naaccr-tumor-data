@@ -214,19 +214,17 @@ class TumorFile {
             extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
         }
 
-        // TODO: factor out common parts of NAACCR_Summary, NAACCR_Visits as TableBuilder a la python?
         boolean complete() { tb.complete(cdw) }
 
         void run() {
-            final DBConfig mem = DBConfig.inMemoryDB("Stats")
-
-            final Table extract = extract_task.results()
-
-            Table data = mem.withSql { Sql memdb ->
-                DataSummary.stats(extract, memdb)
-            }
             cdw.withSql { Sql sql ->
-                tb.build(sql, data)
+                final loadTable = { String name, Table data -> load_data_frame(sql, name.toUpperCase(), data, true) }
+                loadTable('section', TumorOnt.NAACCR_I2B2.per_section)
+                loadTable('record_layout', record_layout)
+                loadTable('tumor_item_type', TumorOnt.NAACCR_I2B2.tumor_item_type)
+                Loader ld = new Loader(sql)
+                URL script = TumorFile.getResource('heron_load/data_char_sim.sql')
+                ld.runScript(script)
             }
         }
     }
@@ -698,26 +696,10 @@ class TumorFile {
     }
 
     static class DataSummary {
-        static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('data_char_sim.sql',
-                TumorOnt.resourceText('heron_load/data_char_sim.sql'),
-                [new Tuple2('data_agg_naaccr', ['naaccr_extract', 'tumors_eav', 'tumor_item_type']),
-                 new Tuple2('data_char_naaccr', ['record_layout'])])
-
-        static Table stats(Table tumors_raw, Sql sql) {
-            final Table ty = TumorOnt.NAACCR_I2B2.tumor_item_type
-            final Table tumors = naaccr_dates(tumors_raw, ['dateOfDiagnosis'], false)
-            final Map<String, Closure<Table>> views = TumorOnt.create_objects(sql, script, [
-                    section        : TumorOnt.NAACCR_I2B2.per_section,
-                    naaccr_extract : tumors,
-                    record_layout  : record_layout,
-                    tumor_item_type: ty,
-                    tumors_eav     : stack_obs(tumors, ty, ['dateOfDiagnosis']),
-            ])
-            Table out = views.values().last()(sql)
-            DoubleColumn sd = out.doubleColumn('sd')
-            sd.set((sd as NumericColumn).isMissing(), 0 as Double)
-            out
-        }
+        /* TODO: fix sd col?
+        DoubleColumn sd = out.doubleColumn('sd')
+        sd.set((sd as NumericColumn).isMissing(), 0 as Double)
+        */
 
         static Table stack_obs(Table data, Table ty,
                                List<String> id_vars = [],

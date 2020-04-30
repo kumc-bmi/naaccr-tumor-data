@@ -191,9 +191,11 @@ obs_detail as (
   from obs_w_section obs
 )
 
-select recordId         -- becomes patient_num via patient_mapping
-     , patientIdNumber  -- pending encounter_num via encounter_mapping
+select recordId         -- becomes encounter_num via patient_mapping
+     , patientIdNumber  -- pending patient_num via encounter_mapping
      , naaccrId         -- for QA
+     , naaccrNum
+     , dateOfDiagnosis
      -- remaining column names are per i2b2 observation_fact
      , concept_cd
      , '@' provider_id  -- IDEA: use abstractedBy?

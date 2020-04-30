@@ -8,9 +8,9 @@ part of the HERON* open source codebase; see NOTICE file for license details.
 
 -- Check that NAACCR data dictionary and data is available.
 select sectionid from section where 1=0;
-select tumor_id, dateOfDiagnosis from naaccr_extract where 1=0;
-select tumor_id, naaccrNum from tumors_eav where 1=0;
-select `naaccr-item-num`, section from record_layout;
+select "NAACCR-ITEM-NUM", section from record_layout where 1=0;
+select encounter_num, dateOfDiagnosis from naaccr_tumors where 1=0;
+select recordid, naaccrNum, dateOfDiagnosis from naaccr_observations where 1=0;
 
 -- Check that tumor_item_type from naaccr_txform.sql is available (esp. for valtype_cd)
 select valtype_cd from tumor_item_type where 1=0;

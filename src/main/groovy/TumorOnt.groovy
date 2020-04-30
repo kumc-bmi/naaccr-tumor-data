@@ -81,12 +81,7 @@ class TumorOnt {
                 terms = NAACCR_I2B2.ont_view_in(sql, task_hash, update_date, who_cache)
             }
             cdw.withSql { Sql sql ->
-                try {
-                    sql.execute("drop table $table_name".toString())
-                } catch (SQLException problem) {
-                    log.warn("drop $table_name: $problem")
-                }
-                load_data_frame(sql, table_name, terms)
+                load_data_frame(sql, table_name, terms, true)
             }
         }
     }
@@ -226,6 +221,8 @@ class TumorOnt {
                 switch (it) {
                     case ColumnType.STRING:
                         return "VARCHAR($varchars)"
+                    case ColumnType.BOOLEAN:
+                        return "NUMBER(1)"
                     case ColumnType.DOUBLE:
                         return "NUMERIC"
                     case ColumnType.LOCAL_DATE:
@@ -365,8 +362,16 @@ class TumorOnt {
         txt
     }
 
-    static void load_data_frame(Sql sql, String name, Table data) {
+    static void load_data_frame(Sql sql, String name, Table data,
+            boolean dropFirst=false) {
         assert name
+        if (dropFirst) {
+            try {
+                sql.execute("drop table $name".toString())
+            } catch (SQLException problem) {
+                log.warn("drop $name: $problem")
+            }
+        }
         log.debug("creating table ${name}")
         sql.execute(SqlScript.create_ddl(name, data.columns()))
         log.debug("inserting ${data.rowCount()} rows into ${name}")
