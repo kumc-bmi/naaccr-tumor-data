@@ -176,5 +176,14 @@ class DBConfig {
             }
             configCache
         }
+
+        String mustGetEnv(String key) {
+            String value = System.getenv(key)  // ISSUE: ambient
+            if (value == null) {
+                log.warn("getEnv($key) failed")
+                exit(1)
+            }
+            value
+        }
     }
 }

@@ -37,15 +37,17 @@ class TumorFile {
     static final String usage = TumorOnt.resourceText('usage.txt')
 
     static void main(String[] args) {
-        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name ->
-                    Properties ps = new Properties()
-                    new File(name).withInputStream { ps.load(it) }
-                    if (ps.containsKey('db.passkey')) {
-                        ps.setProperty('db.password', System.getenv(ps.getProperty('db.passkey')))
-                    }
-                    ps
-                },
+        DBConfig.CLI cli
+        Closure<Properties> getProps = { String name ->
+            Properties ps = new Properties()
+            new File(name).withInputStream { ps.load(it) }
+            if (ps.containsKey('db.passkey')) {
+                ps.setProperty('db.password', cli.mustGetEnv(ps.getProperty('db.passkey')))
+            }
+            ps
+        }
+        cli = new DBConfig.CLI(new Docopt(usage).parse(args),
+                { String name -> getProps(name) },
                 { int it -> System.exit(it) },
                 { String url, Properties ps -> DriverManager.getConnection(url, ps) })
 
