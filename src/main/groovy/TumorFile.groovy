@@ -97,7 +97,8 @@ class TumorFile {
                     cli.property("naaccr.records-table"),
                     cli.property("naaccr.extract-table"))
         } else if (cli.flag('fields')) {
-            fields().write().csv(cli.arg('--file'))
+            String filename = cli.arg('--file')
+            fields().select('naaccrNum', 'FIELD_NAME').write().csv(filename)
         } else if (cli.flag('ontology') || cli.flag('import')) {
             TumorOnt.run_cli(cli)
         } else {
@@ -231,18 +232,19 @@ class TumorFile {
         }
     }
 
-    static Table fields(int max_length = 30,
-                        int max_digits = 7) {
+    static Table fields(int max_length = 29,
+                        int max_digits = 4) {
         Table fields = ddictDF()
         StringColumn field_name = StringColumn.create('FIELD_NAME')
         for (Row item : fields) {
-            final String naaccrId = item.getString('naaccrId')
             final naaccrNum = item.getInt('naaccrNum')
-            final String slug = naaccrId.substring(0, Math.min(naaccrId.length(), max_length - max_digits - 1))
-            field_name.append("${slug.toUpperCase()}_${naaccrNum}".toString())
+            final String snake = item.getString('naaccrId').replaceAll('([A-Z])', '_$1')
+            int sep = "_N".length()
+            final String slug = snake.substring(0, Math.min(snake.length(), max_length - max_digits - sep))
+            field_name.append("${slug.toUpperCase()}_N${naaccrNum}".toString())
         }
         fields.addColumns(field_name)
-        fields.select('naaccrNum', 'FIELD_NAME')
+        fields.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
     }
 
 
@@ -269,27 +271,18 @@ class TumorFile {
         static Table to_db_ids(Table records,
                                int max_length = 30,
                                int max_digits = 7) {
-            // TODO: factor out common code from fields()
-            final Map<String, Integer> byId = ddictDF().iterator().collectEntries { Row row ->
-                [(row.getString('naaccrId')): row.getInt('naaccrNum')]
+            final Map<String, String> byId = fields().iterator().collectEntries { Row row ->
+                [(row.getString('naaccrId')): row.getString('FIELD_NAME')]
             }
-            records.columns().forEach { Column column ->
-                final String naaccrId = column.name()
-                final naaccrNum = byId[naaccrId]
-                final String slug = naaccrId.substring(0, Math.min(naaccrId.length(), max_length - max_digits - 1))
-                column.setName("${slug.toUpperCase()}_${naaccrNum}")
-            }
+            records.columns().forEach { Column column -> column.setName(byId[column.name()]) }
             records
         }
 
         static Table from_db_ids(Table records,
                                  int max_length = 30,
                                  int max_digits = 7) {
-            final Map<String, String> toId = ddictDF().iterator().collectEntries { Row row ->
-                String naaccrId = row.getString('naaccrId')
-                int naaccrNum = row.getInt('naaccrNum')
-                final String slug = naaccrId.substring(0, Math.min(naaccrId.length(), max_length - max_digits - 1))
-                [("${slug.toUpperCase()}_${naaccrNum}" as String): naaccrId]
+            final Map<String, String> toId = fields().iterator().collectEntries { Row row ->
+                [(row.getString('FIELD_NAME')): row.getString('naaccrId')]
             }
             records.columns().forEach { Column column ->
                 String naaccrId = toId[column.name()]

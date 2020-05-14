@@ -426,7 +426,7 @@ class TumorOnt {
         ColumnType[] schema = _schema ? _schema : tabularTypes(new JsonSlurper().parse(meta_path(url)))
         final BufferedReader input = new BufferedReader(new InputStreamReader(url.openStream()))
         skiprows.times { input.readLine() }
-        Table.read().usingOptions(CsvReadOptions.builder(input).columnTypes(schema))
+        Table.read().usingOptions(CsvReadOptions.builder(input).columnTypes(schema).maxCharsPerColumn(32767))
     }
 
     static ColumnType[] tabularTypes(Object meta) {

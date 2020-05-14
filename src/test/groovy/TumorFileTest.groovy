@@ -159,11 +159,11 @@ class TumorFileTest extends TestCase {
         final longNames = dd.where(dd.stringColumn('naaccrId').isLongerThan((30))).stringColumn('naaccrId').asList()
         Table naaccrIds = Table.create("t1", longNames.collect { String id -> StringColumn.create(id) }
                 as Collection<Column<?>>)
-        println(naaccrIds)
+        // println(naaccrIds)
         Table dbnames = TumorFile.NAACCR_Extract.to_db_ids(naaccrIds.copy())
-        println(dbnames)
+        // println(dbnames)
         Table inverted = TumorFile.NAACCR_Extract.from_db_ids(dbnames.copy())
-        println(inverted)
+        // println(inverted)
         assert dbnames.columnNames().findAll { it.length() > 30 } == []
         assert inverted.columnNames() == naaccrIds.columnNames()
     }
@@ -317,7 +317,25 @@ class TumorFileTest extends TestCase {
 
     void testTumorFields() {
         Table actual = TumorFile.fields()
-        assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORDTYPE_10')).rowCount() == 1
+        Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('tumor table.version1.2.csv')).select(
+                'NAACCR Item', 'FIELD_NAME'
+        )
         assert actual.rowCount() > 100
+        assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORD_TYPE_N10')).rowCount() == 1
+
+        actual.column('FIELD_NAME').setName('field_name_computed')
+        Table items = pcornet_spec.joinOn('NAACCR Item').fullOuter(actual, 'naaccrNum')
+        // println(items.first(3))
+        Table problems = items.first(0)
+        for (Row item: items) {
+            if (item.getString('FIELD_NAME') != item.getString('field_name_computed')) {
+                problems.addRow(item)
+            }
+        }
+        println(problems.printAll())
+        assert problems.rowCount() == 0
+            // 'DATE_REGIONAL_LYMPH_NOD_N682' vs. 'DATE_REGIONAL_L_N_DISSE_N682'
+            // 'AJCC_TNM_CLIN_STAGE_GRO_N1004' vs. 'AJCC_TNM_CLIN_STAGE_GR_N1004'
+            // 'AJCC_TNM_PATH_STAGE_GRO_N1014'
     }
 }
