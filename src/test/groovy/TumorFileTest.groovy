@@ -314,4 +314,10 @@ class TumorFileTest extends TestCase {
     void testStableHash() {
         assert TumorFile._stable_hash("abc") == 891568578
     }
+
+    void testTumorFields() {
+        Table actual = TumorFile.fields()
+        assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORDTYPE_10')).rowCount() == 1
+        assert actual.rowCount() > 100
+    }
 }

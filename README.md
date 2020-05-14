@@ -54,6 +54,7 @@ Usage:
   naaccr-tumor-data summary  [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data tumors   [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data facts    [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data fields --file=F
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
   naaccr-tumor-data load [--db=F]
@@ -69,6 +70,7 @@ Options:
   --db=PROPS         database properties file [default: db.properties]
   --no-file          use loaded records rather than file as input
   --task-id=ID       version / completion marker [default: task123]
+  fields             write field table to stdout
   ontology           build NAACCR_ONTOLOGY table
   --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]
   --version=NNN      ontology version [default: 180]

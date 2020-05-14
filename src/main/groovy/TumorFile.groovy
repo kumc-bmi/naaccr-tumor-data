@@ -96,6 +96,8 @@ class TumorFile {
                     flat_file(),
                     cli.property("naaccr.records-table"),
                     cli.property("naaccr.extract-table"))
+        } else if (cli.flag('fields')) {
+            fields().write().csv(cli.arg('--file'))
         } else if (cli.flag('ontology') || cli.flag('import')) {
             TumorOnt.run_cli(cli)
         } else {
@@ -229,6 +231,21 @@ class TumorFile {
         }
     }
 
+    static Table fields(int max_length = 30,
+                        int max_digits = 7) {
+        Table fields = ddictDF()
+        StringColumn field_name = StringColumn.create('FIELD_NAME')
+        for (Row item : fields) {
+            final String naaccrId = item.getString('naaccrId')
+            final naaccrNum = item.getInt('naaccrNum')
+            final String slug = naaccrId.substring(0, Math.min(naaccrId.length(), max_length - max_digits - 1))
+            field_name.append("${slug.toUpperCase()}_${naaccrNum}".toString())
+        }
+        fields.addColumns(field_name)
+        fields.select('naaccrNum', 'FIELD_NAME')
+    }
+
+
     static class NAACCR_Extract implements Task {
         final TableBuilder tb
         final DBConfig cdw
@@ -252,6 +269,7 @@ class TumorFile {
         static Table to_db_ids(Table records,
                                int max_length = 30,
                                int max_digits = 7) {
+            // TODO: factor out common code from fields()
             final Map<String, Integer> byId = ddictDF().iterator().collectEntries { Row row ->
                 [(row.getString('naaccrId')): row.getInt('naaccrNum')]
             }

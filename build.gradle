@@ -167,6 +167,14 @@ task localDBImportTask(type: Exec) {
 }
 localDBImportTask.dependsOn fatjar
 
+task tumorFieldsTask(type: Exec) {
+    description = 'Integration tests: write tumor field names.'
+    group = 'verification'
+
+    commandLine 'java', '-jar', 'build/libs/naaccr-tumor-data.jar', 'fields', '--file', ',tumor_fields.csv'
+}
+tumorFieldsTask.dependsOn fatjar
+
 task integrationTest(type: Task) {
     description = 'Run all integration tests; for example, in preparation for a release'
     group = 'verification'
