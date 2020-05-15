@@ -235,6 +235,7 @@ class TumorFile {
         Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).select(
                 'item', 'FIELD_NAME'
         )
+        // get naaccr-xml naaccrId
         Table items = ddictDF().joinOn('naaccrNum').fullOuter(pcornet_spec, 'item')
         items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
     }
@@ -265,6 +266,9 @@ class TumorFile {
                                int max_digits = 7) {
             final Map<String, String> byId = fields().iterator().collectEntries { Row row ->
                 [(row.getString('naaccrId')): row.getString('FIELD_NAME')]
+            }
+            records.columns().findAll { byId[it.name()] == null || byId[it.name()] == "" }.forEach { Column flaggedPrivate ->
+                records.removeColumns(flaggedPrivate)
             }
             records.columns().forEach { Column column -> column.setName(byId[column.name()]) }
             records
@@ -494,7 +498,9 @@ class TumorFile {
     }
 
     static Table read_fwf(Reader lines, List<String> items) {
-        Table data = Table.create(items.collect { it -> StringColumn.create(it) }
+        Table data = Table.create(items.collect { it ->
+            StringColumn.create(it)
+        }
                 as Collection<Column<?>>)
         PatientReader reader = new PatientFlatReader(lines)
         Patient patient = reader.readPatient()

@@ -129,6 +129,25 @@ class TumorFileTest extends TestCase {
         assert cksum == 5311
     }
 
+    void testExtractDiscrete() {
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        final task_id = "task123"
+        URL no_flat_file = null
+        Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), "NAACCR_RECORDS")
+        Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
+                no_flat_file,
+                "NAACCR_RECORDS",
+                "NAACCR_DISCRETE",
+        )
+
+        cdw.withSql { sql ->
+            load.run()
+            assert extract.complete() == false
+            extract.run()
+            assert extract.complete() == true
+        }
+    }
+
     void testStatsFromDB() {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final String records_table = "TR_RECORDS"
