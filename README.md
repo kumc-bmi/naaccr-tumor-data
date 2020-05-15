@@ -70,7 +70,6 @@ Options:
   --db=PROPS         database properties file [default: db.properties]
   --no-file          use loaded records rather than file as input
   --task-id=ID       version / completion marker [default: task123]
-  fields             write field table to stdout
   ontology           build NAACCR_ONTOLOGY table
   --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]
   --version=NNN      ontology version [default: 180]

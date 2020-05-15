@@ -96,10 +96,6 @@ class TumorFile {
                     flat_file(),
                     cli.property("naaccr.records-table"),
                     cli.property("naaccr.extract-table"))
-        } else if (cli.flag('fields')) {
-            String filename = cli.arg('--file')
-            fields().select('naaccrNum', 'FIELD_NAME').write().csv(filename)
-        } else if (cli.flag('ontology') || cli.flag('import')) {
             TumorOnt.run_cli(cli)
         } else {
             Loader.run_cli(cli)
@@ -232,19 +228,6 @@ class TumorFile {
         }
     }
 
-    static Table fields(int max_length = 29,
-                        int max_digits = 4) {
-        Table fields = ddictDF()
-        StringColumn field_name = StringColumn.create('FIELD_NAME')
-        for (Row item : fields) {
-            final naaccrNum = item.getInt('naaccrNum')
-            final String snake = item.getString('naaccrId').replaceAll('([A-Z])', '_$1')
-            int sep = "_N".length()
-            final String slug = snake.substring(0, Math.min(snake.length(), max_length - max_digits - sep))
-            field_name.append("${slug.toUpperCase()}_N${naaccrNum}".toString())
-        }
-        fields.addColumns(field_name)
-        fields.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
     /**
      * PCORnet tumor table fields
      */
