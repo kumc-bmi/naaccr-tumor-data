@@ -209,8 +209,7 @@ class TumorFileTest extends TestCase {
 
     static final Table _extract = new File(testDataPath).withReader { naaccr_text_lines ->
         // log.info("tr_file: ${testDataPath}")
-        final Table dd = TumorFile.ddictDF()
-        TumorFile.read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+        TumorFile.read_fwf(naaccr_text_lines)
     }
 
     static Table _SQL(Sql sql, String query, int limit = 100) {

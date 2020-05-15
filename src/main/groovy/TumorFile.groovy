@@ -304,10 +304,9 @@ class TumorFile {
 
         @Override
         void run() {
-            final Table dd = ddictDF()
             Table extract = withRecords() { Reader naaccr_text_lines ->
                 log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
-                read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+                read_fwf(naaccr_text_lines)
             }
             cdw.withSql { Sql sql ->
                 log.info("inserting ${extract.rowCount()} records into ${tb.table_name}")
@@ -434,9 +433,8 @@ class TumorFile {
         }
 
         Table _data(Sql sql) {
-            final Table dd = ddictDF()
             extract_task.withRecords { Reader naaccr_text_lines ->
-                final Table extract = read_fwf(naaccr_text_lines, dd.collect { it.getString('naaccrId') })
+                final Table extract = read_fwf(naaccr_text_lines)
                 Table item = ItemObs.make(sql, extract)
                 // TODO: Table seer = SEER_Recode.make(sql, extract)
                 // TODO: Table ssf = SiteSpecificFactors.make(sql, extract)
@@ -497,27 +495,30 @@ class TumorFile {
 
     }
 
-    static Table read_fwf(Reader lines, List<String> items) {
-        Table data = Table.create(items.collect { it ->
-            StringColumn.create(it)
-        }
+    static Table read_fwf(Reader lines) {
+        Table data = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
                 as Collection<Column<?>>)
         PatientReader reader = new PatientFlatReader(lines)
         Patient patient = reader.readPatient()
+
+        final ensureCol = { Item item ->
+            if (!data.columnNames().contains(item.naaccrId)) {
+                data.addColumns(StringColumn.create(item.naaccrId, data.rowCount()))
+            }
+        }
+
         while (patient != null) {
             patient.getTumors().each { Tumor tumor ->
-                Row tumorRow = data.appendRow()
-                patient.items.each { Item item ->
-                    if (items.contains(item.naaccrId)) {
-                        tumorRow.setString(item.naaccrId, item.value)
+                data.appendRow()
+                final consume = { Item it ->
+                    if (it.value.trim() > '') {
+                        ensureCol(it)
+                        data.row(data.rowCount() - 1).setString(it.naaccrId, it.value)
                     }
                 }
-                tumor.items.each { Item item ->
-                    if (items.contains(item.naaccrId)) {
-                        tumorRow.setString(item.naaccrId, item.value)
-                    }
-                }
-                // TODO: get items from NAACCR Data?
+                patient.items.each consume
+                tumor.items.each consume
+                reader.getRootData().items.each consume
             }
             patient = reader.readPatient()
         }
@@ -544,6 +545,8 @@ class TumorFile {
                 'patientIdNumber',      // patient_mapping
                 'abstractedBy',         // IDEA/YAGNI?: provider_id
         ]
+        static List<String> required_cols = (pat_attrs + tmr_attrs + report_attrs + key4.drop(3) +
+                dtcols.collect{ it + 'Flag' })
 
         static Table pat_tmr(Reader naaccr_text_lines) {
             _pick_cols(tmr_attrs + pat_attrs + report_attrs, naaccr_text_lines)
@@ -732,7 +735,13 @@ class TumorFile {
         static Table melt(Table data, List<String> value_vars, List<String> id_vars,
                           String var_name, String value_col = 'value') {
             final Table entity = Table.create(id_vars.collect { String it -> data.column(it) })
-            final List<Column> dataCols = value_vars.collect { String it -> data.column(it) }
+            final dataColNames = data.columnNames()
+            List<String> value_vars_absent = value_vars.findAll { String v -> !dataColNames.contains(v) }
+            final value_vars_present = value_vars.findAll { String v -> dataColNames.contains(v) }
+            if (value_vars_absent.size() > 0) {
+                log.warn("cols missing in melt(): $value_vars_absent")
+            }
+            final List<Column> dataCols = value_vars_present.collect { String it -> data.column(it) }
             Table out = null
             dataCols.forEach { Column valueColumn ->
                 Table slice = entity.copy()
