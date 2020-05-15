@@ -1,0 +1,103 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "item",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "TABLE_NAME",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 2
+      },
+      {
+        "name": "FIELD_NAME",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 3
+      },
+      {
+        "name": "RDBMS_DATA_TYPE",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 4
+      },
+      {
+        "name": "SAS_DATA_TYPE",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 5
+      },
+      {
+        "name": "DATA_FORMAT",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 6
+      },
+      {
+        "name": "REPLICATED_FIELD",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 7
+      },
+      {
+        "name": "UNIT_OF_MEASURE",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 8
+      },
+      {
+        "name": "VALUESET",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 9
+      },
+      {
+        "name": "VALUESET_DESCRIPTOR",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 10
+      },
+      {
+        "name": "FIELD_DEFINITION",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 11
+      },
+      {
+        "name": "FIELD_ORDER",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 12
+      }
+    ]
+  }
+}
