@@ -245,6 +245,15 @@ class TumorFile {
         }
         fields.addColumns(field_name)
         fields.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
+    /**
+     * PCORnet tumor table fields
+     */
+    static Table fields() {
+        Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).select(
+                'item', 'FIELD_NAME'
+        )
+        Table items = ddictDF().joinOn('naaccrNum').fullOuter(pcornet_spec, 'item')
+        items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
     }
 
 

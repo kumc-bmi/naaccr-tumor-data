@@ -4,7 +4,7 @@
     "columns": [
       {
         "name": "item",
-        "datatype": "string",
+        "datatype": "number",
         "null": [
           ""
         ],
@@ -92,7 +92,7 @@
       },
       {
         "name": "FIELD_ORDER",
-        "datatype": "string",
+        "datatype": "number",
         "null": [
           ""
         ],

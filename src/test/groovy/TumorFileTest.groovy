@@ -317,25 +317,27 @@ class TumorFileTest extends TestCase {
 
     void testTumorFields() {
         Table actual = TumorFile.fields()
-        Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('tumor table.version1.2.csv')).select(
-                'NAACCR Item', 'FIELD_NAME'
+        Table pcornet_spec = TumorOnt.read_csv(TumorFileTest.getResource('tumor table.version1.2.csv')).select(
+                'NAACCR Item', 'FLAG', 'FIELD_NAME'
         )
+        pcornet_spec = pcornet_spec.where(pcornet_spec.stringColumn('FLAG').isNotEqualTo('PRIVATE'))
         assert actual.rowCount() > 100
         assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORD_TYPE_N10')).rowCount() == 1
 
-        actual.column('FIELD_NAME').setName('field_name_computed')
+        actual.column('FIELD_NAME').setName('name_test')
         Table items = pcornet_spec.joinOn('NAACCR Item').fullOuter(actual, 'naaccrNum')
         // println(items.first(3))
         Table problems = items.first(0)
         for (Row item: items) {
-            if (item.getString('FIELD_NAME') != item.getString('field_name_computed')) {
+            if (item.getString('FIELD_NAME') != item.getString('name_test')) {
                 problems.addRow(item)
             }
         }
-        println(problems.printAll())
-        assert problems.rowCount() == 0
-            // 'DATE_REGIONAL_LYMPH_NOD_N682' vs. 'DATE_REGIONAL_L_N_DISSE_N682'
-            // 'AJCC_TNM_CLIN_STAGE_GRO_N1004' vs. 'AJCC_TNM_CLIN_STAGE_GR_N1004'
-            // 'AJCC_TNM_PATH_STAGE_GRO_N1014'
+        def missingId = problems.where(problems.column('naaccrId').isMissing())
+        assert missingId.rowCount() == 2
+        def noMatch = problems.where(problems.column('name_test').isMissing())
+        assert noMatch.rowCount() == 26
+        def renamed = problems.where(problems.stringColumn('name_test').isNotIn(''))
+        assert renamed.rowCount() == 23
     }
 }
