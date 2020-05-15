@@ -459,7 +459,8 @@ drop table icd_o_morph;
 create OR replace view pcornet_tumor_fields as
 select 'TUMOR' as TABLE_NAME
      , ty.naaccrNum as item
-     , upper_snake_case(naaccrId) as FIELD_NAME
+     -- avoid ORA-00972: identifier is too long
+     , substr(upper_snake_case(naaccrId), 1, 23) || '_N' || ty.naaccrNum as FIELD_NAME
      , 'RDBMS ' || (case valtype_cd
         when 'N' then 'Number'
         when '@' then 'Text'
