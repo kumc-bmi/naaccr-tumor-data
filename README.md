@@ -23,23 +23,26 @@ db.password=
 db.driver=org.h2.Driver
 db.url=jdbc:h2:file:/tmp/DB1;create=true
 
-naaccr.flat-file=naaccr-xml-sample-v180-incidence-100.txt
+naaccr.flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
 naaccr.records-table: NAACCR_RECORDS
-naaccr.extract-table: NAACCR_DATA
+naaccr.extract-table: TUMOR
 naaccr.stats-table: NAACCR_STATS
 ```
 
-Then, to create `NAACCR_OBSERVATIONS`, run:
+Then, to create the `TUMOR` table following draft PCORnet specifications:
 
 ```shell script
-java -jar naaccr-tumor-data.jar facts
+$ java -jar build/libs/naaccr-tumor-data.jar discrete-data
+[main] INFO DBConfig - getting config from db.properties
+...
+[main] INFO TumorFile - reading records from file:.../naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
+...
+[main] INFO TumorFile - inserted 100 rows into TUMOR
 ```
 
 _Please excuse / ignore `WARNING: An illegal reflective access ...`;
 see [issue 30](https://github.com/kumc-bmi/naaccr-tumor-data/issues/30)._
 
-_Note: adding these observations to the i2b2 star schema requires running `naaccr_facts_load.sql`; porting
-that script to othere databases / environments is still in-progress._
 
 ---
 
@@ -64,7 +67,7 @@ Usage:
 Options:
   load-records       load NAACCR records into a (CLOB) column of a DB table
   discrete-data      split NAACCR records into a wide table of discrete data
-  tumors             build NAACCR_TUMORS table
+  tumors             build NAACCR_TUMORS table with key information about each tumor
   facts              build NAACCR_OBSERVATIONS table
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
