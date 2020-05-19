@@ -209,7 +209,15 @@ class TumorFileTest extends TestCase {
 
     static final Table _extract = new File(testDataPath).withReader { naaccr_text_lines ->
         // log.info("tr_file: ${testDataPath}")
-        TumorFile.read_fwf(naaccr_text_lines)
+        Table result = null
+        TumorFile.read_fwf(naaccr_text_lines) { Table chunk ->
+            if (result == null) { result = chunk }
+            else {
+                result = result.append(chunk)
+            }
+            return
+        }
+        result
     }
 
     static Table _SQL(Sql sql, String query, int limit = 100) {

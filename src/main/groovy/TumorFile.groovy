@@ -187,13 +187,27 @@ class TumorFile {
 
         void build(Sql sql, Table data) {
             data.addColumns(constS('task_id', data, task_id))
+            drop(sql)
+            load_data_frame(sql, table_name, data)
+            log.info("inserted ${data.rowCount()} rows into ${table_name}")
+        }
+
+        void drop(Sql sql) {
             try {
                 sql.execute("drop table ${table_name}".toString())
             } catch (SQLException ignored) {
+                // TODO: distinguish "not found" from others, esp. "because OBJ2 depends on it"
             }
-            // TODO: case fold?
-            load_data_frame(sql, table_name, data)
-            log.info("inserted ${data.rowCount()} rows into ${table_name}")
+        }
+
+        void reset(Sql sql, Table data) {
+            drop(sql)
+            log.debug("creating table ${table_name}")
+            sql.execute(TumorOnt.SqlScript.create_ddl(table_name, data.columns()))
+        }
+
+        void appendChunk(Sql sql, Table data) {
+            TumorOnt.append_data_frame(data, table_name, sql)
         }
     }
 
@@ -304,13 +318,21 @@ class TumorFile {
 
         @Override
         void run() {
-            Table extract = withRecords() { Reader naaccr_text_lines ->
-                log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
-                read_fwf(naaccr_text_lines)
-            }
+            boolean firstChunk = true;
             cdw.withSql { Sql sql ->
-                log.info("inserting ${extract.rowCount()} records into ${tb.table_name}")
-                tb.build(sql, to_db_ids(extract))
+                withRecords() { Reader naaccr_text_lines ->
+                    log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
+                    read_fwf(naaccr_text_lines) { Table extract ->
+                        Table chunk = to_db_ids(extract)
+                        chunk.addColumns(constS('task_id', chunk, tb.task_id))
+                        if (firstChunk) {
+                            tb.reset(sql, chunk)
+                            firstChunk = false
+                        }
+                        log.info("inserting ${extract.rowCount()} records into ${tb.table_name}")
+                        tb.appendChunk(sql, chunk)
+                    }
+                }
             }
         }
 
@@ -422,24 +444,25 @@ class TumorFile {
 
         void run() {
             final DBConfig mem = DBConfig.inMemoryDB("Facts")
-            Table data = null
-            mem.withSql { Sql memdb ->
-                data = _data(memdb)
-            }
-
+            boolean firstChunk = true
             cdw.withSql { Sql sql ->
-                tb.build(sql, data)
-            }
-        }
-
-        Table _data(Sql sql) {
-            extract_task.withRecords { Reader naaccr_text_lines ->
-                final Table extract = read_fwf(naaccr_text_lines)
-                Table item = ItemObs.make(sql, extract)
-                // TODO: Table seer = SEER_Recode.make(sql, extract)
-                // TODO: Table ssf = SiteSpecificFactors.make(sql, extract)
-                // TODO: item.append(seer).append(ssf)
-                item
+                mem.withSql { Sql memdb ->
+                    extract_task.withRecords { Reader naaccr_text_lines ->
+                        read_fwf(naaccr_text_lines) { Table extract ->
+                            Table item = ItemObs.make(memdb, extract)
+                            // TODO: Table seer = SEER_Recode.make(sql, extract)
+                            // TODO: Table ssf = SiteSpecificFactors.make(sql, extract)
+                            // TODO: item.append(seer).append(ssf)
+                            if (firstChunk) {
+                                tb.reset(sql, item)
+                                firstChunk = false
+                            }
+                            tb.appendChunk(sql, item)
+                            memdb.execute('drop all objects')
+                            return
+                        }
+                    }
+                }
             }
         }
     }
@@ -495,20 +518,27 @@ class TumorFile {
 
     }
 
-    static Table read_fwf(Reader lines) {
-        Table data = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
+    static Table read_fwf(Reader lines, Closure<Void> f,
+                         int chunkSize = 64) {
+        Table empty = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
                 as Collection<Column<?>>)
+        Table data = empty.copy()
         PatientReader reader = new PatientFlatReader(lines)
         Patient patient = reader.readPatient()
 
         final ensureCol = { Item item ->
             if (!data.columnNames().contains(item.naaccrId)) {
                 data.addColumns(StringColumn.create(item.naaccrId, data.rowCount()))
+                empty.addColumns(StringColumn.create(item.naaccrId, 0))
             }
         }
 
         while (patient != null) {
             patient.getTumors().each { Tumor tumor ->
+                if (data.rowCount() >= chunkSize) {
+                    f(data)
+                    data = empty.copy()
+                }
                 data.appendRow()
                 final consume = { Item it ->
                     if (it.value.trim() > '') {
@@ -522,7 +552,9 @@ class TumorFile {
             }
             patient = reader.readPatient()
         }
-        data
+        if (data.rowCount() > 0) {
+            f(data)
+        }
     }
 
     static class TumorKeys {

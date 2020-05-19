@@ -11,8 +11,10 @@ import tech.tablesaw.io.csv.CsvReadOptions
 import java.nio.charset.Charset
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.sql.Date
 import java.sql.ResultSet
 import java.sql.SQLException
+import java.sql.Timestamp
 import java.time.LocalDate
 import java.util.zip.ZipFile
 
@@ -337,14 +339,7 @@ class TumorOnt {
                 throw new IllegalArgumentException(missing.toString())
             }
             log.info("${script.name}: create $name")
-            try {
-                sql.execute("drop table if exists $name".toString())
-            } catch (SQLException ignored) {
-            }
-            try {
-                sql.execute("drop view if exists $name".toString())
-            } catch (SQLException ignored) {
-            }
+            dropObject(sql, name)
             sql.execute(it.second)
             Closure<Table> getDF = { Sql sql2 ->
                 Table dft = null
@@ -354,6 +349,17 @@ class TumorOnt {
                 dft
             }
             [(name): getDF]
+        }
+    }
+
+    private static void dropObject(Sql sql, String name) {
+        try {
+            sql.execute("drop table if exists $name".toString())
+        } catch (SQLException ignored) {
+        }
+        try {
+            sql.execute("drop view if exists $name".toString())
+        } catch (SQLException ignored) {
         }
     }
 
@@ -374,6 +380,10 @@ class TumorOnt {
         }
         log.debug("creating table ${name}")
         sql.execute(SqlScript.create_ddl(name, data.columns()))
+        append_data_frame(data, name, sql)
+    }
+
+    static void append_data_frame(Table data, String name, Sql sql) {
         log.debug("inserting ${data.rowCount()} rows into ${name}")
         sql.withBatch(SqlScript.insert_dml(name, data.columns())) { BatchingPreparedStatementWrapper ps ->
             for (Row row : data) {
@@ -394,10 +404,10 @@ class TumorOnt {
                             params << row.getString(params.size())
                             break
                         case ColumnType.LOCAL_DATE:
-                            params << java.sql.Date.valueOf(row.getDate((params.size())))
+                            params << Date.valueOf(row.getDate((params.size())))
                             break
                         case ColumnType.LOCAL_DATE_TIME:
-                            params << java.sql.Timestamp.valueOf(row.getDateTime((params.size())))
+                            params << Timestamp.valueOf(row.getDateTime((params.size())))
                             break
                         case ColumnType.BOOLEAN:
                             params << row.getBoolean(params.size())
