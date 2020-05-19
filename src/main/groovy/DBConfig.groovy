@@ -71,7 +71,7 @@ class DBConfig {
 
     static parseDateExInstall(Sql sql) {
         Class.forName("DBConfig")
-        sql.execute("create alias parseDateEx for \"DBConfig.parseDateEx\" ")
+        sql.execute("create alias if not exists parseDateEx for \"DBConfig.parseDateEx\" ")
     }
 
     static java.sql.Date parseDateEx(String text, String formatString) {
