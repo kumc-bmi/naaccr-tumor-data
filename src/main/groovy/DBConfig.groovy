@@ -122,10 +122,17 @@ class DBConfig {
             opts[target]
         }
 
+        private URI cwd() {
+            new File(System.getProperty('user.dir')).toURI()
+        }
+        URL[] files(String target) {
+            final d = cwd()
+            opts[target].collect { String fn -> d.resolve(fn).toURL() } as URL[]
+        }
+
         // ISSUE: ambient; constructor should take makeURL()
         URL urlArg(String target) {
-            URI cwd = new File(System.getProperty('user.dir')).toURI()
-            cwd.resolve(arg(target)).toURL()
+            cwd().resolve(arg(target)).toURL()
         }
 
         String property(String target) {

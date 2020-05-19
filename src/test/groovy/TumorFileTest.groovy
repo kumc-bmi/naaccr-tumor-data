@@ -71,6 +71,9 @@ class TumorFileTest extends TestCase {
                 { String ignored -> config }, null, null)
         assert cli.urlArg('--who-cache').toString().endsWith(',cache')
         assert cli.property("naaccr.records-table") == "T1"
+
+        final tfiles = new Docopt(doc).withExit(false).parse(['load-files', 'F1', 'F2', 'F3'])
+        assert tfiles['NAACCR_FILE'] == ['F1', 'F2', 'F3']
     }
 
     void testDF() {
@@ -114,7 +117,7 @@ class TumorFileTest extends TestCase {
         int cksum = cdw.withSql { Sql sql ->
             Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), table_name)
             load.run()
-            TumorFile.withClobReader(sql, "select record from $table_name order by line" as String) { Reader lines ->
+            TumorFile.withClobReader(sql, "select observation_blob from $table_name order by encounter_num" as String) { Reader lines ->
                 int accum = 0
                 PatientReader reader = new PatientFlatReader(lines)
                 Patient patient = reader.readPatient()

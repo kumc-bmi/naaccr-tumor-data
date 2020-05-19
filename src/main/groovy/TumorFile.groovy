@@ -67,6 +67,14 @@ class TumorFile {
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
         if (cli.flag('load-records')) {
             work = new NAACCR_Records(cdw, flat_file(), cli.property("naaccr.records-table"))
+        } else if (cli.flag('load-files')) {
+            cli.files('NAACCR_FILE').each { URL naaccr_file ->
+                work = new NAACCR_Records(cdw, naaccr_file, cli.property("naaccr.records-table"))
+                if (work && !work.complete()) {
+                    work.run()
+                }
+            }
+            return
         } else if (cli.flag('discrete-data')) {
             work = new NAACCR_Extract(cdw, task_id,
                     flat_file(),
@@ -106,6 +114,16 @@ class TumorFile {
         }
     }
 
+    static int line_count(URL input) {
+        int count = 0
+        input.withInputStream { InputStream lines ->
+            new Scanner(lines).useDelimiter("\r\n|\n") each { String it ->
+                count += 1
+            }
+        }
+        count
+    }
+
     static class NAACCR_Records implements Task {
         static int batchSize = 1000
         private final DBConfig cdw
@@ -120,15 +138,18 @@ class TumorFile {
 
         boolean complete() {
             boolean done = false
+            int lines = line_count(flat_file)
+            final source_cd = new File(flat_file.path).name
             cdw.withSql { Sql sql ->
                 try {
-                    final row = sql.firstRow("select count(*) from ${table_name}" as String)
+                    final row = sql.firstRow("select count(*) from ${table_name} where source_cd = :source_cd" as String,
+                            [source_cd: source_cd])
                     if (row == null || row.size() == 0) {
                         return null
                     }
                     int rowCount = row[0] as int
-                    if (rowCount > 0) {
-                        log.info("complete: table ${table_name} already has ${rowCount} records.")
+                    if (rowCount >= lines) {
+                        log.info("complete: table ${table_name} already has ${rowCount} records from ${source_cd}.")
                         done = true
                     }
                 } catch (SQLException problem) {
@@ -140,23 +161,24 @@ class TumorFile {
         }
 
         void run() {
-            String stmt = "insert into ${table_name} (line, record) values (?, ?)"
+            final source_cd = new File(flat_file.path).name
+            String stmt = "insert into ${table_name} (source_cd, encounter_num, observation_blob) values (?, ?, ?)"
             log.info("loading ${flat_file}: $stmt")
             flat_file.withInputStream { InputStream naaccr_text_lines ->
                 cdw.withSql { Sql sql ->
                     try {
-                        sql.execute("create table ${table_name} (line int, record clob)" as String)
+                        sql.execute("create table ${table_name} (source_cd varchar(50), encounter_num int, observation_blob clob)" as String)
                     } catch (SQLException problem) {
                         log.warn("cannot create ${table_name}: ${problem}")
                     }
-                    int line = 0
+                    int encounter_num = 0
                     sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
-                        new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String record ->
-                            line += 1
-                            ps.addBatch([line as Object, record as Object])
+                        new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String observation_blob ->
+                            encounter_num += 1
+                            ps.addBatch([source_cd as Object, encounter_num as Object, observation_blob as Object])
                         }
                     }
-                    log.info("inserted ${line} records into $table_name")
+                    log.info("inserted ${encounter_num} records into $table_name")
                 }
             }
         }
@@ -341,7 +363,8 @@ class TumorFile {
             if (flat_file == null) {
                 log.info("reading records from table ${records_table}")
                 result = cdw.withSql { Sql sql ->
-                    withClobReader(sql, "select record from $records_table order by line" as String) { Reader lines ->
+                    String select_blobs = "select observation_blob from $records_table order by source_cd, encounter_num"
+                    withClobReader(sql, select_blobs) { Reader lines ->
                         thunk(lines)
                     }
                 }
@@ -519,7 +542,7 @@ class TumorFile {
     }
 
     static Table read_fwf(Reader lines, Closure<Void> f,
-                         int chunkSize = 64) {
+                          int chunkSize = 64) {
         Table empty = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
                 as Collection<Column<?>>)
         Table data = empty.copy()
@@ -578,7 +601,7 @@ class TumorFile {
                 'abstractedBy',         // IDEA/YAGNI?: provider_id
         ]
         static List<String> required_cols = (pat_attrs + tmr_attrs + report_attrs + key4.drop(3) +
-                dtcols.collect{ it + 'Flag' })
+                dtcols.collect { it + 'Flag' })
 
         static Table pat_tmr(Reader naaccr_text_lines) {
             _pick_cols(tmr_attrs + pat_attrs + report_attrs, naaccr_text_lines)
