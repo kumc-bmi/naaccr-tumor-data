@@ -37,7 +37,7 @@ class TumorOnt {
             }
         } else if (cli.flag("import")) {
             cdw.withSql { Sql sql ->
-                TumorOnt.importCSV(sql, cli.arg("TABLE"), cli.urlArg("DATA"), cli.urlArg("META"))
+                importCSV(sql, cli.arg("TABLE"), cli.urlArg("DATA"), cli.urlArg("META"))
             }
         }
     }

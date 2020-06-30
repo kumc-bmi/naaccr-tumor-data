@@ -69,6 +69,7 @@ class TumorFile {
             work = new NAACCR_Records(cdw, flat_file(), cli.property("naaccr.records-table"))
         } else if (cli.flag('load-files')) {
             cli.files('NAACCR_FILE').each { URL naaccr_file ->
+                //noinspection GrReassignedInClosureLocalVar
                 work = new NAACCR_Records(cdw, naaccr_file, cli.property("naaccr.records-table"))
                 if (work && !work.complete()) {
                     work.run()
@@ -297,9 +298,7 @@ class TumorFile {
          * avoid ORA-00972: identifier is too long
          * @return records, after mutating column names
          */
-        static Table to_db_ids(Table records,
-                               int max_length = 30,
-                               int max_digits = 7) {
+        static Table to_db_ids(Table records) {
             final Map<String, String> byId = fields().iterator().collectEntries { Row row ->
                 [(row.getString('naaccrId')): row.getString('FIELD_NAME')]
             }
@@ -310,9 +309,7 @@ class TumorFile {
             records
         }
 
-        static Table from_db_ids(Table records,
-                                 int max_length = 30,
-                                 int max_digits = 7) {
+        static Table from_db_ids(Table records) {
             final Map<String, String> toId = fields().iterator().collectEntries { Row row ->
                 [(row.getString('FIELD_NAME')): row.getString('naaccrId')]
             }
@@ -340,7 +337,7 @@ class TumorFile {
 
         @Override
         void run() {
-            boolean firstChunk = true;
+            boolean firstChunk = true
             cdw.withSql { Sql sql ->
                 withRecords() { Reader naaccr_text_lines ->
                     log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
@@ -482,7 +479,7 @@ class TumorFile {
                             }
                             tb.appendChunk(sql, item)
                             memdb.execute('drop all objects')
-                            return
+                            return null
                         }
                     }
                 }
@@ -541,7 +538,7 @@ class TumorFile {
 
     }
 
-    static Table read_fwf(Reader lines, Closure<Void> f,
+    static void read_fwf(Reader lines, Closure<Void> f,
                           int chunkSize = 64) {
         Table empty = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
                 as Collection<Column<?>>)
