@@ -31,17 +31,20 @@ class TumorFileTest extends TestCase {
     static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
     void testCLI() {
-        final String doc = TumorFile.usage
-        final args = ['facts']
         final Properties config = new Properties()
-        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): testDataPath,
+        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file')    : testDataPath,
                                             ('naaccr.records-table'): 'TR_REC',
                                             ('naaccr.extract-table'): 'TR_EX'])
-        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
-                { String name -> config  },
-                { int it -> throw new RuntimeException('unexpected exit') },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps) } )
+        DBConfig.CLI cli = buildCLI(['facts'], config)
         TumorFile.run_cli(cli)
+    }
+
+    public static DBConfig.CLI buildCLI(List<String> args, Properties config) {
+        final String doc = TumorFile.usage
+        new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
+                { String name -> config },
+                { int it -> throw new RuntimeException('unexpected exit') },
+                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
     }
 
     // NOTE: if you rename this, update CONTRIBUTING.md
