@@ -53,7 +53,7 @@ class UsageDoc extends DefaultTask {
 
     @TaskAction
     void perform() {
-        final usage = readme.text.split('```\n').find { it.startsWith('Usage:') }
+        final usage = readme.text.split('```\r?\n').find { it.startsWith('Usage:') }
         doc.text = usage
     }
 }
