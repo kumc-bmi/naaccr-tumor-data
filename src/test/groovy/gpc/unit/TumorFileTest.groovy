@@ -92,7 +92,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testDDict() {
-        final dd = TumorFile.ddictDF()
+        final dd = TumorOnt.ddictDF()
         assert dd.rowCount() > 700
 
         final primarySite = dd.where(dd.intColumn("naaccrNum").isEqualTo(400))
@@ -189,7 +189,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testDBIds() {
-        Table dd = TumorFile.ddictDF()
+        Table dd = TumorOnt.ddictDF()
         final longNames = dd.where(dd.stringColumn('naaccrId').isLongerThan((30))).stringColumn('naaccrId').asList()
         Table naaccrIds = Table.create("t1", longNames.collect { String id -> StringColumn.create(id) }
                 as Collection<Column<?>>)
@@ -360,7 +360,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testTumorFields() {
-        Table actual = TumorFile.fields()
+        Table actual = TumorOnt.fields()
         Table pcornet_spec = TumorOnt.read_csv(TumorFileTest.getResource('tumor table.version1.2.csv')).select(
                 'NAACCR Item', 'FLAG', 'FIELD_NAME'
         )

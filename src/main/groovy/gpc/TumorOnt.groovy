@@ -1,5 +1,7 @@
 package gpc
 
+import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
+import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
 import gpc.DBConfig.Task
 import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
@@ -42,6 +44,31 @@ class TumorOnt {
                 importCSV(sql, cli.arg("TABLE"), cli.urlArg("DATA"), cli.urlArg("META"))
             }
         }
+    }
+
+    /**
+     * PCORnet tumor table fields
+     */
+    static Table fields() {
+        Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).select(
+                'item', 'FIELD_NAME'
+        )
+        // get naaccr-xml naaccrId
+        Table items = ddictDF().joinOn('naaccrNum').fullOuter(pcornet_spec, 'item')
+        items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
+    }
+
+    static Table ddictDF(String version = "180") {
+        NaaccrDictionary baseDictionary = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version)
+        final items = baseDictionary.items
+        Table.create(
+                IntColumn.create("naaccrNum", items.collect { it.naaccrNum } as int[]),
+                StringColumn.create("naaccrId", items.collect { it.naaccrId }),
+                StringColumn.create("naaccrName", items.collect { it.naaccrName }),
+                IntColumn.create("startColumn", items.collect { it.startColumn } as int[]),
+                IntColumn.create("length", items.collect { it.length } as int[]),
+                StringColumn.create("parentXmlElement", items.collect { it.parentXmlElement }))
+
     }
 
     static class Ontology1 implements Task {

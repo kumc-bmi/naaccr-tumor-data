@@ -198,10 +198,10 @@ class TumorFile {
             boolean done = false
             account.withSql { Sql sql ->
                 try {
-                    final row = sql.firstRow("select 1 from ${table_name} where task_id = ?.task_id",
+                    final row = sql.firstRow("select count(*) from ${table_name} where task_id = ?.task_id",
                             [task_id: task_id])
-                    if (row != null && row[0] == 1) {
-                        log.info("complete: $task_id")
+                    if (row != null && (row[0] as int) >= 1) {
+                        log.info("complete: ${row[0]} rows with task_id = $task_id")
                         done = true
                     }
                 } catch (SQLException problem) {
@@ -269,18 +269,6 @@ class TumorFile {
         }
     }
 
-    /**
-     * PCORnet tumor table fields
-     */
-    static Table fields() {
-        Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).select(
-                'item', 'FIELD_NAME'
-        )
-        // get naaccr-xml naaccrId
-        Table items = ddictDF().joinOn('naaccrNum').fullOuter(pcornet_spec, 'item')
-        items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
-    }
-
 
     static class NAACCR_Extract implements Task {
         final TableBuilder tb
@@ -303,7 +291,7 @@ class TumorFile {
          * @return records, after mutating column names
          */
         static Table to_db_ids(Table records) {
-            final Map<String, String> byId = fields().iterator().collectEntries { Row row ->
+            final Map<String, String> byId = TumorOnt.fields().iterator().collectEntries { Row row ->
                 [(row.getString('naaccrId')): row.getString('FIELD_NAME')]
             }
             records.columns().findAll { byId[it.name()] == null || byId[it.name()] == "" }.forEach { Column flaggedPrivate ->
@@ -314,7 +302,7 @@ class TumorFile {
         }
 
         static Table from_db_ids(Table records) {
-            final Map<String, String> toId = fields().iterator().collectEntries { Row row ->
+            final Map<String, String> toId = TumorOnt.fields().iterator().collectEntries { Row row ->
                 [(row.getString('FIELD_NAME')): row.getString('naaccrId')]
             }
             records.columns().forEach { Column column ->
@@ -326,36 +314,31 @@ class TumorFile {
             records
         }
 
-        Table results() {
-            if (!complete()) {
-                run()
-            }
-            cdw.withSql { Sql sql ->
-                Table from_db = null
-                sql.query("select * from ${tb.table_name}" as String) { ResultSet results ->
-                    from_db = Table.read().db(results)
-                }
-                from_db_ids(from_db)
-            }
-        }
-
         @Override
         void run() {
             boolean firstChunk = true
+            def colNames = (TumorOnt.fields()
+                    .iterator()
+                    .collect { it.getString('FIELD_NAME') }
+                    .findAll { it > '' }
+            ) + ['task_id']
+            Table blank = Table.create(colNames.collect { StringColumn.create(it) } as Collection<Column>)
             cdw.withSql { Sql sql ->
                 withRecords() { Reader naaccr_text_lines ->
                     log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
                     read_fwf(naaccr_text_lines) { Table extract ->
                         Table chunk = to_db_ids(extract)
-                        chunk.addColumns(constS('task_id', chunk, tb.task_id))
                         if (firstChunk) {
-                            tb.reset(sql, chunk)
+                            tb.reset(sql, blank)
                             firstChunk = false
                         }
-                        log.info("inserting ${extract.rowCount()} records into ${tb.table_name}")
+                        log.info("inserting ${chunk.rowCount()} records into ${tb.table_name}")
                         tb.appendChunk(sql, chunk)
                     }
                 }
+                // only fill in task_id after all rows are done
+                sql.execute("update ${tb.table_name} set task_id = ?.task_id",
+                        [task_id: tb.task_id])
             }
         }
 
@@ -526,24 +509,8 @@ class TumorFile {
 
     }
 
-    /**
-     * @param max_length - avoid ORA-00972: identifier is too long
-     */
-    static Table ddictDF(String version = "180") {
-        NaaccrDictionary baseDictionary = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version)
-        final items = baseDictionary.items
-        Table.create(
-                IntColumn.create("naaccrNum", items.collect { it.naaccrNum } as int[]),
-                StringColumn.create("naaccrId", items.collect { it.naaccrId }),
-                StringColumn.create("naaccrName", items.collect { it.naaccrName }),
-                IntColumn.create("startColumn", items.collect { it.startColumn } as int[]),
-                IntColumn.create("length", items.collect { it.length } as int[]),
-                StringColumn.create("parentXmlElement", items.collect { it.parentXmlElement }))
-
-    }
-
     static void read_fwf(Reader lines, Closure<Void> f,
-                         int chunkSize = 64) {
+                         int chunkSize = 200) {
         Table empty = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
                 as Collection<Column<?>>)
         Table data = empty.copy()

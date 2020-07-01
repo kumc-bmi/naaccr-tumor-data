@@ -54,7 +54,7 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 Usage:
   naaccr-tumor-data load-records [--db=PF]
   naaccr-tumor-data load-files [--db=PF] NAACCR_FILE...
-  naaccr-tumor-data discrete-data [--no-file] [--db=PF]
+  naaccr-tumor-data discrete-data [--no-file] [--db=PF] [--task-id=ID]
   naaccr-tumor-data summary  [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data tumors   [--no-file] [--db=F] [--task-id=ID]
   naaccr-tumor-data facts    [--no-file] [--db=F] [--task-id=ID]
