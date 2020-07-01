@@ -6,6 +6,7 @@ import gpc.unit.TumorFileTest
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
+import org.junit.Ignore
 
 import java.nio.file.Paths
 import java.nio.file.Files
@@ -16,11 +17,11 @@ import java.nio.file.Files
  */
 @CompileStatic
 class Staging extends TestCase {
-    void "test load-records: load NAACCR records from flat-file into a (CLOB) column of a DB table"() {
+    void "test load-records load NAACCR records from flat-file into a (CLOB) column of a DB table"() {
         def cli = cli1(['load-records'], System.getProperty('user.dir'))
 
         def path = Paths.get(TumorFileTest.testDataPath)
-        def lineCount = Files.lines(path).count();
+        def lineCount = Files.lines(path).count()
 
         TumorFile.main(['load-records'] as String[])
 
@@ -39,14 +40,16 @@ class Staging extends TestCase {
         TumorFile.main(argv as String[])
     }
 
-    // TODO: stats test. depends on tumors? move to ETL?
-    void "SKIP test stats on 100 records of test data with local disk h2 DB"() {
-        def argv = ['discrete-data', '--no-file']
-        cli1(argv, System.getProperty('user.dir'))
+    @Ignore("TODO: stats test. depends on tumors? move to ETL?")
+    static class ToDo extends TestCase {
+        void "test stats on 100 records of test data with local disk h2 DB"() {
+            def argv = ['discrete-data', '--no-file']
+            cli1(argv, System.getProperty('user.dir'))
 
-        TumorFile.main(['load-records'] as String[])
-        TumorFile.main(['discrete-data', '--no-file'] as String[])
-        TumorFile.main(['summary', '--no-file'] as String[])
+            TumorFile.main(['load-records'] as String[])
+            TumorFile.main(['discrete-data', '--no-file'] as String[])
+            TumorFile.main(['summary', '--no-file'] as String[])
+        }
     }
 
     void "test load multiple NAACCR files in a local disk h2 DB"() {

@@ -17,6 +17,7 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import org.docopt.Docopt
+import org.junit.Ignore
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.DoubleColumn
 import tech.tablesaw.api.Row
@@ -159,29 +160,32 @@ class TumorFileTest extends TestCase {
         }
     }
 
-    void testStatsFromDB() {
-        final cdw = DBConfig.inMemoryDB("TR", true)
-        final String records_table = "TR_RECORDS"
-        final String extract_table = "TR_DATA"
-        final String stats_table = "TR_STATS"
+    @Ignore("testStatsFromDB: requires live Oracle connection")
+    static class ToDoLive {
+        void testStatsFromDB() {
+            final cdw = DBConfig.inMemoryDB("TR", true)
+            final String records_table = "TR_RECORDS"
+            final String extract_table = "TR_DATA"
+            final String stats_table = "TR_STATS"
 
-        log.warn("skipping testStatsFromDB: requires live Oracle connection")
-        return
+            log.warn("skipping testStatsFromDB: requires live Oracle connection")
+            return
 
-        int cksum = -1
-        cdw.withSql() { Sql sql ->
-            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), records_table)
-            load.run()
-            sql.execute("delete from ${records_table} where line > 10" as String) // stats for 100 is a boring wait
-            Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
-                    null, records_table, extract_table, stats_table)
-            work.run()
-            sql.query("select * from ${stats_table}" as String) { results ->
-                Table stats = Table.read().db(results, "stats")
-                cksum = stats.longColumn('TUMOR_QTY').countUnique()
+            int cksum = -1
+            cdw.withSql() { Sql sql ->
+                Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), records_table)
+                load.run()
+                sql.execute("delete from ${records_table} where line > 10" as String) // stats for 100 is a boring wait
+                Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
+                        null, records_table, extract_table, stats_table)
+                work.run()
+                sql.query("select * from ${stats_table}" as String) { results ->
+                    Table stats = Table.read().db(results, "stats")
+                    cksum = stats.longColumn('TUMOR_QTY').countUnique()
+                }
             }
+            assert cksum == 3
         }
-        assert cksum == 3
     }
 
     void testDBIds() {
@@ -239,17 +243,20 @@ class TumorFileTest extends TestCase {
         out
     }
 
-    void notYettestPatientsTask() {
-        final cdw = DBConfig.inMemoryDB("PT", true)
-        URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", flat_file, "TR_REC", "TR_EX")
-        if (!work.complete()) {
-            work.run()
-        }
+    @Ignore
+    static class ToDo extends TestCase {
+        void testPatientsTask() {
+            final cdw = DBConfig.inMemoryDB("PT", true)
+            URL flat_file = Paths.get(testDataPath).toUri().toURL()
+            Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", flat_file, "TR_REC", "TR_EX")
+            if (!work.complete()) {
+                work.run()
+            }
 
-        Table actual = cdw.withSql { Sql sql -> _SQL(sql, 'select * from NAACCR_PATIENTS limit 20') }
-        println(actual)
-        assert 1 == 0
+            Table actual = cdw.withSql { Sql sql -> _SQL(sql, 'select * from NAACCR_PATIENTS limit 20') }
+            println(actual)
+            assert 1 == 0
+        }
     }
 
     /*****

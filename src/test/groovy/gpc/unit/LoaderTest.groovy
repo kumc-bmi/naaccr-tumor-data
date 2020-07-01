@@ -7,11 +7,13 @@ import groovy.sql.GroovyResultSet
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
+import org.junit.Test
 
 import static groovy.test.GroovyAssert.shouldFail
 
 @CompileStatic
 class LoaderTest extends TestCase {
+    @Test
     @SuppressWarnings("GrMethodMayBeStatic")
     void 'inMemoryDB supports select'() {
         def account = DBConfig.inMemoryDB("A1")
