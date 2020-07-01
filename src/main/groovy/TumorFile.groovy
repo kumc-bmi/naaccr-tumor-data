@@ -106,8 +106,10 @@ class TumorFile {
                     cli.property("naaccr.records-table"),
                     cli.property("naaccr.extract-table"))
             TumorOnt.run_cli(cli)
-        } else {
+        } else if (cli.flag('load') || cli.flag('run') || cli.flag('query')) {
             Loader.run_cli(cli)
+        } else {
+            TumorOnt.run_cli(cli)
         }
 
         if (work && !work.complete()) {
@@ -539,7 +541,7 @@ class TumorFile {
     }
 
     static void read_fwf(Reader lines, Closure<Void> f,
-                          int chunkSize = 64) {
+                         int chunkSize = 64) {
         Table empty = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
                 as Collection<Column<?>>)
         Table data = empty.copy()

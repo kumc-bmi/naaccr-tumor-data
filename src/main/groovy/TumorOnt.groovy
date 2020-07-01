@@ -307,7 +307,10 @@ class TumorOnt {
             }
 
             final current_task = fromRecords([[task_hash: task_hash] as Map]).setName("current_task")
-            cs_terms.removeColumns('update_date', 'sourcesystem_cd') // KLUDGE: mutable. at least it's idempotent.
+            // KLUDGE: mutable.
+            if (cs_terms.columnNames().contains('update_date')) {
+                cs_terms.removeColumns('update_date', 'sourcesystem_cd')
+            }
             final tables = [
                     current_task       : current_task,
                     naaccr_top         : naaccr_top(update_date),
