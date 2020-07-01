@@ -49,7 +49,7 @@ class UsageDoc extends DefaultTask {
     File readme = project.file('README.md')
 
     @OutputFile
-    File doc = project.file('src/main/resources/usage.txt')
+    File doc = project.file('src/main/resources/gpc/usage.txt')
 
     @TaskAction
     void perform() {

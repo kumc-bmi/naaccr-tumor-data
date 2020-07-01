@@ -1,3 +1,5 @@
+package gpc
+
 import groovy.json.JsonBuilder
 import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
@@ -19,6 +21,7 @@ class Loader {
     }
 
     void runScript(URL input) {
+        assert input != null
         def edited = productSqlEdits(productName())
 
         input.withInputStream { stream ->

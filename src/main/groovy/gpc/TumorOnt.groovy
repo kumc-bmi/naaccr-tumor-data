@@ -1,4 +1,6 @@
-import DBConfig.Task
+package gpc
+
+import gpc.DBConfig.Task
 import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
@@ -187,7 +189,7 @@ class TumorOnt {
         result
     }
 
-    static class SqlScript { // TODO: refactor: move SqlScript out of TumorOnt
+    static class SqlScript { // TODO: refactor: move SqlScript out of gpc.TumorOnt
         final String name
         final String code
         final List<Tuple3<String, String, List<String>>> objects
@@ -246,7 +248,7 @@ class TumorOnt {
     }
 
     static class LOINC_NAACCR {
-        // TODO: static final measure = read_csv(TumorOnt.getResource('loinc_naaccr/loinc_naaccr.csv'))
+        // TODO: static final measure = read_csv(gpc.TumorOnt.getResource('loinc_naaccr/loinc_naaccr.csv'))
         static final Table answer = read_csv(TumorOnt.getResource('loinc_naaccr/loinc_naaccr_answer.csv'))
         // TODO? static final answer_struct = answer.columns().collect { Column<?> it -> it.copy().setName(it.name().toLowerCase()) }
     }
@@ -264,7 +266,7 @@ class TumorOnt {
         /* obsolete
         static final tx_script = new SqlScript(
                 'naaccr_txform.sql',
-                resourceText(TumorOnt.getResource('heron_load/naaccr_txform.sql')), [])
+                resourceText(gpc.TumorOnt.getResource('heron_load/naaccr_txform.sql')), [])
         */
 
         static final String per_item_view = 'tumor_item_type'

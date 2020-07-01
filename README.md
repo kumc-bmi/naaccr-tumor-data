@@ -33,11 +33,11 @@ Then, to create the `TUMOR` table following draft PCORnet specifications:
 
 ```shell script
 $ java -jar build/libs/naaccr-tumor-data.jar discrete-data
-[main] INFO DBConfig - getting config from db.properties
+[main] INFO gpc.DBConfig - getting config from db.properties
 ...
-[main] INFO TumorFile - reading records from file:.../naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
+[main] INFO gpc.TumorFile - reading records from file:.../naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
 ...
-[main] INFO TumorFile - inserted 100 rows into TUMOR
+[main] INFO gpc.TumorFile - inserted 100 rows into TUMOR
 ```
 
 _Please excuse / ignore `WARNING: An illegal reflective access ...`;

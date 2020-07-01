@@ -1,3 +1,7 @@
+package gpc.unit
+
+import gpc.DBConfig
+import gpc.Loader
 import groovy.json.JsonOutput
 import groovy.sql.GroovyResultSet
 import groovy.sql.Sql
@@ -42,7 +46,7 @@ class LoaderTest extends TestCase {
         def account = DBConfig.inMemoryDB("A1")
         account.withSql { Sql sql ->
             sql.execute('drop all objects')
-            def input = getClass().getResource('naaccr_tables.sql')
+            def input = Loader.getResource('naaccr_tables.sql')
             def loader = new Loader(sql)
             loader.runScript(input)
         }
@@ -52,7 +56,7 @@ class LoaderTest extends TestCase {
         def account = DBConfig.inMemoryDB("A1")
         account.withSql { Sql sql ->
             def loader = new Loader(sql)
-            loader.runScript(getClass().getResource('naaccr_tables.sql'))
+            loader.runScript(Loader.getResource('naaccr_tables.sql'))
             loader.runScript(getClass().getResource('naaccr_query_data.sql'))
 
             // query for each datatype... except dates; due to ambient timezone access, it's not portable somehow
@@ -79,7 +83,7 @@ class LoaderTest extends TestCase {
         def account = DBConfig.inMemoryDB("A1")
         account.withSql { Sql sql ->
             def loader = new Loader(sql)
-            loader.runScript(getClass().getResource('naaccr_tables.sql'))
+            loader.runScript(Loader.getResource('naaccr_tables.sql'))
             sql.execute "delete from naaccr_tumors"
             loader.load(input)
 

@@ -1,3 +1,5 @@
+package gpc
+
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -6,7 +8,6 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 
 @CompileStatic
 @Slf4j
@@ -70,8 +71,8 @@ class DBConfig {
     }
 
     static parseDateExInstall(Sql sql) {
-        Class.forName("DBConfig")
-        sql.execute("create alias if not exists parseDateEx for \"DBConfig.parseDateEx\" ")
+        Class.forName("gpc.DBConfig")
+        sql.execute("create alias if not exists parseDateEx for \"gpc.DBConfig.parseDateEx\" ")
     }
 
     static java.sql.Date parseDateEx(String text, String formatString) {

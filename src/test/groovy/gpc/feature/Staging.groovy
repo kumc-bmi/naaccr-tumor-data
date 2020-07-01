@@ -1,3 +1,8 @@
+package gpc.feature
+
+import gpc.DBConfig
+import gpc.TumorFile
+import gpc.unit.TumorFileTest
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
@@ -10,7 +15,7 @@ import java.nio.file.Files
  * ISSUE: use temp dir?
  */
 @CompileStatic
-class StagingIntegrationTest  extends TestCase {
+class Staging extends TestCase {
     void "test load-records: load NAACCR records from flat-file into a (CLOB) column of a DB table"() {
         def cli = cli1(['load-records'], System.getProperty('user.dir'))
 

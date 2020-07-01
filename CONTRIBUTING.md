@@ -49,10 +49,10 @@ We find [https://dbeaver.io/ DBeaver] a handy SQL development environment.
       (which is only typesafe in the return value, not the arguments).
 
 
-## docopt: Usage documentation in README.d is code
+## docopt: Usage documentation in README.md is code
 
 Note the [docopt](https://mvnrepository.com/artifact/com.offbytwo/docopt) dependency in `build.gradle`
-and `TumorFileTest.testDocOpt`. The `buildUsageDoc` gradle task extracts the usage doc from `README.md`
+and `gpc.unit.TumorFileTest.testDocOpt`. The `buildUsageDoc` gradle task extracts the usage doc from `README.md`
 and puts it in `src/main/resources/usage.txt`.
 
 

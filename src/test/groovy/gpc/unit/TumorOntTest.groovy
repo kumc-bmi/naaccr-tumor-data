@@ -1,3 +1,7 @@
+package gpc.unit
+
+import gpc.DBConfig
+import gpc.TumorOnt
 import groovy.sql.Sql
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase

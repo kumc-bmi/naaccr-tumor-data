@@ -1,4 +1,6 @@
-import DBConfig.Task
+package gpc
+
+import gpc.DBConfig.Task
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.record.fixed.FixedColumnsField
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
