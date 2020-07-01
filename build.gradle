@@ -67,7 +67,7 @@ task fatjar(type: Jar) {
     group = 'build'
 
     manifest {
-        attributes 'Main-Class': 'TumorFile'
+        attributes 'Main-Class': 'gpc.TumorFile'
     }
     from {
         configurations
