@@ -1,16 +1,16 @@
 package gpc.unit
 
-import gpc.DBConfig
-import gpc.DBConfig.Task
-import gpc.TumorFile
-import gpc.TumorFile.DataSummary
-import gpc.TumorFile.TumorKeys
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import com.imsweb.naaccrxml.PatientFlatReader
 import com.imsweb.naaccrxml.PatientReader
 import com.imsweb.naaccrxml.entity.Patient
+import gpc.DBConfig
+import gpc.DBConfig.Task
+import gpc.TumorFile
+import gpc.TumorFile.DataSummary
+import gpc.TumorFile.TumorKeys
 import gpc.TumorOnt
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
@@ -226,8 +226,9 @@ class TumorFileTest extends TestCase {
         // log.info("tr_file: ${testDataPath}")
         Table result = null
         TumorFile.read_fwf(naaccr_text_lines) { Table chunk ->
-            if (result == null) { result = chunk }
-            else {
+            if (result == null) {
+                result = chunk
+            } else {
                 result = result.append(chunk)
             }
             return
@@ -343,7 +344,7 @@ class TumorFileTest extends TestCase {
                     'VALTYPE_CD', 'TVAL_CHAR', 'NVAL_NUM', 'VALUEFLAG_CD', 'UNITS_CD',
                     'END_DATE', 'LOCATION_CD', 'UPDATE_DATE']
             assert actual.columnTypes() as List == [
-                    ColumnType.INTEGER, ColumnType.STRING, ColumnType.STRING,  ColumnType.INTEGER, ColumnType.LOCAL_DATE,
+                    ColumnType.INTEGER, ColumnType.STRING, ColumnType.STRING, ColumnType.INTEGER, ColumnType.LOCAL_DATE,
                     ColumnType.STRING, ColumnType.STRING, ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.INTEGER,
                     ColumnType.STRING, ColumnType.STRING, ColumnType.DOUBLE, ColumnType.STRING, ColumnType.STRING,
                     ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.LOCAL_DATE]
@@ -372,7 +373,7 @@ class TumorFileTest extends TestCase {
         Table items = pcornet_spec.joinOn('NAACCR Item').fullOuter(actual, 'naaccrNum')
         // println(items.first(3))
         Table problems = items.first(0)
-        for (Row item: items) {
+        for (Row item : items) {
             if (item.getString('FIELD_NAME') != item.getString('name_test')) {
                 problems.addRow(item)
             }

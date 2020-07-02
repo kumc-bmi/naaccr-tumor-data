@@ -358,7 +358,7 @@ class TumorOnt {
     }
 
     static Map<String, Closure<Table>> create_objects(Sql sql, SqlScript script,
-                                             Map<String, Table> tables) {
+                                                      Map<String, Table> tables) {
         final Set provided = tables.keySet()
         tables.each { key, df ->
             log.info("${script.name}: $key = ${df.columnNames()}")
@@ -401,7 +401,7 @@ class TumorOnt {
     }
 
     static void load_data_frame(Sql sql, String name, Table data,
-            boolean dropFirst=false) {
+                                boolean dropFirst = false) {
         assert name
         if (dropFirst) {
             try {
