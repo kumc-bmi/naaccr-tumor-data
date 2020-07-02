@@ -1,16 +1,14 @@
 package gpc
 
-import gpc.DBConfig.Task
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.record.fixed.FixedColumnsField
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
-import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
 import com.imsweb.naaccrxml.PatientFlatReader
 import com.imsweb.naaccrxml.PatientReader
 import com.imsweb.naaccrxml.entity.Item
 import com.imsweb.naaccrxml.entity.Patient
 import com.imsweb.naaccrxml.entity.Tumor
-import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
+import gpc.DBConfig.Task
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic

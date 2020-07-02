@@ -24,7 +24,7 @@ class LoaderTest extends TestCase {
         }
     }
 
-    static final Map dbInfo1 = ["db.url" : 'jdbc:h2:mem:A1;create=true', "db.driver": 'org.h2.Driver',
+    static final Map dbInfo1 = ["db.url"     : 'jdbc:h2:mem:A1;create=true', "db.driver": 'org.h2.Driver',
                                 "db.username": 'SA', "db.password": '']
     static final Properties dbProps1 = ({ ->
         Properties ps = new Properties()

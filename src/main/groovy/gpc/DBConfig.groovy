@@ -57,7 +57,7 @@ class DBConfig {
         properties
     }
 
-    static DBConfig inMemoryDB(String databaseName, boolean reset=false) {
+    static DBConfig inMemoryDB(String databaseName, boolean reset = false) {
         String url = "jdbc:h2:mem:${databaseName};create=true"
         String driver = 'org.h2.Driver'
         log.debug("looking up in-memory JDBC driver: $driver")
@@ -116,7 +116,7 @@ class DBConfig {
             opts[target] == true
         }
 
-        String arg(String target, String fallback=null) {
+        String arg(String target, String fallback = null) {
             if (!opts.containsKey(target) || opts[target] == null) {
                 return fallback
             }
@@ -126,6 +126,7 @@ class DBConfig {
         private URI cwd() {
             new File(System.getProperty('user.dir')).toURI()
         }
+
         URL[] files(String target) {
             final d = cwd()
             opts[target].collect { String fn -> d.resolve(fn).toURL() } as URL[]

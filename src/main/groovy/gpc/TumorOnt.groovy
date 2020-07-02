@@ -60,9 +60,9 @@ class TumorOnt {
         final dd = ddictDF()
         Table items
         if (strict) {
-            items = pcornet_spec.joinOn('item').inner(dd,'naaccrNum')
+            items = pcornet_spec.joinOn('item').inner(dd, 'naaccrNum')
         } else {
-            items = pcornet_spec.joinOn('item').leftOuter(dd,'naaccrNum')
+            items = pcornet_spec.joinOn('item').leftOuter(dd, 'naaccrNum')
         }
         items.column("item").setName("naaccrNum")
         items.setName("TUMOR")

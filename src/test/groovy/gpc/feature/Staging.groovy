@@ -8,8 +8,8 @@ import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import org.junit.Ignore
 
-import java.nio.file.Paths
 import java.nio.file.Files
+import java.nio.file.Paths
 
 /**
  * CAUTION: ambient access to user.dir to write config file, DB.
