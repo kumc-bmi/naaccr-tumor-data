@@ -19,7 +19,6 @@ import junit.framework.TestCase
 import org.docopt.Docopt
 import org.junit.Ignore
 import tech.tablesaw.api.ColumnType
-import tech.tablesaw.api.DoubleColumn
 import tech.tablesaw.api.Row
 import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
@@ -83,12 +82,6 @@ class TumorFileTest extends TestCase {
 
         final tfiles = new Docopt(doc).withExit(false).parse(['load-files', 'F1', 'F2', 'F3'])
         assert tfiles['NAACCR_FILE'] == ['F1', 'F2', 'F3']
-    }
-
-    void testDF() {
-        double[] numbers = [1, 2, 3, 4]
-        DoubleColumn nc = DoubleColumn.create("nc", numbers)
-        System.out.println(nc.print())
     }
 
     void testDDict() {
