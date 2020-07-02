@@ -311,11 +311,30 @@ class TumorFile {
 
         @Override
         void run() {
+            // TODO: support other NAACCR file versions
+            // TODO: support SUBSTRING vs. SUBSTR
+            final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
+            final statements = layoutToSQL(v18, records_table, tb.table_name, "OBSERVATION_BLOB", "TASK_ID", "SUBSTR")
+            def (create, insert) = [statements[0], statements[1]]
+            cdw.withSql { Sql sql ->
+                tb.drop(sql)
+                log.info("creating ${tb.table_name}")
+                sql.execute(create)
+                log.info("inserting into ${tb.table_name}")
+                sql.execute(insert)
+                log.info("updating task_id in ${tb.table_name}")
+                // only fill in task_id after all rows are done
+                // TODO: since the insert is one transaction, fill in task_id too?
+                sql.execute("update ${tb.table_name} set task_id = ?.task_id",
+                        [task_id: tb.task_id])
+            }
+        }
+
+        void runRillyRillySlowly() {
             boolean firstChunk = true
             def colNames = (TumorOnt.fields()
                     .iterator()
                     .collect { it.getString('FIELD_NAME') }
-                    .findAll { it > '' }
             ) + ['task_id']
             Table blank = Table.create(colNames.collect { StringColumn.create(it) } as Collection<Column>)
             cdw.withSql { Sql sql ->
@@ -353,7 +372,32 @@ class TumorFile {
             }
             result
         }
+
+        static List<String> layoutToSQL(FixedColumnsLayout layout, String source, String dest, String clob,
+                                        String taskCol = "TASK_ID",
+                                        String substr = "SUBSTR",
+                                        String varchar = "VARCHAR2",
+                                        String hint = '/*+ parallel(8) append */') {
+            final Map<Integer, String> itemToCol = TumorOnt.fields()
+                    .collectEntries {
+                        [it.getInt("naaccrNum"), it.getString("FIELD_NAME")]
+                    }
+            final keys = itemToCol.keySet()
+            final items = layout.allFields.findAll { keys.contains(it.naaccrItemNum) }
+            final colDefs = items.collect {
+                "${itemToCol[it.naaccrItemNum]} ${varchar}(${it.length})"
+            }.join(',\n  ')
+            final insertCols = items.collect { itemToCol[it.naaccrItemNum] }.join(",\n  ")
+            final selectCols = items.collect {
+                "TRIM(${substr}(S.${clob}, ${it.start}, ${it.length})) as ${itemToCol[it.naaccrItemNum]}"
+            }.join(",\n  ")
+            [
+                    "create table ${dest} (${colDefs},\n  ${taskCol} ${varchar}(1024))",
+                    "insert ${hint} into ${dest}(${insertCols})\nselect ${selectCols}\nfrom ${source} S"
+            ] as List<String>
+        }
     }
+
 
     /** Make a per-tumor table for use in encounter_mapping etc.
      */
