@@ -11,6 +11,7 @@ import com.imsweb.naaccrxml.entity.Tumor
 import gpc.DBConfig.Task
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
+import groovy.text.SimpleTemplateEngine
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.docopt.Docopt
@@ -310,22 +311,60 @@ class TumorFile {
         @Override
         void run() {
             // TODO: support other NAACCR file versions
-            // TODO: support SUBSTRING vs. SUBSTR
             final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
-            final statements = layoutToSQL(v18, records_table, tb.table_name, "OBSERVATION_BLOB", "TASK_ID", "SUBSTR")
-            def (create, insert) = [statements[0], statements[1]]
+            // TODO: non-Oracle databases
+            // TODO: support SUBSTRING vs. SUBSTR
+            def substr = "SUBSTR"
+
+            final parts = layoutToSQL(v18, tb.table_name, "OBSERVATION_BLOB", "TASK_ID", substr)
+            def (create, colNames, exprs) = [parts[0], parts[1], parts[2]]
             cdw.withSql { Sql sql ->
                 tb.drop(sql)
                 log.info("creating ${tb.table_name}")
                 sql.execute(create)
-                log.info("inserting into ${tb.table_name}")
-                sql.execute(insert)
-                log.info("updating task_id in ${tb.table_name}")
+
+                def offset = 0
+                final limit = 1000
+
+                do {
+                    final pg = pageStatement(cdw.url, records_table, offset, limit)
+                    log.info("inserting <= ${limit} rows at ${offset} into ${tb.table_name}...")
+                    if ((sql.firstRow("select count(*) from (${pg})".toString())[0] as int) <= 0) {
+                        break
+                    }
+                    sql.execute("insert /*+ append */ into ${tb.table_name} ($colNames) select ${exprs} from (${pg}) S".toString())
+                    offset += limit
+                } while (1);
                 // only fill in task_id after all rows are done
-                // TODO: since the insert is one transaction, fill in task_id too?
+                log.info("updating task_id in ${tb.table_name}")
                 sql.execute("update ${tb.table_name} set task_id = ?.task_id",
                         [task_id: tb.task_id])
             }
+        }
+
+        static String pageStatement(String dbURL, String src, int offset, int limit) {
+            def h2SQL = '''
+select *
+from ${src}
+order by source_cd, encounter_num
+limit ${limit} offset ${offset}
+'''
+
+            def oraSQL = '''
+select *
+from (select rownum as rn, s.*
+    from (select *
+        from ${src}
+        order by source_cd, encounter_num) s
+    where rownum <= ${offset + limit}
+)
+where rn > ${offset}'''
+
+            def template = new SimpleTemplateEngine().createTemplate(dbURL.contains("ora") ? oraSQL : h2SQL)
+
+            def binding = ["offset": offset, "limit": limit, "src": src]
+            final txt = template.make(binding).toString()
+            txt
         }
 
         void runRillyRillySlowly() {
@@ -371,11 +410,10 @@ class TumorFile {
             result
         }
 
-        static List<String> layoutToSQL(FixedColumnsLayout layout, String source, String dest, String clob,
+        static List<String> layoutToSQL(FixedColumnsLayout layout, String dest, String clob,
                                         String taskCol = "TASK_ID",
                                         String substr = "SUBSTR",
-                                        String varchar = "VARCHAR2",
-                                        String hint = '/*+ parallel(8) append */') {
+                                        String varchar = "VARCHAR2") {
             final Map<Integer, String> itemToCol = TumorOnt.fields()
                     .collectEntries {
                         [it.getInt("naaccrNum"), it.getString("FIELD_NAME")]
@@ -391,7 +429,8 @@ class TumorFile {
             }.join(",\n  ")
             [
                     "create table ${dest} (${colDefs},\n  ${taskCol} ${varchar}(1024))",
-                    "insert ${hint} into ${dest}(${insertCols})\nselect ${selectCols}\nfrom ${source} S"
+                    insertCols,
+                    selectCols
             ] as List<String>
         }
     }

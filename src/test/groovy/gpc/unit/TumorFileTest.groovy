@@ -13,7 +13,6 @@ import gpc.TumorFile.DataSummary
 import gpc.TumorFile.TumorKeys
 import gpc.TumorOnt
 import groovy.sql.Sql
-import groovy.text.SimpleTemplateEngine
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
@@ -221,12 +220,13 @@ class TumorFileTest extends TestCase {
 
     void "test layoutToSQL"() {
         final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
-        final sql = TumorFile.NAACCR_Extract.layoutToSQL(v18, "TUMOR_RECORDS", "TUMOR_DATA", "RECORD", "SUBSTR")
-        def (create, insert) = [sql[0], sql[1]]
+        final parts = TumorFile.NAACCR_Extract.layoutToSQL(v18, "TUMOR_RECORDS", "TUMOR_DATA", "RECORD", "SUBSTR")
+        def (create, cols, exprs) = [parts[0], parts[1], parts[2]]
         final qty = 586 // TODO:  640 less some mismatches (below) and... what?
         assert create.count(",") == qty
-        assert insert.count("SUBSTR") == qty
-        assert insert.count(",") == qty * 4 - 2
+        assert cols.count(",") == qty - 1
+        assert exprs.count("SUBSTR") == qty
+        assert exprs.count(",") == qty * 3 - 1
     }
 
     void "test pagination idea"() {
@@ -234,37 +234,13 @@ class TumorFileTest extends TestCase {
         final limit = 3
         final src = "NAACCR_RECORDS"
 
-        def h2SQL = '''
-select *
-from ${src}
-order by source_cd, encounter_num
-limit ${limit} offset ${offset}
-'''
-        def oraSQL = '''
-select *
-from (select rownum as rn, s.*
-    from (select *
-        from ${src}
-        order by source_cd, encounter_num) s
-    where rownum < ${offset + chunkSize}
-)
-where rn >= ${offset}'''
-        def template = new SimpleTemplateEngine().createTemplate(h2SQL)
-
-        // TODO: non-Oracle databases
-        final pageStatement = { ->
-            def binding = ["offset": "" + offset, "limit": "" + limit, "src": src]
-            final txt = template.make(binding).toString()
-            txt
-        }
-
         final cdw = DBConfig.inMemoryDB("TR")
         cdw.withSql { Sql sql ->
             Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), "NAACCR_RECORDS")
             load.run()
 
             do {
-                final pg = pageStatement()
+                final pg = TumorFile.NAACCR_Extract.pageStatement(cdw.url, "NAACCR_RECORDS", offset, limit)
                 if ((sql.firstRow("select count(*) from (${pg})".toString())[0] as int) <= 0) {
                     break
                 }
