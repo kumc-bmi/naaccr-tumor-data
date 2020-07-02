@@ -354,13 +354,15 @@ class TumorFileTest extends TestCase {
     }
 
     void testTumorFields() {
-        Table actual = TumorOnt.fields()
+        Table actual = TumorOnt.fields(false)
+        assert actual.rowCount() == 640
+        assert actual.rowCount() > 100
+        assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORD_TYPE_N10')).rowCount() == 1
+
         Table pcornet_spec = TumorOnt.read_csv(TumorFileTest.getResource('tumor table.version1.2.csv')).select(
                 'NAACCR Item', 'FLAG', 'FIELD_NAME'
         )
         pcornet_spec = pcornet_spec.where(pcornet_spec.stringColumn('FLAG').isNotEqualTo('PRIVATE'))
-        assert actual.rowCount() > 100
-        assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORD_TYPE_N10')).rowCount() == 1
 
         actual.column('FIELD_NAME').setName('name_test')
         Table items = pcornet_spec.joinOn('NAACCR Item').fullOuter(actual, 'naaccrNum')
@@ -372,7 +374,7 @@ class TumorFileTest extends TestCase {
             }
         }
         def missingId = problems.where(problems.column('naaccrId').isMissing())
-        assert missingId.rowCount() == 2
+        assert missingId.rowCount() == 26
         def noMatch = problems.where(problems.column('name_test').isMissing())
         assert noMatch.rowCount() == 26
         def renamed = problems.where(problems.stringColumn('name_test').isNotIn(''))

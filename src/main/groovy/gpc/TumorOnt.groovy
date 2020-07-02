@@ -48,13 +48,24 @@ class TumorOnt {
 
     /**
      * PCORnet tumor table fields
+     * @param strict - only include fields where v18 naaccrId is known?
+     * @param includePrivate - include PHI fields?
+     * @return Table
      */
-    static Table fields() {
+    static Table fields(boolean strict = true) {
         Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).select(
                 'item', 'FIELD_NAME'
         )
         // get naaccr-xml naaccrId
-        Table items = ddictDF().joinOn('naaccrNum').fullOuter(pcornet_spec, 'item')
+        final dd = ddictDF()
+        Table items
+        if (strict) {
+            items = pcornet_spec.joinOn('item').inner(dd,'naaccrNum')
+        } else {
+            items = pcornet_spec.joinOn('item').leftOuter(dd,'naaccrNum')
+        }
+        items.column("item").setName("naaccrNum")
+        items.setName("TUMOR")
         items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
     }
 

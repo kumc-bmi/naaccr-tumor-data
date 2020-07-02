@@ -294,8 +294,8 @@ class TumorFile {
             final Map<String, String> byId = TumorOnt.fields().iterator().collectEntries { Row row ->
                 [(row.getString('naaccrId')): row.getString('FIELD_NAME')]
             }
-            records.columns().findAll { byId[it.name()] == null || byId[it.name()] == "" }.forEach { Column flaggedPrivate ->
-                records.removeColumns(flaggedPrivate)
+            records.columns().findAll { byId[it.name()] == null }.forEach { Column missingId ->
+                records.removeColumns(missingId)
             }
             records.columns().forEach { Column column -> column.setName(byId[column.name()]) }
             records
@@ -305,12 +305,7 @@ class TumorFile {
             final Map<String, String> toId = TumorOnt.fields().iterator().collectEntries { Row row ->
                 [(row.getString('FIELD_NAME')): row.getString('naaccrId')]
             }
-            records.columns().forEach { Column column ->
-                String naaccrId = toId[column.name()]
-                if (naaccrId != null) {
-                    column.setName(toId[column.name()])
-                }
-            }
+            records.columns().forEach { Column column -> column.setName(toId[column.name()]) }
             records
         }
 
