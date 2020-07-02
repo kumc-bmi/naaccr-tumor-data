@@ -16,9 +16,11 @@ java {
 repositories { mavenCentral() }
 
 dependencies {
-    compile 'org.codehaus.groovy:groovy:3.0.2'
-    compile 'org.codehaus.groovy:groovy-json:3.0.2'
-    compile 'org.codehaus.groovy:groovy-sql:3.0.2'
+    compile 'org.codehaus.groovy:groovy:3.0.4'
+    compile 'org.codehaus.groovy:groovy-json:3.0.4'
+    compile 'org.codehaus.groovy:groovy-sql:3.0.4'
+    // https://mvnrepository.com/artifact/org.codehaus.groovy/groovy-templates
+    compile 'org.codehaus.groovy:groovy-templates:3.0.4'
     compile 'com.imsweb:naaccr-xml:6.6'
     compile 'com.imsweb:layout:2.0'
     compile 'tech.tablesaw:tablesaw-core:0.37.2'
@@ -41,7 +43,7 @@ dependencies {
     runtime 'com.microsoft.sqlserver:mssql-jdbc:8.1.0.jre13-preview'
 
     testCompile 'junit:junit:4.12'
-    testCompile 'org.codehaus.groovy:groovy-test:3.0.2'
+    testCompile 'org.codehaus.groovy:groovy-test:3.0.4'
 }
 
 class UsageDoc extends DefaultTask {
