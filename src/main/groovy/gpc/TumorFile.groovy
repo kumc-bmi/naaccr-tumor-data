@@ -308,8 +308,7 @@ class TumorFile {
             records
         }
 
-        @Override
-        void run() {
+        void runTooSlowToo() {
             // TODO: support other NAACCR file versions
             final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
             // TODO: non-Oracle databases
@@ -340,6 +339,109 @@ class TumorFile {
                 sql.execute("update ${tb.table_name} set task_id = ?.task_id",
                         [task_id: tb.task_id])
             }
+        }
+
+        @Override
+        void run() {
+            cdw.withSql { Sql sql ->
+                TumorFile.NAACCR_Extract.loadFlatFile(
+                        sql, new File(flat_file.path), tb.table_name, tb.task_id, TumorOnt.pcornet_fields)
+            }
+        }
+
+        static int loadFlatFile(Sql sql, File flat_file, String table_name, String task_id, Table fields,
+                                String varchar = "VARCHAR2", int batchSize = 64) {
+            FixedColumnsLayout layout = theLayout(flat_file)
+            final source_cd = flat_file.name
+
+            final colInfo = columnInfo(fields, layout, varchar)
+            String ddl = """
+            create table ${table_name} (
+              source_cd varchar(50),
+              encounter_num int,
+              task_id ${varchar}(1024),
+              ${colInfo.collect { it.colDef }.join(",\n  ")},
+              observation_blob clob
+            )
+            """
+
+            String dml = """
+            insert into ${table_name} (
+              source_cd, encounter_num, observation_blob,
+              ${colInfo.collect { it.name }.join(',\n  ')})
+            values (:source_cd, :encounter_num, :observation_blob, ${colInfo.collect { it.param }.join('\n,  ')})
+            """
+            int encounter_num = 0
+            flat_file.withInputStream { InputStream naaccr_text_lines ->
+                dropIfExists(sql, table_name)
+                sql.execute(ddl)
+                sql.withBatch(batchSize, dml) { BatchingPreparedStatementWrapper ps ->
+                    new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String line ->
+                        encounter_num += 1
+                        Map<String, Object> record = colInfo.collectEntries {
+                            final start = it.start as int
+                            final length = it.length as int
+                            [it.name, line.substring(start, start + length)]
+                        }
+                        ps.addBatch([
+                                source_cd       : source_cd as Object,
+                                encounter_num   : encounter_num as Object,
+                                observation_blob: line as Object
+                        ] + record)
+                    }
+                }
+                log.info("inserted ${encounter_num} records into $table_name")
+            }
+            // only fill in task_id after all rows are done
+            log.info("updating task_id in ${table_name}")
+            sql.execute("update ${table_name} set task_id = ?.task_id",
+                    [task_id: task_id])
+
+            encounter_num
+        }
+
+        static boolean dropIfExists(Sql sql, String table_name) {
+            final results = sql.connection.getMetaData().getTables(null, null, table_name, null);
+            if (results.next())
+            {
+                sql.execute("drop table ${table_name}" as String)
+                return true
+            }
+            return false
+        }
+
+        static FixedColumnsLayout theLayout(File flat_file) {
+            final layouts = LayoutFactory.discoverFormat(flat_file)
+            if (layouts.size() < 1) {
+                throw new RuntimeException("cannot discover format of ${flat_file}")
+            } else if (layouts.size() > 1) {
+                throw new RuntimeException("ambiguous format: ${flat_file}: ${layouts.collect { it.layoutId }}.join(',')")
+            }
+            final layout = LayoutFactory.getLayout(layouts[0].layoutId) as FixedColumnsLayout
+            layout
+        }
+
+        static public List<Map> columnInfo(Table fields, FixedColumnsLayout layout, String varchar) {
+            fields.collect {
+                final num = it.getInt("item")
+                final name = it.getString("FIELD_NAME")
+                final item = layout.getFieldByNaaccrItemNumber(num)
+                [num: num, name: name, item: item]
+            }.findAll {
+                if (it.item == null) {
+                    log.warn("item not found in ${layout.layoutId}: ${it.num} ${it.name}")
+                }
+                it.item != null
+            }.collect {
+                final item = it.item as FixedColumnsField
+                [
+                        name  : it.name,
+                        start : item.start,
+                        length: item.length,
+                        colDef: "${it.name} ${varchar}(${item.length}) ",
+                        param : ":${it.name}",
+                ]
+            } as List<Map>
         }
 
         static String pageStatement(String dbURL, String src, int offset, int limit) {

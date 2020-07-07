@@ -33,10 +33,9 @@ class Staging extends TestCase {
     }
 
     void "test discrete data on 100 records of test data with local disk h2 DB"() {
-        def argv = ['discrete-data', '--no-file']
+        def argv = ['discrete-data']
         final cli = cli1(argv, System.getProperty('user.dir'))
 
-        TumorFile.main(['load-records'] as String[])
         TumorFile.main(argv as String[])
         cli.account().withSql { Sql sql ->
             final qty = sql.firstRow("select count(distinct PRIMARY_SITE_N400) from NAACCR_DISCRETE")[0]

@@ -46,6 +46,8 @@ class TumorOnt {
         }
     }
 
+    static Table pcornet_fields = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
+
     /**
      * PCORnet tumor table fields
      * @param strict - only include fields where v18 naaccrId is known?

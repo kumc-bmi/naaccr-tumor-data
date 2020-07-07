@@ -140,16 +140,14 @@ class TumorFileTest extends TestCase {
     void testExtractDiscrete() {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final task_id = "task123"
-        URL no_flat_file = null
-        Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), "NAACCR_RECORDS")
+        URL flat_file = Paths.get(testDataPath).toUri().toURL()
         Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
-                no_flat_file,
+                flat_file,
                 "NAACCR_RECORDS",
                 "NAACCR_DISCRETE",
         )
 
         cdw.withSql { sql ->
-            load.run()
             assert extract.complete() == false
             extract.run()
             assert extract.complete() == true
@@ -217,6 +215,17 @@ class TumorFileTest extends TestCase {
               ['long-label': 'Registry Type', 'start': 2, 'naaccr-item-num': 30, 'section': 'Record ID', 'grouped': false],
               ['long-label': 'Reserved 00', 'start': 3, 'naaccr-item-num': 37, 'section': 'Record ID', 'grouped': false]]
     }
+
+    void "test loading naaccr flat file"() {
+        DBConfig.inMemoryDB("TR").withSql { Sql sql ->
+            final claimed = TumorFile.NAACCR_Extract.loadFlatFile(
+                    sql, new File(testDataPath), "TUMOR", "task1234", TumorOnt.pcornet_fields)
+            assert claimed == 100
+            final actual = sql.firstRow('select count(PRIMARY_SITE_N400) from TUMOR')[0]
+            assert actual == claimed
+        }
+    }
+
 
     void "test layoutToSQL"() {
         final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
