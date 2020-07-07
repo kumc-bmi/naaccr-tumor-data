@@ -378,11 +378,11 @@ class TumorFile {
                 sql.withBatch(batchSize, dml) { BatchingPreparedStatementWrapper ps ->
                     new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String line ->
                         encounter_num += 1
-                        Map<String, Object> record = colInfo.collectEntries {
+                        Map<String, Object> record = colInfo.collect {
                             final start = it.start as int
                             final length = it.length as int
-                            [it.name, line.substring(start, start + length)]
-                        }
+                            [it.name, line.substring(start, start + length).trim()]
+                        }.findAll { (it[1] as String) > '' }.collectEntries { it }
                         ps.addBatch([
                                 source_cd       : source_cd as Object,
                                 encounter_num   : encounter_num as Object,
