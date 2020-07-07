@@ -17,21 +17,6 @@ import java.nio.file.Paths
  */
 @CompileStatic
 class Staging extends TestCase {
-    void "test load-records load NAACCR records from flat-file into a (CLOB) column of a DB table"() {
-        def cli = cli1(['load-records'], System.getProperty('user.dir'))
-
-        def path = Paths.get(TumorFileTest.testDataPath)
-        def lineCount = Files.lines(path).count()
-
-        TumorFile.main(['load-records'] as String[])
-
-        def rowCount = cli.account().withSql { Sql sql ->
-            sql.firstRow("select count(*) from NAACCR_RECORDS")[0]
-        }
-        assert rowCount == lineCount
-        TumorFile.main(['query', "select count(*) from NAACCR_RECORDS"] as String[])
-    }
-
     void "test discrete data on 100 records of test data with local disk h2 DB"() {
         def argv = ['discrete-data']
         final cli = cli1(argv, System.getProperty('user.dir'))
@@ -44,6 +29,20 @@ class Staging extends TestCase {
             assert txt == 'task123'
             final v = sql.firstRow("select distinct naaccr_record_version_n50 from naaccr_discrete")[0]
             assert v == '180'
+        }
+    }
+
+    static final String v16_file = 'naaccr_xml_samples/valid_standard-file-1.txt'
+    void "test a v16 flat file"() {
+        def argv = ['discrete-data']
+        final cli = cli1(argv, System.getProperty('user.dir'), v16_file)
+
+        TumorFile.main(argv as String[])
+        cli.account().withSql { Sql sql ->
+            final qty = sql.firstRow("select count(distinct PRIMARY_SITE_N400) from NAACCR_DISCRETE")[0]
+            assert qty == 1
+            final v = sql.firstRow("select distinct naaccr_record_version_n50 from naaccr_discrete")[0]
+            assert v == '160'
         }
     }
 
@@ -71,13 +70,17 @@ class Staging extends TestCase {
         TumorFile.main(argv as String[])
     }
 
-    static DBConfig.CLI cli1(List<String> argv, String userDir) {
+    static DBConfig.CLI cli1(List<String> argv, String userDir,
+                             String flat_file = null) {
         Properties ps = new Properties()
+        if (!flat_file) {
+            flat_file = TumorFileTest.testDataPath
+        }
         ps.putAll(["db.url"              : "jdbc:h2:file:${userDir}/DB1;create=true".toString(),
                    "db.driver"           : 'org.h2.Driver',
                    "db.username"         : 'SA',
                    "db.password"         : '',
-                   "naaccr.flat-file"    : TumorFileTest.testDataPath,
+                   "naaccr.flat-file"    : flat_file,
                    "naaccr.records-table": "NAACCR_RECORDS",
                    "naaccr.extract-table": "NAACCR_DISCRETE",
                    "naaccr.stats-table"  : "NAACCR_EXPORT_STATS",
