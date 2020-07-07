@@ -388,6 +388,9 @@ class TumorFile {
                                 encounter_num   : encounter_num as Object,
                                 observation_blob: line as Object
                         ] + record)
+                        if (encounter_num % 1000 == 0) {
+                            log.info('inserted {} records', encounter_num)
+                        }
                     }
                 }
                 log.info("inserted ${encounter_num} records into $table_name")
