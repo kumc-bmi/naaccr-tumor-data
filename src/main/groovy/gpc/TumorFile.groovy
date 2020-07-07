@@ -403,11 +403,14 @@ class TumorFile {
             encounter_num
         }
 
-        static boolean dropIfExists(Sql sql, String table_name) {
-            final results = sql.connection.getMetaData().getTables(null, null, table_name, null);
+        static boolean dropIfExists(Sql sql, String table_qname) {
+            final parts = table_qname.split('\\.')
+            String schema = parts.length == 2 ? parts[0].toUpperCase() : null
+            String table_name = parts[-1].toUpperCase()
+            final results = sql.connection.getMetaData().getTables(null, schema, table_name, null);
             if (results.next())
             {
-                sql.execute("drop table ${table_name}" as String)
+                sql.execute("drop table ${table_qname}" as String)
                 return true
             }
             return false
