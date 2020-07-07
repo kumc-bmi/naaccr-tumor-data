@@ -42,6 +42,8 @@ class Staging extends TestCase {
             assert qty == 50
             final txt = sql.firstRow("select distinct task_id from naaccr_discrete")[0]
             assert txt == 'task123'
+            final v = sql.firstRow("select distinct naaccr_record_version_n50 from naaccr_discrete")[0]
+            assert v == '180'
         }
     }
 

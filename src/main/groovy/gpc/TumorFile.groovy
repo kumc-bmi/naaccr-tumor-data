@@ -379,7 +379,7 @@ class TumorFile {
                     new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String line ->
                         encounter_num += 1
                         Map<String, Object> record = colInfo.collect {
-                            final start = it.start as int
+                            final start = it.start as int - 1
                             final length = it.length as int
                             [it.name, line.substring(start, start + length).trim()]
                         }.findAll { (it[1] as String) > '' }.collectEntries { it }
@@ -424,6 +424,7 @@ class TumorFile {
                 throw new RuntimeException("ambiguous format: ${flat_file}: ${layouts.collect { it.layoutId }}.join(',')")
             }
             final layout = LayoutFactory.getLayout(layouts[0].layoutId) as FixedColumnsLayout
+            log.info('{}: layout {}', flat_file.name, layout.layoutName)
             layout
         }
 
