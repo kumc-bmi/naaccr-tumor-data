@@ -11,7 +11,6 @@ import com.imsweb.naaccrxml.entity.Tumor
 import gpc.DBConfig.Task
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
-import groovy.text.SimpleTemplateEngine
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import org.docopt.Docopt
@@ -58,20 +57,16 @@ class TumorFile {
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        Closure<URL> flat_file = { ->
-            cli.flag('--no-file') ? null : cli.urlProperty("naaccr.flat-file")
-        }
-
         // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
-        if (cli.flag('load-records')) {
-            work = new NAACCR_Records(cdw, flat_file(), cli.property("naaccr.records-table"))
-        } else if (cli.flag('load-files')) {
+        if (cli.flag('load-files')) {
             cli.files('NAACCR_FILE').each { URL naaccr_file ->
                 //noinspection GrReassignedInClosureLocalVar
-                work = new NAACCR_Records(cdw, naaccr_file, cli.property("naaccr.records-table"))
+                work = new NAACCR_Extract(
+                        cdw, task_id,
+                        cli.urlProperty("naaccr.flat-file"), cli.property("naaccr.extract-table"))
                 if (work && !work.complete()) {
                     work.run()
                 }
@@ -79,32 +74,27 @@ class TumorFile {
             return
         } else if (cli.flag('discrete-data')) {
             work = new NAACCR_Extract(cdw, task_id,
-                    flat_file(),
-                    cli.property("naaccr.records-table"),
+                    cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.extract-table"),
             )
         } else if (cli.flag('summary')) {
             work = new NAACCR_Summary(cdw, task_id,
-                    flat_file(),
-                    cli.property("naaccr.records-table"),
+                    cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.extract-table"),
                     cli.property("naaccr.stats-table"),
             )
         } else if (cli.flag('tumors')) {
             work = new NAACCR_Visits(cdw, task_id,
-                    flat_file(),
-                    cli.property("naaccr.records-table"),
+                    cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.extract-table"),
                     2000000)
         } else if (cli.flag('facts')) {
             work = new NAACCR_Facts(cdw, task_id,
-                    flat_file(),
-                    cli.property("naaccr.records-table"),
+                    cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.extract-table"))
         } else if (cli.flag('patients')) {
             work = new NAACCR_Patients(cdw, task_id,
-                    flat_file(),
-                    cli.property("naaccr.records-table"),
+                    cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.extract-table"))
             TumorOnt.run_cli(cli)
         } else if (cli.flag('load') || cli.flag('run') || cli.flag('query')) {
@@ -126,67 +116,6 @@ class TumorFile {
             }
         }
         count
-    }
-
-    static class NAACCR_Records implements Task {
-        static int batchSize = 1000
-        private final DBConfig cdw
-        private final URL flat_file
-        final String table_name
-
-        NAACCR_Records(DBConfig cdw, URL flat_file, String table) {
-            this.cdw = cdw
-            this.flat_file = flat_file
-            this.table_name = table
-        }
-
-        boolean complete() {
-            boolean done = false
-            int lines = line_count(flat_file)
-            final source_cd = new File(flat_file.path).name
-            cdw.withSql { Sql sql ->
-                try {
-                    final row = sql.firstRow("select count(*) from ${table_name} where source_cd = :source_cd" as String,
-                            [source_cd: source_cd])
-                    if (row == null || row.size() == 0) {
-                        return null
-                    }
-                    int rowCount = row[0] as int
-                    if (rowCount >= lines) {
-                        log.info("complete: table ${table_name} already has ${rowCount} records from ${source_cd}.")
-                        done = true
-                    }
-                } catch (SQLException problem) {
-                    log.warn("not complete: $problem")
-                }
-                null
-            }
-            done
-        }
-
-        void run() {
-            final source_cd = new File(flat_file.path).name
-            String stmt = "insert into ${table_name} (source_cd, encounter_num, observation_blob) values (?, ?, ?)"
-            log.info("loading ${flat_file}: $stmt")
-            flat_file.withInputStream { InputStream naaccr_text_lines ->
-                cdw.withSql { Sql sql ->
-                    try {
-                        sql.execute("create table ${table_name} (source_cd varchar(50), encounter_num int, observation_blob clob)" as String)
-                    } catch (SQLException problem) {
-                        log.warn("cannot create ${table_name}: ${problem}")
-                    }
-                    int encounter_num = 0
-                    sql.withBatch(batchSize, stmt) { BatchingPreparedStatementWrapper ps ->
-                        new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String observation_blob ->
-                            encounter_num += 1
-                            ps.addBatch([source_cd as Object, encounter_num as Object, observation_blob as Object])
-                        }
-                    }
-                    log.info("inserted ${encounter_num} records into $table_name")
-                }
-            }
-        }
-
     }
 
     private static class TableBuilder {
@@ -247,10 +176,10 @@ class TumorFile {
         final NAACCR_Extract extract_task
 
         NAACCR_Summary(DBConfig cdw, String task_id,
-                       URL flat_file = null, String records_table, String extract_table, String stats_table) {
+                       URL flat_file = null, String extract_table, String stats_table) {
             tb = new TableBuilder(task_id: task_id, table_name: stats_table)
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
         }
 
         boolean complete() { tb.complete(cdw) }
@@ -273,73 +202,15 @@ class TumorFile {
         final TableBuilder tb
         final DBConfig cdw
         final URL flat_file
-        final String records_table
 
-        NAACCR_Extract(DBConfig cdw, String task_id, URL flat_file = null, String records_table, String extract_table) {
+        NAACCR_Extract(DBConfig cdw, String task_id, URL flat_file, String extract_table) {
             this.cdw = cdw
             tb = new TableBuilder(task_id: task_id, table_name: extract_table)
             this.flat_file = flat_file
-            this.records_table = records_table
         }
 
         @Override
         boolean complete() { tb.complete(cdw) }
-
-        /**
-         * avoid ORA-00972: identifier is too long
-         * @return records, after mutating column names
-         */
-        static Table to_db_ids(Table records) {
-            final Map<String, String> byId = TumorOnt.fields().iterator().collectEntries { Row row ->
-                [(row.getString('naaccrId')): row.getString('FIELD_NAME')]
-            }
-            records.columns().findAll { byId[it.name()] == null }.forEach { Column missingId ->
-                records.removeColumns(missingId)
-            }
-            records.columns().forEach { Column column -> column.setName(byId[column.name()]) }
-            records
-        }
-
-        static Table from_db_ids(Table records) {
-            final Map<String, String> toId = TumorOnt.fields().iterator().collectEntries { Row row ->
-                [(row.getString('FIELD_NAME')): row.getString('naaccrId')]
-            }
-            records.columns().forEach { Column column -> column.setName(toId[column.name()]) }
-            records
-        }
-
-        void runTooSlowToo() {
-            // TODO: support other NAACCR file versions
-            final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
-            // TODO: non-Oracle databases
-            // TODO: support SUBSTRING vs. SUBSTR
-            def substr = "SUBSTR"
-
-            final parts = layoutToSQL(v18, tb.table_name, "OBSERVATION_BLOB", "TASK_ID", substr)
-            def (create, colNames, exprs) = [parts[0], parts[1], parts[2]]
-            cdw.withSql { Sql sql ->
-                tb.drop(sql)
-                log.info("creating ${tb.table_name}")
-                sql.execute(create)
-
-                def offset = 0
-                final limit = 1000
-
-                do {
-                    final pg = pageStatement(cdw.url, records_table, offset, limit)
-                    log.info("inserting <= ${limit} rows at ${offset} into ${tb.table_name}...")
-                    if ((sql.firstRow("select count(*) from (${pg})".toString())[0] as int) <= 0) {
-                        break
-                    }
-                    sql.execute("insert /*+ append */ into ${tb.table_name} ($colNames) select ${exprs} from (${pg}) S".toString())
-                    offset += limit
-                } while (1);
-                // only fill in task_id after all rows are done
-                log.info("updating task_id in ${tb.table_name}")
-                sql.execute("update ${tb.table_name} set task_id = ?.task_id",
-                        [task_id: tb.task_id])
-            }
-        }
 
         @Override
         void run() {
@@ -408,8 +279,7 @@ class TumorFile {
             String schema = parts.length == 2 ? parts[0].toUpperCase() : null
             String table_name = parts[-1].toUpperCase()
             final results = sql.connection.getMetaData().getTables(null, schema, table_name, null);
-            if (results.next())
-            {
+            if (results.next()) {
                 sql.execute("drop table ${table_qname}" as String)
                 return true
             }
@@ -451,96 +321,11 @@ class TumorFile {
             } as List<Map>
         }
 
-        static String pageStatement(String dbURL, String src, int offset, int limit) {
-            def h2SQL = '''
-select *
-from ${src}
-order by source_cd, encounter_num
-limit ${limit} offset ${offset}
-'''
-
-            def oraSQL = '''
-select *
-from (select rownum as rn, s.*
-    from (select *
-        from ${src}
-        order by source_cd, encounter_num) s
-    where rownum <= ${offset + limit}
-)
-where rn > ${offset}'''
-
-            def template = new SimpleTemplateEngine().createTemplate(dbURL.contains("ora") ? oraSQL : h2SQL)
-
-            def binding = ["offset": offset, "limit": limit, "src": src]
-            final txt = template.make(binding).toString()
-            txt
-        }
-
-        void runRillyRillySlowly() {
-            boolean firstChunk = true
-            def colNames = (TumorOnt.fields()
-                    .iterator()
-                    .collect { it.getString('FIELD_NAME') }
-            ) + ['task_id']
-            Table blank = Table.create(colNames.collect { StringColumn.create(it) } as Collection<Column>)
-            cdw.withSql { Sql sql ->
-                withRecords() { Reader naaccr_text_lines ->
-                    log.info("extracting discrete data from ${records_table} to ${tb.table_name}")
-                    read_fwf(naaccr_text_lines) { Table extract ->
-                        Table chunk = to_db_ids(extract)
-                        if (firstChunk) {
-                            tb.reset(sql, blank)
-                            firstChunk = false
-                        }
-                        log.info("inserting ${chunk.rowCount()} records into ${tb.table_name}")
-                        tb.appendChunk(sql, chunk)
-                    }
-                }
-                // only fill in task_id after all rows are done
-                sql.execute("update ${tb.table_name} set task_id = ?.task_id",
-                        [task_id: tb.task_id])
-            }
-        }
-
         def <V> V withRecords(Closure<V> thunk) {
             V result
-            if (flat_file == null) {
-                log.info("reading records from table ${records_table}")
-                result = cdw.withSql { Sql sql ->
-                    String select_blobs = "select observation_blob from $records_table order by source_cd, encounter_num"
-                    withClobReader(sql, select_blobs) { Reader lines ->
-                        thunk(lines)
-                    }
-                }
-            } else {
-                log.info("reading records from ${flat_file}")
-                result = thunk(new InputStreamReader(flat_file.openStream()))
-            }
+            log.info("reading records from ${flat_file}")
+            result = thunk(new InputStreamReader(flat_file.openStream()))
             result
-        }
-
-        static List<String> layoutToSQL(FixedColumnsLayout layout, String dest, String clob,
-                                        String taskCol = "TASK_ID",
-                                        String substr = "SUBSTR",
-                                        String varchar = "VARCHAR2") {
-            final Map<Integer, String> itemToCol = TumorOnt.fields()
-                    .collectEntries {
-                        [it.getInt("naaccrNum"), it.getString("FIELD_NAME")]
-                    }
-            final keys = itemToCol.keySet()
-            final items = layout.allFields.findAll { keys.contains(it.naaccrItemNum) }
-            final colDefs = items.collect {
-                "${itemToCol[it.naaccrItemNum]} ${varchar}(${it.length})"
-            }.join(',\n  ')
-            final insertCols = items.collect { itemToCol[it.naaccrItemNum] }.join(",\n  ")
-            final selectCols = items.collect {
-                "TRIM(${substr}(S.${clob}, ${it.start}, ${it.length})) as ${itemToCol[it.naaccrItemNum]}"
-            }.join(",\n  ")
-            [
-                    "create table ${dest} (${colDefs},\n  ${taskCol} ${varchar}(1024))",
-                    insertCols,
-                    selectCols
-            ] as List<String>
         }
     }
 
@@ -555,10 +340,10 @@ where rn > ${offset}'''
         private final DBConfig cdw
         private final NAACCR_Extract extract_task
 
-        NAACCR_Visits(DBConfig cdw, String task_id, URL flat_file, String records_table, String extract_table, int start) {
+        NAACCR_Visits(DBConfig cdw, String task_id, URL flat_file, String extract_table, int start) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
             encounter_num_start = start
         }
 
@@ -593,10 +378,10 @@ where rn > ${offset}'''
         private final DBConfig cdw
         private final NAACCR_Extract extract_task
 
-        NAACCR_Patients(DBConfig cdw, String task_id, URL flat_file, String records_table, String extract_table) {
+        NAACCR_Patients(DBConfig cdw, String task_id, URL flat_file, String extract_table) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
 
         }
 
@@ -625,11 +410,11 @@ where rn > ${offset}'''
         private final URL flat_file
         private final NAACCR_Extract extract_task
 
-        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_file, String records_table, String extract_table) {
+        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_file, String extract_table) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
             this.flat_file = flat_file
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, records_table, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
         }
 
         boolean complete() { tb.complete(cdw) }
@@ -837,44 +622,6 @@ where rn > ${offset}'''
             out.removeColumns(id_col)
             out
         }
-    }
-
-    static <V> V withClobReader(Sql sql, String query, Closure<V> thunk) {
-        final PipedOutputStream wr = new PipedOutputStream()
-        PipedInputStream rd = new PipedInputStream(wr)
-        Reader lines = new InputStreamReader(rd)
-        byte CR = 13
-        byte LF = 10
-        int progress = 0
-        int report_interval = 1000
-
-        Thread worker = new Thread({ ->
-            try {
-                sql.eachRow(query) { row ->
-                    // println("clob length: ${(row.getClob(1)).length()}")
-                    Clob text = row.getClob(1)
-                    String str = text.getSubString(1L, text.length() as int)
-                    wr.write(str.getBytes(Charset.forName("UTF-8")))
-                    wr.write(CR)
-                    wr.write(LF)
-                    progress++
-                    if (progress % report_interval == 0) {
-                        log.info("processed ${progress} records of: ${query}")
-                    }
-                }
-            } finally {
-                wr.close()
-            }
-        })
-        worker.start()
-        V result = null
-        try {
-            result = thunk(lines)
-        } finally {
-            lines.close()
-            worker.join()
-        }
-        result
     }
 
     static final FixedColumnsLayout layout18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout

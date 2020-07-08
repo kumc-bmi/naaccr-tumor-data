@@ -24,7 +24,6 @@ db.driver=org.h2.Driver
 db.url=jdbc:h2:file:/tmp/DB1;create=true
 
 naaccr.flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
-naaccr.records-table: NAACCR_RECORDS
 naaccr.extract-table: TUMOR
 naaccr.stats-table: NAACCR_STATS
 ```
@@ -52,12 +51,11 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 
 ```
 Usage:
-  naaccr-tumor-data load-records [--db=PF]
   naaccr-tumor-data load-files [--db=PF] NAACCR_FILE...
   naaccr-tumor-data discrete-data [--db=PF] [--task-id=ID]
-  naaccr-tumor-data summary  [--no-file] [--db=F] [--task-id=ID]
-  naaccr-tumor-data tumors   [--no-file] [--db=F] [--task-id=ID]
-  naaccr-tumor-data facts    [--no-file] [--db=F] [--task-id=ID]
+  naaccr-tumor-data summary  [--db=F] [--task-id=ID]
+  naaccr-tumor-data tumors   [--db=F] [--task-id=ID]
+  naaccr-tumor-data facts    [--db=F] [--task-id=ID]
   naaccr-tumor-data fields --file=F
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
@@ -72,7 +70,6 @@ Options:
   facts              build NAACCR_OBSERVATIONS table
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
-  --no-file          use loaded records rather than file as input
   --task-id=ID       version / completion marker [default: task123]
   ontology           build NAACCR_ONTOLOGY table
   --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]

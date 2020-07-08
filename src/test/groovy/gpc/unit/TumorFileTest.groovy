@@ -38,7 +38,6 @@ class TumorFileTest extends TestCase {
     void testCLI() {
         final Properties config = new Properties()
         config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file')    : testDataPath,
-                                            ('naaccr.records-table'): 'TR_REC',
                                             ('naaccr.extract-table'): 'TR_EX'])
         DBConfig.CLI cli = buildCLI(['facts'], config)
         TumorFile.run_cli(cli)
@@ -115,35 +114,12 @@ class TumorFileTest extends TestCase {
         }
     }
 
-    void testReadTumorsFromDB() {
-        final cdw = DBConfig.inMemoryDB("TR", true)
-        final String table_name = "NAACCR_RECORDS"
-
-        int cksum = cdw.withSql { Sql sql ->
-            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), table_name)
-            load.run()
-            TumorFile.withClobReader(sql, "select observation_blob from $table_name order by encounter_num" as String) { Reader lines ->
-                int accum = 0
-                PatientReader reader = new PatientFlatReader(lines)
-                Patient patient = reader.readPatient()
-                while (patient != null) {
-                    int num = Integer.parseInt(patient.getItemValue('patientIdNumber'))
-                    accum += num
-                    patient = reader.readPatient()
-                }
-                accum
-            }
-        }
-        assert cksum == 5311
-    }
-
     void testExtractDiscrete() {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final task_id = "task123"
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
         Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
                 flat_file,
-                "NAACCR_RECORDS",
                 "NAACCR_DISCRETE",
         )
 
@@ -158,7 +134,6 @@ class TumorFileTest extends TestCase {
     static class ToDoLive {
         void testStatsFromDB() {
             final cdw = DBConfig.inMemoryDB("TR", true)
-            final String records_table = "TR_RECORDS"
             final String extract_table = "TR_DATA"
             final String stats_table = "TR_STATS"
 
@@ -167,11 +142,8 @@ class TumorFileTest extends TestCase {
 
             int cksum = -1
             cdw.withSql() { Sql sql ->
-                Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), records_table)
-                load.run()
-                sql.execute("delete from ${records_table} where line > 10" as String) // stats for 100 is a boring wait
                 Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
-                        null, records_table, extract_table, stats_table)
+                        Paths.get(testDataPath).toUri().toURL(), extract_table, stats_table)
                 work.run()
                 sql.query("select * from ${stats_table}" as String) { results ->
                     Table stats = Table.read().db(results, "stats")
@@ -180,20 +152,6 @@ class TumorFileTest extends TestCase {
             }
             assert cksum == 3
         }
-    }
-
-    void testDBIds() {
-        Table dd = TumorOnt.ddictDF()
-        final longNames = dd.where(dd.stringColumn('naaccrId').isLongerThan((30))).stringColumn('naaccrId').asList()
-        Table naaccrIds = Table.create("t1", longNames.collect { String id -> StringColumn.create(id) }
-                as Collection<Column<?>>)
-        // println(naaccrIds)
-        Table dbnames = TumorFile.NAACCR_Extract.to_db_ids(naaccrIds.copy())
-        // println(dbnames)
-        Table inverted = TumorFile.NAACCR_Extract.from_db_ids(dbnames.copy())
-        // println(inverted)
-        assert dbnames.columnNames().findAll { it.length() > 30 } == []
-        assert inverted.columnNames() == naaccrIds.columnNames()
     }
 
     void testLayout() {
@@ -227,40 +185,6 @@ class TumorFileTest extends TestCase {
     }
 
 
-    void "test layoutToSQL"() {
-        final FixedColumnsLayout v18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
-        final parts = TumorFile.NAACCR_Extract.layoutToSQL(v18, "TUMOR_RECORDS", "TUMOR_DATA", "RECORD", "SUBSTR")
-        def (create, cols, exprs) = [parts[0], parts[1], parts[2]]
-        final qty = 586 // TODO:  640 less some mismatches (below) and... what?
-        assert create.count(",") == qty
-        assert cols.count(",") == qty - 1
-        assert exprs.count("SUBSTR") == qty
-        assert exprs.count(",") == qty * 3 - 1
-    }
-
-    void "test pagination idea"() {
-        def offset = 0
-        final limit = 3
-        final src = "NAACCR_RECORDS"
-
-        final cdw = DBConfig.inMemoryDB("TR")
-        cdw.withSql { Sql sql ->
-            Task load = new TumorFile.NAACCR_Records(cdw, Paths.get(testDataPath).toUri().toURL(), "NAACCR_RECORDS")
-            load.run()
-
-            do {
-                final pg = TumorFile.NAACCR_Extract.pageStatement(cdw.url, "NAACCR_RECORDS", offset, limit)
-                if ((sql.firstRow("select count(*) from (${pg})".toString())[0] as int) <= 0) {
-                    break
-                }
-                final data = sql.rows(pg)
-                // println(data)
-                offset += limit
-            } while (1);
-        }
-        assert offset >= 100
-    }
-
     static final Table _extract = new File(testDataPath).withReader { naaccr_text_lines ->
         // log.info("tr_file: ${testDataPath}")
         Table result = null
@@ -288,7 +212,7 @@ class TumorFileTest extends TestCase {
         void testPatientsTask() {
             final cdw = DBConfig.inMemoryDB("PT", true)
             URL flat_file = Paths.get(testDataPath).toUri().toURL()
-            Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", flat_file, "TR_REC", "TR_EX")
+            Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", flat_file, "TR_EX")
             if (!work.complete()) {
                 work.run()
             }
@@ -354,7 +278,7 @@ class TumorFileTest extends TestCase {
 
     void testVisits() {
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Table tumors = new TumorFile.NAACCR_Visits(null, "task123", flat_file, "TR_REC", "TR_EX", 12345)._data(12345)
+        Table tumors = new TumorFile.NAACCR_Visits(null, "task123", flat_file, "TR_EX", 12345)._data(12345)
         assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
         assert tumors.intColumn('encounter_num').min() == 12345
     }
