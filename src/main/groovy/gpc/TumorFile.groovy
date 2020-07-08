@@ -208,6 +208,18 @@ class TumorFile {
 
         @Override
         void run() {
+            Table fields =  TumorOnt.pcornet_fields.copy()
+
+            // PCORnet spec doesn't include MRN column, but we need it for patient mapping.
+            [
+                    [item:20, FIELD_NAME: 'PATIENT_ID_NUMBER_N20'],
+                    [item: 21, FIELD_NAME: 'PATIENT_SYSTEM_ID_HOSP_N21'],
+            ].forEach {
+                Row patid = fields.appendRow()
+                patid.setInt('item', it.item as int)
+                patid.setString('FIELD_NAME', it.FIELD_NAME as String)
+            }
+
             cdw.withSql { Sql sql ->
                 dropIfExists(sql, tb.table_name)
                 int encounter_num = 0
@@ -215,7 +227,7 @@ class TumorFile {
                     final create = ix == 0
                     final update = ix == flat_files.size() - 1
                     encounter_num = TumorFile.NAACCR_Extract.loadFlatFile(
-                            sql, new File(flat_file.path), tb.table_name, tb.task_id, TumorOnt.pcornet_fields,
+                            sql, new File(flat_file.path), tb.table_name, tb.task_id, fields,
                             encounter_num, create, update)
                 }
             }
@@ -233,6 +245,7 @@ class TumorFile {
             create table ${table_name} (
               source_cd varchar(50),
               encounter_num int,
+              patient_num int,
               task_id ${varchar}(1024),
               ${colInfo.collect { it.colDef }.join(",\n  ")},
               observation_blob clob
@@ -252,11 +265,7 @@ class TumorFile {
                 sql.withBatch(batchSize, dml) { BatchingPreparedStatementWrapper ps ->
                     new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String line ->
                         encounter_num += 1
-                        Map<String, Object> record = colInfo.collect {
-                            final start = it.start as int - 1
-                            final length = it.length as int
-                            [it.name, line.substring(start, start + length).trim()]
-                        }.findAll { (it[1] as String) > '' }.collectEntries { it }
+                        final record = fixedRecord(colInfo, line)
                         ps.addBatch([
                                 source_cd       : source_cd as Object,
                                 encounter_num   : encounter_num as Object,
@@ -277,6 +286,14 @@ class TumorFile {
             }
 
             encounter_num
+        }
+
+        public static Map<String, Object> fixedRecord(List<Map> colInfo, String line) {
+            colInfo.collect {
+                final start = it.start as int - 1
+                final length = it.length as int
+                [it.name, line.substring(start, start + length).trim()]
+            }.findAll { (it[1] as String) > '' }.collectEntries { it }
         }
 
         static boolean dropIfExists(Sql sql, String table_qname) {

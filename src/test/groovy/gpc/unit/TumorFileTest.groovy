@@ -97,6 +97,50 @@ class TumorFileTest extends TestCase {
         }
     }
 
+    void "test patient mapping"() {
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        final task_id = "task123"
+        URL flat_file = Paths.get(testDataPath).toUri().toURL()
+        final tumor_table = 'NAACCR_DISCRETE'
+        Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
+                [flat_file],
+                tumor_table,
+        )
+
+        final patient_ide_source = 'SMS@kumed.com'
+        final patient_mapping = 'patient_mapping'
+        String dml = """
+        update ${tumor_table} tr
+        set tr.patient_num = (
+            select pm.patient_num
+            from ${patient_mapping} pm
+            where pm.patient_ide_source = :patient_ide_source
+            and pm.patient_ide = tr.PATIENT_ID_NUMBER_N20
+            )
+        """
+        // TODO: trim(leading '0' from tr.patient_System_Id_Hosp_N21)
+        cdw.withSql { Sql sql ->
+            sql.execute("""
+            create table patient_mapping (
+                patient_num int,
+                patient_ide_source varchar(50),
+                patient_ide varchar(64)
+            )""")
+            sql.withBatch(3, 'insert into patient_mapping(patient_num, patient_ide_source, patient_ide) values (:num, :src, :ide)') { ps ->
+                [
+                        [num: 1, src: patient_ide_source, ide: '00000010'],
+                        [num: 2, src: patient_ide_source, ide: '00000011'],
+                        [num: 3, src: patient_ide_source, ide: '00000012'],
+                ].forEach { ps.addBatch(it) }
+            }
+            extract.run()
+            sql.execute(dml, [patient_ide_source: patient_ide_source])
+            final row1 = sql.firstRow(
+                    "select count(distinct patient_num) from ${tumor_table}" as String)
+            assert row1[0] == 3
+        }
+    }
+
     void testExtractDiscrete() {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final task_id = "task123"
