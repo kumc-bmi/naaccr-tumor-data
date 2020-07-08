@@ -241,6 +241,8 @@ class TumorFileTest extends TestCase {
     void testVisits() {
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
         Table tumors = new TumorFile.NAACCR_Visits(null, "task123", [flat_file], "TR_EX", 12345)._data(12345)
+        final sites = tumors.stringColumn('primarySite')
+        assert sites.countUnique() > 2
         assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
         assert tumors.intColumn('encounter_num').min() == 12345
     }
