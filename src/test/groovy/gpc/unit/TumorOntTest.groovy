@@ -99,6 +99,18 @@ class TumorOntTest extends TestCase {
         assert create_top.contains("\"C_HLEVEL\" INTEGER")
     }
 
+    void testDDict() {
+        final dd = TumorOnt.ddictDF()
+        assert dd.rowCount() > 700
+
+        final primarySite = dd.where(dd.intColumn("naaccrNum").isEqualTo(400))
+
+        assert primarySite[0].getString("naaccrId") == "primarySite"
+        assert primarySite[0].getString("naaccrName") == 'Primary Site'
+        assert primarySite[0].getInt("startColumn") == 554
+        assert primarySite[0].getInt("length") == 4
+        assert primarySite[0].getString("parentXmlElement") == 'Tumor'
+    }
 
     void testOnt() {
         def update_date = LocalDate.of(2000, 1, 1)

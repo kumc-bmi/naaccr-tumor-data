@@ -3,9 +3,6 @@ package gpc.unit
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
-import com.imsweb.naaccrxml.PatientFlatReader
-import com.imsweb.naaccrxml.PatientReader
-import com.imsweb.naaccrxml.entity.Patient
 import gpc.DBConfig
 import gpc.DBConfig.Task
 import gpc.TumorFile
@@ -20,9 +17,7 @@ import org.docopt.Docopt
 import org.junit.Ignore
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.Row
-import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
-import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.dates.DateFilters
 import tech.tablesaw.columns.strings.StringFilters
 
@@ -86,18 +81,6 @@ class TumorFileTest extends TestCase {
         assert tfiles['NAACCR_FILE'] == ['F1', 'F2', 'F3']
     }
 
-    void testDDict() {
-        final dd = TumorOnt.ddictDF()
-        assert dd.rowCount() > 700
-
-        final primarySite = dd.where(dd.intColumn("naaccrNum").isEqualTo(400))
-
-        assert primarySite[0].getString("naaccrId") == "primarySite"
-        assert primarySite[0].getString("naaccrName") == 'Primary Site'
-        assert primarySite[0].getInt("startColumn") == 554
-        assert primarySite[0].getInt("length") == 4
-        assert primarySite[0].getString("parentXmlElement") == 'Tumor'
-    }
 
     void testPatients() {
         new File(testDataPath).withReader { reader ->
@@ -130,29 +113,6 @@ class TumorFileTest extends TestCase {
         }
     }
 
-    @Ignore("testStatsFromDB: requires live Oracle connection")
-    static class ToDoLive {
-        void testStatsFromDB() {
-            final cdw = DBConfig.inMemoryDB("TR", true)
-            final String extract_table = "TR_DATA"
-            final String stats_table = "TR_STATS"
-
-            log.warn("skipping testStatsFromDB: requires live Oracle connection")
-            return
-
-            int cksum = -1
-            cdw.withSql() { Sql sql ->
-                Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
-                        [Paths.get(testDataPath).toUri().toURL()], extract_table, stats_table)
-                work.run()
-                sql.query("select * from ${stats_table}" as String) { results ->
-                    Table stats = Table.read().db(results, "stats")
-                    cksum = stats.longColumn('TUMOR_QTY').countUnique()
-                }
-            }
-            assert cksum == 3
-        }
-    }
 
     void testLayout() {
         List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(new File(testDataPath))
@@ -185,18 +145,20 @@ class TumorFileTest extends TestCase {
     }
 
 
-    static final Table _extract = new File(testDataPath).withReader { naaccr_text_lines ->
-        // log.info("tr_file: ${testDataPath}")
-        Table result = null
-        TumorFile.read_fwf(naaccr_text_lines) { Table chunk ->
-            if (result == null) {
-                result = chunk
-            } else {
-                result = result.append(chunk)
+    static final Table _extract() {
+        new File(testDataPath).withReader { naaccr_text_lines ->
+            // log.info("tr_file: ${testDataPath}")
+            Table result = null
+            TumorFile.read_fwf(naaccr_text_lines) { Table chunk ->
+                if (result == null) {
+                    result = chunk
+                } else {
+                    result = result.append(chunk)
+                }
+                return
             }
-            return
+            result
         }
-        result
     }
 
     static Table _SQL(Sql sql, String query, int limit = 100) {
@@ -269,7 +231,7 @@ class TumorFileTest extends TestCase {
 
     void testItemDates() {
         Table actual = TumorFile.naaccr_dates(
-                _extract.select('dateOfDiagnosis', 'dateOfLastContact'),
+                _extract().select('dateOfDiagnosis', 'dateOfLastContact'),
                 ['dateOfDiagnosis', 'dateOfLastContact'],
                 true).first(10)
         println(actual)
@@ -284,6 +246,7 @@ class TumorFileTest extends TestCase {
     }
 
     void testObsRaw() {
+        final _extract = _extract()
         Table _ty = TumorOnt.NAACCR_I2B2.tumor_item_type
         Table _raw_obs = DataSummary.stack_obs(_extract, _ty, TumorKeys.key4 + TumorKeys.dtcols)
         _raw_obs = TumorFile.naaccr_dates(_raw_obs, TumorKeys.dtcols)
@@ -300,7 +263,7 @@ class TumorFileTest extends TestCase {
 
     void testItemObs() {
         DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
-            final Table actual = TumorFile.ItemObs.make(memdb, _extract)
+            final Table actual = TumorFile.ItemObs.make(memdb, _extract())
             assert actual.columnNames() == [
                     'RECORDID', 'PATIENTIDNUMBER', 'NAACCRID', 'NAACCRNUM', 'DATEOFDIAGNOSIS',
                     'CONCEPT_CD', 'PROVIDER_ID', 'START_DATE', 'MODIFIER_CD', 'INSTANCE_NUM',

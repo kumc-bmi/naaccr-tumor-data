@@ -7,6 +7,9 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import org.junit.Ignore
+import tech.tablesaw.api.Table
+
+import java.nio.file.Paths
 
 /**
  * CAUTION: ambient access to user.dir to write config file, DB.
@@ -91,5 +94,26 @@ class Staging extends TestCase {
         ps.store(new File(cli.arg("--db")).newWriter(), null)
         cli.account().withSql { Sql sql -> sql.execute('drop all objects') }
         cli
+    }
+
+    @Ignore("testStatsFromDB: requires live Oracle connection")
+    static class ToDoLive {
+        void testStatsFromDB() {
+            final cdw = DBConfig.inMemoryDB("TR", true)
+            final String extract_table = "TR_DATA"
+            final String stats_table = "TR_STATS"
+
+            int cksum = -1
+            cdw.withSql() { Sql sql ->
+                DBConfig.Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
+                        [Paths.get(TumorFileTest.testDataPath).toUri().toURL()], extract_table, stats_table)
+                work.run()
+                sql.query("select * from ${stats_table}" as String) { results ->
+                    Table stats = Table.read().db(results, "stats")
+                    cksum = stats.longColumn('TUMOR_QTY').countUnique()
+                }
+            }
+            assert cksum == 3
+        }
     }
 }
