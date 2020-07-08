@@ -119,7 +119,7 @@ class TumorFileTest extends TestCase {
         final task_id = "task123"
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
         Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
-                flat_file,
+                [flat_file],
                 "NAACCR_DISCRETE",
         )
 
@@ -143,7 +143,7 @@ class TumorFileTest extends TestCase {
             int cksum = -1
             cdw.withSql() { Sql sql ->
                 Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
-                        Paths.get(testDataPath).toUri().toURL(), extract_table, stats_table)
+                        [Paths.get(testDataPath).toUri().toURL()], extract_table, stats_table)
                 work.run()
                 sql.query("select * from ${stats_table}" as String) { results ->
                     Table stats = Table.read().db(results, "stats")
@@ -212,7 +212,7 @@ class TumorFileTest extends TestCase {
         void testPatientsTask() {
             final cdw = DBConfig.inMemoryDB("PT", true)
             URL flat_file = Paths.get(testDataPath).toUri().toURL()
-            Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", flat_file, "TR_EX")
+            Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", [flat_file], "TR_EX")
             if (!work.complete()) {
                 work.run()
             }
@@ -278,7 +278,7 @@ class TumorFileTest extends TestCase {
 
     void testVisits() {
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Table tumors = new TumorFile.NAACCR_Visits(null, "task123", flat_file, "TR_EX", 12345)._data(12345)
+        Table tumors = new TumorFile.NAACCR_Visits(null, "task123", [flat_file], "TR_EX", 12345)._data(12345)
         assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
         assert tumors.intColumn('encounter_num').min() == 12345
     }

@@ -62,39 +62,33 @@ class TumorFile {
         Task work = null
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
         if (cli.flag('load-files')) {
-            cli.files('NAACCR_FILE').each { URL naaccr_file ->
-                //noinspection GrReassignedInClosureLocalVar
-                work = new NAACCR_Extract(
-                        cdw, task_id,
-                        cli.urlProperty("naaccr.flat-file"), cli.property("naaccr.extract-table"))
-                if (work && !work.complete()) {
-                    work.run()
-                }
-            }
-            return
+            //noinspection GrReassignedInClosureLocalVar
+            work = new NAACCR_Extract(
+                    cdw, task_id,
+                    cli.files('NAACCR_FILE'), cli.property("naaccr.extract-table"))
         } else if (cli.flag('discrete-data')) {
             work = new NAACCR_Extract(cdw, task_id,
-                    cli.urlProperty("naaccr.flat-file"),
+                    [cli.urlProperty("naaccr.flat-file")],
                     cli.property("naaccr.extract-table"),
             )
         } else if (cli.flag('summary')) {
             work = new NAACCR_Summary(cdw, task_id,
-                    cli.urlProperty("naaccr.flat-file"),
+                    [cli.urlProperty("naaccr.flat-file")],
                     cli.property("naaccr.extract-table"),
                     cli.property("naaccr.stats-table"),
             )
         } else if (cli.flag('tumors')) {
             work = new NAACCR_Visits(cdw, task_id,
-                    cli.urlProperty("naaccr.flat-file"),
+                    [cli.urlProperty("naaccr.flat-file")],
                     cli.property("naaccr.extract-table"),
                     2000000)
         } else if (cli.flag('facts')) {
             work = new NAACCR_Facts(cdw, task_id,
-                    cli.urlProperty("naaccr.flat-file"),
+                    [cli.urlProperty("naaccr.flat-file")],
                     cli.property("naaccr.extract-table"))
         } else if (cli.flag('patients')) {
             work = new NAACCR_Patients(cdw, task_id,
-                    cli.urlProperty("naaccr.flat-file"),
+                    [cli.urlProperty("naaccr.flat-file")],
                     cli.property("naaccr.extract-table"))
             TumorOnt.run_cli(cli)
         } else if (cli.flag('load') || cli.flag('run') || cli.flag('query')) {
@@ -176,10 +170,10 @@ class TumorFile {
         final NAACCR_Extract extract_task
 
         NAACCR_Summary(DBConfig cdw, String task_id,
-                       URL flat_file = null, String extract_table, String stats_table) {
+                       List<URL> flat_files, String extract_table, String stats_table) {
             tb = new TableBuilder(task_id: task_id, table_name: stats_table)
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_files, extract_table)
         }
 
         boolean complete() { tb.complete(cdw) }
@@ -201,12 +195,12 @@ class TumorFile {
     static class NAACCR_Extract implements Task {
         final TableBuilder tb
         final DBConfig cdw
-        final URL flat_file
+        final List<URL> flat_files
 
-        NAACCR_Extract(DBConfig cdw, String task_id, URL flat_file, String extract_table) {
+        NAACCR_Extract(DBConfig cdw, String task_id, List<URL> flat_files, String extract_table) {
             this.cdw = cdw
             tb = new TableBuilder(task_id: task_id, table_name: extract_table)
-            this.flat_file = flat_file
+            this.flat_files = flat_files
         }
 
         @Override
@@ -215,12 +209,21 @@ class TumorFile {
         @Override
         void run() {
             cdw.withSql { Sql sql ->
-                TumorFile.NAACCR_Extract.loadFlatFile(
-                        sql, new File(flat_file.path), tb.table_name, tb.task_id, TumorOnt.pcornet_fields)
+                dropIfExists(sql, tb.table_name)
+                int encounter_num = 0
+                flat_files.eachWithIndex { flat_file, ix ->
+                    final create = ix == 0
+                    final update = ix == flat_files.size() - 1
+                    encounter_num = TumorFile.NAACCR_Extract.loadFlatFile(
+                            sql, new File(flat_file.path), tb.table_name, tb.task_id, TumorOnt.pcornet_fields,
+                            encounter_num, create, update)
+                }
             }
         }
 
         static int loadFlatFile(Sql sql, File flat_file, String table_name, String task_id, Table fields,
+                                int encounter_num = 0,
+                                boolean create = true, boolean update = true,
                                 String varchar = "VARCHAR2", int batchSize = 64) {
             FixedColumnsLayout layout = theLayout(flat_file)
             final source_cd = flat_file.name
@@ -242,10 +245,10 @@ class TumorFile {
               ${colInfo.collect { it.name }.join(',\n  ')})
             values (:source_cd, :encounter_num, :observation_blob, ${colInfo.collect { it.param }.join('\n,  ')})
             """
-            int encounter_num = 0
             flat_file.withInputStream { InputStream naaccr_text_lines ->
-                dropIfExists(sql, table_name)
-                sql.execute(ddl)
+                if (create) {
+                    sql.execute(ddl)
+                }
                 sql.withBatch(batchSize, dml) { BatchingPreparedStatementWrapper ps ->
                     new Scanner(naaccr_text_lines).useDelimiter("\r\n|\n") each { String line ->
                         encounter_num += 1
@@ -267,9 +270,11 @@ class TumorFile {
                 log.info("inserted ${encounter_num} records into $table_name")
             }
             // only fill in task_id after all rows are done
-            log.info("updating task_id in ${table_name}")
-            sql.execute("update ${table_name} set task_id = ?.task_id",
-                    [task_id: task_id])
+            if (update) {
+                log.info("updating task_id in ${table_name}")
+                sql.execute("update ${table_name} set task_id = ?.task_id",
+                        [task_id: task_id])
+            }
 
             encounter_num
         }
@@ -323,8 +328,10 @@ class TumorFile {
 
         def <V> V withRecords(Closure<V> thunk) {
             V result
-            log.info("reading records from ${flat_file}")
-            result = thunk(new InputStreamReader(flat_file.openStream()))
+            for (flat_file in flat_files) {
+                log.info("reading records from ${flat_file}")
+                result = thunk(new InputStreamReader(flat_file.openStream()))
+            }
             result
         }
     }
@@ -340,10 +347,10 @@ class TumorFile {
         private final DBConfig cdw
         private final NAACCR_Extract extract_task
 
-        NAACCR_Visits(DBConfig cdw, String task_id, URL flat_file, String extract_table, int start) {
+        NAACCR_Visits(DBConfig cdw, String task_id, List<URL> flat_files, String extract_table, int start) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_files, extract_table)
             encounter_num_start = start
         }
 
@@ -378,10 +385,10 @@ class TumorFile {
         private final DBConfig cdw
         private final NAACCR_Extract extract_task
 
-        NAACCR_Patients(DBConfig cdw, String task_id, URL flat_file, String extract_table) {
+        NAACCR_Patients(DBConfig cdw, String task_id, List<URL> flat_files, String extract_table) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_files, extract_table)
 
         }
 
@@ -407,14 +414,14 @@ class TumorFile {
 
         final TableBuilder tb
         private final DBConfig cdw
-        private final URL flat_file
+        private final List<URL> flat_files
         private final NAACCR_Extract extract_task
 
-        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_file, String extract_table) {
+        NAACCR_Facts(DBConfig cdw, String task_id, List<URL> flat_files, String extract_table) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
-            this.flat_file = flat_file
+            this.flat_files = flat_files
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_file, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, flat_files, extract_table)
         }
 
         boolean complete() { tb.complete(cdw) }

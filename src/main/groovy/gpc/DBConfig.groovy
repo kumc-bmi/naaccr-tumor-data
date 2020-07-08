@@ -127,9 +127,9 @@ class DBConfig {
             new File(System.getProperty('user.dir')).toURI()
         }
 
-        URL[] files(String target) {
+        List<URL> files(String target) {
             final d = cwd()
-            opts[target].collect { String fn -> d.resolve(fn).toURL() } as URL[]
+            opts[target].collect { String fn -> d.resolve(fn).toURL() }
         }
 
         // ISSUE: ambient; constructor should take makeURL()

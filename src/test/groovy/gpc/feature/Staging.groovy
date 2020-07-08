@@ -8,9 +8,6 @@ import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import org.junit.Ignore
 
-import java.nio.file.Files
-import java.nio.file.Paths
-
 /**
  * CAUTION: ambient access to user.dir to write config file, DB.
  * ISSUE: use temp dir?
@@ -33,6 +30,7 @@ class Staging extends TestCase {
     }
 
     static final String v16_file = 'naaccr_xml_samples/valid_standard-file-1.txt'
+
     void "test a v16 flat file"() {
         def argv = ['discrete-data']
         final cli = cli1(argv, System.getProperty('user.dir'), v16_file)
@@ -60,14 +58,18 @@ class Staging extends TestCase {
 
     void "test load multiple NAACCR files in a local disk h2 DB"() {
         def argv = ['load-files', 'tmp1', 'tmp2']
-        cli1(argv, System.getProperty('user.dir'))
+        final cli = cli1(argv, System.getProperty('user.dir'))
 
         ['tmp1', 'tmp2'].each { String n ->
             new File(n).withPrintWriter { w ->
-                ['line1', 'line2', 'line3'].each { w.println(it) }
+                w.write(new File(TumorFileTest.testDataPath).text)
             }
         }
         TumorFile.main(argv as String[])
+        cli.account().withSql { Sql sql ->
+            final qty = sql.firstRow("select count(*) from NAACCR_DISCRETE")[0]
+            assert qty == 200
+        }
     }
 
     static DBConfig.CLI cli1(List<String> argv, String userDir,
