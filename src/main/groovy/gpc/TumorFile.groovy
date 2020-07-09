@@ -18,8 +18,6 @@ import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
-import java.nio.charset.Charset
-import java.sql.Clob
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -208,11 +206,11 @@ class TumorFile {
 
         @Override
         void run() {
-            Table fields =  TumorOnt.pcornet_fields.copy()
+            Table fields = TumorOnt.pcornet_fields.copy()
 
             // PCORnet spec doesn't include MRN column, but we need it for patient mapping.
             [
-                    [item:20, FIELD_NAME: 'PATIENT_ID_NUMBER_N20'],
+                    [item: 20, FIELD_NAME: 'PATIENT_ID_NUMBER_N20'],
                     [item: 21, FIELD_NAME: 'PATIENT_SYSTEM_ID_HOSP_N21'],
             ].forEach {
                 Row patid = fields.appendRow()
@@ -468,6 +466,186 @@ class TumorFile {
         }
     }
 
+    static class ObservationFact {
+        final String schema
+        final String fact_table
+
+        ObservationFact(String schema, String fact_table) {
+            this.schema = schema
+            this.fact_table = fact_table
+        }
+
+        String qname(String object_name) {
+            (schema == null ? '' : (schema + '.')) + object_name
+        }
+
+        static private String colDefs
+        static private String colNames
+        static private String params
+        static {
+            final obs_cols = [
+                    [name: "ENCOUNTER_NUM", type: "int", null: false],
+                    [name: "PATIENT_NUM", type: "int", null: false],
+                    [name: "CONCEPT_CD", type: "VARCHAR(50)", null: false],
+                    [name: "PROVIDER_ID", type: "VARCHAR(50)", null: false],
+                    [name: "START_DATE", type: "timestamp", null: false],
+                    [name: "MODIFIER_CD", type: "VARCHAR(100)", null: false],
+                    [name: "INSTANCE_NUM", type: "int", null: false],
+                    [name: "VALTYPE_CD", type: "VARCHAR(50)"],
+                    [name: "TVAL_CHAR", type: "VARCHAR(4000)"],
+                    [name: "NVAL_NUM", type: "float"],
+                    [name: "END_DATE", type: "timestamp"],
+                    [name: "UPDATE_DATE", type: "timestamp"],
+                    [name: "DOWNLOAD_DATE", type: "timestamp"],
+                    [name: "IMPORT_DATE", type: "timestamp"],
+                    [name: "SOURCESYSTEM_CD", type: "VARCHAR(50)"],
+                    [name: "UPLOAD_ID", type: "int"],
+            ]
+            colDefs = obs_cols.collect { "${it.name} ${it.type} ${it.null == false ? "not null" : ""}" }.join(",\n  ")
+            colNames = obs_cols.collect { it.name }.join(",\n  ")
+            params = obs_cols.collect { "?.${it.name}".toLowerCase() }.join(",\n  ")
+        }
+
+        String ddl() {
+            """
+            create table ${qname(fact_table)} (
+                ${colDefs},
+                primary key (
+                    ENCOUNTER_NUM, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD, INSTANCE_NUM)
+            )
+            """
+        }
+
+        String insertStatement() {
+            """
+            insert into ${qname(fact_table)} (
+                ${colNames}
+            ) values (
+                ${params}
+            )
+            """
+        }
+
+        static final not_null = '@'
+
+        int patientMap(Sql sql, String patientId, String patient_ide_source) {
+            // TODO: parameterize i2b2 star schema
+            final row1 = sql.firstRow("""
+            select patient_num from ${qname('patient_mapping')}
+            where patient_ide_source = ?.patient_ide_source and patient_ide = ?.patientId
+            """ as String, [patient_ide_source: patient_ide_source, patientId: patientId])
+            if (row1 == null) {
+                throw new IndexOutOfBoundsException()
+            }
+            final patient_num = row1[0] as int
+            patient_num
+        }
+
+    }
+
+    static int makeTumorFacts(File flat_file, int encounter_num,
+                              Sql sql, String schema, String fact_table, String mrnItem,
+                              String sourcesystem_cd, LocalDate import_date, int upload_id) {
+        final facts = new ObservationFact(schema, fact_table)
+        log.info("fact DML: {}", facts.insertStatement())
+
+        final layout = TumorFile.NAACCR_Extract.theLayout(flat_file)
+
+        final itemInfo = TumorOnt.NAACCR_I2B2.tumor_item_type.iterator().collect {
+            final num = it.getInt('naaccrNum')
+            final lf = layout.getFieldByNaaccrItemNumber(num)
+            if (lf != null) {
+                assert num == lf.naaccrItemNum
+                assert it.getString('naaccrId') == lf.name
+            }
+            [num: num, valtype_cd: it.getString('valtype_cd'), layout: lf]
+        }.findAll { it.layout != null }
+
+        final patIdField = layout.getFieldByName(mrnItem)
+        final dateFields = [
+                'dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
+                'dateCaseCompleted', 'dateCaseLastChanged', 'dateCaseReportExported'
+        ].collect { layout.getFieldByName(it) }
+
+        sql.execute(facts.ddl())
+        sql.withBatch(256, facts.insertStatement()) { ps ->
+            new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
+                encounter_num += 1
+                int patient_num
+                String patientId
+                try {
+                    patientId = fieldValue(patIdField, line)
+                    patient_num = facts.patientMap(sql, patientId, sourcesystem_cd)
+                } catch (noSuchPatient) {
+                    log.warn('cannot find {} in patient_mapping', patientId)
+                }
+                Map<String, LocalDate> dates = dateFields.collectEntries { FixedColumnsField dtf ->
+                    [dtf.name, TumorFile.parseDate(fieldValue(dtf, line))]
+                }
+                itemInfo.each { item ->
+                    Map record
+                    try {
+                        record = itemFact(encounter_num, patient_num, line, dates,
+                                item.layout as FixedColumnsField, item.valtype_cd as String,
+                                import_date, sourcesystem_cd, upload_id)
+                    } catch (badItem) {
+                        log.warn('cannot make fact for patient {} tumor {} item {}: {}',
+                                patientId, encounter_num)
+                    }
+                    if (record != null) {
+                        ps.addBatch(record)
+                    }
+                }
+            }
+        }
+        encounter_num
+    }
+
+    static String fieldValue(FixedColumnsField field, String line) {
+        line.substring(field.start - 1, field.start + field.length - 1).trim()
+    }
+
+    static Map itemFact(int encounter_num, int patient_num, String line, Map<String, LocalDate> dates,
+                        FixedColumnsField fixed, String valtype_cd,
+                        import_date, String sourcesystem_cd, int upload_id) {
+        final value = fieldValue(fixed, line)
+        if (value == '') {
+            return null
+        }
+        final nominal = valtype_cd == '@' ? value : ''
+        final start_date = (
+                valtype_cd == 'D' ? TumorFile.parseDate(value) :
+                        fixed.section == 'Follow-up/Recurrence/Death' ? dates.dateOfLastContact :
+                                dates.dateOfDiagnosis)
+        if (start_date == null) {
+            throw new IllegalArgumentException('no dateOfDiagnosis')
+        }
+        String concept_cd = "NAACCR|${fixed.naaccrItemNum}:${nominal}"
+        assert concept_cd.length() <= 50
+        final update_date = [
+                dates.dateCaseLastChanged, dates.dateCaseCompleted,
+                dates.dateOfLastContact, dates.dateOfDiagnosis,
+        ].find { it != null }
+        [
+                encounter_num  : encounter_num,
+                patient_num    : patient_num,
+                concept_cd     : concept_cd,
+                provider_id    : ObservationFact.not_null,
+                start_date     : start_date,
+                modifier_cd    : ObservationFact.not_null,
+                instance_num   : 1,
+                valtype_cd     : valtype_cd,
+                tval_char      : valtype_cd[0] == 'T' ? value : null,
+                nval_num       : valtype_cd[0] == 'N' ? value : null,
+                end_date       : start_date,
+                update_date    : update_date,
+                download_date  : dates.dateCaseReportExported,
+                import_date    : import_date,
+                sourcesystem_cd: sourcesystem_cd,
+                upload_id      : upload_id,
+        ]
+    }
+
     static class ItemObs {
         static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('naaccr_txform.sql',
                 TumorOnt.resourceText('heron_load/naaccr_txform.sql'),
@@ -680,16 +858,18 @@ class TumorFile {
         String name = sc.name()
         sc = sc.trim().concatenate('01019999').substring(0, 8)
         // type of StringColumn.map(fun, creator) is too fancy for groovy CompileStatic
-        final data = sc.asList().collect { String txt ->
-            LocalDate value
-            try {
-                value = LocalDate.parse(txt, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
-            } catch (DateTimeParseException ignored) {
-                value = null
-            }
-            value
-        }
+        final data = sc.asList().collect { parseDate(it) }
         DateColumn.create(name, data)
+    }
+
+    static LocalDate parseDate(String txt) {
+        LocalDate value
+        try {
+            value = LocalDate.parse(txt, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
+        } catch (DateTimeParseException ignored) {
+            value = null
+        }
+        value
     }
 
     static class DataSummary {
