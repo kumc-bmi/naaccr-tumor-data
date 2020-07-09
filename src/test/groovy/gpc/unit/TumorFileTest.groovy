@@ -120,12 +120,12 @@ class TumorFileTest extends TestCase {
         """
         // TODO: trim(leading '0' from tr.patient_System_Id_Hosp_N21)
         cdw.withSql { Sql sql ->
-            mockPatientMapping(sql, patient_ide_source, 3)
+            mockPatientMapping(sql, patient_ide_source, 20)
             extract.run()
             sql.execute(dml, [patient_ide_source: patient_ide_source])
             final row1 = sql.firstRow(
                     "select count(distinct patient_num) from ${tumor_table}" as String)
-            assert row1[0] == 3
+            assert row1[0] == 11
         }
     }
 
@@ -138,7 +138,7 @@ class TumorFileTest extends TestCase {
                 patient_ide varchar(64)
             )""")
         sql.withBatch(
-                3,
+                256,
                 'insert into patient_mapping(patient_num, patient_ide_source, patient_ide) values (:num, :src, :ide)'
         ) { ps ->
             (1..qty).collect {
@@ -335,7 +335,6 @@ class TumorFileTest extends TestCase {
         final sourcesystem_cd = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
         final upload_id = -1 // TODO: transition from task_id to upload_id?
         final flat_file = new File(testDataPath)
-        final import_date = LocalDate.of(2020, 2, 15)
         final mrnItem = 'patientIdNumber' // TODO: hospital id number
         String schema = null
         final fact_table = 'observation_fact_1'
@@ -344,7 +343,7 @@ class TumorFileTest extends TestCase {
             mockPatientMapping(memdb, sourcesystem_cd, 100)
 
             final enc = TumorFile.makeTumorFacts(flat_file, 2000, memdb, schema, fact_table, mrnItem,
-                    sourcesystem_cd, import_date, upload_id)
+                    sourcesystem_cd, upload_id)
             final actual = memdb.firstRow("""
                 select count(*) records
                      , count(distinct encounter_num) encounters

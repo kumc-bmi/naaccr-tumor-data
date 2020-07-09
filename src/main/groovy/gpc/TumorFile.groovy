@@ -82,7 +82,7 @@ class TumorFile {
                     2000000)
         } else if (cli.flag('facts')) {
             work = new NAACCR_Facts(cdw, task_id,
-                    [cli.urlProperty("naaccr.flat-file")],
+                    cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.extract-table"))
         } else if (cli.flag('patients')) {
             work = new NAACCR_Patients(cdw, task_id,
@@ -429,19 +429,34 @@ class TumorFile {
 
         final TableBuilder tb
         private final DBConfig cdw
-        private final List<URL> flat_files
+        private final URL flat_file
         private final NAACCR_Extract extract_task
 
-        NAACCR_Facts(DBConfig cdw, String task_id, List<URL> flat_files, String extract_table) {
+        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_files, String extract_table) {
             tb = new TableBuilder(task_id: task_id, table_name: table_name)
-            this.flat_files = flat_files
+            this.flat_file = flat_files
             this.cdw = cdw
-            extract_task = new NAACCR_Extract(cdw, task_id, flat_files, extract_table)
+            extract_task = new NAACCR_Extract(cdw, task_id, [flat_file], extract_table)
         }
 
         boolean complete() { tb.complete(cdw) }
 
         void run() {
+            final sourcesystem_cd = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+            final upload_id = -1 // TODO: transition from task_id to upload_id?
+            final flat_file = new File(flat_file.path)
+            final mrnItem = 'patientIdNumber' // TODO: hospital id number
+            String schema = null
+            final fact_table = 'observation_fact_1'
+            int encounter_num_start = 2000000
+
+            cdw.withSql { Sql memdb ->
+                TumorFile.makeTumorFacts(flat_file, encounter_num_start, memdb, schema, fact_table, mrnItem,
+                        sourcesystem_cd, upload_id)
+            }
+        }
+
+        void runMemDB() {
             final DBConfig mem = DBConfig.inMemoryDB("Facts")
             boolean firstChunk = true
             cdw.withSql { Sql sql ->
@@ -503,7 +518,9 @@ class TumorFile {
             ]
             colDefs = obs_cols.collect { "${it.name} ${it.type} ${it.null == false ? "not null" : ""}" }.join(",\n  ")
             colNames = obs_cols.collect { it.name }.join(",\n  ")
-            params = obs_cols.collect { "?.${it.name}".toLowerCase() }.join(",\n  ")
+            params = obs_cols.collect {
+                it.name == 'IMPORT_DATE' ? 'current_timestamp' : "?.${it.name}".toLowerCase()
+            }.join(",\n  ")
         }
 
         String ddl() {
@@ -545,7 +562,7 @@ class TumorFile {
 
     static int makeTumorFacts(File flat_file, int encounter_num,
                               Sql sql, String schema, String fact_table, String mrnItem,
-                              String sourcesystem_cd, LocalDate import_date, int upload_id) {
+                              String sourcesystem_cd, int upload_id) {
         final facts = new ObservationFact(schema, fact_table)
         log.info("fact DML: {}", facts.insertStatement())
 
@@ -587,7 +604,7 @@ class TumorFile {
                     try {
                         record = itemFact(encounter_num, patient_num, line, dates,
                                 item.layout as FixedColumnsField, item.valtype_cd as String,
-                                import_date, sourcesystem_cd, upload_id)
+                                sourcesystem_cd, upload_id)
                     } catch (badItem) {
                         log.warn('cannot make fact for patient {} tumor {} item {}: {}',
                                 patientId, encounter_num)
@@ -607,7 +624,7 @@ class TumorFile {
 
     static Map itemFact(int encounter_num, int patient_num, String line, Map<String, LocalDate> dates,
                         FixedColumnsField fixed, String valtype_cd,
-                        import_date, String sourcesystem_cd, int upload_id) {
+                        String sourcesystem_cd, int upload_id) {
         final value = fieldValue(fixed, line)
         if (value == '') {
             return null
@@ -640,7 +657,6 @@ class TumorFile {
                 end_date       : start_date,
                 update_date    : update_date,
                 download_date  : dates.dateCaseReportExported,
-                import_date    : import_date,
                 sourcesystem_cd: sourcesystem_cd,
                 upload_id      : upload_id,
         ]
