@@ -137,6 +137,10 @@ class DBConfig {
             cwd().resolve(arg(target)).toURL()
         }
 
+        int intArg(String target) {
+            Integer.parseInt(arg(target))
+        }
+
         String property(String target,
                         String fallback = 'throw') {
             String value = getConfig().getProperty(target)

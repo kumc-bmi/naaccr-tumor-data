@@ -55,7 +55,7 @@ Usage:
   naaccr-tumor-data discrete-data [--db=PF] [--task-id=ID]
   naaccr-tumor-data summary  [--db=F] [--task-id=ID]
   naaccr-tumor-data tumors   [--db=F] [--task-id=ID]
-  naaccr-tumor-data facts    [--db=F] [--task-id=ID]
+  naaccr-tumor-data facts    [--db=F] --upload-id=NNN
   naaccr-tumor-data fields --file=F
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
@@ -67,7 +67,8 @@ Options:
   load-records       load NAACCR records into a (CLOB) column of a DB table
   discrete-data      split NAACCR records into a wide table of discrete data
   tumors             build NAACCR_TUMORS table with key information about each tumor
-  facts              build NAACCR_OBSERVATIONS table
+  facts              build OBSERVATION_FACT_NNN table
+  --upload-id=NNN    to fill in observation_fact.upload_id
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
   --task-id=ID       version / completion marker [default: task123]

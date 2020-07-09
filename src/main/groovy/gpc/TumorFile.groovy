@@ -18,6 +18,7 @@ import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
+import javax.annotation.Nullable
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -59,6 +60,7 @@ class TumorFile {
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
+
         if (cli.flag('load-files')) {
             //noinspection GrReassignedInClosureLocalVar
             work = new NAACCR_Extract(
@@ -81,7 +83,8 @@ class TumorFile {
                     cli.property("naaccr.extract-table"),
                     2000000)
         } else if (cli.flag('facts')) {
-            work = new NAACCR_Facts(cdw, task_id,
+            work = new NAACCR_Facts(cdw,
+                    cli.intArg('--upload-id'),
                     cli.urlProperty("naaccr.flat-file"),
                     cli.property("i2b2.star-schema", null),
                     cli.property("naaccr.extract-table"))
@@ -339,18 +342,17 @@ class TumorFile {
             result
         }
 
-        void updatePatientNum(Sql sql, String patient_ide_source, String patient_ide_expr) {
-            final facts = new TumorFile.ObservationFact(null, 'badly_factored')
+        void updatePatientNum(Sql sql, I2B2Upload upload, String patient_ide_expr) {
             final dml = """
                 update ${tb.table_name} tr
                 set tr.patient_num = (
                     select pm.patient_num
-                    from ${facts.qname('patient_mapping')} pm
+                    from ${upload.patientMapping} pm
                     where pm.patient_ide_source = ?.source
                     and pm.patient_ide = ${patient_ide_expr}
                     )
             """
-            sql.execute(dml, [source: patient_ide_source])
+            sql.execute(dml, [source: upload.patient_ide_source])
         }
 
         Map<String, Integer> getPatientMapping(Sql sql, patient_ide_col) {
@@ -461,16 +463,15 @@ class TumorFile {
         final TableBuilder tb
         private final DBConfig cdw
         private final URL flat_file
-        private final String star_schema
-        private final int upload_id
         private final NAACCR_Extract extract_task
+        private final I2B2Upload upload
 
-        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_file, String schema, String extract_table) {
-            this.upload_id = 123 // TODO: transition from task_id to upload_id?
+        NAACCR_Facts(DBConfig cdw, int upload_id, URL flat_file, String schema, String extract_table) {
+            final task_id = "upload_id_${upload_id}"  // TODO: transition from task_id to upload_id
             tb = new TableBuilder(task_id: task_id, table_name: "OBSERVATION_FACT_${upload_id}")
             this.flat_file = flat_file
-            this.star_schema = schema
             this.cdw = cdw
+            this.upload = new I2B2Upload(schema, upload_id, sourcesystem_cd, patient_ide_source)
             extract_task = new NAACCR_Extract(cdw, task_id, [flat_file], extract_table)
         }
 
@@ -480,14 +481,13 @@ class TumorFile {
             final flat_file = new File(flat_file.path)
 
             cdw.withSql { Sql sql ->
-                extract_task.updatePatientNum(sql, patient_ide_source, patient_ide_expr)
+                extract_task.updatePatientNum(sql, upload, patient_ide_expr)
                 final toPatientNum = extract_task.getPatientMapping(sql, patient_ide_col)
 
                 makeTumorFacts(
                         flat_file, encounter_num_start,
-                        sql, star_schema, mrnItem, toPatientNum,
-                        tb.table_name,
-                        sourcesystem_cd, upload_id)
+                        sql, mrnItem, toPatientNum,
+                        upload)
             }
         }
 
@@ -516,16 +516,28 @@ class TumorFile {
         }
     }
 
-    static class ObservationFact {
+    static class I2B2Upload {
         final String schema
-        final String fact_table
+        final int upload_id
+        final String sourcesystem_cd
+        final String patient_ide_source
 
-        ObservationFact(String schema, String fact_table) {
+        I2B2Upload(@Nullable String schema, int upload_id, String sourcesystem_cd, String patient_ide_source) {
             this.schema = schema
-            this.fact_table = fact_table
+            this.upload_id = upload_id
+            this.sourcesystem_cd = sourcesystem_cd
+            this.patient_ide_source = patient_ide_source
         }
 
-        String qname(String object_name) {
+        String getFactTable() {
+            qname("OBSERVATION_FACT_${upload_id}")
+        }
+
+        String getPatientMapping() {
+            qname("PATIENT_MAPPING")
+        }
+
+        private String qname(String object_name) {
             (schema == null ? '' : (schema + '.')) + object_name
         }
 
@@ -558,9 +570,9 @@ class TumorFile {
             }.join(",\n  ")
         }
 
-        String ddl() {
+        String getFactTableDDL() {
             """
-            create table ${qname(fact_table)} (
+            create table ${factTable} (
                 ${colDefs},
                 primary key (
                     ENCOUNTER_NUM, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD, INSTANCE_NUM)
@@ -568,9 +580,9 @@ class TumorFile {
             """
         }
 
-        String insertStatement() {
+        String getInsertStatement() {
             """
-            insert into ${qname(fact_table)} (
+            insert into ${getFactTable()} (
                 ${colNames}
             ) values (
                 ${params}
@@ -582,12 +594,10 @@ class TumorFile {
     }
 
     static int makeTumorFacts(File flat_file, int encounter_num,
-                              Sql sql, String schema, String mrnItem, Map <String, Integer> toPatientNum,
-                              String fact_table,
-                              String sourcesystem_cd, int upload_id,
+                              Sql sql, String mrnItem, Map<String, Integer> toPatientNum,
+                              I2B2Upload upload,
                               boolean include_phi = false) {
-        final facts = new ObservationFact(schema, fact_table)
-        log.info("fact DML: {}", facts.insertStatement())
+        log.info("fact DML: {}", upload.insertStatement)
 
         final layout = TumorFile.NAACCR_Extract.theLayout(flat_file)
 
@@ -610,9 +620,9 @@ class TumorFile {
                 'dateCaseCompleted', 'dateCaseLastChanged', 'dateCaseReportExported'
         ].collect { layout.getFieldByName(it) }
 
-        dropIfExists(sql, facts.qname(facts.fact_table))
-        sql.execute(facts.ddl())
-        sql.withBatch(256, facts.insertStatement()) { ps ->
+        dropIfExists(sql, upload.factTable)
+        sql.execute(upload.factTableDDL)
+        sql.withBatch(256, upload.insertStatement) { ps ->
             new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
                 encounter_num += 1
                 String patientId = fieldValue(patIdField, line)
@@ -636,7 +646,7 @@ class TumorFile {
                     try {
                         record = itemFact(encounter_num, patient_num, line, dates,
                                 field, item.valtype_cd as String,
-                                sourcesystem_cd, upload_id)
+                                upload.sourcesystem_cd, upload.upload_id)
                     } catch (badItem) {
                         log.warn('tumor {} patient {}: cannot make fact for item {}: {}',
                                 encounter_num, patientId, field.name, badItem.toString())
@@ -678,7 +688,7 @@ class TumorFile {
             }
         } else {
             start_date = fixed.section == 'Follow-up/Recurrence/Death' ? dates.dateOfLastContact :
-                            dates.dateOfDiagnosis
+                    dates.dateOfDiagnosis
         }
         String concept_cd = "NAACCR|${fixed.naaccrItemNum}:${nominal}"
         assert concept_cd.length() <= 50
@@ -690,9 +700,9 @@ class TumorFile {
                 encounter_num  : encounter_num,
                 patient_num    : patient_num,
                 concept_cd     : concept_cd,
-                provider_id    : ObservationFact.not_null,
+                provider_id    : I2B2Upload.not_null,
                 start_date     : start_date,
-                modifier_cd    : ObservationFact.not_null,
+                modifier_cd    : I2B2Upload.not_null,
                 instance_num   : 1,
                 valtype_cd     : valtype_cd,
                 tval_char      : valtype_cd[0] == 'T' ? value : null,

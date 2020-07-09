@@ -286,20 +286,20 @@ class TumorFileTest extends TestCase {
     void "test i2b2 fact table"() {
         final patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
         final sourcesystem_cd = 'my-naaccr-file'
-        final upload_id = -1 // TODO: transition from task_id to upload_id?
+        final upload_id = 123456 // TODO: transition from task_id to upload_id?
         final flat_file = new File(testDataPath)
         final mrnItem = 'patientIdNumber' // TODO: hospital id number
         String schema = null
-        final fact_table = 'observation_fact_1'
 
         DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
             Map<String, Integer> toPatientNum = (0..100).collectEntries { [String.format('%08d', it), it] }
 
+            final upload = new TumorFile.I2B2Upload(schema, upload_id, sourcesystem_cd, patient_ide_source)
             final enc = TumorFile.makeTumorFacts(
                     flat_file, 2000,
-                    memdb, schema, mrnItem, toPatientNum,
-                    fact_table,
-                    sourcesystem_cd, upload_id)
+                    memdb, mrnItem, toPatientNum,
+                    upload)
+
             final actual = memdb.firstRow("""
                 select count(*) records
                      , count(distinct encounter_num) encounters
@@ -309,7 +309,7 @@ class TumorFileTest extends TestCase {
                      , count(distinct valtype_cd) types
                      , count(distinct tval_char) texts
                      , count(distinct nval_num) numbers
-                from ${fact_table}
+                from ${upload.factTable}
             """ as String)
             assert actual == ['RECORDS': 6808, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 553,
                               'DATES'  : 188, 'TYPES': 4, 'TEXTS': 0, 'NUMBERS': 51]
@@ -330,10 +330,12 @@ class TumorFileTest extends TestCase {
                 extract_table,
         )
 
+        final upload = new TumorFile.I2B2Upload(null, 1, "NAACCR", patient_ide_source)
+
         cdw.withSql { Sql sql ->
             mockPatientMapping(sql, patient_ide_source, 100)
             extract.run()
-            extract.updatePatientNum(sql, patient_ide_source, patient_ide_expr)
+            extract.updatePatientNum(sql, upload, patient_ide_expr)
             final toPatientNum = extract.getPatientMapping(sql, patient_ide_col)
             assert toPatientNum.size() == 91
         }
