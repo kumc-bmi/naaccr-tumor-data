@@ -137,10 +137,14 @@ class DBConfig {
             cwd().resolve(arg(target)).toURL()
         }
 
-        String property(String target) {
+        String property(String target,
+                        String fallback = 'throw') {
             String value = getConfig().getProperty(target)
             if (value == null) {
-                throw new IllegalArgumentException(target)
+                if (fallback == 'throw') {
+                    throw new IllegalArgumentException(target)
+                }
+                value = fallback
             }
             value
         }

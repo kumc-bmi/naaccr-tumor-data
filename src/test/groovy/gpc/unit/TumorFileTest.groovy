@@ -30,14 +30,6 @@ import java.time.LocalDate
 class TumorFileTest extends TestCase {
     static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
 
-    void testCLI() {
-        final Properties config = new Properties()
-        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file')    : testDataPath,
-                                            ('naaccr.extract-table'): 'TR_EX'])
-        DBConfig.CLI cli = buildCLI(['facts'], config)
-        TumorFile.run_cli(cli)
-    }
-
     /**
      * CAUTION: Ambient access to DB Connection
      */
@@ -97,37 +89,6 @@ class TumorFileTest extends TestCase {
         }
     }
 
-    void "test patient mapping"() {
-        final cdw = DBConfig.inMemoryDB("TR", true)
-        final task_id = "task123"
-        URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        final tumor_table = 'NAACCR_DISCRETE'
-        Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
-                [flat_file],
-                tumor_table,
-        )
-
-        final patient_ide_source = 'SMS@kumed.com'
-        final patient_mapping = 'patient_mapping'
-        String dml = """
-        update ${tumor_table} tr
-        set tr.patient_num = (
-            select pm.patient_num
-            from ${patient_mapping} pm
-            where pm.patient_ide_source = :patient_ide_source
-            and pm.patient_ide = tr.PATIENT_ID_NUMBER_N20
-            )
-        """
-        // TODO: trim(leading '0' from tr.patient_System_Id_Hosp_N21)
-        cdw.withSql { Sql sql ->
-            mockPatientMapping(sql, patient_ide_source, 20)
-            extract.run()
-            sql.execute(dml, [patient_ide_source: patient_ide_source])
-            final row1 = sql.firstRow(
-                    "select count(distinct patient_num) from ${tumor_table}" as String)
-            assert row1[0] == 11
-        }
-    }
 
     static void mockPatientMapping(Sql sql, String patient_ide_source,
                                    int qty = 100) {
@@ -142,7 +103,7 @@ class TumorFileTest extends TestCase {
                 'insert into patient_mapping(patient_num, patient_ide_source, patient_ide) values (:num, :src, :ide)'
         ) { ps ->
             (1..qty).collect {
-                [num: it, src: patient_ide_source, ide: String.format('%08d', it)]
+                [num: it, src: patient_ide_source, ide: it.toString()]
             }.each { ps.addBatch(it) }
         }
     }
@@ -288,15 +249,6 @@ class TumorFileTest extends TestCase {
         assert actual.where((actual.dateColumn('dateOfDiagnosis') as DateFilters).isMissing()).rowCount() == 0
     }
 
-    void testVisits() {
-        URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        Table tumors = new TumorFile.NAACCR_Visits(null, "task123", [flat_file], "TR_EX", 12345)._data(12345)
-        final sites = tumors.stringColumn('primarySite')
-        assert sites.countUnique() > 2
-        assert tumors.stringColumn('recordId').countUnique() == tumors.rowCount()
-        assert tumors.intColumn('encounter_num').min() == 12345
-    }
-
     void testObsRaw() {
         final _extract = _extract()
         Table _ty = TumorOnt.NAACCR_I2B2.tumor_item_type
@@ -332,7 +284,8 @@ class TumorFileTest extends TestCase {
     }
 
     void "test i2b2 fact table"() {
-        final sourcesystem_cd = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+        final patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+        final sourcesystem_cd = 'my-naaccr-file'
         final upload_id = -1 // TODO: transition from task_id to upload_id?
         final flat_file = new File(testDataPath)
         final mrnItem = 'patientIdNumber' // TODO: hospital id number
@@ -340,9 +293,12 @@ class TumorFileTest extends TestCase {
         final fact_table = 'observation_fact_1'
 
         DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
-            mockPatientMapping(memdb, sourcesystem_cd, 100)
+            Map<String, Integer> toPatientNum = (0..100).collectEntries { [String.format('%08d', it), it] }
 
-            final enc = TumorFile.makeTumorFacts(flat_file, 2000, memdb, schema, fact_table, mrnItem,
+            final enc = TumorFile.makeTumorFacts(
+                    flat_file, 2000,
+                    memdb, schema, mrnItem, toPatientNum,
+                    fact_table,
                     sourcesystem_cd, upload_id)
             final actual = memdb.firstRow("""
                 select count(*) records
@@ -355,12 +311,33 @@ class TumorFileTest extends TestCase {
                      , count(distinct nval_num) numbers
                 from ${fact_table}
             """ as String)
-            assert actual == ['RECORDS': 7346, 'ENCOUNTERS': 100, 'PATIENTS': 92, 'CONCEPTS': 576,
-                              'DATES'  : 194, 'TYPES': 5, 'TEXTS': 95, 'NUMBERS': 53]
-            assert enc == 2000 + (actual.ENCOUNTERS as int)
+            assert actual == ['RECORDS': 6808, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 553,
+                              'DATES'  : 188, 'TYPES': 4, 'TEXTS': 0, 'NUMBERS': 51]
+            assert enc == 2100
         }
     }
 
+    void "test patient mapping"() {
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        final task_id = "task123"
+        URL flat_file = Paths.get(testDataPath).toUri().toURL()
+        final patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+        final patient_ide_col = 'PATIENT_ID_NUMBER_N20'
+        final patient_ide_expr = "trim(leading '0' from tr.${patient_ide_col})"
+        final extract_table = "NAACCR_DISCRETE"
+        final extract = new TumorFile.NAACCR_Extract(cdw, task_id,
+                [flat_file],
+                extract_table,
+        )
+
+        cdw.withSql { Sql sql ->
+            mockPatientMapping(sql, patient_ide_source, 100)
+            extract.run()
+            extract.updatePatientNum(sql, patient_ide_source, patient_ide_expr)
+            final toPatientNum = extract.getPatientMapping(sql, patient_ide_col)
+            assert toPatientNum.size() == 91
+        }
+    }
 
     /**
      * _stable_hash uses a published algorithm (CRC32)

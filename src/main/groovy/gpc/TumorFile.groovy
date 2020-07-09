@@ -83,6 +83,7 @@ class TumorFile {
         } else if (cli.flag('facts')) {
             work = new NAACCR_Facts(cdw, task_id,
                     cli.urlProperty("naaccr.flat-file"),
+                    cli.property("i2b2.star-schema", null),
                     cli.property("naaccr.extract-table"))
         } else if (cli.flag('patients')) {
             work = new NAACCR_Patients(cdw, task_id,
@@ -286,24 +287,12 @@ class TumorFile {
             encounter_num
         }
 
-        public static Map<String, Object> fixedRecord(List<Map> colInfo, String line) {
+        static Map<String, Object> fixedRecord(List<Map> colInfo, String line) {
             colInfo.collect {
                 final start = it.start as int - 1
                 final length = it.length as int
                 [it.name, line.substring(start, start + length).trim()]
             }.findAll { (it[1] as String) > '' }.collectEntries { it }
-        }
-
-        static boolean dropIfExists(Sql sql, String table_qname) {
-            final parts = table_qname.split('\\.')
-            String schema = parts.length == 2 ? parts[0].toUpperCase() : null
-            String table_name = parts[-1].toUpperCase()
-            final results = sql.connection.getMetaData().getTables(null, schema, table_name, null);
-            if (results.next()) {
-                sql.execute("drop table ${table_qname}" as String)
-                return true
-            }
-            return false
         }
 
         static FixedColumnsLayout theLayout(File flat_file) {
@@ -318,7 +307,7 @@ class TumorFile {
             layout
         }
 
-        static public List<Map> columnInfo(Table fields, FixedColumnsLayout layout, String varchar) {
+        static List<Map> columnInfo(Table fields, FixedColumnsLayout layout, String varchar) {
             fields.collect {
                 final num = it.getInt("item")
                 final name = it.getString("FIELD_NAME")
@@ -349,8 +338,45 @@ class TumorFile {
             }
             result
         }
+
+        void updatePatientNum(Sql sql, String patient_ide_source, String patient_ide_expr) {
+            final facts = new TumorFile.ObservationFact(null, 'badly_factored')
+            final dml = """
+                update ${tb.table_name} tr
+                set tr.patient_num = (
+                    select pm.patient_num
+                    from ${facts.qname('patient_mapping')} pm
+                    where pm.patient_ide_source = ?.source
+                    and pm.patient_ide = ${patient_ide_expr}
+                    )
+            """
+            sql.execute(dml, [source: patient_ide_source])
+        }
+
+        Map<String, Integer> getPatientMapping(Sql sql, patient_ide_col) {
+            String q = """
+                select ${patient_ide_col} ide, patient_num from ${tb.table_name}
+                where patient_num is not null
+            """.trim()
+            log.info('{}', q)
+            final rows = sql.rows(q)
+            log.info('got {} rows', rows.size())
+            Map<String, Integer> toPatientId = rows.collectEntries { [it.ide, it.patient_num] }
+            toPatientId
+        }
     }
 
+    static boolean dropIfExists(Sql sql, String table_qname) {
+        final parts = table_qname.split('\\.')
+        String schema = parts.length == 2 ? parts[0].toUpperCase() : null
+        String table_name = parts[-1].toUpperCase()
+        final results = sql.connection.getMetaData().getTables(null, schema, table_name, null);
+        if (results.next()) {
+            sql.execute("drop table ${table_qname}" as String)
+            return true
+        }
+        return false
+    }
 
     /** Make a per-tumor table for use in encounter_mapping etc.
      */
@@ -425,16 +451,25 @@ class TumorFile {
     }
 
     static class NAACCR_Facts implements Task {
-        static final String table_name = "NAACCR_OBSERVATIONS"
+        static final int encounter_num_start = 2000000
+        static final String sourcesystem_cd = 'tumor_registry@kumed.com'
+        static final String patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+        static final String mrnItem = 'patientSystemIdHosp' // TODO: patientIdNumber
+        static final String patient_ide_col = 'PATIENT_SYSTEM_ID_HOSP_N21' // TODO: 'PATIENT_ID_NUMBER_N20'
+        static final String patient_ide_expr = "trim(leading '0' from tr.${patient_ide_col})"
 
         final TableBuilder tb
         private final DBConfig cdw
         private final URL flat_file
+        private final String star_schema
+        private final int upload_id
         private final NAACCR_Extract extract_task
 
-        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_files, String extract_table) {
-            tb = new TableBuilder(task_id: task_id, table_name: table_name)
-            this.flat_file = flat_files
+        NAACCR_Facts(DBConfig cdw, String task_id, URL flat_file, String schema, String extract_table) {
+            this.upload_id = 123 // TODO: transition from task_id to upload_id?
+            tb = new TableBuilder(task_id: task_id, table_name: "OBSERVATION_FACT_${upload_id}")
+            this.flat_file = flat_file
+            this.star_schema = schema
             this.cdw = cdw
             extract_task = new NAACCR_Extract(cdw, task_id, [flat_file], extract_table)
         }
@@ -442,16 +477,16 @@ class TumorFile {
         boolean complete() { tb.complete(cdw) }
 
         void run() {
-            final sourcesystem_cd = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
-            final upload_id = -1 // TODO: transition from task_id to upload_id?
             final flat_file = new File(flat_file.path)
-            final mrnItem = 'patientIdNumber' // TODO: hospital id number
-            String schema = null
-            final fact_table = 'observation_fact_1'
-            int encounter_num_start = 2000000
 
-            cdw.withSql { Sql memdb ->
-                TumorFile.makeTumorFacts(flat_file, encounter_num_start, memdb, schema, fact_table, mrnItem,
+            cdw.withSql { Sql sql ->
+                extract_task.updatePatientNum(sql, patient_ide_source, patient_ide_expr)
+                final toPatientNum = extract_task.getPatientMapping(sql, patient_ide_col)
+
+                makeTumorFacts(
+                        flat_file, encounter_num_start,
+                        sql, star_schema, mrnItem, toPatientNum,
+                        tb.table_name,
                         sourcesystem_cd, upload_id)
             }
         }
@@ -544,25 +579,13 @@ class TumorFile {
         }
 
         static final not_null = '@'
-
-        int patientMap(Sql sql, String patientId, String patient_ide_source) {
-            // TODO: parameterize i2b2 star schema
-            final row1 = sql.firstRow("""
-            select patient_num from ${qname('patient_mapping')}
-            where patient_ide_source = ?.patient_ide_source and patient_ide = ?.patientId
-            """ as String, [patient_ide_source: patient_ide_source, patientId: patientId])
-            if (row1 == null) {
-                throw new IndexOutOfBoundsException()
-            }
-            final patient_num = row1[0] as int
-            patient_num
-        }
-
     }
 
     static int makeTumorFacts(File flat_file, int encounter_num,
-                              Sql sql, String schema, String fact_table, String mrnItem,
-                              String sourcesystem_cd, int upload_id) {
+                              Sql sql, String schema, String mrnItem, Map <String, Integer> toPatientNum,
+                              String fact_table,
+                              String sourcesystem_cd, int upload_id,
+                              boolean include_phi = false) {
         final facts = new ObservationFact(schema, fact_table)
         log.info("fact DML: {}", facts.insertStatement())
 
@@ -575,44 +598,55 @@ class TumorFile {
                 assert num == lf.naaccrItemNum
                 assert it.getString('naaccrId') == lf.name
             }
-            [num: num, valtype_cd: it.getString('valtype_cd'), layout: lf]
-        }.findAll { it.layout != null }
+            [num        : num, layout: lf,
+             valtype_cd : it.getString('valtype_cd'),
+             phi_id_kind: it.getString('phi_id_kind'),]
+        }.findAll { it.layout != null && (include_phi || it.phi_id_kind as String <= '') }
 
         final patIdField = layout.getFieldByName(mrnItem)
+        final dxDateField = layout.getFieldByName('dateOfDiagnosis')
         final dateFields = [
                 'dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
                 'dateCaseCompleted', 'dateCaseLastChanged', 'dateCaseReportExported'
         ].collect { layout.getFieldByName(it) }
 
+        dropIfExists(sql, facts.qname(facts.fact_table))
         sql.execute(facts.ddl())
         sql.withBatch(256, facts.insertStatement()) { ps ->
             new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
                 encounter_num += 1
-                int patient_num
-                String patientId
-                try {
-                    patientId = fieldValue(patIdField, line)
-                    patient_num = facts.patientMap(sql, patientId, sourcesystem_cd)
-                } catch (noSuchPatient) {
-                    log.warn('cannot find {} in patient_mapping', patientId)
+                String patientId = fieldValue(patIdField, line)
+                if (!toPatientNum.containsKey(patientId)) {
+                    log.warn('tumor {}: cannot find {} in patient_mapping', encounter_num, patientId)
+                    return
                 }
+                final patient_num = toPatientNum[patientId]
                 Map<String, LocalDate> dates = dateFields.collectEntries { FixedColumnsField dtf ->
                     [dtf.name, TumorFile.parseDate(fieldValue(dtf, line))]
                 }
+                if (dates.dateOfDiagnosis == null) {
+                    log.info('tumor {} patient {}: cannot parse dateOfDiagnosis: {}',
+                            encounter_num, patientId, fieldValue(dxDateField, line))
+                    return
+                }
+                int fact_qty = 0
                 itemInfo.each { item ->
                     Map record
+                    final field = item.layout as FixedColumnsField
                     try {
                         record = itemFact(encounter_num, patient_num, line, dates,
-                                item.layout as FixedColumnsField, item.valtype_cd as String,
+                                field, item.valtype_cd as String,
                                 sourcesystem_cd, upload_id)
                     } catch (badItem) {
-                        log.warn('cannot make fact for patient {} tumor {} item {}: {}',
-                                patientId, encounter_num)
+                        log.warn('tumor {} patient {}: cannot make fact for item {}: {}',
+                                encounter_num, patientId, field.name, badItem.toString())
                     }
                     if (record != null) {
                         ps.addBatch(record)
+                        fact_qty += 1
                     }
                 }
+                log.info('tumor {} patient {}: made {} facts', encounter_num, patientId, fact_qty)
             }
         }
         encounter_num
@@ -630,12 +664,21 @@ class TumorFile {
             return null
         }
         final nominal = valtype_cd == '@' ? value : ''
-        final start_date = (
-                valtype_cd == 'D' ? TumorFile.parseDate(value) :
-                        fixed.section == 'Follow-up/Recurrence/Death' ? dates.dateOfLastContact :
-                                dates.dateOfDiagnosis)
-        if (start_date == null) {
-            throw new IllegalArgumentException('no dateOfDiagnosis')
+        def start_date
+        if (valtype_cd == 'D') {
+            if (value == '99999999') {
+                // "blank" date value
+                return null
+            }
+            start_date = TumorFile.parseDate(value)
+            if (start_date == null) {
+                log.warn('tumor {} patient {}: cannot parse {}: [{}]',
+                        encounter_num, patient_num, fixed.name, value)
+                return null
+            }
+        } else {
+            start_date = fixed.section == 'Follow-up/Recurrence/Death' ? dates.dateOfLastContact :
+                            dates.dateOfDiagnosis
         }
         String concept_cd = "NAACCR|${fixed.naaccrItemNum}:${nominal}"
         assert concept_cd.length() <= 50
