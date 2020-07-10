@@ -215,6 +215,9 @@ class TumorFileTest extends TestCase {
     void testDates() {
         def actual = TumorFile.naaccr_date_col(date_cases.stringColumn('text'))
         assert date_cases_ymd == actual.asList()
+
+        actual = date_cases.stringColumn('text').iterator().collect { String it -> TumorFile.parseDate(it) }
+        assert date_cases_ymd == actual
     }
 
     static final Table date_cases = TumorOnt.read_csv(TumorFileTest.getResource('date_cases.csv'))
@@ -311,8 +314,8 @@ class TumorFileTest extends TestCase {
                      , count(distinct nval_num) numbers
                 from ${upload.factTable}
             """ as String)
-            assert actual == ['RECORDS': 6808, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 553,
-                              'DATES'  : 188, 'TYPES': 4, 'TEXTS': 0, 'NUMBERS': 51]
+            assert actual == ['RECORDS': 6711, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 552,
+                              'DATES'  : 188, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 18]
             assert enc == 2100
         }
     }

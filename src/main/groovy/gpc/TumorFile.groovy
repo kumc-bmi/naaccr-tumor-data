@@ -609,9 +609,8 @@ class TumorFile {
                 assert it.getString('naaccrId') == lf.name
             }
             [num        : num, layout: lf,
-             valtype_cd : it.getString('valtype_cd'),
-             phi_id_kind: it.getString('phi_id_kind'),]
-        }.findAll { it.layout != null && (include_phi || it.phi_id_kind as String <= '') }
+             valtype_cd : it.getString('valtype_cd')]
+        }.findAll { it.layout != null && (include_phi || !(it.valtype_cd as String).contains('i')) }
 
         final patIdField = layout.getFieldByName(mrnItem)
         final dxDateField = layout.getFieldByName('dateOfDiagnosis')
@@ -623,6 +622,7 @@ class TumorFile {
         dropIfExists(sql, upload.factTable)
         sql.execute(upload.factTableDDL)
         sql.withBatch(256, upload.insertStatement) { ps ->
+            int fact_qty = 0
             new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
                 encounter_num += 1
                 String patientId = fieldValue(patIdField, line)
@@ -639,14 +639,13 @@ class TumorFile {
                             encounter_num, patientId, fieldValue(dxDateField, line))
                     return
                 }
-                int fact_qty = 0
                 itemInfo.each { item ->
                     Map record
                     final field = item.layout as FixedColumnsField
                     try {
                         record = itemFact(encounter_num, patient_num, line, dates,
                                 field, item.valtype_cd as String,
-                                upload.sourcesystem_cd, upload.upload_id)
+                                upload.sourcesystem_cd)
                     } catch (badItem) {
                         log.warn('tumor {} patient {}: cannot make fact for item {}: {}',
                                 encounter_num, patientId, field.name, badItem.toString())
@@ -656,9 +655,13 @@ class TumorFile {
                         fact_qty += 1
                     }
                 }
-                log.info('tumor {} patient {}: made {} facts', encounter_num, patientId, fact_qty)
+                if (encounter_num % 20 == 0) {
+                    log.info('tumor {}: {} facts', encounter_num, fact_qty)
+                }
             }
         }
+        // only fill in upload_id after all rows are done
+        sql.execute("update ${upload.factTable} set upload_id = ?.upload_id".toString(), [upload_id: upload.upload_id])
         encounter_num
     }
 
@@ -668,13 +671,13 @@ class TumorFile {
 
     static Map itemFact(int encounter_num, int patient_num, String line, Map<String, LocalDate> dates,
                         FixedColumnsField fixed, String valtype_cd,
-                        String sourcesystem_cd, int upload_id) {
+                        String sourcesystem_cd) {
         final value = fieldValue(fixed, line)
         if (value == '') {
             return null
         }
         final nominal = valtype_cd == '@' ? value : ''
-        def start_date
+        LocalDate start_date
         if (valtype_cd == 'D') {
             if (value == '99999999') {
                 // "blank" date value
@@ -692,6 +695,16 @@ class TumorFile {
         }
         String concept_cd = "NAACCR|${fixed.naaccrItemNum}:${nominal}"
         assert concept_cd.length() <= 50
+        Double num
+        if (valtype_cd == 'N') {
+            try {
+                num = Double.parseDouble(value)
+            } catch (badNum) {
+                log.warn('tumor {} patient {}: cannot parse number {}: [{}]',
+                        encounter_num, patient_num, fixed.name, value)
+                return null
+            }
+        }
         final update_date = [
                 dates.dateCaseLastChanged, dates.dateCaseCompleted,
                 dates.dateOfLastContact, dates.dateOfDiagnosis,
@@ -705,13 +718,13 @@ class TumorFile {
                 modifier_cd    : I2B2Upload.not_null,
                 instance_num   : 1,
                 valtype_cd     : valtype_cd,
-                tval_char      : valtype_cd[0] == 'T' ? value : null,
-                nval_num       : valtype_cd[0] == 'N' ? value : null,
+                tval_char      : valtype_cd == 'T' ? value : null,
+                nval_num       : valtype_cd == 'N' ? num : null,
                 end_date       : start_date,
                 update_date    : update_date,
                 download_date  : dates.dateCaseReportExported,
                 sourcesystem_cd: sourcesystem_cd,
-                upload_id      : upload_id,
+                upload_id      : null,
         ]
     }
 
@@ -933,8 +946,10 @@ class TumorFile {
 
     static LocalDate parseDate(String txt) {
         LocalDate value
+        int nch = txt.length()
+        String full = nch == 4 ? txt + '0101' : nch == 6 ? txt + '01' : txt
         try {
-            value = LocalDate.parse(txt, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
+            value = LocalDate.parse(full, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
         } catch (DateTimeParseException ignored) {
             value = null
         }
