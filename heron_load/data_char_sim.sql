@@ -6,104 +6,100 @@ part of the HERON* open source codebase; see NOTICE file for license details.
  
 */
 
--- Check that NAACCR data dictionary and data is available.
-select sectionid from section where 1=0;
-select "NAACCR-ITEM-NUM", section from record_layout where 1=0;
-select encounter_num, dateOfDiagnosis from naaccr_tumors where 1=0;
-select recordid, naaccrNum, dateOfDiagnosis from naaccr_observations where 1=0;
+-- dependencies:
+select concept_cd from nightHeronData.observation_fact_123456 where 1 = 0;
+select c_basecode from naaccr_ontology where 1 = 0;
 
--- Check that tumor_item_type from naaccr_txform.sql is available (esp. for valtype_cd)
-select valtype_cd from tumor_item_type where 1=0;
-
-
-drop view if exists data_agg_naaccr;
-create view data_agg_naaccr as
-with
-cases as (
-  select year(dateOfDiagnosis) as dx_yr, count(*) as tumor_qty
-  from naaccr_extract
-  group by year(dateOfDiagnosis)
-)
-, with_yr as (
-  select year(dateOfDiagnosis) dx_yr
-       , eav.*
-  from tumors_eav eav
-)
-, with_ty as (
-  select with_yr.dx_yr, with_yr.dateOfDiagnosis, ty.valtype_cd
-       , value
-/*       , case when valtype_cd = '@'
-         then raw_value  -- TODO: trim
-         end as code_value */
-       , case
-         when valtype_cd in ('N', 'Ni')
-         then cast(value as float)
-         end as numeric_value
-       , case
-         when valtype_cd = 'D'
-         -- ISSUE: length 14 datetime?
-         then to_date(substring(concat(value, '0101'), 1, 8),
-                      'yyyyMMdd')
-         end as date_value
-       , ty.naaccrNum
-       , ty.naaccrId
-  from with_yr
-  join tumor_item_type ty on ty.naaccrId = with_yr.naaccrId
-)
--- count data points by item (variable) and year of diagnosis
-, by_item_yr as (
-  select dx_yr, naaccrId, present
-  from
-  (
-    select dx_yr, naaccrId, count(*) present
-    from with_yr eav
-    group by dx_yr, naaccrId
-  ) agg
-)
-,
--- break down nominals by value
+drop table data_agg_naaccr;
+create table data_agg_naaccr as
+with obs as (
+  select * from nightHeronData.observation_fact_123456
+),
+detail as (
+    select encounter_num, start_date
+         , concept_cd
+         , substr(concept_cd, bar + 1, colon - bar - 1) naaccrNum
+         , valtype_cd
+         , case when valtype_cd = '@' then substr(concept_cd, colon + 1) else null end as value
+         , nval_num
+    from (
+    select encounter_num, start_date, valtype_cd, nval_num
+         , concept_cd, instr(concept_cd, '|') bar, instr(concept_cd, ':') colon
+    from obs
+    )
+),
+tumor as (
+    select encounter_num, start_date dx_date, extract(year from start_date) dx_yr
+    from obs
+    where concept_cd = 'NAACCR|390:'
+),
+by_yr as (
+    select dx_yr, count(distinct encounter_num) tumor_qty
+    from tumor
+    group by dx_yr
+),
+by_item as (
+    select dx_yr, naaccrNum, valtype_cd, count(*) present
+    from detail join tumor on tumor.encounter_num = detail.encounter_num
+    group by dx_yr, naaccrNum, valtype_cd
+),
 by_val as (
-  select by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present,
-         eav.valtype_cd, eav.value, count(*) freq
-  from with_ty eav
-  join by_item_yr by_item on eav.naaccrId = by_item.naaccrId and eav.dx_yr = by_item.dx_yr
-  where eav.valtype_cd = '@'
-  group by by_item.dx_yr, by_item.naaccrId, eav.naaccrNum, by_item.present, eav.valtype_cd, eav.value
-)
-,
+    select dx_yr, concept_cd, naaccrNum, value, count(*) freq
+    from detail join tumor on tumor.encounter_num = detail.encounter_num
+    where valtype_cd = '@'
+    group by dx_yr, concept_cd, naaccrNum, value
+),
 -- normalize date variables to the reference date: diagnosis
 event as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, datediff('day', e.dateOfDiagnosis, e.date_value)  as mag
-  from with_ty e where valtype_cd = 'D'
-)
-,
+  select dx_yr, concept_cd, naaccrNum, valtype_cd, trunc(detail.start_date) - trunc(tumor.dx_date) as mag
+  from detail join tumor on tumor.encounter_num = detail.encounter_num
+  where valtype_cd = 'D'
+),
 measurement as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, 0+numeric_value as mag /*ISSUE: fix numeric when building EAV*/
-  from with_ty where valtype_cd = 'N'
-)
-,
+  select dx_yr, concept_cd, naaccrNum, valtype_cd, nval_num as mag
+  from detail join tumor on tumor.encounter_num = detail.encounter_num
+  where valtype_cd = 'N'
+),
 -- assuming normal distribution, characterize continuous data
 stats as (
-  select dx_yr, naaccrNum, naaccrId, valtype_cd, avg(mag) mean, stddev_pop(mag) sd
+  select dx_yr, concept_cd, naaccrNum, valtype_cd, avg(mag) mean, stddev_pop(mag) sd
   from (select * from event union all select * from measurement)
-  group by dx_yr, naaccrNum, naaccrId, valtype_cd
+  group by dx_yr, concept_cd, naaccrNum, valtype_cd
 )
 -- For nominal data, save the frequency of each value
-select by_val.dx_yr, by_val.naaccrId, by_val.naaccrNum, by_val.valtype_cd
+select by_val.dx_yr, by_val.naaccrNum, by_item.valtype_cd
      , cast(null as float) mean, cast(null as float) sd
-     , by_val.value, by_val.freq
-     , by_val.present
-     , cases.tumor_qty
+     , by_val.value, by_val.concept_cd, by_val.freq
+     , by_item.present
+     , by_yr.tumor_qty
 from by_val
-join cases on cases.dx_yr = by_val.dx_yr
+join by_item on by_item.dx_yr = by_val.dx_yr and by_item.naaccrNum = by_val.naaccrNum
+join by_yr on by_item.dx_yr = by_yr.dx_yr
 union all
-select stats.dx_yr, by_item.naaccrId, stats.naaccrNum, stats.valtype_cd
+select stats.dx_yr, stats.naaccrNum, stats.valtype_cd
      , mean, sd
-     , null value, null freq, by_item.present, cases.tumor_qty
+     , null value, stats.concept_cd, null freq, by_item.present, by_yr.tumor_qty
 from stats
-join by_item_yr by_item on stats.naaccrId = by_item.naaccrId and stats.dx_yr = by_item.dx_yr
-join cases on stats.dx_yr = cases.dx_yr
+join by_item on stats.naaccrNum = by_item.naaccrNum and stats.dx_yr = by_item.dx_yr
+join by_yr on stats.dx_yr = by_yr.dx_yr
+order by dx_yr desc, naaccrnum
 ;
+
+
+select agg.dx_yr, agg.naaccrNum, agg.valtype_cd
+     , agg.mean, agg.sd
+     , agg.value, agg.concept_cd
+     -- , agg.freq, agg.present, agg.tumor_qty
+     , round(present / tumor_qty * 100, 2) pct_present
+     , round(freq / present * 100, 2) pct_freq
+     , t.c_name
+     , t.c_fullname
+     , t.c_tooltip
+from data_agg_naaccr agg
+left join naaccr_ontology t on t.c_basecode = agg.concept_cd
+order by agg.dx_yr desc, naaccrNum, value, t.c_fullname
+;
+
 
 
 drop view if exists data_char_naaccr;
