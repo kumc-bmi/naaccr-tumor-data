@@ -16,4 +16,26 @@ class I2B2Star extends TestCase {
         TumorFile.main(['discrete-data'] as String[])
         TumorFile.main(['facts', '--upload-id=111222'] as String[])
     }
+
+    @Ignore
+    static class ToDo {
+        void "test i2b2 facts from v16 flat file"() {
+
+        }
+
+        void "test bc_qa variables"() {
+
+        }
+
+        void "test seer site recode"() {
+        }
+
+        void "test site-specific factors csterms"() {
+
+        }
+
+        void "test icd_o_meta terms"() {
+
+        }
+    }
 }

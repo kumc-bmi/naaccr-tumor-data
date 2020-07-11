@@ -1,3 +1,5 @@
+# TODO: prune pyspark jupyter nb stuff incl. synthetic_data.py
+
 # %% [markdown]
 # ## Synthesizing Data
 #

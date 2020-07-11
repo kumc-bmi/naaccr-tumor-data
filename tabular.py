@@ -1,3 +1,5 @@
+# TODO: prune tabular.py ; port to groovy / Java?
+
 """tabular -- DataFrame API for tabular data
 
 Script usage

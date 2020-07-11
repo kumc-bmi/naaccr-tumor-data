@@ -105,3 +105,5 @@ test-loader: src/test/resources/data.jsonl ./build/libs/naaccr-tumor-data.jar
 	./gradlew test
 	./gradlew fatjar
 
+
+# TODO: prune Makefile

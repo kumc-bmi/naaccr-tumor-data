@@ -13,7 +13,7 @@ import java.nio.file.Paths
 
 /**
  * CAUTION: ambient access to user.dir to write config file, DB.
- * ISSUE: use temp dir?
+ * TODO: use temp dir
  */
 @CompileStatic
 class Staging extends TestCase {
@@ -96,8 +96,33 @@ class Staging extends TestCase {
         cli
     }
 
-    @Ignore("testStatsFromDB: requires live Oracle connection")
-    static class ToDoLive {
+    @Ignore("TODO: stats test. depends on tumors? move to ETL?")
+    static class ToDo extends TestCase {
+        void "test build ontology without luigi, python, Spark"() {
+
+        }
+
+        void "test TODO rename discrete-data command to tumor-table"() {
+        }
+
+        void "test complete check based on upload_id rather than task_id"() {
+
+        }
+
+        void "test that tumor table has patid varchar column"() {
+
+        }
+
+        void "test stats on 100 records of test data with local disk h2 DB"() {
+            def argv = ['discrete-data', '--no-file']
+            cli1(argv, System.getProperty('user.dir'))
+
+            TumorFile.main(['load-records'] as String[])
+            TumorFile.main(['discrete-data', '--no-file'] as String[])
+            TumorFile.main(['summary', '--no-file'] as String[])
+        }
+
+        @Ignore("testStatsFromDB: requires live Oracle connection")
         void testStatsFromDB() {
             final cdw = DBConfig.inMemoryDB("TR", true)
             final String extract_table = "TR_DATA"

@@ -1,3 +1,4 @@
+# TODO: prune pyspark stuff incl. this env-dev.yml
 name: py3tr
 channels:
   - conda-forge

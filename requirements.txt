@@ -1,3 +1,5 @@
+# TODO: prune pyspark, incl. this requirements.txt
+
 ##
 # We recommend Anaconda for most uses. See environment.yml,
 # env-dev.yml and CONTRIBUTING.md for detail.

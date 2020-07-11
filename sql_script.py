@@ -1,3 +1,5 @@
+# TODO: prune pyspark stuff incl. this sql_script.py
+
 r"""
 
 Run SQL create ... statements given DFs for input views.

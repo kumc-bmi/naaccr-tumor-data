@@ -1,3 +1,5 @@
+# TODO: prune pyspark, luigi stuff inc. this param_val.py
+
 """param_val - static type checking for luigi parameters
 To mypy, an IntParam looks like an instance of the class IntParam;
 but at runtime, luigi actually picks an int value. So the type

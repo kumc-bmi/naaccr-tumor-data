@@ -1,3 +1,5 @@
+# TODO: prune pyspark, jupyter stuff, incl. this run_nb.py
+
 # cf. https://nbconvert.readthedocs.io/en/latest/execute_api.html
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor

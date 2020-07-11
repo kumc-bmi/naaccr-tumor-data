@@ -151,12 +151,20 @@ class TumorFile {
             }
         }
 
+        @Deprecated
+        /**
+         * no more need to insert from Table
+         */
         void reset(Sql sql, Table data) {
             drop(sql)
             log.debug("creating table ${table_name}")
             sql.execute(TumorOnt.SqlScript.create_ddl(table_name, data.columns()))
         }
 
+        @Deprecated
+        /**
+         * no more need to insert from Table
+         */
         void appendChunk(Sql sql, Table data) {
             TumorOnt.append_data_frame(data, table_name, sql)
         }
@@ -166,6 +174,7 @@ class TumorFile {
         StringColumn.create(name, [val] * t.rowCount() as String[])
     }
 
+    // TODO: fix Summary / stats design. Use generated facts?
     static class NAACCR_Summary implements Task {
         final TableBuilder tb
         final DBConfig cdw
@@ -380,7 +389,10 @@ class TumorFile {
         return false
     }
 
-    /** Make a per-tumor table for use in encounter_mapping etc.
+    @Deprecated
+    /**
+     * Make a per-tumor table for use in encounter_mapping etc.
+     * @Deprecated: we sequentially number tumors as we load them from the flat file now.
      */
     static class NAACCR_Visits implements Task {
         static final String table_name = "NAACCR_TUMORS"
@@ -491,6 +503,7 @@ class TumorFile {
             }
         }
 
+        @Deprecated
         void runMemDB() {
             final DBConfig mem = DBConfig.inMemoryDB("Facts")
             boolean firstChunk = true
@@ -728,6 +741,10 @@ class TumorFile {
         ]
     }
 
+    @Deprecated
+    /**
+     * obsolete in favor of makeTumorFacts
+     */
     static class ItemObs {
         static final TumorOnt.SqlScript script = new TumorOnt.SqlScript('naaccr_txform.sql',
                 TumorOnt.resourceText('heron_load/naaccr_txform.sql'),
@@ -755,6 +772,7 @@ class TumorFile {
         }
     }
 
+    @Deprecated
     static long _stable_hash(String text) {
         final CRC32 out = new CRC32()
         final byte[] bs = text.getBytes('UTF-8')
@@ -763,6 +781,10 @@ class TumorFile {
 
     }
 
+    @Deprecated
+    /**
+     * obsolete in favor of makeTumorFacts
+     */
     static void read_fwf(Reader lines, Closure<Void> f,
                          int chunkSize = 200) {
         Table empty = Table.create(TumorKeys.required_cols.collect { StringColumn.create(it) }
@@ -802,6 +824,10 @@ class TumorFile {
         }
     }
 
+    @Deprecated
+    /**
+     * obsolete in favor of makeTumorFacts
+     */
     static class TumorKeys {
         static List<String> pat_ids = ['patientSystemIdHosp', 'patientIdNumber']
         static List<String> pat_attrs = pat_ids + ['dateOfBirth', 'dateOfLastContact', 'sex', 'vitalStatus']
@@ -908,7 +934,15 @@ class TumorFile {
         }
     }
 
+    @Deprecated
+    /**
+     * obsolete in favor of theLayout
+     */
     static final FixedColumnsLayout layout18 = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
+    @Deprecated
+    /**
+     * obsolete in favor of theLayout
+     */
     static final Table record_layout = TumorOnt.fromRecords(
             layout18.getAllFields().collect { FixedColumnsField it ->
                 [('long-label')     : it.longLabel,
@@ -920,6 +954,7 @@ class TumorFile {
                 ] as Map
             })
 
+    @Deprecated
     static Table naaccr_dates(Table df, List<String> date_cols,
                               boolean keep = false) {
         final orig_cols = df.columnNames()
@@ -936,6 +971,7 @@ class TumorFile {
         df
     }
 
+    @Deprecated
     static DateColumn naaccr_date_col(StringColumn sc) {
         String name = sc.name()
         sc = sc.trim().concatenate('01019999').substring(0, 8)

@@ -1,3 +1,4 @@
+# TODO: prune pyspark stuff incl. this environment.yml
 # Usage:
 #   $ conda env create -f environment.yml
 # or perhaps

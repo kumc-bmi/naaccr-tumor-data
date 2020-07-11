@@ -1,3 +1,5 @@
+# TODO: prune luigi pyspark stuff incld tumor_reg_tasks.py
+
 """tumor_reg_tasks -- NAACCR Tumor Registry ETL Tasks
 
 Main tasks are:
