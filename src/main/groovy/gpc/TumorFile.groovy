@@ -56,44 +56,36 @@ class TumorFile {
     static void run_cli(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        // IDEA: support disk DB in place of memdb
         //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
 
-        if (cli.flag('load-files')) {
-            //noinspection GrReassignedInClosureLocalVar
-            work = new NAACCR_Extract(
-                    cdw, task_id,
-                    cli.files('NAACCR_FILE'), cli.property("naaccr.extract-table"))
-        } else if (cli.flag('discrete-data')) {
+        if (cli.flag('tumor-table')) {
             work = new NAACCR_Extract(cdw, task_id,
                     [cli.urlProperty("naaccr.flat-file")],
-                    cli.property("naaccr.extract-table"),
+                    cli.property("naaccr.tumor-table"),
             )
+        } else if (cli.flag('tumor-files')) {
+            work = new NAACCR_Extract(
+                    cdw, task_id,
+                    cli.files('NAACCR_FILE'), cli.property("naaccr.tumor-table"))
         } else if (cli.flag('summary')) {
             work = new NAACCR_Summary(cdw, task_id,
                     [cli.urlProperty("naaccr.flat-file")],
-                    cli.property("naaccr.extract-table"),
+                    cli.property("naaccr.tumor-table"),
                     cli.property("naaccr.stats-table"),
             )
-        } else if (cli.flag('tumors')) {
-            work = new NAACCR_Visits(cdw, task_id,
-                    [cli.urlProperty("naaccr.flat-file")],
-                    cli.property("naaccr.extract-table"),
-                    2000000)
         } else if (cli.flag('facts')) {
-            work = new NAACCR_Facts(cdw,
-                    cli.intArg('--upload-id'),
-                    cli.urlProperty("naaccr.flat-file"),
+            final upload = new I2B2Upload(
                     cli.property("i2b2.star-schema", null),
-                    cli.property("naaccr.extract-table"))
-        } else if (cli.flag('patients')) {
-            work = new NAACCR_Patients(cdw, task_id,
-                    [cli.urlProperty("naaccr.flat-file")],
-                    cli.property("naaccr.extract-table"))
-            TumorOnt.run_cli(cli)
-        } else if (cli.flag('load') || cli.flag('run') || cli.flag('query')) {
+                    cli.intArg('--upload-id'),
+                    cli.arg('--obs-src'),
+                    cli.arg('--mrn-src'))
+            work = new NAACCR_Facts(cdw,
+                    upload,
+                    cli.urlProperty("naaccr.flat-file"),
+                    cli.property("naaccr.tumor-table"))
+        } else if (cli.flag('run') || cli.flag('query')) {
             Loader.run_cli(cli)
         } else {
             TumorOnt.run_cli(cli)
@@ -121,6 +113,7 @@ class TumorFile {
         boolean complete(DBConfig account) {
             boolean done = false
             account.withSql { Sql sql ->
+                // TODO: avoid noisy warnings by using JDBC metadata to check whether table exists
                 try {
                     final row = sql.firstRow("select count(*) from ${table_name} where task_id = ?.task_id",
                             [task_id: task_id])
@@ -138,25 +131,18 @@ class TumorFile {
 
         void build(Sql sql, Table data) {
             data.addColumns(constS('task_id', data, task_id))
-            drop(sql)
+            dropIfExists(sql, table_name)
             load_data_frame(sql, table_name, data)
             log.info("inserted ${data.rowCount()} rows into ${table_name}")
         }
 
-        void drop(Sql sql) {
-            try {
-                sql.execute("drop table ${table_name}".toString())
-            } catch (SQLException ignored) {
-                // TODO: distinguish "not found" from others, esp. "because OBJ2 depends on it"
-            }
-        }
 
         @Deprecated
         /**
          * no more need to insert from Table
          */
         void reset(Sql sql, Table data) {
-            drop(sql)
+            dropIfExists(sql, table_name)
             log.debug("creating table ${table_name}")
             sql.execute(TumorOnt.SqlScript.create_ddl(table_name, data.columns()))
         }
@@ -222,14 +208,9 @@ class TumorFile {
             Table fields = TumorOnt.pcornet_fields.copy()
 
             // PCORnet spec doesn't include MRN column, but we need it for patient mapping.
-            [
-                    [item: 20, FIELD_NAME: 'PATIENT_ID_NUMBER_N20'],
-                    [item: 21, FIELD_NAME: 'PATIENT_SYSTEM_ID_HOSP_N21'],
-            ].forEach {
-                Row patid = fields.appendRow()
-                patid.setInt('item', it.item as int)
-                patid.setString('FIELD_NAME', it.FIELD_NAME as String)
-            }
+            Row patid = fields.appendRow()
+            patid.setInt('item', 20)
+            patid.setString('FIELD_NAME', 'PATIENT_ID_NUMBER_N20')
 
             cdw.withSql { Sql sql ->
                 dropIfExists(sql, tb.table_name)
@@ -248,6 +229,8 @@ class TumorFile {
                                 int encounter_num = 0,
                                 boolean create = true, boolean update = true,
                                 String varchar = "VARCHAR2", int batchSize = 64) {
+            // TODO: look up "VARCHAR2" using getTypeInfo
+            // https://docs.oracle.com/javase/7/docs/api/java/sql/DatabaseMetaData.html#getTypeInfo()
             FixedColumnsLayout layout = theLayout(flat_file)
             final source_cd = flat_file.name
 
@@ -377,11 +360,16 @@ class TumorFile {
         }
     }
 
+    /**
+     * Drop a table using JDBC metadata to check whether it exists first.
+     * @param table_qname either schema.name or just name
+     * @return true iff the table existed (and hence was dropped)
+     */
     static boolean dropIfExists(Sql sql, String table_qname) {
         final parts = table_qname.split('\\.')
         String schema = parts.length == 2 ? parts[0].toUpperCase() : null
         String table_name = parts[-1].toUpperCase()
-        final results = sql.connection.getMetaData().getTables(null, schema, table_name, null);
+        final results = sql.connection.getMetaData().getTables(null, schema, table_name, null)
         if (results.next()) {
             sql.execute("drop table ${table_qname}" as String)
             return true
@@ -429,7 +417,10 @@ class TumorFile {
         }
     }
 
-    /** Make a per-patient table for use in patient_mapping etc.
+    @Deprecated
+    /**
+     * Make a per-patient table for use in patient_mapping etc.
+     * @Deprecated: we add a patient_num column to the PCORnet TUMOR table instead now.
      */
     static class NAACCR_Patients implements Task {
         static String table_name = "NAACCR_PATIENTS"
@@ -465,11 +456,9 @@ class TumorFile {
     }
 
     static class NAACCR_Facts implements Task {
-        static final int encounter_num_start = 2000000
-        static final String sourcesystem_cd = 'tumor_registry@kumed.com'
-        static final String patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
-        static final String mrnItem = 'patientSystemIdHosp' // TODO: patientIdNumber
-        static final String patient_ide_col = 'PATIENT_SYSTEM_ID_HOSP_N21' // TODO: 'PATIENT_ID_NUMBER_N20'
+        static final int encounter_num_start = 2000000 // TODO: sync with TUMOR extract. build facts from CLOB?
+        static final String mrnItem = 'patientIdNumber'
+        static final String patient_ide_col = 'PATIENT_ID_NUMBER_N20'
         static final String patient_ide_expr = "trim(leading '0' from tr.${patient_ide_col})"
 
         final TableBuilder tb
@@ -478,12 +467,12 @@ class TumorFile {
         private final NAACCR_Extract extract_task
         private final I2B2Upload upload
 
-        NAACCR_Facts(DBConfig cdw, int upload_id, URL flat_file, String schema, String extract_table) {
-            final task_id = "upload_id_${upload_id}"  // TODO: transition from task_id to upload_id
-            tb = new TableBuilder(task_id: task_id, table_name: "OBSERVATION_FACT_${upload_id}")
+        NAACCR_Facts(DBConfig cdw, I2B2Upload upload, URL flat_file, String extract_table) {
+            final task_id = "upload_id_${upload.upload_id}"  // TODO: transition from task_id to upload_id
+            tb = new TableBuilder(task_id: task_id, table_name: "OBSERVATION_FACT_${upload.upload_id}")
             this.flat_file = flat_file
             this.cdw = cdw
-            this.upload = new I2B2Upload(schema, upload_id, sourcesystem_cd, patient_ide_source)
+            this.upload = upload
             extract_task = new NAACCR_Extract(cdw, task_id, [flat_file], extract_table)
         }
 
@@ -563,6 +552,7 @@ class TumorFile {
                     [name: "PATIENT_NUM", type: "int", null: false],
                     [name: "CONCEPT_CD", type: "VARCHAR(50)", null: false],
                     [name: "PROVIDER_ID", type: "VARCHAR(50)", null: false],
+                    // TODO: check timestamp vs. date re partition exchange; switch to create table as?
                     [name: "START_DATE", type: "timestamp", null: false],
                     [name: "MODIFIER_CD", type: "VARCHAR(100)", null: false],
                     [name: "INSTANCE_NUM", type: "int", null: false],
@@ -621,8 +611,8 @@ class TumorFile {
                 assert num == lf.naaccrItemNum
                 assert it.getString('naaccrId') == lf.name
             }
-            [num        : num, layout: lf,
-             valtype_cd : it.getString('valtype_cd')]
+            [num       : num, layout: lf,
+             valtype_cd: it.getString('valtype_cd')]
         }.findAll { it.layout != null && (include_phi || !(it.valtype_cd as String).contains('i')) }
 
         final patIdField = layout.getFieldByName(mrnItem)

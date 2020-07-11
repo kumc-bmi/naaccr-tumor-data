@@ -24,19 +24,18 @@ db.driver=org.h2.Driver
 db.url=jdbc:h2:file:/tmp/DB1;create=true
 
 naaccr.flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
-naaccr.extract-table: TUMOR
-naaccr.stats-table: NAACCR_STATS
+naaccr.tumor-table: TUMOR
 ```
 
 Then, to create the `TUMOR` table following draft PCORnet specifications:
 
 ```shell script
-$ java -jar build/libs/naaccr-tumor-data.jar discrete-data
-[main] INFO gpc.DBConfig - getting config from db.properties
+$ java -jar build/libs/naaccr-tumor-data.jar tumor-table
+INFO gpc.DBConfig - getting config from db.properties
 ...
-[main] INFO gpc.TumorFile - reading records from file:.../naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
+INFO all_naaccr.DAT: layout NAACCR 18 Incidence
 ...
-[main] INFO gpc.TumorFile - inserted 100 rows into TUMOR
+INFO inserted 100 records into TUMOR
 ```
 
 _Please excuse / ignore `WARNING: An illegal reflective access ...`;
@@ -51,27 +50,25 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 
 ```
 Usage:
-  naaccr-tumor-data load-files [--db=PF] NAACCR_FILE...
-  naaccr-tumor-data discrete-data [--db=PF] [--task-id=ID]
+  naaccr-tumor-data tumor-table [--db=PF] [--task-id=ID]
+  naaccr-tumor-data tumor-files [--db=PF] NAACCR_FILE...
+  naaccr-tumor-data facts    [--db=F] --upload-id=NNN [--mrn-src=S] [--obs-src=S]
   naaccr-tumor-data summary  [--db=F] [--task-id=ID]
-  naaccr-tumor-data tumors   [--db=F] [--task-id=ID]
-  naaccr-tumor-data facts    [--db=F] --upload-id=NNN
-  naaccr-tumor-data fields --file=F
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
-  naaccr-tumor-data load [--db=F]
   naaccr-tumor-data run SCRIPT [--db=F]
   naaccr-tumor-data query SQL [--db=F]
 
 Options:
-  load-records       load NAACCR records into a (CLOB) column of a DB table
-  discrete-data      split NAACCR records into a wide table of discrete data
-  tumors             build NAACCR_TUMORS table with key information about each tumor
+  tumor-table        load TUMOR table from flat file
+  --task-id=ID       version / completion marker [default: task123]
+  tumor-files        load NAACCR records into a (CLOB) column of a DB table
   facts              build OBSERVATION_FACT_NNN table
-  --upload-id=NNN    to fill in observation_fact.upload_id
+  --upload-id=NNN    to fill in observation_fact.upload_id [default: 1]
+  --mrn-src=S        patient_ide_source to look up MRNs [default: SMS@kumed.com]
+  --obs-src=S        sourcesystem_cd to give to facts [default: tumor_registry@kumed.com]
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
-  --task-id=ID       version / completion marker [default: task123]
   ontology           build NAACCR_ONTOLOGY table
   --table-name=T     ontology table name [default: NAACCR_ONTOLOGY]
   --version=NNN      ontology version [default: 180]
@@ -82,10 +79,8 @@ Options:
   TABLE              target table name
   DATA               CSV file
   META               W3C tabular data metadata (JSON)
-  load               load data from stdin using JSON (details TODO)
   run                run SQL script
   query              run SQL query and write results to stdout in JSON
-
 ```
 
 ---

@@ -14,7 +14,6 @@ import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import org.docopt.Docopt
-import org.junit.Ignore
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
@@ -45,14 +44,14 @@ class TumorFileTest extends TestCase {
     void testDocOpt() {
         final String doc = TumorFile.usage
         assert doc.startsWith('Usage:')
-        final args = ['tumors']
+        final args = ['tumor-table']
         final actual = new Docopt(doc).withExit(false).parse(args)
         assert actual['--db'] == 'db.properties'
-        assert actual['tumors'] == true
+        assert actual['tumor-table'] == true
         assert actual['facts'] == false
 
         final both = new Docopt(doc).withExit(false).parse(
-                ['tumors', '--task-id', 'abc123', '--db', 'deid.properties'])
+                ['tumor-table', '--task-id', 'abc123', '--db', 'deid.properties'])
         assert both['--db'] == 'deid.properties'
         assert both["--update-date"] == null
 
@@ -69,7 +68,7 @@ class TumorFileTest extends TestCase {
         assert cli.urlArg('--who-cache').toString().endsWith(',cache')
         assert cli.property("naaccr.records-table") == "T1"
 
-        final tfiles = new Docopt(doc).withExit(false).parse(['load-files', 'F1', 'F2', 'F3'])
+        final tfiles = new Docopt(doc).withExit(false).parse(['tumor-files', 'F1', 'F2', 'F3'])
         assert tfiles['NAACCR_FILE'] == ['F1', 'F2', 'F3']
     }
 
@@ -152,6 +151,26 @@ class TumorFileTest extends TestCase {
             assert claimed == 100
             final actual = sql.firstRow('select count(PRIMARY_SITE_N400) from TUMOR')[0]
             assert actual == claimed
+
+            final rs = sql.connection.metaData.getColumns(null, null, 'TUMOR', null)
+            def cols = []
+            while (rs.next()) {
+                cols << rs.getString('COLUMN_NAME')
+            }
+            assert cols.size() == 635
+
+            final pcf = TumorOnt.pcornet_fields.stringColumn('FIELD_NAME').asList()
+            assert pcf.size() == 640
+            // 10 fields are missing due to:
+            // WARN item not found in naaccr-18-incidence: 7320 PATH_DATE_SPEC_COLLECT1_N7320
+            assert pcf.minus(cols) == [
+                    'PATH_DATE_SPEC_COLLECT1_N7320', 'PATH_DATE_SPEC_COLLECT2_N7321', 'PATH_DATE_SPEC_COLLECT3_N7322',
+                    'PATH_DATE_SPEC_COLLECT4_N7323', 'PATH_DATE_SPEC_COLLECT5_N7324',
+                    'PATH_REPORT_TYPE1_N7480', 'PATH_REPORT_TYPE2_N7481', 'PATH_REPORT_TYPE3_N7482',
+                    'PATH_REPORT_TYPE4_N7483', 'PATH_REPORT_TYPE5_N7484'
+            ]
+            // 5 extra are present:
+            assert cols.minus(pcf) == ['SOURCE_CD', 'ENCOUNTER_NUM', 'PATIENT_NUM', 'TASK_ID', 'OBSERVATION_BLOB']
         }
     }
 
@@ -180,21 +199,6 @@ class TumorFileTest extends TestCase {
         out
     }
 
-    @Ignore
-    static class ToDo extends TestCase {
-        void testPatientsTask() {
-            final cdw = DBConfig.inMemoryDB("PT", true)
-            URL flat_file = Paths.get(testDataPath).toUri().toURL()
-            Task work = new TumorFile.NAACCR_Patients(cdw, "task123456", [flat_file], "TR_EX")
-            if (!work.complete()) {
-                work.run()
-            }
-
-            Table actual = cdw.withSql { Sql sql -> _SQL(sql, 'select * from NAACCR_PATIENTS limit 20') }
-            println(actual)
-            assert 1 == 0
-        }
-    }
 
     /*****
      * Date parsing. Ugh.
@@ -360,7 +364,9 @@ class TumorFileTest extends TestCase {
         Table pcornet_spec = TumorOnt.read_csv(TumorFileTest.getResource('tumor table.version1.2.csv')).select(
                 'NAACCR Item', 'FLAG', 'FIELD_NAME'
         )
+        assert pcornet_spec.rowCount() == 775
         pcornet_spec = pcornet_spec.where(pcornet_spec.stringColumn('FLAG').isNotEqualTo('PRIVATE'))
+        assert pcornet_spec.rowCount() == 775 - 109
 
         actual.column('FIELD_NAME').setName('name_test')
         Table items = pcornet_spec.joinOn('NAACCR Item').fullOuter(actual, 'naaccrNum')

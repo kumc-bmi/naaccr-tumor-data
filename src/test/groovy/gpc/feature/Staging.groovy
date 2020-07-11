@@ -14,11 +14,12 @@ import java.nio.file.Paths
 /**
  * CAUTION: ambient access to user.dir to write config file, DB.
  * TODO: use temp dir
+ * TODO: consider renaming Staging to something about PCORNet tumor table
  */
 @CompileStatic
 class Staging extends TestCase {
     void "test discrete data on 100 records of test data with local disk h2 DB"() {
-        def argv = ['discrete-data']
+        def argv = ['tumor-table']
         final cli = cli1(argv, System.getProperty('user.dir'))
 
         TumorFile.main(argv as String[])
@@ -35,7 +36,7 @@ class Staging extends TestCase {
     static final String v16_file = 'naaccr_xml_samples/valid_standard-file-1.txt'
 
     void "test a v16 flat file"() {
-        def argv = ['discrete-data']
+        def argv = ['tumor-table']
         final cli = cli1(argv, System.getProperty('user.dir'), v16_file)
 
         TumorFile.main(argv as String[])
@@ -47,20 +48,8 @@ class Staging extends TestCase {
         }
     }
 
-    @Ignore("TODO: stats test. depends on tumors? move to ETL?")
-    static class ToDo extends TestCase {
-        void "test stats on 100 records of test data with local disk h2 DB"() {
-            def argv = ['discrete-data', '--no-file']
-            cli1(argv, System.getProperty('user.dir'))
-
-            TumorFile.main(['load-records'] as String[])
-            TumorFile.main(['discrete-data', '--no-file'] as String[])
-            TumorFile.main(['summary', '--no-file'] as String[])
-        }
-    }
-
     void "test load multiple NAACCR files in a local disk h2 DB"() {
-        def argv = ['load-files', 'tmp1', 'tmp2']
+        def argv = ['tumor-files', 'tmp1', 'tmp2']
         final cli = cli1(argv, System.getProperty('user.dir'))
 
         ['tmp1', 'tmp2'].each { String n ->
@@ -81,14 +70,13 @@ class Staging extends TestCase {
         if (!flat_file) {
             flat_file = TumorFileTest.testDataPath
         }
-        ps.putAll(["db.url"              : "jdbc:h2:file:${userDir}/DB1;create=true".toString(),
-                   "db.driver"           : 'org.h2.Driver',
-                   "db.username"         : 'SA',
-                   "db.password"         : '',
-                   "naaccr.flat-file"    : flat_file,
-                   "naaccr.records-table": "NAACCR_RECORDS",
-                   "naaccr.extract-table": "NAACCR_DISCRETE",
-                   "naaccr.stats-table"  : "NAACCR_EXPORT_STATS",
+        ps.putAll(["db.url"            : "jdbc:h2:file:${userDir}/DB1;create=true".toString(),
+                   "db.driver"         : 'org.h2.Driver',
+                   "db.username"       : 'SA',
+                   "db.password"       : '',
+                   "naaccr.flat-file"  : flat_file,
+                   "naaccr.tumor-table": "NAACCR_DISCRETE",
+                   "naaccr.stats-table": "NAACCR_EXPORT_STATS",
         ])
         def cli = TumorFileTest.buildCLI(argv, ps)
         ps.store(new File(cli.arg("--db")).newWriter(), null)
