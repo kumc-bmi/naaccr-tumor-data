@@ -384,4 +384,14 @@ class TumorFileTest extends TestCase {
         def renamed = problems.where(problems.stringColumn('name_test').isNotIn(''))
         assert renamed.rowCount() == 23
     }
+
+    void "test loading layout for id data extraction"() {
+        final account = DBConfig.inMemoryDB("layout")
+        account.withSql {
+            final t1 = new TumorFile.LoadLayouts(account, "layout")
+            assert t1.complete() == false
+            t1.run()
+            assert t1.complete() == true
+        }
+    }
 }

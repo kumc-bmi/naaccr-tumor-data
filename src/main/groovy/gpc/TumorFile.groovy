@@ -19,6 +19,7 @@ import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
 import javax.annotation.Nullable
+import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -85,10 +86,14 @@ class TumorFile {
                     upload,
                     cli.urlProperty("naaccr.flat-file"),
                     cli.property("naaccr.tumor-table"))
+        } else if (cli.flag('load-layouts')) {
+            work = new LoadLayouts(cdw, cli.arg('--layout-table'))
         } else if (cli.flag('run') || cli.flag('query')) {
             Loader.run_cli(cli)
+            return
         } else {
             TumorOnt.run_cli(cli)
+            return
         }
 
         if (work && !work.complete()) {
@@ -366,12 +371,17 @@ class TumorFile {
      * @return true iff the table existed (and hence was dropped)
      */
     static boolean dropIfExists(Sql sql, String table_qname) {
+        if (tableExists(sql, table_qname)) {
+            sql.execute("drop table ${table_qname}" as String)
+        }
+    }
+
+    static boolean tableExists(Sql sql, String table_qname) {
         final parts = table_qname.split('\\.')
         String schema = parts.length == 2 ? parts[0].toUpperCase() : null
         String table_name = parts[-1].toUpperCase()
         final results = sql.connection.getMetaData().getTables(null, schema, table_name, null)
         if (results.next()) {
-            sql.execute("drop table ${table_qname}" as String)
             return true
         }
         return false
@@ -1023,6 +1033,122 @@ class TumorFile {
                 }
             }
             out
+        }
+    }
+
+
+    static class LoadLayouts implements DBConfig.Task {
+        final private DBConfig account
+        final String table_name
+
+        LoadLayouts(DBConfig account, String table_name) {
+            this.account = account
+            this.table_name = table_name
+        }
+
+        boolean complete() {
+            account.withSql { Sql sql ->
+                def fieldsPerVersion
+                try {
+                    fieldsPerVersion = sql.rows(
+                            "select layoutVersion, count(*) field_qty from ${table_name} group by layoutVersion".toString())
+                    log.info("load-layout complete? {}", fieldsPerVersion)
+                } catch (SQLException oops) {
+                    log.warn("failed to check layout records: {}", oops.toString())
+                    return false
+                }
+                (fieldsPerVersion.findAll { it.field_qty as int >= 100 }).size() >= 3
+            }
+        }
+
+        List<String> mapColumns(Closure<String> f) {
+            final pretty_long = 64
+            [
+                    [COLUMN_NAME: 'naaccrItemNum', DATA_TYPE: java.sql.Types.INTEGER],
+                    [COLUMN_NAME: 'section', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
+                    [COLUMN_NAME: 'name', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
+                    [COLUMN_NAME: 'longLabel', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
+                    [COLUMN_NAME: 'shortLabel', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
+                    [COLUMN_NAME: 'startPos', DATA_TYPE: java.sql.Types.INTEGER],
+                    [COLUMN_NAME: 'endPos', DATA_TYPE: java.sql.Types.INTEGER],
+                    [COLUMN_NAME: 'length', DATA_TYPE: java.sql.Types.INTEGER],
+                    [COLUMN_NAME: 'trim', DATA_TYPE: java.sql.Types.BOOLEAN],
+                    [COLUMN_NAME: 'padChar', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: 1],
+                    [COLUMN_NAME: 'align', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: 16], // actually enum: LEFT, ...
+                    [COLUMN_NAME: 'defaultValue', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
+                    // subFields?
+            ].collect { f(it.COLUMN_NAME, it.DATA_TYPE, it.COLUMN_SIZE) }
+        }
+
+        void run() {
+            final layouts = [
+                    LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_12) as FixedColumnsLayout,
+                    LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_14) as FixedColumnsLayout,
+                    LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_16) as FixedColumnsLayout,
+                    LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18) as FixedColumnsLayout,
+            ]
+            account.withSql { Sql sql ->
+                dropIfExists(sql, table_name)
+                sql.execute(ddl(sql))
+                final String stmt = """
+                    insert into ${table_name} (layoutVersion,
+                    ${mapColumns { String name, _t, _s -> name }.join(",\n  ")})
+                    values (?.layoutVersion, ${mapColumns { name, _t, _s -> "?.${name}".toString() }.join(",\n  ")})
+                """.trim()
+                log.info("layout insert: {}", stmt)
+                layouts.each { layout ->
+
+                    layout.allFields.each { field ->
+                        final Map params = [
+                                layoutVersion: layout.layoutVersion,
+                                naaccrItemNum: field.naaccrItemNum,
+                                section      : field.section,
+                                name         : field.name,
+                                longLabel    : field.longLabel,
+                                shortLabel   : field.shortLabel,
+                                startPos     : field.start,
+                                endPos       : field.end,
+                                length       : field.length,
+                                trim         : field.trim,
+                                padChar      : field.padChar,
+                                align        : field.align.toString(),
+                                defaultValue : field.defaultValue
+                        ]
+                        sql.executeInsert(params, stmt)
+                    }
+                }
+            }
+        }
+
+        Map<Integer, String> typeNames(Connection connection) {
+            final dbTypes = connection.metaData.getTypeInfo()
+            Map<Integer, String> toName = [:]
+            while (dbTypes.next()) {
+                // println([DATA_TYPE    : dbTypes.getInt('DATA_TYPE'),
+                //          TYPE_NAME    : dbTypes.getString('TYPE_NAME'),
+                //          CREATE_PARAMS: dbTypes.getString('CREATE_PARAMS')])
+                final ty = dbTypes.getInt('DATA_TYPE')
+                if (!toName.containsKey(ty)) {
+                    toName[ty] = dbTypes.getString('TYPE_NAME')
+                }
+            }
+            if (toName[java.sql.Types.BOOLEAN] == null) {
+                toName[java.sql.Types.BOOLEAN] = toName[java.sql.Types.INTEGER]
+            }
+            toName
+        }
+
+        String ddl(Sql sql) {
+            final toName = typeNames(sql.connection)
+            final colDefs = mapColumns { name, ty, size ->
+                "${name} ${toName[ty]}" + ({ s -> s != null ? "(${s})" : "" })(size)
+            }
+            """
+             create table ${table_name} (
+                layoutVersion ${toName[java.sql.Types.VARCHAR]}(3),
+                ${colDefs.join(",\n  ")}
+            )
+            """.trim()
         }
     }
 }

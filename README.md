@@ -52,6 +52,7 @@ _The `naaccr-tumor-data` command is short for `java -jar naaccr-tumor-data.jar`.
 Usage:
   naaccr-tumor-data tumor-table [--db=PF] [--task-id=ID]
   naaccr-tumor-data tumor-files [--db=PF] NAACCR_FILE...
+  naaccr-tumor-data load-layouts [--db=PF] [--layout-table=T]
   naaccr-tumor-data facts    [--db=F] --upload-id=NNN [--mrn-src=S] [--obs-src=S]
   naaccr-tumor-data summary  [--db=F] [--task-id=ID]
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
@@ -63,6 +64,8 @@ Options:
   tumor-table        load TUMOR table from flat file
   --task-id=ID       version / completion marker [default: task123]
   tumor-files        load NAACCR records into a (CLOB) column of a DB table
+  load-layouts       load NAACCR layout data
+  --layout-table=T   where to load layout data [default: LAYOUT]
   facts              build OBSERVATION_FACT_NNN table
   --upload-id=NNN    to fill in observation_fact.upload_id [default: 1]
   --mrn-src=S        patient_ide_source to look up MRNs [default: SMS@kumed.com]

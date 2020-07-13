@@ -64,6 +64,17 @@ class Staging extends TestCase {
         }
     }
 
+    void "test load layouts"() {
+        def argv = ['load-layouts']
+        final cli = cli1(argv, System.getProperty('user.dir'))
+
+        TumorFile.main(argv as String[])
+        cli.account().withSql { Sql sql ->
+            final qty = sql.firstRow("select count(*) from LAYOUT")[0]
+            assert qty > 300
+        }
+    }
+
     static DBConfig.CLI cli1(List<String> argv, String userDir,
                              String flat_file = null) {
         Properties ps = new Properties()
