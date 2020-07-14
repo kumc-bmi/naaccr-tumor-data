@@ -70,7 +70,7 @@ class Staging extends TestCase {
 
         TumorFile.main(argv as String[])
         cli.account().withSql { Sql sql ->
-            final qty = sql.firstRow("select count(*) from LAYOUT")[0]
+            final qty = sql.firstRow("select count(*) from LAYOUT")[0] as Integer
             assert qty > 300
         }
     }

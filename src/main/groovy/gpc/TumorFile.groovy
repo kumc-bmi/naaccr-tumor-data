@@ -9,6 +9,7 @@ import com.imsweb.naaccrxml.entity.Item
 import com.imsweb.naaccrxml.entity.Patient
 import com.imsweb.naaccrxml.entity.Tumor
 import gpc.DBConfig.Task
+import gpc.DBConfig.ColumnMeta
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
@@ -19,10 +20,10 @@ import tech.tablesaw.columns.Column
 import tech.tablesaw.columns.strings.StringFilters
 
 import javax.annotation.Nullable
-import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.SQLException
+import java.sql.Types
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -223,7 +224,7 @@ class TumorFile {
                 flat_files.eachWithIndex { flat_file, ix ->
                     final create = ix == 0
                     final update = ix == flat_files.size() - 1
-                    encounter_num = TumorFile.NAACCR_Extract.loadFlatFile(
+                    encounter_num = loadFlatFile(
                             sql, new File(flat_file.path), tb.table_name, tb.task_id, fields,
                             encounter_num, create, update)
                 }
@@ -233,30 +234,22 @@ class TumorFile {
         static int loadFlatFile(Sql sql, File flat_file, String table_name, String task_id, Table fields,
                                 int encounter_num = 0,
                                 boolean create = true, boolean update = true,
-                                String varchar = "VARCHAR2", int batchSize = 64) {
-            // TODO: look up "VARCHAR2" using getTypeInfo
-            // https://docs.oracle.com/javase/7/docs/api/java/sql/DatabaseMetaData.html#getTypeInfo()
+                                int batchSize = 64) {
             FixedColumnsLayout layout = theLayout(flat_file)
             final source_cd = flat_file.name
 
-            final colInfo = columnInfo(fields, layout, varchar)
-            String ddl = """
-            create table ${table_name} (
-              source_cd varchar(50),
-              encounter_num int,
-              patient_num int,
-              task_id ${varchar}(1024),
-              ${colInfo.collect { it.colDef }.join(",\n  ")},
-              observation_blob clob
-            )
-            """
+            final colInfo = columnInfo(fields, layout)
+            final cols = [
+                    new ColumnMeta(name: "source_cd", size: 50),
+                    new ColumnMeta(name: "encounter_num", dataType: Types.INTEGER),
+                    new ColumnMeta(name: "patient_num", dataType: Types.INTEGER),
+                    new ColumnMeta(name: "task_id", size: 1024),
+            ] + colInfo.collect { it.v2 } + [
+                    new ColumnMeta(name: "observation_blob", dataType: Types.CLOB),
+            ]
+            String ddl = ColumnMeta.createStatement(table_name, cols, ColumnMeta.typeNames(sql.connection))
+            String dml = ColumnMeta.insertStatement(table_name, cols)
 
-            String dml = """
-            insert into ${table_name} (
-              source_cd, encounter_num, observation_blob,
-              ${colInfo.collect { it.name }.join(',\n  ')})
-            values (:source_cd, :encounter_num, :observation_blob, ${colInfo.collect { it.param }.join('\n,  ')})
-            """
             flat_file.withInputStream { InputStream naaccr_text_lines ->
                 if (create) {
                     sql.execute(ddl)
@@ -287,11 +280,11 @@ class TumorFile {
             encounter_num
         }
 
-        static Map<String, Object> fixedRecord(List<Map> colInfo, String line) {
+        static Map<String, Object> fixedRecord(List<Tuple2<Integer, ColumnMeta>> colInfo, String line) {
             colInfo.collect {
-                final start = it.start as int - 1
-                final length = it.length as int
-                [it.name, line.substring(start, start + length).trim()]
+                final start = it.v1 - 1
+                final length = it.v2.size
+                [it.v2.name, line.substring(start, start + length).trim()]
             }.findAll { (it[1] as String) > '' }.collectEntries { it }
         }
 
@@ -307,7 +300,7 @@ class TumorFile {
             layout
         }
 
-        static List<Map> columnInfo(Table fields, FixedColumnsLayout layout, String varchar) {
+        static List<Tuple2<Integer, ColumnMeta>> columnInfo(Table fields, FixedColumnsLayout layout) {
             fields.collect {
                 final num = it.getInt("item")
                 final name = it.getString("FIELD_NAME")
@@ -320,14 +313,8 @@ class TumorFile {
                 it.item != null
             }.collect {
                 final item = it.item as FixedColumnsField
-                [
-                        name  : it.name,
-                        start : item.start,
-                        length: item.length,
-                        colDef: "${it.name} ${varchar}(${item.length}) ",
-                        param : ":${it.name}",
-                ]
-            } as List<Map>
+                new Tuple2(item.start, new ColumnMeta(name: it.name, size: item.length))
+            }
         }
 
         def <V> V withRecords(Closure<V> thunk) {
@@ -374,6 +361,7 @@ class TumorFile {
         if (tableExists(sql, table_qname)) {
             sql.execute("drop table ${table_qname}" as String)
         }
+        return false
     }
 
     static boolean tableExists(Sql sql, String table_qname) {
@@ -553,40 +541,30 @@ class TumorFile {
             (schema == null ? '' : (schema + '.')) + object_name
         }
 
-        static private String colDefs
-        static private String colNames
-        static private String params
-        static {
-            final obs_cols = [
-                    [name: "ENCOUNTER_NUM", type: "int", null: false],
-                    [name: "PATIENT_NUM", type: "int", null: false],
-                    [name: "CONCEPT_CD", type: "VARCHAR(50)", null: false],
-                    [name: "PROVIDER_ID", type: "VARCHAR(50)", null: false],
-                    // TODO: check timestamp vs. date re partition exchange; switch to create table as?
-                    [name: "START_DATE", type: "timestamp", null: false],
-                    [name: "MODIFIER_CD", type: "VARCHAR(100)", null: false],
-                    [name: "INSTANCE_NUM", type: "int", null: false],
-                    [name: "VALTYPE_CD", type: "VARCHAR(50)"],
-                    [name: "TVAL_CHAR", type: "VARCHAR(4000)"],
-                    [name: "NVAL_NUM", type: "float"],
-                    [name: "END_DATE", type: "timestamp"],
-                    [name: "UPDATE_DATE", type: "timestamp"],
-                    [name: "DOWNLOAD_DATE", type: "timestamp"],
-                    [name: "IMPORT_DATE", type: "timestamp"],
-                    [name: "SOURCESYSTEM_CD", type: "VARCHAR(50)"],
-                    [name: "UPLOAD_ID", type: "int"],
-            ]
-            colDefs = obs_cols.collect { "${it.name} ${it.type} ${it.null == false ? "not null" : ""}" }.join(",\n  ")
-            colNames = obs_cols.collect { it.name }.join(",\n  ")
-            params = obs_cols.collect {
-                it.name == 'IMPORT_DATE' ? 'current_timestamp' : "?.${it.name}".toLowerCase()
-            }.join(",\n  ")
-        }
+        static final List<ColumnMeta> obs_cols = [
+                new ColumnMeta(name: "ENCOUNTER_NUM", dataType: Types.INTEGER, nullable: false),
+                new ColumnMeta(name: "PATIENT_NUM", dataType: Types.INTEGER, nullable: false),
+                new ColumnMeta(name: "CONCEPT_CD", size: 50, nullable: false),
+                new ColumnMeta(name: "PROVIDER_ID", size: 50, nullable: false),
+                // TODO: check timestamp vs. date re partition exchange; switch to create table as?
+                new ColumnMeta(name: "START_DATE", dataType: Types.TIMESTAMP, nullable: false),
+                new ColumnMeta(name: "MODIFIER_CD", size: 100, nullable: false),
+                new ColumnMeta(name: "INSTANCE_NUM", dataType: Types.INTEGER, nullable: false),
+                new ColumnMeta(name: "VALTYPE_CD", size: 50),
+                new ColumnMeta(name: "TVAL_CHAR", size: 4000),
+                new ColumnMeta(name: "NVAL_NUM", dataType: Types.FLOAT),
+                new ColumnMeta(name: "END_DATE", dataType: Types.TIMESTAMP),
+                new ColumnMeta(name: "UPDATE_DATE", dataType: Types.TIMESTAMP),
+                new ColumnMeta(name: "DOWNLOAD_DATE", dataType: Types.TIMESTAMP),
+                new ColumnMeta(name: "IMPORT_DATE", dataType: Types.TIMESTAMP),
+                new ColumnMeta(name: "SOURCESYSTEM_CD", size: 50),
+                new ColumnMeta(name: "UPLOAD_ID", dataType: Types.INTEGER),
+        ]
 
-        String getFactTableDDL() {
+        String getFactTableDDL(Map<Integer, String> toName) {
             """
             create table ${factTable} (
-                ${colDefs},
+                ${obs_cols.collect { it.ddl(toName)}.join(",\n  ")},
                 primary key (
                     ENCOUNTER_NUM, CONCEPT_CD, PROVIDER_ID, START_DATE, MODIFIER_CD, INSTANCE_NUM)
             )
@@ -595,14 +573,13 @@ class TumorFile {
 
         String getInsertStatement() {
             """
-            insert into ${getFactTable()} (
-                ${colNames}
-            ) values (
-                ${params}
-            )
-            """
+            insert into ${factTable} (
+            ${obs_cols.collect { it.name }.join(",\n  ")})
+            values (${obs_cols.collect {
+                it.name == 'IMPORT_DATE' ? 'current_timestamp' : "?.${it.name}".toLowerCase()
+            }.join(",\n  ")})
+            """.trim()
         }
-
         static final not_null = '@'
     }
 
@@ -612,7 +589,7 @@ class TumorFile {
                               boolean include_phi = false) {
         log.info("fact DML: {}", upload.insertStatement)
 
-        final layout = TumorFile.NAACCR_Extract.theLayout(flat_file)
+        final layout = NAACCR_Extract.theLayout(flat_file)
 
         final itemInfo = TumorOnt.NAACCR_I2B2.tumor_item_type.iterator().collect {
             final num = it.getInt('naaccrNum')
@@ -633,7 +610,7 @@ class TumorFile {
         ].collect { layout.getFieldByName(it) }
 
         dropIfExists(sql, upload.factTable)
-        sql.execute(upload.factTableDDL)
+        sql.execute(upload.getFactTableDDL(ColumnMeta.typeNames(sql.connection)))
         sql.withBatch(256, upload.insertStatement) { ps ->
             int fact_qty = 0
             new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
@@ -645,7 +622,7 @@ class TumorFile {
                 }
                 final patient_num = toPatientNum[patientId]
                 Map<String, LocalDate> dates = dateFields.collectEntries { FixedColumnsField dtf ->
-                    [dtf.name, TumorFile.parseDate(fieldValue(dtf, line))]
+                    [dtf.name, parseDate(fieldValue(dtf, line))]
                 }
                 if (dates.dateOfDiagnosis == null) {
                     log.info('tumor {} patient {}: cannot parse dateOfDiagnosis: {}',
@@ -696,7 +673,7 @@ class TumorFile {
                 // "blank" date value
                 return null
             }
-            start_date = TumorFile.parseDate(value)
+            start_date = parseDate(value)
             if (start_date == null) {
                 log.warn('tumor {} patient {}: cannot parse {}: [{}]',
                         encounter_num, patient_num, fixed.name, value)
@@ -713,8 +690,8 @@ class TumorFile {
             try {
                 num = Double.parseDouble(value)
             } catch (badNum) {
-                log.warn('tumor {} patient {}: cannot parse number {}: [{}]',
-                        encounter_num, patient_num, fixed.name, value)
+                log.warn('tumor {} patient {}: cannot parse number {}: [{}] {}',
+                        encounter_num, patient_num, fixed.name, value, badNum.toString())
                 return null
             }
         }
@@ -1037,7 +1014,7 @@ class TumorFile {
     }
 
 
-    static class LoadLayouts implements DBConfig.Task {
+    static class LoadLayouts implements Task {
         final private DBConfig account
         final String table_name
 
@@ -1061,23 +1038,24 @@ class TumorFile {
             }
         }
 
-        List<String> mapColumns(Closure<String> f) {
+        static List<ColumnMeta> columns() {
             final pretty_long = 64
             [
-                    [COLUMN_NAME: 'naaccrItemNum', DATA_TYPE: java.sql.Types.INTEGER],
-                    [COLUMN_NAME: 'section', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
-                    [COLUMN_NAME: 'name', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
-                    [COLUMN_NAME: 'longLabel', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
-                    [COLUMN_NAME: 'shortLabel', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
-                    [COLUMN_NAME: 'startPos', DATA_TYPE: java.sql.Types.INTEGER],
-                    [COLUMN_NAME: 'endPos', DATA_TYPE: java.sql.Types.INTEGER],
-                    [COLUMN_NAME: 'length', DATA_TYPE: java.sql.Types.INTEGER],
-                    [COLUMN_NAME: 'trim', DATA_TYPE: java.sql.Types.BOOLEAN],
-                    [COLUMN_NAME: 'padChar', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: 1],
-                    [COLUMN_NAME: 'align', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: 16], // actually enum: LEFT, ...
-                    [COLUMN_NAME: 'defaultValue', DATA_TYPE: java.sql.Types.VARCHAR, COLUMN_SIZE: pretty_long],
+                    new ColumnMeta(name: 'layoutVersion', size: 3),
+                    new ColumnMeta(name: 'naaccrItemNum', dataType: Types.INTEGER),
+                    new ColumnMeta(name: 'section', size: pretty_long),
+                    new ColumnMeta(name: 'name', size: pretty_long),
+                    new ColumnMeta(name: 'longLabel', size: pretty_long),
+                    new ColumnMeta(name: 'shortLabel', size: pretty_long),
+                    new ColumnMeta(name: 'startPos', dataType: Types.INTEGER),
+                    new ColumnMeta(name: 'endPos', dataType: Types.INTEGER),
+                    new ColumnMeta(name: 'length', dataType: Types.INTEGER),
+                    new ColumnMeta(name: 'trim', dataType: Types.BOOLEAN),
+                    new ColumnMeta(name: 'padChar', size: 1),
+                    new ColumnMeta(name: 'align', size: 16), // actually enum: LEFT, ...
+                    new ColumnMeta(name: 'defaultValue', size: pretty_long),
                     // subFields?
-            ].collect { f(it.COLUMN_NAME, it.DATA_TYPE, it.COLUMN_SIZE) }
+            ]
         }
 
         void run() {
@@ -1089,12 +1067,8 @@ class TumorFile {
             ]
             account.withSql { Sql sql ->
                 dropIfExists(sql, table_name)
-                sql.execute(ddl(sql))
-                final String stmt = """
-                    insert into ${table_name} (layoutVersion,
-                    ${mapColumns { String name, _t, _s -> name }.join(",\n  ")})
-                    values (?.layoutVersion, ${mapColumns { name, _t, _s -> "?.${name}".toString() }.join(",\n  ")})
-                """.trim()
+                sql.execute(ColumnMeta.createStatement(table_name, columns(), ColumnMeta.typeNames(sql.connection)))
+                final String stmt = ColumnMeta.insertStatement(table_name, columns())
                 log.info("layout insert: {}", stmt)
                 layouts.each { layout ->
 
@@ -1118,37 +1092,6 @@ class TumorFile {
                     }
                 }
             }
-        }
-
-        Map<Integer, String> typeNames(Connection connection) {
-            final dbTypes = connection.metaData.getTypeInfo()
-            Map<Integer, String> toName = [:]
-            while (dbTypes.next()) {
-                // println([DATA_TYPE    : dbTypes.getInt('DATA_TYPE'),
-                //          TYPE_NAME    : dbTypes.getString('TYPE_NAME'),
-                //          CREATE_PARAMS: dbTypes.getString('CREATE_PARAMS')])
-                final ty = dbTypes.getInt('DATA_TYPE')
-                if (!toName.containsKey(ty)) {
-                    toName[ty] = dbTypes.getString('TYPE_NAME')
-                }
-            }
-            if (toName[java.sql.Types.BOOLEAN] == null) {
-                toName[java.sql.Types.BOOLEAN] = toName[java.sql.Types.INTEGER]
-            }
-            toName
-        }
-
-        String ddl(Sql sql) {
-            final toName = typeNames(sql.connection)
-            final colDefs = mapColumns { name, ty, size ->
-                "${name} ${toName[ty]}" + ({ s -> s != null ? "(${s})" : "" })(size)
-            }
-            """
-             create table ${table_name} (
-                layoutVersion ${toName[java.sql.Types.VARCHAR]}(3),
-                ${colDefs.join(",\n  ")}
-            )
-            """.trim()
         }
     }
 }
