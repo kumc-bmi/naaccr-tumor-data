@@ -8,7 +8,7 @@ import groovy.util.logging.Slf4j
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
-import java.text.SimpleDateFormat
+import java.sql.Types
 
 @CompileStatic
 @Slf4j
@@ -71,40 +71,16 @@ class DBConfig {
         it
     }
 
-    @Deprecated
-    static parseDateExInstall(Sql sql) {
-        Class.forName("gpc.DBConfig")
-        sql.execute("create alias if not exists parseDateEx for \"gpc.DBConfig.parseDateEx\" ")
-    }
-
-    @Deprecated
-    static java.sql.Date parseDateEx(String text, String formatString) {
-        SimpleDateFormat std
-        Date dt = null
-        try {
-            final fmt = new SimpleDateFormat(formatString)
-            std = new SimpleDateFormat('yyyy-MM-dd')
-            dt = fmt.parse(text)
-            String iso = std.format(dt)
-            return java.sql.Date.valueOf(iso)
-        } catch (Exception oops) {
-            if (text.replace("9", "") != "") {
-                log.warn("bad date: $text $oops")
-            }
-            return null
-        }
-    }
-
     @Immutable
     static class ColumnMeta {
         final String name
-        final Integer dataType = java.sql.Types.VARCHAR
+        final Integer dataType = Types.VARCHAR
         final Integer size = null
-        final Boolean nullable = null
+        final Boolean nullable = true
 
         String ddl(Map<Integer, String> toName) {
             final sizePart = size != null ? "(${size})" : ""
-            final nullPart = nullable == false ? " not null" : ""
+            final nullPart = !nullable ? " not null" : ""
             "${name} ${toName[dataType]}${sizePart} ${nullPart}"
         }
 
@@ -141,8 +117,8 @@ class DBConfig {
                     toName[ty] = dbTypes.getString('TYPE_NAME')
                 }
             }
-            if (toName[java.sql.Types.BOOLEAN] == null) {
-                toName[java.sql.Types.BOOLEAN] = toName[java.sql.Types.INTEGER]
+            if (toName[Types.BOOLEAN] == null) {
+                toName[Types.BOOLEAN] = toName[Types.INTEGER]
             }
             toName
         }
@@ -179,7 +155,10 @@ class DBConfig {
             opts[target]
         }
 
-        private URI cwd() {
+        /**
+         * CAUTION: ambient access to user.dir
+         */
+        private static URI cwd() {
             new File(System.getProperty('user.dir')).toURI()
         }
 

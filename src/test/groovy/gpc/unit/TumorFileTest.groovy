@@ -6,19 +6,14 @@ import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import gpc.DBConfig
 import gpc.DBConfig.Task
 import gpc.TumorFile
-import gpc.TumorFile.DataSummary
-import gpc.TumorFile.TumorKeys
 import gpc.TumorOnt
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import org.docopt.Docopt
-import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
-import tech.tablesaw.columns.dates.DateFilters
-import tech.tablesaw.columns.strings.StringFilters
 
 import java.nio.file.Paths
 import java.sql.DriverManager
@@ -32,7 +27,7 @@ class TumorFileTest extends TestCase {
     /**
      * CAUTION: Ambient access to DB Connection
      */
-    public static DBConfig.CLI buildCLI(List<String> args, Properties config) {
+    static DBConfig.CLI buildCLI(List<String> args, Properties config) {
         final String doc = TumorFile.usage
         new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
                 { String name -> config },
@@ -73,22 +68,6 @@ class TumorFileTest extends TestCase {
     }
 
 
-    void testPatients() {
-        new File(testDataPath).withReader { reader ->
-            Table patientData = TumorKeys.patients(reader)
-
-            // got expected columns?
-            assert patientData.columnNames() == TumorKeys.pat_attrs + TumorKeys.report_attrs
-
-            // count patient records. Note: 6 tumors were on existing patients
-            assert patientData.rowCount() == 94
-            // just as many patientIdNumber values, right?
-            assert patientData.select('patientIdNumber').dropDuplicateRows().rowCount() == 94
-            println(patientData.first(5))
-        }
-    }
-
-
     static void mockPatientMapping(Sql sql, String patient_ide_source,
                                    int qty = 100) {
         sql.execute("""
@@ -117,9 +96,9 @@ class TumorFileTest extends TestCase {
         )
 
         cdw.withSql { sql ->
-            assert extract.complete() == false
+            assert !extract.complete()
             extract.run()
-            assert extract.complete() == true
+            assert extract.complete()
         }
     }
 
@@ -163,40 +142,15 @@ class TumorFileTest extends TestCase {
             assert pcf.size() == 640
             // 10 fields are missing due to:
             // WARN item not found in naaccr-18-incidence: 7320 PATH_DATE_SPEC_COLLECT1_N7320
-            assert pcf.minus(cols) == [
+            assert pcf - cols == [
                     'PATH_DATE_SPEC_COLLECT1_N7320', 'PATH_DATE_SPEC_COLLECT2_N7321', 'PATH_DATE_SPEC_COLLECT3_N7322',
                     'PATH_DATE_SPEC_COLLECT4_N7323', 'PATH_DATE_SPEC_COLLECT5_N7324',
                     'PATH_REPORT_TYPE1_N7480', 'PATH_REPORT_TYPE2_N7481', 'PATH_REPORT_TYPE3_N7482',
                     'PATH_REPORT_TYPE4_N7483', 'PATH_REPORT_TYPE5_N7484'
             ]
             // 5 extra are present:
-            assert cols.minus(pcf) == ['SOURCE_CD', 'ENCOUNTER_NUM', 'PATIENT_NUM', 'TASK_ID', 'OBSERVATION_BLOB']
+            assert cols - pcf == ['SOURCE_CD', 'ENCOUNTER_NUM', 'PATIENT_NUM', 'TASK_ID', 'OBSERVATION_BLOB']
         }
-    }
-
-
-    static final Table _extract() {
-        new File(testDataPath).withReader { naaccr_text_lines ->
-            // log.info("tr_file: ${testDataPath}")
-            Table result = null
-            TumorFile.read_fwf(naaccr_text_lines) { Table chunk ->
-                if (result == null) {
-                    result = chunk
-                } else {
-                    result = result.append(chunk)
-                }
-                return
-            }
-            result
-        }
-    }
-
-    static Table _SQL(Sql sql, String query, int limit = 100) {
-        Table out = null
-        sql.query(query) { results ->
-            out = Table.read().db(results).first(limit)
-        }
-        out
     }
 
 
@@ -217,10 +171,7 @@ class TumorFileTest extends TestCase {
      In Date of Last Contact, we've also seen 19919999
      */
     void testDates() {
-        def actual = TumorFile.naaccr_date_col(date_cases.stringColumn('text'))
-        assert date_cases_ymd == actual.asList()
-
-        actual = date_cases.stringColumn('text').iterator().collect { String it -> TumorFile.parseDate(it) }
+        final actual = date_cases.stringColumn('text').iterator().collect { String it -> TumorFile.parseDate(it) }
         assert date_cases_ymd == actual
     }
 
@@ -233,69 +184,12 @@ class TumorFileTest extends TestCase {
                 it.getInt('day'))
     }
 
-    void testDatesInH2() {
-        DBConfig acct1 = DBConfig.inMemoryDB("dates", true)
-        acct1.withSql { Sql sql ->
-            TumorOnt.load_data_frame(sql, "date_cases", date_cases)
-            DBConfig.parseDateExInstall(sql)
-            final actual = sql.rows("""
-                 select parseDateEx(substring(concat(text, '0101'), 1, 8), 'yyyyMMdd') as date_value
-                 from date_cases
-                  """ as String).collect { it.date_value.toString() }
-            // H2 parses 19709999 as 1978-06-07; we'll let that slide
-            assert actual.take(4) == date_cases_ymd.collect { it == null ? null : it.toString() }.take(4)
-        }
-    }
-
-    void testItemDates() {
-        Table actual = TumorFile.naaccr_dates(
-                _extract().select('dateOfDiagnosis', 'dateOfLastContact'),
-                ['dateOfDiagnosis', 'dateOfLastContact'],
-                true).first(10)
-        println(actual)
-        assert actual.where((actual.dateColumn('dateOfDiagnosis') as DateFilters).isMissing()).rowCount() == 0
-    }
-
-    void testObsRaw() {
-        final _extract = _extract()
-        Table _ty = TumorOnt.NAACCR_I2B2.tumor_item_type
-        Table _raw_obs = DataSummary.stack_obs(_extract, _ty, TumorKeys.key4 + TumorKeys.dtcols)
-        _raw_obs = TumorFile.naaccr_dates(_raw_obs, TumorKeys.dtcols)
-
-        assert _raw_obs.columnNames() == [
-                'recordId', 'patientSystemIdHosp', 'tumorRecordNumber', 'patientIdNumber', 'abstractedBy',
-                'dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact', 'dateCaseCompleted', 'dateCaseLastChanged',
-                'naaccrId', 'value']
-        assert _raw_obs.intColumn('recordId').countUnique() == _extract.rowCount()
-        assert _raw_obs.stringColumn('naaccrId').countUnique() > 100
-        // at least 1 in 20 fields populated
-        assert _raw_obs.rowCount() >= _ty.rowCount() * _extract.rowCount() / 20
-    }
-
-    void testItemObs() {
-        DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
-            final Table actual = TumorFile.ItemObs.make(memdb, _extract())
-            assert actual.columnNames() == [
-                    'RECORDID', 'PATIENTIDNUMBER', 'NAACCRID', 'NAACCRNUM', 'DATEOFDIAGNOSIS',
-                    'CONCEPT_CD', 'PROVIDER_ID', 'START_DATE', 'MODIFIER_CD', 'INSTANCE_NUM',
-                    'VALTYPE_CD', 'TVAL_CHAR', 'NVAL_NUM', 'VALUEFLAG_CD', 'UNITS_CD',
-                    'END_DATE', 'LOCATION_CD', 'UPDATE_DATE']
-            assert actual.columnTypes() as List == [
-                    ColumnType.INTEGER, ColumnType.STRING, ColumnType.STRING, ColumnType.INTEGER, ColumnType.LOCAL_DATE,
-                    ColumnType.STRING, ColumnType.STRING, ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.INTEGER,
-                    ColumnType.STRING, ColumnType.STRING, ColumnType.DOUBLE, ColumnType.STRING, ColumnType.STRING,
-                    ColumnType.LOCAL_DATE, ColumnType.STRING, ColumnType.LOCAL_DATE]
-            assert actual.rowCount() >= 300
-            assert actual.where((actual.stringColumn('CONCEPT_CD') as StringFilters).isMissing()).rowCount() == 0
-        }
-    }
-
     void "test i2b2 fact table"() {
-        final patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+        final patient_ide_source = 'SMS@kumed.com'
         final sourcesystem_cd = 'my-naaccr-file'
         final upload_id = 123456 // TODO: transition from task_id to upload_id?
         final flat_file = new File(testDataPath)
-        final mrnItem = 'patientIdNumber' // TODO: hospital id number
+        final mrnItem = 'patientIdNumber' // TODO: 2300 MRN
         String schema = null
 
         DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
@@ -318,8 +212,8 @@ class TumorFileTest extends TestCase {
                      , count(distinct nval_num) numbers
                 from ${upload.factTable}
             """ as String)
-            assert actual == ['RECORDS': 6711, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 552,
-                              'DATES'  : 188, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 18]
+            assert actual as Map == ['RECORDS': 6711, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 552,
+                                     'DATES'  : 188, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 18]
             assert enc == 2100
         }
     }
@@ -328,7 +222,7 @@ class TumorFileTest extends TestCase {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final task_id = "task123"
         URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        final patient_ide_source = 'SMS@kumed.com' // TODO: configurable patient_ide_source?
+        final patient_ide_source = 'SMS@kumed.com'
         final patient_ide_col = 'PATIENT_ID_NUMBER_N20'
         final patient_ide_expr = "trim(leading '0' from tr.${patient_ide_col})"
         final extract_table = "NAACCR_DISCRETE"
@@ -389,9 +283,9 @@ class TumorFileTest extends TestCase {
         final account = DBConfig.inMemoryDB("layout")
         account.withSql {
             final t1 = new TumorFile.LoadLayouts(account, "layout")
-            assert t1.complete() == false
+            assert !t1.complete()
             t1.run()
-            assert t1.complete() == true
+            assert t1.complete()
         }
     }
 }

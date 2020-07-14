@@ -7,9 +7,6 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import org.junit.Ignore
-import tech.tablesaw.api.Table
-
-import java.nio.file.Paths
 
 /**
  * CAUTION: ambient access to user.dir to write config file, DB.
@@ -110,34 +107,6 @@ class Staging extends TestCase {
 
         void "test that tumor table has patid varchar column"() {
 
-        }
-
-        void "test stats on 100 records of test data with local disk h2 DB"() {
-            def argv = ['discrete-data', '--no-file']
-            cli1(argv, System.getProperty('user.dir'))
-
-            TumorFile.main(['load-records'] as String[])
-            TumorFile.main(['discrete-data', '--no-file'] as String[])
-            TumorFile.main(['summary', '--no-file'] as String[])
-        }
-
-        @Ignore("testStatsFromDB: requires live Oracle connection")
-        void testStatsFromDB() {
-            final cdw = DBConfig.inMemoryDB("TR", true)
-            final String extract_table = "TR_DATA"
-            final String stats_table = "TR_STATS"
-
-            int cksum = -1
-            cdw.withSql() { Sql sql ->
-                DBConfig.Task work = new TumorFile.NAACCR_Summary(cdw, "task123",
-                        [Paths.get(TumorFileTest.testDataPath).toUri().toURL()], extract_table, stats_table)
-                work.run()
-                sql.query("select * from ${stats_table}" as String) { results ->
-                    Table stats = Table.read().db(results, "stats")
-                    cksum = stats.longColumn('TUMOR_QTY').countUnique()
-                }
-            }
-            assert cksum == 3
         }
     }
 }
