@@ -8,25 +8,29 @@ import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import org.junit.Ignore
 
+import java.nio.file.Files
+import java.nio.file.Path
+
 /**
- * CAUTION: ambient access to user.dir to write config file, DB.
- * TODO: use temp dir
+ * CAUTION: ambient access to temp dir to write config file, DB.
  * TODO: consider renaming Staging to something about PCORNet tumor table
  */
 @CompileStatic
 class Staging extends TestCase {
     void "test discrete data on 100 records of test data with local disk h2 DB"() {
         def argv = ['tumor-table']
-        final cli = cli1(argv, System.getProperty('user.dir'))
+        withTempDir('db1') { dbDir ->
+            final cli = cli1(argv, dbDir.toString())
 
-        TumorFile.main(argv as String[])
-        cli.account().withSql { Sql sql ->
-            final qty = sql.firstRow("select count(distinct PRIMARY_SITE_N400) from NAACCR_DISCRETE")[0]
-            assert qty == 50
-            final txt = sql.firstRow("select distinct task_id from naaccr_discrete")[0]
-            assert txt == 'task123'
-            final v = sql.firstRow("select distinct naaccr_record_version_n50 from naaccr_discrete")[0]
-            assert v == '180'
+            TumorFile.main(argv as String[])
+            cli.account().withSql { Sql sql ->
+                final qty = sql.firstRow("select count(distinct PRIMARY_SITE_N400) from TUMOR")[0]
+                assert qty == 50
+                final txt = sql.firstRow("select distinct task_id from TUMOR")[0]
+                assert txt == 'task123'
+                final v = sql.firstRow("select distinct naaccr_record_version_n50 from TUMOR")[0]
+                assert v == '180'
+            }
         }
     }
 
@@ -34,41 +38,42 @@ class Staging extends TestCase {
 
     void "test a v16 flat file"() {
         def argv = ['tumor-table']
-        final cli = cli1(argv, System.getProperty('user.dir'), v16_file)
+        withTempDir('db1') { dbDir ->
+            final cli = cli1(argv, dbDir.toString(), v16_file)
 
-        TumorFile.main(argv as String[])
-        cli.account().withSql { Sql sql ->
-            final qty = sql.firstRow("select count(distinct PRIMARY_SITE_N400) from NAACCR_DISCRETE")[0]
-            assert qty == 1
-            final v = sql.firstRow("select distinct naaccr_record_version_n50 from naaccr_discrete")[0]
-            assert v == '160'
+            TumorFile.main(argv as String[])
+            cli.account().withSql { Sql sql ->
+                final qty = sql.firstRow("select count(distinct PRIMARY_SITE_N400) from TUMOR")[0]
+                assert qty == 1
+                final v = sql.firstRow("select distinct naaccr_record_version_n50 from TUMOR")[0]
+                assert v == '160'
+            }
         }
     }
 
-    void "test load multiple NAACCR files in a local disk h2 DB"() {
-        def argv = ['tumor-files', 'tmp1', 'tmp2']
-        final cli = cli1(argv, System.getProperty('user.dir'))
+    void "test load multiple NAACCR file versions in a local disk h2 DB"() {
+        def argv = ['tumor-files', TumorFileTest.testDataPath, v16_file]
+        withTempDir('db1') { dbDir ->
+            final cli = cli1(argv, dbDir.toString())
 
-        ['tmp1', 'tmp2'].each { String n ->
-            new File(n).withPrintWriter { w ->
-                w.write(new File(TumorFileTest.testDataPath).text)
+            TumorFile.main(argv as String[])
+            cli.account().withSql { Sql sql ->
+                final qty = sql.firstRow("select count(*) from TUMOR")[0]
+                assert qty == 102
             }
-        }
-        TumorFile.main(argv as String[])
-        cli.account().withSql { Sql sql ->
-            final qty = sql.firstRow("select count(*) from NAACCR_DISCRETE")[0]
-            assert qty == 200
         }
     }
 
     void "test load layouts"() {
         def argv = ['load-layouts']
-        final cli = cli1(argv, System.getProperty('user.dir'))
+        withTempDir('db1') { dbDir ->
+            final cli = cli1(argv, dbDir.toString())
 
-        TumorFile.main(argv as String[])
-        cli.account().withSql { Sql sql ->
-            final qty = sql.firstRow("select count(*) from LAYOUT")[0] as Integer
-            assert qty > 300
+            TumorFile.main(argv as String[])
+            cli.account().withSql { Sql sql ->
+                final qty = sql.firstRow("select count(*) from LAYOUT")[0] as Integer
+                assert qty > 300
+            }
         }
     }
 
@@ -83,13 +88,37 @@ class Staging extends TestCase {
                    "db.username"       : 'SA',
                    "db.password"       : '',
                    "naaccr.flat-file"  : flat_file,
-                   "naaccr.tumor-table": "NAACCR_DISCRETE",
+                   "naaccr.tumor-table": "TUMOR",
                    "naaccr.stats-table": "NAACCR_EXPORT_STATS",
         ])
         def cli = TumorFileTest.buildCLI(argv, ps)
         ps.store(new File(cli.arg("--db")).newWriter(), null)
         cli.account().withSql { Sql sql -> sql.execute('drop all objects') }
         cli
+    }
+
+    static <V> V withTempDir(String prefix, Closure<V> thunk) {
+        Path path = Files.createTempDirectory(prefix)
+        try {
+            thunk(path)
+        } finally {
+            deleteFolder(path.toFile())
+        }
+    }
+
+    // ack NCode Oct 2011 https://stackoverflow.com/a/7768086/7963
+    static void deleteFolder(File folder) {
+        final files = folder.listFiles()
+        if (files != null) { //some JVMs return null for empty dirs
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    deleteFolder(f)
+                } else {
+                    f.delete()
+                }
+            }
+        }
+        folder.delete()
     }
 
     @Ignore("TODO: stats test. depends on tumors? move to ETL?")
@@ -103,6 +132,10 @@ class Staging extends TestCase {
         }
 
         void "test that tumor table has patid varchar column"() {
+
+        }
+
+        void "test loading v16 and v18 in that order"() {
 
         }
     }

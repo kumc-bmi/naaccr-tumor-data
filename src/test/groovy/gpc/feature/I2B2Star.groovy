@@ -6,16 +6,21 @@ import groovy.sql.Sql
 import junit.framework.TestCase
 import org.junit.Ignore
 
+/**
+ * CAUTION: ambient access to temp dir for config, DB
+ */
 class I2B2Star extends TestCase {
     void "test facts from 100 records of test data with local disk h2 DB"() {
         String patient_ide_source = 'SMS@kumed.com'
 
-        final cli = Staging.cli1(['tumor-table'], System.getProperty('user.dir'))
-        cli.account().withSql { Sql sql ->
-            TumorFileTest.mockPatientMapping(sql, patient_ide_source, 100)
+        Staging.withTempDir('db1') { dbDir ->
+            final cli = Staging.cli1(['tumor-table'], dbDir.toString())
+            cli.account().withSql { Sql sql ->
+                TumorFileTest.mockPatientMapping(sql, patient_ide_source, 100)
+            }
+            TumorFile.main(['tumor-table'] as String[])
+            TumorFile.main(['facts', '--upload-id=111222'] as String[])
         }
-        TumorFile.main(['tumor-table'] as String[])
-        TumorFile.main(['facts', '--upload-id=111222'] as String[])
     }
 
     @Ignore

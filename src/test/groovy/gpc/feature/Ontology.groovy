@@ -8,8 +8,10 @@ import org.junit.Ignore
 @CompileStatic
 class Ontology extends TestCase {
     void "test build NAACCR_ONTOLOGY in a local disk h2 DB"() {
-        Staging.cli1(['ontology'], System.getProperty('user.dir'))
-        TumorFile.main(['ontology'] as String[])
+        Staging.withTempDir('db1') { dbDir ->
+            Staging.cli1(['ontology'], dbDir.toString())
+            TumorFile.main(['ontology'] as String[])
+        }
     }
 
     @Ignore("TODO: metadata.json for 2017 ont")
