@@ -1,5 +1,6 @@
 package gpc.unit
 
+import com.imsweb.layout.Field
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
@@ -300,6 +301,98 @@ class TumorFileTest extends TestCase {
             final actual = sql.firstRow("select sum(dx_yr) YR_SUM, count(distinct concept_cd) CD_QTY from tumor_data_stats")
             assert actual as Map == [YR_SUM: 54782529, CD_QTY: 13179]
         }
+    }
+
+    void "test synthesizing data"() {
+        final stats = TumorFileTest.getResource("tumor_data_stats.csv")
+        final dest = new File('synthetic1500.dat')
+        final qty = 150
+
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        final rng = new Random(1)
+        final layout = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
+        cdw.withSql { Sql sql ->
+            Tabular.importCSV(sql, "stats", stats, Tabular.meta_path(stats))
+            final record = syntheticRecord(sql, layout, rng)
+            assert record.length() == layout.layoutLineLength
+            assert record.substring(0, 1) == 'I'
+            assert TumorFile.fieldValue(layout.getFieldByName('dateOfDiagnosis'), record) == '20150516'
+
+            if (false) {
+                dest.withPrintWriter { out ->
+                    (1..qty).each {
+                        final txt = syntheticRecord(sql, layout, rng)
+                        out.println(txt)
+                    }
+                }
+            }
+        }
+    }
+
+    static String syntheticRecord(Sql sql, FixedColumnsLayout layout, Random rng) {
+        String record = " ".repeat(layout.layoutLineLength)
+        final dx_yrs = sql.rows("select distinct DX_YR from stats").collect { it.DX_YR as Integer }
+        final dx_yr = dx_yrs.get(rng.nextInt(dx_yrs.size()))
+        final dx_dt = LocalDate.of(dx_yr, rng.nextInt(12) + 1, rng.nextInt(28) + 1)
+        sql.eachRow(
+                "select distinct VALTYPE_CD, NAACCRNUM, PCT_PRESENT from stats where DX_YR = ${dx_yr} order by naaccrnum"
+        ) { item ->
+            if (item.getDouble('PCT_PRESENT') < rng.nextInt(100)) {
+                return
+            }
+            final field = layout.getFieldByNaaccrItemNumber(item.getInt('NAACCRNUM'))
+            final splice = { String it ->
+                assert field.length >= it.length()
+                final pad = field.padChar.repeat(field.length - it.length())
+                assert field.align == Field.FieldAlignment.LEFT || field.align == Field.FieldAlignment.RIGHT
+                final txt = field.align == Field.FieldAlignment.LEFT ? it + pad : pad + it
+                record = record.substring(0, field.start - 1) + txt + record.substring(field.start - 1 + field.length)
+            }
+            final valtype_cd = item.getString('VALTYPE_CD')
+            //noinspection GroovyFallthrough
+            switch (valtype_cd) {
+                case '@':
+                    final cut = rng.nextInt(100)
+                    double acc = 0.0
+                    final choices = sql.rows(
+                            "select VALUE, PCT_FREQ from stats where dx_yr = ${dx_yr} and naaccrNum = ${item.getInt('NAACCRNUM')} order by pct_freq desc"
+                    )
+                    final choice = choices.find {
+                        acc += it.PCT_FREQ as Double
+                        acc > cut
+                    }
+                    splice(String.format("%" + field.length + "s", choice.VALUE as String))
+                    break
+                case 'D':
+                    if (field.name == 'dateOfDiagnosis') {
+                        splice(dx_dt.toString().replace('-', ''))
+                        return
+                    }
+                case 'N':
+                    final dist = sql.firstRow(
+                            "select MEAN, SD from stats where dx_yr = ${dx_yr} and naaccrNum = ${item.getInt('NAACCRNUM')}"
+                    )
+                    Double mean = dist.MEAN as Double
+                    Double sd = dist.SD as Double
+                    assert mean != null && sd != null
+                    final qty = (mean + rng.nextGaussian() * sd).round().abs()
+                    if (valtype_cd == 'D') {
+                        final when = dx_dt.plusDays(qty)
+                        splice(when.toString().replace('-', ''))
+                    } else {
+                        String digits = qty.toString()
+                        if (digits.length() > field.length) {
+                            // oops... on rare occasions, normally distributed variables take on extreme values
+                            digits = digits.substring(0, field.length)
+                        }
+                        splice(digits)
+                    }
+                    break
+                default:
+                    assert "@DN".contains(valtype_cd)
+            }
+        }
+        record
     }
 
 }
