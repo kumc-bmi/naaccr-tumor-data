@@ -98,9 +98,6 @@ class Staging extends TestCase {
 
         }
 
-        void "test TODO rename discrete-data command to tumor-table"() {
-        }
-
         void "test complete check based on upload_id rather than task_id"() {
 
         }
