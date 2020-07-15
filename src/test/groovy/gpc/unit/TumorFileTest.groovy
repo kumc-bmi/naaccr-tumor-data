@@ -5,6 +5,7 @@ import com.imsweb.layout.LayoutInfo
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import gpc.DBConfig
 import gpc.DBConfig.Task
+import gpc.Tabular
 import gpc.TumorFile
 import gpc.TumorOnt
 import groovy.sql.Sql
@@ -288,4 +289,17 @@ class TumorFileTest extends TestCase {
             assert t1.complete()
         }
     }
+
+    void "test loading tumor data stats"() {
+        final data = TumorFileTest.getResource("tumor_data_stats.csv")
+        assert data != null
+
+        final cdw = DBConfig.inMemoryDB("TR", true)
+        cdw.withSql { Sql sql ->
+            Tabular.importCSV(sql, "tumor_data_stats", data, Tabular.meta_path(data))
+            final actual = sql.firstRow("select sum(dx_yr) YR_SUM, count(distinct concept_cd) CD_QTY from tumor_data_stats")
+            assert actual as Map == [YR_SUM: 54782529, CD_QTY: 13179]
+        }
+    }
+
 }

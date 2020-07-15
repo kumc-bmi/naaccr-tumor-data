@@ -1,0 +1,79 @@
+{
+  "@context": "http://www.w3.org/ns/csvw",
+  "tableSchema": {
+    "columns": [
+      {
+        "name": "DX_YR",
+        "datatype": "integer",
+        "null": [
+          ""
+        ],
+        "number": 1
+      },
+      {
+        "name": "NAACCRNUM",
+        "datatype": "integer",
+        "null": [
+          ""
+        ],
+        "number": 2
+      },
+      {
+        "name": "VALTYPE_CD",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 3
+      },
+      {
+        "name": "MEAN",
+        "datatype": "double",
+        "null": [
+          ""
+        ],
+        "number": 4
+      },
+      {
+        "name": "SD",
+        "datatype": "double",
+        "null": [
+          ""
+        ],
+        "number": 5
+      },
+      {
+        "name": "VALUE",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 6
+      },
+      {
+        "name": "CONCEPT_CD",
+        "datatype": "string",
+        "null": [
+          ""
+        ],
+        "number": 7
+      },
+      {
+        "name": "PCT_PRESENT",
+        "datatype": "double",
+        "null": [
+          ""
+        ],
+        "number": 8
+      },
+      {
+        "name": "PCT_FREQ",
+        "datatype": "double",
+        "null": [
+          ""
+        ],
+        "number": 9
+      }
+    ]
+  }
+}

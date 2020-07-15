@@ -3,8 +3,8 @@ package gpc
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.record.fixed.FixedColumnsField
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
-import gpc.DBConfig.ColumnMeta
 import gpc.DBConfig.Task
+import gpc.Tabular.ColumnMeta
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic

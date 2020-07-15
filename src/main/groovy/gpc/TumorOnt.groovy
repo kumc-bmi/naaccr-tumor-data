@@ -19,6 +19,7 @@ import java.sql.Date
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Timestamp
+import java.sql.Types
 import java.time.LocalDate
 import java.util.zip.ZipFile
 
@@ -413,6 +414,7 @@ class TumorOnt {
         txt
     }
 
+    @Deprecated
     static void load_data_frame(Sql sql, String name, Table data,
                                 boolean dropFirst = false) {
         assert name
@@ -428,6 +430,7 @@ class TumorOnt {
         append_data_frame(data, name, sql)
     }
 
+    @Deprecated
     static void append_data_frame(Table data, String name, Sql sql) {
         log.debug("inserting ${data.rowCount()} rows into ${name}")
         sql.withBatch(SqlScript.insert_dml(name, data.columns())) { BatchingPreparedStatementWrapper ps ->
@@ -478,26 +481,24 @@ class TumorOnt {
     }
 
     static Table read_csv(URL url, ColumnType[] _schema = null, int skiprows = 0) {
-        ColumnType[] schema = _schema ? _schema : tabularTypes(new JsonSlurper().parse(meta_path(url)))
+        ColumnType[] schema = _schema ? _schema : tabularTypes(new JsonSlurper().parse(Tabular.meta_path(url)))
         final BufferedReader input = new BufferedReader(new InputStreamReader(url.openStream()))
         skiprows.times { input.readLine() }
         Table.read().usingOptions(CsvReadOptions.builder(input).columnTypes(schema).maxCharsPerColumn(32767))
     }
 
     static ColumnType[] tabularTypes(Object meta) {
-        (((meta as Map)?.tableSchema as Map)?.columns as List).collect {
-            String name = (it as Map)?.datatype as String
-            switch (name) {
-                case "number":
+        final schema = Tabular.columnDescriptions(meta)
+        schema.collect {
+            switch (it.dataType) {
+                case Types.INTEGER:
                     return ColumnType.INTEGER
-                case "string":
+                case Types.DOUBLE:
+                    return ColumnType.DOUBLE
+                case Types.VARCHAR:
                     return ColumnType.STRING
-                case "date":
-                    return ColumnType.LOCAL_DATE
-                case "datetime":
-                    return ColumnType.LOCAL_DATE_TIME
                 default:
-                    throw new IllegalAccessException(name)
+                    throw new IllegalAccessException(it.dataType.toString())
             }
         } as ColumnType[]
     }
@@ -506,9 +507,6 @@ class TumorOnt {
         TumorOnt.getResourceAsStream(s).text
     }
 
-    static URL meta_path(URL path) {
-        new URL(path.toString().replace('.csv', '-metadata.json'))
-    }
 
     static class Pathlib {
         static String stem(URL path) {
@@ -517,6 +515,7 @@ class TumorOnt {
         }
     }
 
+    @Deprecated
     static Table fromRecords(List<Map<String, Object>> obj) {
         Collection<Column<?>> cols = ((obj.first().collect { k, v ->
             switch (v) {

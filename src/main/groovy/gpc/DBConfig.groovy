@@ -2,13 +2,11 @@ package gpc
 
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
-import groovy.transform.Immutable
 import groovy.util.logging.Slf4j
 
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
-import java.sql.Types
 
 @CompileStatic
 @Slf4j
@@ -71,58 +69,6 @@ class DBConfig {
         it
     }
 
-    @Immutable
-    static class ColumnMeta {
-        final String name
-        final Integer dataType = Types.VARCHAR
-        final Integer size = null
-        final Boolean nullable = true
-
-        String ddl(Map<Integer, String> toName) {
-            final sizePart = size != null ? "(${size})" : ""
-            final nullPart = !nullable ? " not null" : ""
-            "${name} ${toName[dataType]}${sizePart} ${nullPart}"
-        }
-
-        static String createStatement(String table_name, List<ColumnMeta> cols, Map<Integer, String> toName) {
-            """
-             create table ${table_name} (
-                ${cols.collect { it.ddl(toName) }.join(",\n  ")}
-            )
-            """.trim()
-        }
-
-        static String insertStatement(String table_name, List<ColumnMeta> cols) {
-            """
-            insert into ${table_name} (
-            ${cols.collect { it.name }.join(",\n  ")})
-            values (${cols.collect { it.param() }.join(",\n  ")})
-            """.trim()
-        }
-
-        String param() {
-            "?.${name}"
-        }
-
-        static Map<Integer, String> typeNames(Connection connection) {
-            // https://docs.oracle.com/javase/7/docs/api/java/sql/DatabaseMetaData.html#getTypeInfo()
-            final dbTypes = connection.metaData.getTypeInfo()
-            Map<Integer, String> toName = [:]
-            while (dbTypes.next()) {
-                // println([DATA_TYPE    : dbTypes.getInt('DATA_TYPE'),
-                //          TYPE_NAME    : dbTypes.getString('TYPE_NAME'),
-                //          CREATE_PARAMS: dbTypes.getString('CREATE_PARAMS')])
-                final ty = dbTypes.getInt('DATA_TYPE')
-                if (!toName.containsKey(ty)) {
-                    toName[ty] = dbTypes.getString('TYPE_NAME')
-                }
-            }
-            if (toName[Types.BOOLEAN] == null) {
-                toName[Types.BOOLEAN] = toName[Types.INTEGER]
-            }
-            toName
-        }
-    }
 
     interface Task {
         boolean complete()
