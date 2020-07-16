@@ -471,7 +471,7 @@ class TumorFile {
             return null
         }
         final nominal = valtype_cd == '@' ? value : ''
-        LocalDate start_date
+        LocalDate start_date = dates.dateOfDiagnosis
         if (valtype_cd == 'D') {
             if (value == '99999999') {
                 // "blank" date value
@@ -483,14 +483,14 @@ class TumorFile {
                         encounter_num, patient_num, fixed.name, value)
                 return null
             }
-        } else {
-            start_date = fixed.section == 'Follow-up/Recurrence/Death' ? dates.dateOfLastContact :
-                    dates.dateOfDiagnosis
+        } else if (fixed.section == 'Follow-up/Recurrence/Death'
+                && dates.dateOfLastContact !== null) {
+            start_date = dates.dateOfLastContact
         }
         String concept_cd = "NAACCR|${fixed.naaccrItemNum}:${nominal}"
         assert concept_cd.length() <= 50
         Double num = null
-        if (valtype_cd == 'N') {
+        if (valtype_cd == 'N' && !value.startsWith(('XX'))) {
             try {
                 num = Double.parseDouble(value)
             } catch (badNum) {
