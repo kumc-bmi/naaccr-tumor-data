@@ -1,11 +1,14 @@
 label,text,year,month,day
 normal,19700101,1970,1,1
 no day,197001,1970,1,1
+2 digit year - not to spec,150621,,,
 no month,1970,1970,1,1
-leading space,1970,1970,1,1
+leading space, 1970,1970,1,1
 "no month, variation",19709999,,,
 all 9s,99999999,,,
 all 0s,00000000,,,
 almost all 9s,99990,,,
 empty,,,,
 inscruitable,12001024,1200,10,24
+oddball,2015407,,,
+

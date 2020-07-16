@@ -532,6 +532,7 @@ class TumorFile {
     static LocalDate parseDate(String txt) {
         LocalDate value
         int nch = txt.length()
+        // final y2k = { String yymmdd -> (yymmdd < '50' ? '20' : '19') + yymmdd }
         String full = nch == 4 ? txt + '0101' : nch == 6 ? txt + '01' : txt
         try {
             value = LocalDate.parse(full, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
