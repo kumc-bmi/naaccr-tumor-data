@@ -298,8 +298,13 @@ class TumorFileTest extends TestCase {
         }
     }
 
+    // String.repeat is new in Java 11 but we target Java 8
+    static String repeat(String s, int n) {
+        new String(new char[n]).replace("\0", s)
+    }
+
     static String syntheticRecord(Sql sql, FixedColumnsLayout layout, Random rng) {
-        String record = " ".repeat(layout.layoutLineLength)
+        String record = repeat(" ", layout.layoutLineLength)
         final dx_yrs = sql.rows("select distinct DX_YR from stats").collect { it.DX_YR as Integer }
         final dx_yr = dx_yrs.get(rng.nextInt(dx_yrs.size()))
         final dx_dt = LocalDate.of(dx_yr, rng.nextInt(12) + 1, rng.nextInt(28) + 1)
@@ -312,7 +317,7 @@ class TumorFileTest extends TestCase {
             final field = layout.getFieldByNaaccrItemNumber(item.getInt('NAACCRNUM'))
             final splice = { String it ->
                 assert field.length >= it.length()
-                final pad = field.padChar.repeat(field.length - it.length())
+                final pad = repeat(field.padChar, field.length - it.length())
                 assert field.align == Field.FieldAlignment.LEFT || field.align == Field.FieldAlignment.RIGHT
                 final txt = field.align == Field.FieldAlignment.LEFT ? it + pad : pad + it
                 record = record.substring(0, field.start - 1) + txt + record.substring(field.start - 1 + field.length)
