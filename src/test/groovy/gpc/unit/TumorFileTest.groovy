@@ -13,59 +13,53 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
-import org.docopt.Docopt
 import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
 
+import java.nio.file.Path
 import java.nio.file.Paths
-import java.sql.DriverManager
 import java.time.LocalDate
 
 @CompileStatic
 @Slf4j
 class TumorFileTest extends TestCase {
-    static final String testDataPath = 'naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt'
-
-    /**
-     * CAUTION: Ambient access to DB Connection
-     */
-    static DBConfig.CLI buildCLI(List<String> args, Properties config) {
-        final String doc = TumorFile.usage
-        new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args),
-                { String name -> config },
-                { int it -> throw new RuntimeException('unexpected exit') },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
+    // CAUTION: ambient access to source code directory
+    static final Path resolveSource(String other) {
+        Paths.get('').resolve(other)
     }
+    static final URL sample100 = TumorFileTest.getResource('naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt')
 
     // NOTE: if you rename this, update CONTRIBUTING.md
     void testDocOpt() {
-        final String doc = TumorFile.usage
-        assert doc.startsWith('Usage:')
+        assert TumorFile.usageText.startsWith('Usage:')
         final args = ['tumor-table']
-        final actual = new Docopt(doc).withExit(false).parse(args)
+        final actual = TumorFile.docopt.parse(args)
         assert actual['--db'] == 'db.properties'
         assert actual['tumor-table'] == true
         assert actual['facts'] == false
 
-        final both = new Docopt(doc).withExit(false).parse(
+        final both = TumorFile.docopt.parse(
                 ['tumor-table', '--task-id', 'abc123', '--db', 'deid.properties'])
         assert both['--db'] == 'deid.properties'
         assert both["--update-date"] == null
 
         def args2 = ['ontology', '--task-hash=1234', '--update-date=2002-02-02', '--who-cache=,cache']
-        final more = new Docopt(doc).withExit(false).parse(
+        final more = TumorFile.docopt.parse(
                 args2)
         assert more['--task-hash'] == '1234'
         assert LocalDate.parse(more["--update-date"] as String) == LocalDate.of(2002, 2, 2)
 
         final Properties config = new Properties()
-        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): testDataPath, ('naaccr.records-table'): 'T1'])
-        DBConfig.CLI cli = new DBConfig.CLI(new Docopt(doc).withExit(false).parse(args2),
-                { String ignored -> config }, null, null)
-        assert cli.urlArg('--who-cache').toString().endsWith(',cache')
+        config.putAll(LoaderTest.dbInfo1 + [('naaccr.flat-file'): sample100.toString(), ('naaccr.records-table'): 'T1'])
+        DBConfig.CLI cli = new DBConfig.CLI(TumorFile.docopt.parse(args2),
+                [
+                        fetchProperties: { String ignored -> config },
+                        resolve: { String other -> Paths.get(other) }
+                ] as DBConfig.IO)
+        assert cli.pathArg('--who-cache').toString().endsWith(',cache')
         assert cli.property("naaccr.records-table") == "T1"
 
-        final tfiles = new Docopt(doc).withExit(false).parse(['tumor-files', 'F1', 'F2', 'F3'])
+        final tfiles = TumorFile.docopt.parse(['tumor-files', 'F1', 'F2', 'F3'])
         assert tfiles['NAACCR_FILE'] == ['F1', 'F2', 'F3']
     }
 
@@ -91,7 +85,7 @@ class TumorFileTest extends TestCase {
     void testExtractDiscrete() {
         final cdw = DBConfig.inMemoryDB("TR", true)
         final task_id = "task123"
-        URL flat_file = Paths.get(testDataPath).toUri().toURL()
+        final flat_file = Paths.get(sample100.toURI())
         Task extract = new TumorFile.NAACCR_Extract(cdw, task_id,
                 [flat_file],
                 "NAACCR_DISCRETE",
@@ -106,7 +100,7 @@ class TumorFileTest extends TestCase {
 
 
     void testLayout() {
-        List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(new File(testDataPath))
+        List<LayoutInfo> possibleFormats = LayoutFactory.discoverFormat(Paths.get(sample100.toURI()).toFile())
         assert !possibleFormats.isEmpty()
         assert possibleFormats.first().layoutId == 'naaccr-18-incidence'
 
@@ -128,7 +122,7 @@ class TumorFileTest extends TestCase {
     void "test loading naaccr flat file"() {
         DBConfig.inMemoryDB("TR").withSql { Sql sql ->
             final claimed = TumorFile.NAACCR_Extract.loadFlatFile(
-                    sql, new File(testDataPath), "TUMOR", "task1234", TumorOnt.pcornet_fields)
+                    sql, Paths.get(sample100.toURI()), "TUMOR", "task1234", TumorOnt.pcornet_fields)
             assert claimed == 100
             final actual = sql.firstRow('select count(PRIMARY_SITE_N400) from TUMOR')[0]
             assert actual == claimed
@@ -190,7 +184,7 @@ class TumorFileTest extends TestCase {
         final patient_ide_source = 'SMS@kumed.com'
         final sourcesystem_cd = 'my-naaccr-file'
         final upload_id = 123456 // TODO: transition from task_id to upload_id?
-        final flat_file = new File(testDataPath)
+        final flat_file = Paths.get(sample100.toURI())
         final mrnItem = 'patientIdNumber' // TODO: 2300 MRN
         String schema = null
 
@@ -217,30 +211,6 @@ class TumorFileTest extends TestCase {
             assert actual as Map == ['RECORDS': 6711, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 552,
                                      'DATES'  : 188, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 18]
             assert enc == 2100
-        }
-    }
-
-    void "test patient mapping"() {
-        final cdw = DBConfig.inMemoryDB("TR", true)
-        final task_id = "task123"
-        URL flat_file = Paths.get(testDataPath).toUri().toURL()
-        final patient_ide_source = 'SMS@kumed.com'
-        final patient_ide_col = 'PATIENT_ID_NUMBER_N20'
-        final patient_ide_expr = "trim(leading '0' from tr.${patient_ide_col})"
-        final extract_table = "NAACCR_DISCRETE"
-        final extract = new TumorFile.NAACCR_Extract(cdw, task_id,
-                [flat_file],
-                extract_table,
-        )
-
-        final upload = new TumorFile.I2B2Upload(null, 1, "NAACCR", patient_ide_source)
-
-        cdw.withSql { Sql sql ->
-            mockPatientMapping(sql, patient_ide_source, 100)
-            extract.run()
-            extract.updatePatientNum(sql, upload, patient_ide_expr)
-            final toPatientNum = extract.getPatientMapping(sql, patient_ide_col)
-            assert toPatientNum.size() == 91
         }
     }
 
@@ -297,7 +267,7 @@ class TumorFileTest extends TestCase {
 
         final cdw = DBConfig.inMemoryDB("TR", true)
         cdw.withSql { Sql sql ->
-            Tabular.importCSV(sql, "tumor_data_stats", data, Tabular.meta_path(data))
+            Tabular.importCSV(sql, "tumor_data_stats", data, Tabular.metadata(data))
             final actual = sql.firstRow("select sum(dx_yr) YR_SUM, count(distinct concept_cd) CD_QTY from tumor_data_stats")
             assert actual as Map == [YR_SUM: 54782529, CD_QTY: 13179]
         }
@@ -312,7 +282,7 @@ class TumorFileTest extends TestCase {
         final rng = new Random(1)
         final layout = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
         cdw.withSql { Sql sql ->
-            Tabular.importCSV(sql, "stats", stats, Tabular.meta_path(stats))
+            Tabular.importCSV(sql, "stats", stats, Tabular.metadata(stats))
             final record = syntheticRecord(sql, layout, rng)
             assert record.length() == layout.layoutLineLength
             assert record.substring(0, 1) == 'I'

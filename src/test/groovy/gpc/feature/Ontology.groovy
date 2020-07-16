@@ -5,12 +5,14 @@ import groovy.transform.CompileStatic
 import junit.framework.TestCase
 import org.junit.Ignore
 
+import java.nio.file.Path
+
 @CompileStatic
 class Ontology extends TestCase {
     void "test build NAACCR_ONTOLOGY in a local disk h2 DB"() {
-        Staging.withTempDir('db1') { dbDir ->
-            Staging.cli1(['ontology'], dbDir.toString())
-            TumorFile.main(['ontology'] as String[])
+        Staging.withTempDir('db1') { Path dbDir ->
+            final cli = Staging.cli1(['ontology'], dbDir)
+            TumorFile.run(cli)
         }
     }
 
@@ -18,7 +20,7 @@ class Ontology extends TestCase {
     static class ToDo extends TestCase {
         void "test import 2017 ontology into local disk h2 DB"() {
             def argv = ['import', 'ONT_2017', 'heron_load/shrine_ont.naaccr_ontology.csv', 'heron_load/shrine_ont.naaccr_ontology-metadata.json']
-            Staging.cli1(argv, System.getProperty('user.dir'))
+            Staging.cli1(argv, null)
             TumorFile.main(argv as String[])
         }
     }

@@ -15,11 +15,7 @@ import tech.tablesaw.io.csv.CsvReadOptions
 import java.nio.charset.Charset
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.sql.Date
-import java.sql.ResultSet
-import java.sql.SQLException
-import java.sql.Timestamp
-import java.sql.Types
+import java.sql.*
 import java.time.LocalDate
 import java.util.zip.ZipFile
 
@@ -42,12 +38,14 @@ class TumorOnt {
             }
         } else if (cli.flag("import")) {
             cdw.withSql { Sql sql ->
-                importCSV(sql, cli.arg("TABLE"), cli.urlArg("DATA"), cli.urlArg("META"))
+                importCSV(sql, cli.arg("TABLE"),
+                        cli.pathArg("DATA").toUri().toURL(),
+                        cli.pathArg("META").toUri().toURL())
             }
         }
     }
 
-    static Table pcornet_fields = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
+    static Table pcornet_fields = read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
 
     /**
      * PCORnet tumor table fields
@@ -56,7 +54,7 @@ class TumorOnt {
      * @return Table
      */
     static Table fields(boolean strict = true) {
-        Table pcornet_spec = TumorOnt.read_csv(TumorOnt.getResource('fields.csv')).select(
+        Table pcornet_spec = read_csv(TumorOnt.getResource('fields.csv')).select(
                 'item', 'FIELD_NAME'
         )
         // get naaccr-xml naaccrId
@@ -481,7 +479,7 @@ class TumorOnt {
     }
 
     static Table read_csv(URL url, ColumnType[] _schema = null, int skiprows = 0) {
-        ColumnType[] schema = _schema ? _schema : tabularTypes(new JsonSlurper().parse(Tabular.meta_path(url)))
+        ColumnType[] schema = _schema ? _schema : tabularTypes(Tabular.metadata(url))
         final BufferedReader input = new BufferedReader(new InputStreamReader(url.openStream()))
         skiprows.times { input.readLine() }
         Table.read().usingOptions(CsvReadOptions.builder(input).columnTypes(schema).maxCharsPerColumn(32767))

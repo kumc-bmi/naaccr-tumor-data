@@ -4,6 +4,7 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 
+import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -76,18 +77,24 @@ class DBConfig {
         void run()
     }
 
+    static interface IO {
+        Properties fetchProperties(String name)
+
+        void exit(int status)
+
+        Connection getConnection(String url, Properties properties)
+
+        Path resolve(String other)
+    }
+
     static class CLI {
         protected final Map opts
-        private final Closure<Properties> fetchProperties
+        private final IO io
         private Properties configCache = null
-        private final Closure<Void> exit
-        private final Closure<Connection> getConnection
 
-        CLI(Map opts, Closure<Properties> getProperties, Closure exit, Closure<Connection> getConnection) {
+        CLI(Map opts, IO io) {
             this.opts = opts
-            this.fetchProperties = getProperties
-            this.exit = exit
-            this.getConnection = getConnection
+            this.io = io
         }
 
         boolean flag(String target) {
@@ -101,21 +108,12 @@ class DBConfig {
             opts[target]
         }
 
-        /**
-         * CAUTION: ambient access to user.dir
-         */
-        private static URI cwd() {
-            new File(System.getProperty('user.dir')).toURI()
+        List<Path> files(String target) {
+            opts[target].collect { String fn -> io.resolve(fn) }
         }
 
-        List<URL> files(String target) {
-            final d = cwd()
-            opts[target].collect { String fn -> d.resolve(fn).toURL() }
-        }
-
-        // ISSUE: ambient; constructor should take makeURL()
-        URL urlArg(String target) {
-            cwd().resolve(arg(target)).toURL()
+        Path pathArg(String target) {
+            io.resolve(arg(target))
         }
 
         int intArg(String target) {
@@ -134,10 +132,8 @@ class DBConfig {
             value
         }
 
-        // ISSUE: ambient; constructor should take makeURL()
-        URL urlProperty(String target) {
-            URI cwd = new File(System.getProperty('user.dir')).toURI()
-            cwd.resolve(property(target)).toURL()
+        Path pathProperty(String target) {
+            io.resolve(property(target))
         }
 
         DBConfig account() {
@@ -146,14 +142,14 @@ class DBConfig {
                 config = jdbcProperties(config)
             } catch (IllegalStateException oops) {
                 log.warn("Config missing property: $oops")
-                exit(1)
+                io.exit(1)
             } catch (ClassNotFoundException oops) {
                 log.warn("driver not found (fix CLASSPATH?): $oops")
-                exit(1)
+                io.exit(1)
             }
             String url = config.getProperty('url')
             log.info("DB: $url")
-            new DBConfig(url, config, getConnection)
+            new DBConfig(url, config, io::getConnection)
         }
 
         // a bit of a kludge
@@ -164,22 +160,22 @@ class DBConfig {
             String db = arg("--db")
             if (!db) {
                 log.warn("expected --db=PROPS")
-                exit(1)
+                io.exit(1)
             }
             log.info("getting config from $db")
             try {
-                configCache = fetchProperties(db)
-            } catch (IOException oops) {
+                configCache = io.fetchProperties(db)
+            } catch (Exception oops) {
                 log.warn("cannot load properties from ${db}: $oops")
             }
             configCache
         }
 
-        String mustGetEnv(String key) {
-            String value = System.getenv(key)  // ISSUE: ambient
+        static String mustGetEnv(Map<String, String> env, String key) {
+            String value = env[key]
             if (value == null) {
                 log.warn("getEnv($key) failed")
-                exit(1)
+                throw new RuntimeException(key)
             }
             value
         }

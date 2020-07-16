@@ -14,6 +14,8 @@ import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
 
 import javax.annotation.Nullable
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.sql.DriverManager
 import java.sql.SQLException
 import java.sql.Types
@@ -26,36 +28,40 @@ import java.util.zip.CRC32
 @Slf4j
 class TumorFile {
     // see also: buildUsageDoc groovy task
-    static final String usage = TumorOnt.resourceText('usage.txt')
+    static final String usageText = TumorFile.getResourceAsStream('usage.txt').text
+    static final Docopt docopt = new Docopt(usageText).withExit(false)
 
     static void main(String[] args) {
-        DBConfig.CLI cli
-        Closure<Properties> getProps = { String name ->
-            Properties ps = new Properties()
-            new File(name).withInputStream { ps.load(it) }
-            if (ps.containsKey('db.passkey')) {
-                ps.setProperty('db.password', cli.mustGetEnv(ps.getProperty('db.passkey')))
-            }
-            ps
-        }
-        cli = new DBConfig.CLI(new Docopt(usage).parse(args),
-                { String name -> getProps(name) },
-                { int it -> System.exit(it) },
-                { String url, Properties ps -> DriverManager.getConnection(url, ps) })
+        final cwd = Paths.get('')
+        final io = [
+                exit           : System::exit,
+                getConnection  : DriverManager::getConnection,
+                resolve        : cwd::resolve,
+                fetchProperties: { String name -> getProps(cwd, System.getenv(), name) },
+        ] as DBConfig.IO
 
-        run_cli(cli)
+        final opts = docopt.withExit(true).parse(args)
+        run(new DBConfig.CLI(opts, io))
     }
 
-    static void run_cli(DBConfig.CLI cli) {
+    static Properties getProps(Path cwd, Map<String, String> env, String name) {
+        Properties ps = new Properties()
+        cwd.resolve(name).toFile().withInputStream { ps.load(it) }
+        if (ps.containsKey('db.passkey')) {
+            ps.setProperty('db.password', DBConfig.CLI.mustGetEnv(env, ps.getProperty('db.passkey')))
+        }
+        ps
+    }
+
+    static void run(DBConfig.CLI cli) {
         DBConfig cdw = cli.account()
 
-        //noinspection GroovyUnusedAssignment -- avoids weird cast error
         Task work = null
         String task_id = cli.arg("--task-id", "task123")  // TODO: replace by date, NPI?
 
         if (cli.flag('tumor-table')) {
             work = new NAACCR_Extract(cdw, task_id,
-                    [cli.urlProperty("naaccr.flat-file")],
+                    [cli.pathProperty("naaccr.flat-file")],
                     cli.property("naaccr.tumor-table"),
             )
         } else if (cli.flag('tumor-files')) {
@@ -70,8 +76,9 @@ class TumorFile {
                     cli.arg('--mrn-src'))
             work = new NAACCR_Facts(cdw,
                     upload,
-                    cli.urlProperty("naaccr.flat-file"),
-                    cli.property("naaccr.tumor-table"))
+                    cli.pathProperty("naaccr.flat-file"),
+                    cli.property("naaccr.tumor-table"),
+                    cli.property("i2b2.patient-mapping-query"))
         } else if (cli.flag('load-layouts')) {
             work = new LoadLayouts(cdw, cli.arg('--layout-table'))
         } else if (cli.flag('run') || cli.flag('query')) {
@@ -127,9 +134,9 @@ class TumorFile {
     static class NAACCR_Extract implements Task {
         final TableBuilder tb
         final DBConfig cdw
-        final List<URL> flat_files
+        final List<Path> flat_files
 
-        NAACCR_Extract(DBConfig cdw, String task_id, List<URL> flat_files, String extract_table) {
+        NAACCR_Extract(DBConfig cdw, String task_id, List<Path> flat_files, String extract_table) {
             this.cdw = cdw
             tb = new TableBuilder(task_id: task_id, table_name: extract_table)
             this.flat_files = flat_files
@@ -154,18 +161,18 @@ class TumorFile {
                     final create = ix == 0
                     final update = ix == flat_files.size() - 1
                     encounter_num = loadFlatFile(
-                            sql, new File(flat_file.path), tb.table_name, tb.task_id, fields,
+                            sql, flat_file, tb.table_name, tb.task_id, fields,
                             encounter_num, create, update)
                 }
             }
         }
 
-        static int loadFlatFile(Sql sql, File flat_file, String table_name, String task_id, Table fields,
+        static int loadFlatFile(Sql sql, Path flat_file, String table_name, String task_id, Table fields,
                                 int encounter_num = 0,
                                 boolean create = true, boolean update = true,
                                 int batchSize = 64) {
             FixedColumnsLayout layout = theLayout(flat_file)
-            final source_cd = flat_file.name
+            final source_cd = flat_file.fileName.toString()
 
             final colInfo = columnInfo(fields, layout)
             final cols = [
@@ -179,7 +186,7 @@ class TumorFile {
             String ddl = ColumnMeta.createStatement(table_name, cols, ColumnMeta.typeNames(sql.connection))
             String dml = ColumnMeta.insertStatement(table_name, cols)
 
-            flat_file.withInputStream { InputStream naaccr_text_lines ->
+            flat_file.toFile().withInputStream { InputStream naaccr_text_lines ->
                 if (create) {
                     sql.execute(ddl)
                 }
@@ -217,15 +224,15 @@ class TumorFile {
             }.findAll { (it[1] as String) > '' }.collectEntries { it }
         }
 
-        static FixedColumnsLayout theLayout(File flat_file) {
-            final layouts = LayoutFactory.discoverFormat(flat_file)
+        static FixedColumnsLayout theLayout(Path flat_file) {
+            final layouts = LayoutFactory.discoverFormat(flat_file.toFile())
             if (layouts.size() < 1) {
                 throw new RuntimeException("cannot discover format of ${flat_file}")
             } else if (layouts.size() > 1) {
                 throw new RuntimeException("ambiguous format: ${flat_file}: ${layouts.collect { it.layoutId }}.join(',')")
             }
             final layout = LayoutFactory.getLayout(layouts[0].layoutId) as FixedColumnsLayout
-            log.info('{}: layout {}', flat_file.name, layout.layoutName)
+            log.info('{}: layout {}', flat_file.fileName, layout.layoutName)
             layout
         }
 
@@ -244,31 +251,6 @@ class TumorFile {
                 final item = it.item as FixedColumnsField
                 new Tuple2(item.start, new ColumnMeta(name: it.name, size: item.length))
             }
-        }
-
-        void updatePatientNum(Sql sql, I2B2Upload upload, String patient_ide_expr) {
-            final dml = """
-                update ${tb.table_name} tr
-                set tr.patient_num = (
-                    select pm.patient_num
-                    from ${upload.patientMapping} pm
-                    where pm.patient_ide_source = ?.source
-                    and pm.patient_ide = ${patient_ide_expr}
-                    )
-            """
-            sql.execute(dml, [source: upload.patient_ide_source])
-        }
-
-        Map<String, Integer> getPatientMapping(Sql sql, patient_ide_col) {
-            String q = """
-                select ${patient_ide_col} ide, patient_num from ${tb.table_name}
-                where patient_num is not null
-            """.trim()
-            log.info('{}', q)
-            final rows = sql.rows(q)
-            log.info('got {} rows', rows.size())
-            Map<String, Integer> toPatientId = rows.collectEntries { [it.ide, it.patient_num] }
-            toPatientId
         }
     }
 
@@ -298,32 +280,28 @@ class TumorFile {
     static class NAACCR_Facts implements Task {
         static final int encounter_num_start = 2000000 // TODO: sync with TUMOR extract. build facts from CLOB?
         static final String mrnItem = 'patientIdNumber'
-        static final String patient_ide_col = 'PATIENT_ID_NUMBER_N20'
-        static final String patient_ide_expr = "trim(leading '0' from tr.${patient_ide_col})"
 
         final TableBuilder tb
         private final DBConfig cdw
-        private final URL flat_file
-        private final NAACCR_Extract extract_task
+        private final Path flat_file
         private final I2B2Upload upload
+        final String patientMappingQuery
 
-        NAACCR_Facts(DBConfig cdw, I2B2Upload upload, URL flat_file, String extract_table) {
+        NAACCR_Facts(DBConfig cdw, I2B2Upload upload, Path flat_file, String extract_table,
+                     String patientMappingQuery) {
             final task_id = "upload_id_${upload.upload_id}"  // TODO: transition from task_id to upload_id
             tb = new TableBuilder(task_id: task_id, table_name: "OBSERVATION_FACT_${upload.upload_id}")
             this.flat_file = flat_file
             this.cdw = cdw
             this.upload = upload
-            extract_task = new NAACCR_Extract(cdw, task_id, [flat_file], extract_table)
+            this.patientMappingQuery = patientMappingQuery
         }
 
         boolean complete() { tb.complete(cdw) }
 
         void run() {
-            final flat_file = new File(flat_file.path)
-
             cdw.withSql { Sql sql ->
-                extract_task.updatePatientNum(sql, upload, patient_ide_expr)
-                final toPatientNum = extract_task.getPatientMapping(sql, patient_ide_col)
+                final toPatientNum = getPatientMapping(sql, patientMappingQuery)
 
                 makeTumorFacts(
                         flat_file, encounter_num_start,
@@ -331,23 +309,25 @@ class TumorFile {
                         upload)
             }
         }
+
+        static Map<String, Integer> getPatientMapping(Sql sql, String patientMappingQuery) {
+            sql.rows(patientMappingQuery).collectEntries { [it.MRN, it.PATIENT_NUM] }
+        }
     }
 
     static class I2B2Upload {
         final String schema
-        final int upload_id
+        final Integer upload_id
         final String sourcesystem_cd
-        final String patient_ide_source
 
-        I2B2Upload(@Nullable String schema, int upload_id, String sourcesystem_cd, String patient_ide_source) {
+        I2B2Upload(@Nullable String schema, @Nullable Integer upload_id, String sourcesystem_cd, String patient_ide_source) {
             this.schema = schema
             this.upload_id = upload_id
             this.sourcesystem_cd = sourcesystem_cd
-            this.patient_ide_source = patient_ide_source
         }
 
         String getFactTable() {
-            qname("OBSERVATION_FACT_${upload_id}")
+            qname("OBSERVATION_FACT" + (upload_id == null ? "" : "_${upload_id}"))
         }
 
         String getPatientMapping() {
@@ -400,7 +380,7 @@ class TumorFile {
         static final not_null = '@'
     }
 
-    static int makeTumorFacts(File flat_file, int encounter_num,
+    static int makeTumorFacts(Path flat_file, int encounter_num,
                               Sql sql, String mrnItem, Map<String, Integer> toPatientNum,
                               I2B2Upload upload,
                               boolean include_phi = false) {

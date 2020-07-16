@@ -7,6 +7,7 @@ import groovy.transform.Immutable
 import tech.tablesaw.api.ColumnType
 import tech.tablesaw.api.Table
 
+import java.nio.file.Path
 import java.sql.Connection
 import java.sql.Types
 
@@ -68,8 +69,8 @@ class Tabular {
         }
     }
 
-    static void importCSV(Sql sql, String table_name, URL data, URL meta) {
-        final schema = columnDescriptions(new JsonSlurper().parse(meta))
+    static void importCSV(Sql sql, String table_name, URL data, Map metadata) {
+        final schema = columnDescriptions(metadata)
         final stmt = ColumnMeta.createStatement(table_name, schema, ColumnMeta.typeNames(sql.connection))
         sql.execute(stmt)
         sql.withBatch(256, ColumnMeta.insertStatement(table_name, schema)) { ps ->
@@ -214,7 +215,12 @@ class Tabular {
         }
     }
 
-    static URL meta_path(URL path) {
-        new URL(path.toString().replace('.csv', '-metadata.json'))
+    static Map metadata(URL path) {
+        final meta = new URL(meta_path(path.toString()))
+        new JsonSlurper().parse(meta) as Map
+    }
+
+    static String meta_path(String path) {
+        path.replace('.csv', '-metadata.json')
     }
 }
