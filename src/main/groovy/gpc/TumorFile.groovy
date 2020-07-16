@@ -415,7 +415,7 @@ class TumorFile {
 
         dropIfExists(sql, upload.factTable)
         sql.execute(upload.getFactTableDDL(ColumnMeta.typeNames(sql.connection)))
-        sql.withBatch(256, upload.insertStatement) { ps ->
+        sql.withBatch(4096, upload.insertStatement) { ps ->
             int fact_qty = 0
             new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
                 encounter_num += 1
@@ -449,7 +449,7 @@ class TumorFile {
                         fact_qty += 1
                     }
                 }
-                if (encounter_num % 20 == 0) {
+                if (encounter_num % 1000 == 0) {
                     log.info('tumor {}: {} facts', encounter_num, fact_qty)
                 }
             }
