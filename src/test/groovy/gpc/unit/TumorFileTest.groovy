@@ -13,6 +13,7 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
+import org.junit.Test
 import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
 
@@ -63,6 +64,15 @@ class TumorFileTest extends TestCase {
         assert tfiles['NAACCR_FILE'] == ['F1', 'F2', 'F3']
     }
 
+    void 'test pathArg on missing SCRIPT arg'() {
+        final cli = new DBConfig.CLI(TumorFile.docopt.parse('query', 'select 1'), [:] as DBConfig.IO)
+        try {
+            cli.pathArg("SCRIPT")
+            assert 'should have thrown' == ''
+        } catch (IllegalArgumentException ignored) {
+            assert ignored != null
+        }
+    }
 
     static void mockPatientMapping(Sql sql, String patient_ide_source,
                                    int qty = 100) {

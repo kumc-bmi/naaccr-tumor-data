@@ -113,7 +113,11 @@ class DBConfig {
         }
 
         Path pathArg(String target) {
-            io.resolve(arg(target))
+            final s = arg(target)
+            if (!s) {
+                throw new IllegalArgumentException(target)
+            }
+            io.resolve(s)
         }
 
         int intArg(String target) {

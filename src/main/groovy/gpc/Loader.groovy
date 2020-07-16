@@ -105,11 +105,11 @@ class Loader {
         account.withSql { Sql sql ->
             def loader = new Loader(sql)
 
-            URL script = cli.pathArg("SCRIPT").toUri().toURL()
-            String query = cli.arg("SQL")
-            if (script) {
+            if (cli.flag('run')) {
+                URL script = cli.pathArg("SCRIPT").toUri().toURL()
                 loader.runScript(script)
-            } else if (query) {
+            } else if (cli.flag('query')) {
+                String query = cli.arg("SQL")
                 def json = loader.query(query)
                 System.out.withWriter {
                     json.writeTo(it)
