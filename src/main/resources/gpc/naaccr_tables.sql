@@ -1,3 +1,4 @@
+-- TODO: prune naaccr_tables.sql; use observation_fact.sql for Loader test
 drop table if exists naaccr_tumors;
 drop table if exists naaccr_pmap;
 drop table if exists naaccr_patients;

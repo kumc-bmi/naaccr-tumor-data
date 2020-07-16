@@ -25,6 +25,10 @@ db.url=jdbc:h2:file:/tmp/DB1;create=true
 
 naaccr.flat-file=naaccr_xml_samples/naaccr-xml-sample-v180-incidence-100.txt
 naaccr.tumor-table: TUMOR
+
+i2b2.patient-mapping-query: select distinct MRN, patient_num from ...
+# i2b2.schema: i2b2demodata
+# i2b2.template-fact-table: i2b2demodata.observation_fact
 ```
 
 Then, to create the `TUMOR` table following draft PCORnet specifications:
@@ -53,7 +57,7 @@ Usage:
   naaccr-tumor-data tumor-table [--db=PF] [--task-id=ID]
   naaccr-tumor-data tumor-files [--db=PF] NAACCR_FILE...
   naaccr-tumor-data load-layouts [--db=PF] [--layout-table=T]
-  naaccr-tumor-data facts    [--db=F] --upload-id=NNN [--mrn-src=S] [--obs-src=S]
+  naaccr-tumor-data facts  [--db=F] --upload-id=NNN [--obs-src=S] [--mrn-item=N] [--encounter-start=N]
   naaccr-tumor-data summary  [--db=F] [--task-id=ID]
   naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
@@ -68,8 +72,9 @@ Options:
   --layout-table=T   where to load layout data [default: LAYOUT]
   facts              build OBSERVATION_FACT_NNN table
   --upload-id=NNN    to fill in observation_fact.upload_id [default: 1]
-  --mrn-src=S        patient_ide_source to look up MRNs [default: SMS@kumed.com]
   --obs-src=S        sourcesystem_cd to give to facts [default: tumor_registry@kumed.com]
+  --mrn-item=N       NAACCR item to use for patient mapping [default: patientIdNumber]
+  --encounter-start=N  encounter_num start [default: 2000000]
   summary            build NAACCR_EXTRACT_STATS table
   --db=PROPS         database properties file [default: db.properties]
   ontology           build NAACCR_ONTOLOGY table

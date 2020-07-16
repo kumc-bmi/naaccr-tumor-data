@@ -181,7 +181,6 @@ class TumorFileTest extends TestCase {
     }
 
     void "test i2b2 fact table"() {
-        final patient_ide_source = 'SMS@kumed.com'
         final sourcesystem_cd = 'my-naaccr-file'
         final upload_id = 123456 // TODO: transition from task_id to upload_id?
         final flat_file = Paths.get(sample100.toURI())
@@ -191,7 +190,7 @@ class TumorFileTest extends TestCase {
         DBConfig.inMemoryDB("obs").withSql { Sql memdb ->
             Map<String, Integer> toPatientNum = (0..100).collectEntries { [String.format('%08d', it), it] }
 
-            final upload = new TumorFile.I2B2Upload(schema, upload_id, sourcesystem_cd, patient_ide_source)
+            final upload = new TumorFile.I2B2Upload(schema, upload_id, sourcesystem_cd)
             final enc = TumorFile.makeTumorFacts(
                     flat_file, 2000,
                     memdb, mrnItem, toPatientNum,

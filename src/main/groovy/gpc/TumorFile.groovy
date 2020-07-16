@@ -73,12 +73,15 @@ class TumorFile {
                     cli.property("i2b2.star-schema", null),
                     cli.intArg('--upload-id'),
                     cli.arg('--obs-src'),
-                    cli.arg('--mrn-src'))
+                    cli.property("i2b2.template-fact-table", null),
+            )
             work = new NAACCR_Facts(cdw,
                     upload,
                     cli.pathProperty("naaccr.flat-file"),
-                    cli.property("naaccr.tumor-table"),
-                    cli.property("i2b2.patient-mapping-query"))
+                    cli.property("i2b2.patient-mapping-query"),
+                    cli.arg('--mrn-item'),
+                    cli.intArg('--encounter-start'),
+            )
         } else if (cli.flag('load-layouts')) {
             work = new LoadLayouts(cdw, cli.arg('--layout-table'))
         } else if (cli.flag('run') || cli.flag('query')) {
@@ -278,23 +281,24 @@ class TumorFile {
     }
 
     static class NAACCR_Facts implements Task {
-        static final int encounter_num_start = 2000000 // TODO: sync with TUMOR extract. build facts from CLOB?
-        static final String mrnItem = 'patientIdNumber'
-
         final TableBuilder tb
+        final int encounter_num_start
+        final String mrnItem
         private final DBConfig cdw
         private final Path flat_file
         private final I2B2Upload upload
         final String patientMappingQuery
 
-        NAACCR_Facts(DBConfig cdw, I2B2Upload upload, Path flat_file, String extract_table,
-                     String patientMappingQuery) {
+        NAACCR_Facts(DBConfig cdw, I2B2Upload upload, Path flat_file,
+                     String patientMappingQuery, String mrnItem, int encounter_num_start) {
             final task_id = "upload_id_${upload.upload_id}"  // TODO: transition from task_id to upload_id
-            tb = new TableBuilder(task_id: task_id, table_name: "OBSERVATION_FACT_${upload.upload_id}")
+            tb = new TableBuilder(task_id: task_id, table_name: upload.factTable)
             this.flat_file = flat_file
             this.cdw = cdw
             this.upload = upload
             this.patientMappingQuery = patientMappingQuery
+            this.mrnItem = mrnItem
+            this.encounter_num_start = encounter_num_start
         }
 
         boolean complete() { tb.complete(cdw) }
@@ -319,19 +323,18 @@ class TumorFile {
         final String schema
         final Integer upload_id
         final String sourcesystem_cd
+        final String template_table = null
 
-        I2B2Upload(@Nullable String schema, @Nullable Integer upload_id, String sourcesystem_cd, String patient_ide_source) {
+        I2B2Upload(@Nullable String schema, @Nullable Integer upload_id, String sourcesystem_cd,
+                   String template_table = null) {
             this.schema = schema
             this.upload_id = upload_id
             this.sourcesystem_cd = sourcesystem_cd
+            this.template_table = template_table
         }
 
         String getFactTable() {
             qname("OBSERVATION_FACT" + (upload_id == null ? "" : "_${upload_id}"))
-        }
-
-        String getPatientMapping() {
-            qname("PATIENT_MAPPING")
         }
 
         private String qname(String object_name) {
@@ -359,6 +362,10 @@ class TumorFile {
         ]
 
         String getFactTableDDL(Map<Integer, String> toName) {
+            if (template_table) {
+                return """create table ${factTable} as select * from ${template_table} where 1 = 0"""
+            }
+
             """
             create table ${factTable} (
                 ${obs_cols.collect { it.ddl(toName) }.join(",\n  ")},

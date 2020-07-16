@@ -100,7 +100,7 @@ class Staging extends TestCase {
 
     static DBConfig.IO io1(Path workDir,
                            URL testData = null,
-                           String query = "select 1") {
+                           Map<String, String> extraProperties = [:]) {
         Properties ps = new Properties()
         if (!testData) {
             testData = TumorFileTest.sample100
@@ -112,8 +112,7 @@ class Staging extends TestCase {
                    "db.password"               : '',
                    "naaccr.flat-file"          : flat_file.toString(),
                    "naaccr.tumor-table"        : "TUMOR",
-                   "i2b2.patient-mapping-query": query
-        ])
+        ] + extraProperties)
         buildIO(ps, workDir)
     }
 
