@@ -38,12 +38,128 @@ class TumorOnt {
             }
         } else if (cli.flag("import")) {
             cdw.withSql { Sql sql ->
-                importCSV(sql, cli.arg("TABLE"),
+                Tabular.importCSV(sql,
+                        cli.arg("TABLE"),
                         cli.pathArg("DATA").toUri().toURL(),
-                        cli.pathArg("META").toUri().toURL())
+                        Tabular.metadata(cli.pathArg("META").toUri().toURL()))
             }
         }
     }
+
+    /**
+     * create_oracle_i2b2metadata_tables.sql
+     * create_postgresql_i2b2metadata_tables.sql
+     * https://github.com/i2b2/i2b2-data/blob/master/edu.harvard.i2b2.data/Release_1-7/NewInstall/Metadata/scripts/
+     */
+    static List<Tabular.ColumnMeta> metadataColumns = [
+            new Tabular.ColumnMeta(name: 'C_HLEVEL', dataType: Types.INTEGER, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_FULLNAME', size: 700, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_NAME', size: 2000, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_SYNONYM_CD', dataType: Types.CHAR, size: 1, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_VISUALATTRIBUTES', dataType: Types.CHAR, size: 3, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_TOTALNUM', dataType: Types.INTEGER),
+            new Tabular.ColumnMeta(name: 'C_BASECODE', size: 50),
+            new Tabular.ColumnMeta(name: 'C_METADATAXML', dataType: Types.CLOB),
+            new Tabular.ColumnMeta(name: 'C_FACTTABLECOLUMN', size: 50, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_TABLENAME', size: 50, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_COLUMNNAME', size: 50, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_COLUMNDATATYPE', size: 50, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_OPERATOR', size: 10, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_DIMCODE', size: 700, nullable: false),
+            new Tabular.ColumnMeta(name: 'C_COMMENT', dataType: Types.CLOB),
+            new Tabular.ColumnMeta(name: 'C_TOOLTIP', size: 900),
+            new Tabular.ColumnMeta(name: 'M_APPLIED_PATH', size: 700, nullable: false),
+            new Tabular.ColumnMeta(name: 'UPDATE_DATE', dataType: Types.TIMESTAMP, nullable: false),
+            new Tabular.ColumnMeta(name: 'DOWNLOAD_DATE', dataType: Types.TIMESTAMP),
+            new Tabular.ColumnMeta(name: 'IMPORT_DATE', dataType: Types.TIMESTAMP),
+            new Tabular.ColumnMeta(name: 'SOURCESYSTEM_CD', size: 50),
+            new Tabular.ColumnMeta(name: 'VALUETYPE_CD', size: 50),
+            new Tabular.ColumnMeta(name: 'M_EXCLUSION_CD', size: 25),
+            new Tabular.ColumnMeta(name: 'C_PATH', size: 700),
+            new Tabular.ColumnMeta(name: 'C_SYMBOL', size: 50),
+    ]
+    static final URL sectionCSV = TumorOnt.getResource('heron_load/section.csv')
+    static final URL itemCSV = TumorOnt.getResource('heron_load/tumor_item_type.csv')
+
+
+    static void writeTerms(Writer out, LocalDate update_date, URL curated, Closure<Map> makeTerm) {
+        final hd = TumorOnt.metadataColumns.collect { it.name }
+        Tabular.writeCSV(out, hd) { Closure<Void> process ->
+            curated.withInputStream { stream ->
+                Tabular.eachCSVRecord(stream, Tabular.columnDescriptions(curated)) { Map record ->
+                    process(makeTerm(record) + [UPDATE_DATE: update_date])
+                }
+            }
+        }
+    }
+
+    static void insertTerms(Sql sql, String table_name, URL curated, Closure<Map> makeTerm) {
+        final insert = Tabular.ColumnMeta.insertStatement(table_name, TumorOnt.metadataColumns)
+                .replace('?.UPDATE_DATE', 'current_timestamp')
+        sql.withBatch(16, insert) { ps ->
+            curated.withInputStream { stream ->
+                Tabular.eachCSVRecord(stream, Tabular.columnDescriptions(curated)) { Map record ->
+                    final term = makeTerm(record)
+                    ps.addBatch(term)
+                }
+            }
+        }
+    }
+
+    static final Map top = [
+            C_HLEVEL       : 1,
+            C_FULLNAME     : "\\i2b2\\naaccr\\",
+            C_NAME         : 'Cancer Cases (NAACCR Hierarchy)',
+            SOURCESYSTEM_CD: 'heron-admin@kumc.edu',
+    ] as Map
+    static final Map normal_term = [
+            C_SYNONYM_CD     : 'N',
+            C_FACTTABLECOLUMN: 'CONCEPT_CD',
+            C_TABLENAME      : 'CONCEPT_DIMENSION',
+            C_COLUMNNAME     : 'CONCEPT_PATH',
+            C_COLUMNDATATYPE : 'T',
+            C_OPERATOR       : 'LIKE',
+            C_COMMENT        : null,
+            M_APPLIED_PATH   : '@', // @@not_null
+            M_EXCLUSION_CD   : '@',
+            C_TOTALNUM       : null,
+            VALUETYPE_CD     : null,
+            C_METADATAXML    : null,
+    ] as Map
+
+    static Map makeSectionTerm(Map section) {
+        String path = "${top.C_FULLNAME}S:${section.sectionid} ${section.section}\\"
+        normal_term + [
+                C_HLEVEL          : top.C_HLEVEL as int + 1,
+                C_FULLNAME        : path,
+                C_DIMCODE         : path,
+                C_NAME            : "${String.format('%02d', section.sectionid)} ${section.section}".toString(),
+                C_BASECODE        : null,
+                C_VISUALATTRIBUTES: 'FA',
+                C_TOOLTIP         : null, // TODO
+        ] as Map
+    }
+
+    static String substr(String s, int lo, int hi) {
+        s.length() > hi ? s.substring(lo, hi) : s
+    }
+
+    static Map makeItemTerm(Map item) {
+        final sc = makeSectionTerm([sectionid: item.sectionId, section: item.section])
+        String path = sc.C_FULLNAME as String + substr("${String.format('%04d', item.naaccrNum)} ${item.naaccrName}".toString(), 0, 40) + '\\'
+        normal_term + [
+                C_HLEVEL          : sc.C_HLEVEL as int + 1,
+                C_FULLNAME        : path,
+                C_DIMCODE         : path,
+                C_NAME            : "${String.format('%04d', item.naaccrNum)} ${item.naaccrName}".toString(),
+                C_BASECODE        : "NAACCR|${item.naaccrNum}:".toString(),
+                // TODO: hide concepts where we have no data
+                // TODO: hide Histology since '0420', '0522' we already have Morph--Type/Behav
+                C_VISUALATTRIBUTES: item.valtype_cd == '@' ? 'FA' : 'LA',
+                C_TOOLTIP         : null, // TODO
+        ] as Map
+    }
+
 
     static Table pcornet_fields = read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
 

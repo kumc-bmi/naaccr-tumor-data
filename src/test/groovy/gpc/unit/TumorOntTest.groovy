@@ -1,8 +1,11 @@
 package gpc.unit
 
 import gpc.DBConfig
+import gpc.Tabular
+import gpc.Tabular.ColumnMeta
 import gpc.TumorOnt
 import groovy.sql.Sql
+import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import tech.tablesaw.api.ColumnType
@@ -13,9 +16,54 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.LocalDate
 
+@CompileStatic
 @Slf4j
 class TumorOntTest extends TestCase {
-    static final cache = ',cache/'
+    void 'test import sections'() {
+        final table_name = 'NAACCR_ONTOLOGY'
+
+        DBConfig.inMemoryDB("sections", true).withSql { Sql sql ->
+            final toTypeName = ColumnMeta.typeNames(sql.connection)
+            sql.execute(ColumnMeta.createStatement(table_name, TumorOnt.metadataColumns, toTypeName))
+            TumorOnt.insertTerms(sql, table_name, TumorOnt.sectionCSV, { Map s -> TumorOnt.makeSectionTerm(s) })
+            final actual = sql.firstRow('select min(c_fullname) fn1, min(c_name) n1, count(*) qty from NAACCR_ONTOLOGY')
+            assert actual == [
+                    N1 : '01 Cancer Identification',
+                    FN1: '\\i2b2\\naaccr\\S:1 Cancer Identification\\',
+                    QTY: 17,
+            ]
+        }
+    }
+
+    void 'test write sections'() {
+        final update_date = LocalDate.of(2020, 7, 17)
+        final out = new StringWriter()
+        TumorOnt.writeTerms(out, update_date, TumorOnt.sectionCSV, { Map s -> TumorOnt.makeSectionTerm(s) })
+        final actual = out.toString().split('\r\n')
+        assert actual.size() == 18
+        assert actual[0].startsWith('C_HLEVEL,C_FULLNAME,C_NAME')
+        assert actual[1].startsWith('2,\\i2b2\\naaccr\\S:1 Cancer Identification\\')
+        assert actual[1].count(',') == TumorOnt.metadataColumns.size() - 1
+    }
+
+    void 'test import items'() {
+        final table_name = 'NAACCR_ONTOLOGY'
+
+        DBConfig.inMemoryDB("sections", true).withSql { Sql sql ->
+            final toTypeName = ColumnMeta.typeNames(sql.connection)
+            sql.execute(ColumnMeta.createStatement(table_name, TumorOnt.metadataColumns, toTypeName))
+            TumorOnt.insertTerms(sql, table_name, TumorOnt.itemCSV, { Map s -> TumorOnt.makeItemTerm(s) })
+            final actual = sql.firstRow('select min(c_fullname) fn1, min(c_name) n1, count(*) qty from NAACCR_ONTOLOGY')
+            assert actual == [
+                    'FN1':'\\i2b2\\naaccr\\S:1 Cancer Identification\\0380 Sequence Number--Central\\',
+                    'N1':'0010 Record Type',
+                    'QTY':732,
+            ]
+        }
+    }
+
+
+    static final String cache = ',cache/'
 
     void testLoadCSV() {
         final Table per_section = TumorOnt.read_csv(TumorOnt.getResource('heron_load/section.csv'))
@@ -161,7 +209,7 @@ class TumorOntTest extends TestCase {
         final records = [
                 [c_facttablecolumn: "x", c_comment: "xx", c_totalnum: 1],
                 [c_facttablecolumn: "CONCEPT_CD", c_comment: null, c_totalnum: null]
-        ]
+        ] as List<Map<String, Object>>
         final actual = TumorOnt.fromRecords(records)
         assert actual.columnTypes() == [ColumnType.STRING, ColumnType.STRING, ColumnType.INTEGER] as ColumnType[]
         assert actual.rowCount() == 2

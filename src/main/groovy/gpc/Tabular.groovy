@@ -181,6 +181,33 @@ class Tabular {
         } while ((ch = text.read()) != -1)
     }
 
+    static void writeCSV(Writer out, List<String> hd, Closure eachRecord) {
+        final write1 = { List<String> row ->
+            String sep = ''
+            row.each { out.print(sep); out.print(it.replace('"', '""')); sep = ',' }
+            out.print('\r\n')
+        }
+
+        boolean first = true
+        eachRecord { Map<String, Object> record ->
+            if (first) {
+                if (!hd) {
+                    hd = record.collect { it.key }
+                }
+                write1(hd)
+                first = false
+            }
+            write1(hd.collect {
+                final v = record.getOrDefault(it, null)
+                v == null ? '' : v.toString()
+            })
+        }
+    }
+
+    static List<ColumnMeta> columnDescriptions(URL meta) {
+        columnDescriptions(metadata(meta))
+    }
+
     static List<ColumnMeta> columnDescriptions(Object meta) {
         final columns = (((meta as Map)?.tableSchema as Map)?.columns as List<Map>)
         assert columns != null
