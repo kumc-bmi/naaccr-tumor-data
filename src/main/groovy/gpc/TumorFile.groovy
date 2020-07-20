@@ -542,6 +542,9 @@ class TumorFile {
         value
     }
 
+    static class SEERRecode {
+        static URL recode = TumorFile.getResource('seer_site_recode.txt')
+    }
 
     static class LoadLayouts implements Task {
         final private DBConfig account

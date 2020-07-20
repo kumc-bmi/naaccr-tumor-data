@@ -259,6 +259,68 @@ class TumorFileTest extends TestCase {
         assert renamed.rowCount() == 23
     }
 
+    static String stripTrailing(String s) {
+        s.replaceFirst('\\s++$', "")
+    }
+
+    static Map ranges(String txt, boolean sometimes = true) {
+        final exc = ['All sites except ', 'excluding '].findAll { txt.startsWith((it)) }
+        final String atoms = exc.size() > 0 ? txt.substring(exc[0].size()) : txt
+        final ti0 = atoms.split(', and sometimes ') as List<String>
+        final t1 = (sometimes ? ti0 : ti0[0..<1]).join(',')
+        final hilos = t1.split(',').collect { it.strip() }
+
+        def parseBounds = { String t ->
+            if (t.contains('-')) {
+                final lo_hi = t.split('-', 2)
+                return [lo: lo_hi[0], hi: lo_hi[1]]
+            } else {
+                return [lo: t, hi: null]
+            }
+        }
+
+        return [excl: exc.size() > 0, bounds: hilos.findAll { it.length() > 0 }.collect(parseBounds)]
+    }
+
+    void "test SEER Recode"() {
+        assert ranges('C530-C539', false) == [
+                excl: false, bounds: [[lo: 'C530', hi: 'C539']]]
+        assert ranges('excluding 9590-9989, and sometimes 9050-9055, 9140') == [
+                excl: true, bounds: [[lo: '9590', hi: '9989'], [lo: '9050', hi: '9055'], [lo: '9140', hi: null]]]
+        assert ranges('excluding 9590-9989, and sometimes 9050-9055, 9140', false) == [
+                excl: true, bounds: [[lo: '9590', hi: '9989']]]
+        assert ranges('All sites except C024, C098-C099, C111, C142, C379, C422, C770-C779') == [
+                excl: true, bounds: [
+                [lo: 'C024', hi: null], [lo: 'C098', hi: 'C099'], [lo: 'C111', hi: null],
+                [lo: 'C142', hi: null], [lo: 'C379', hi: null], [lo: 'C422', hi: null], [lo: 'C770', hi: 'C779']]]
+
+        final rules = TumorFile.SEERRecode.recode.text
+                .split('\n')
+                .dropWhile { it.startsWith('Site ') }
+                .collect { it.split(';') }
+                .takeWhile { it.size() >= 4 }
+                .collect { [siteGroup: stripTrailing(it[0]), site: it[1], histology: it[2], recode: stripTrailing(it[3])] }
+
+        List<Map> path = []
+        final group_paths = rules.collect { rule ->
+            final indent = rule.siteGroup.takeWhile { it == ' ' }.length()
+            final label = rule.siteGroup.substring(indent)
+            path = path.findAll { it -> it.ix as int < indent } + [[ix: indent, segment: label] as Map]
+            [level: path.size(), path: path.collect { Map it -> it.segment }, recode: rule.recode]
+        }
+        final substr = { String s, int lo, int hi -> hi < s.length() ? s.substring(lo, hi) : s.substring(lo) }
+        final terms = group_paths.collect { p ->
+            [
+                    C_HLEVEL          : p.level as int - 1,
+                    C_DIMCODE         : p.path.collect { substr(it as String, 0, 20) }.join('\\'),
+                    C_NAME            : (p.path as List<String>)[-1],
+                    C_BASECODE        : p.recode, // TODO: SEER_SITE:?
+                    C_VISUALATTRIBUTES: p.recode as String > '' ? 'LA' : 'FA'
+            ]
+        }
+        assert terms[2] == ['C_HLEVEL': 1, 'C_DIMCODE': 'Oral Cavity and Phar\\Tongue', 'C_NAME': 'Tongue', 'C_BASECODE': '20020', 'C_VISUALATTRIBUTES': 'LA']
+    }
+
     void "test loading layout for id data extraction"() {
         final account = DBConfig.inMemoryDB("layout")
         account.withSql {
