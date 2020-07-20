@@ -13,7 +13,6 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
-import org.junit.Test
 import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
 
@@ -55,7 +54,7 @@ class TumorFileTest extends TestCase {
         DBConfig.CLI cli = new DBConfig.CLI(TumorFile.docopt.parse(args2),
                 [
                         fetchProperties: { String ignored -> config },
-                        resolve: { String other -> Paths.get(other) }
+                        resolve        : { String other -> Paths.get(other) }
                 ] as DBConfig.IO)
         assert cli.pathArg('--who-cache').toString().endsWith(',cache')
         assert cli.property("naaccr.records-table") == "T1"
