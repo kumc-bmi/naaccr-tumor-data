@@ -248,13 +248,30 @@ class TumorOnt {
     static class NAACCR_R {
         // Names assumed by naaccr_txform.sql
 
-        static final Table field_info = read_csv(TumorOnt.getResource('naaccr_r_raw/field_info.csv'))
+        static final URL field_info_csv = TumorOnt.getResource('naaccr_r_raw/field_info.csv')
+        static final Map field_info_meta = [
+                tableSchema: [ columns : [
+                        [number: 1, name: "code", datatype: "string", nulls: [""]],
+                        [number: 2, name: "label", datatype: "string", nulls: [""]],
+                        [number: 3, name: "means_missing", datatype: "boolean", nulls: [""]],
+                        [number: 4, name: "description", datatype: "string", nulls: [""]],
+                ]]
+        ]
+        static final Table field_info = read_csv(field_info_csv, Table.create(
+                IntColumn.create("item"),
+                StringColumn.create("name"),
+                StringColumn.create("type"),
+        ).columnTypes())
         static final Table field_info_schema = Table.create(
                 StringColumn.create("code"),
                 StringColumn.create("label"),
                 BooleanColumn.create("means_missing"),
                 StringColumn.create("description"))
-        static final Table field_code_scheme = read_csv(TumorOnt.getResource('naaccr_r_raw/field_code_scheme.csv'))
+        static final URL field_code_scheme_csv = TumorOnt.getResource('naaccr_r_raw/field_code_scheme.csv')
+        static final Table field_code_scheme = read_csv(field_code_scheme_csv, Table.create(
+                StringColumn.create("name"),
+                StringColumn.create("scheme"),
+        ).columnTypes())
 
         static final URL _code_labels = TumorOnt.getResource('naaccr_r_raw/code-labels/')
 
