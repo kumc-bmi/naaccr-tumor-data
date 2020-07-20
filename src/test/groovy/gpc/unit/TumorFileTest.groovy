@@ -11,6 +11,7 @@ import gpc.TumorFile
 import gpc.TumorOnt
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.transform.Immutable
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import tech.tablesaw.api.Row
@@ -128,6 +129,79 @@ class TumorFileTest extends TestCase {
               ['long-label': 'Reserved 00', 'start': 3, 'naaccr-item-num': 37, 'section': 'Record ID', 'grouped': false]]
     }
 
+    static List<Map<String, Object>> recode_in_100 = [
+            ['PRIMARY_SITE_N400': 'C001', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C019', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C059', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C079', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8430'],
+            ['PRIMARY_SITE_N400': 'C099', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9680'],
+            ['PRIMARY_SITE_N400': 'C160', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C165', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C169', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8010'],
+            ['PRIMARY_SITE_N400': 'C180', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8261'],
+            ['PRIMARY_SITE_N400': 'C182', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C183', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8261'],
+            ['PRIMARY_SITE_N400': 'C185', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C187', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8010'],
+            ['PRIMARY_SITE_N400': 'C187', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C187', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8261'],
+            ['PRIMARY_SITE_N400': 'C199', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C209', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C211', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C220', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8170'],
+            ['PRIMARY_SITE_N400': 'C320', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C321', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C340', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8020'],
+            ['PRIMARY_SITE_N400': 'C341', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8046'],
+            ['PRIMARY_SITE_N400': 'C341', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8071'],
+            ['PRIMARY_SITE_N400': 'C341', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C343', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8041'],
+            ['PRIMARY_SITE_N400': 'C343', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C349', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8010'],
+            ['PRIMARY_SITE_N400': 'C349', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8012'],
+            ['PRIMARY_SITE_N400': 'C349', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+            ['PRIMARY_SITE_N400': 'C402', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9180'],
+            ['PRIMARY_SITE_N400': 'C421', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9800'],
+            ['PRIMARY_SITE_N400': 'C421', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9823'],
+            ['PRIMARY_SITE_N400': 'C421', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9989'],
+            ['PRIMARY_SITE_N400': 'C443', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8742'],
+            ['PRIMARY_SITE_N400': 'C445', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8743'],
+            ['PRIMARY_SITE_N400': 'C446', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8720'],
+            ['PRIMARY_SITE_N400': 'C502', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8500'],
+            ['PRIMARY_SITE_N400': 'C502', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8520'],
+            ['PRIMARY_SITE_N400': 'C504', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8010'],
+            ['PRIMARY_SITE_N400': 'C504', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8500'],
+            ['PRIMARY_SITE_N400': 'C504', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8503'],
+            ['PRIMARY_SITE_N400': 'C508', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8500'],
+            ['PRIMARY_SITE_N400': 'C508', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8522'],
+            ['PRIMARY_SITE_N400': 'C509', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C509', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8500'],
+            ['PRIMARY_SITE_N400': 'C539', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8010'],
+            ['PRIMARY_SITE_N400': 'C540', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C549', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8260'],
+            ['PRIMARY_SITE_N400': 'C569', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C619', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8140'],
+            ['PRIMARY_SITE_N400': 'C629', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9070'],
+            ['PRIMARY_SITE_N400': 'C649', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8310'],
+            ['PRIMARY_SITE_N400': 'C649', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8312'],
+            ['PRIMARY_SITE_N400': 'C673', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8120'],
+            ['PRIMARY_SITE_N400': 'C679', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8050'],
+            ['PRIMARY_SITE_N400': 'C679', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8120'],
+            ['PRIMARY_SITE_N400': 'C679', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8130'],
+            ['PRIMARY_SITE_N400': 'C700', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9537'],
+            ['PRIMARY_SITE_N400': 'C713', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9440'],
+            ['PRIMARY_SITE_N400': 'C715', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9391'],
+            ['PRIMARY_SITE_N400': 'C719', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8000'],
+            ['PRIMARY_SITE_N400': 'C719', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9401'],
+            ['PRIMARY_SITE_N400': 'C770', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9695'],
+            ['PRIMARY_SITE_N400': 'C772', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9690'],
+            ['PRIMARY_SITE_N400': 'C778', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9699'],
+            ['PRIMARY_SITE_N400': 'C779', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9590'],
+            ['PRIMARY_SITE_N400': 'C779', 'HISTOLOGIC_TYPE_ICD_O3_N522': '9699'],
+            ['PRIMARY_SITE_N400': 'C809', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8000'],
+            ['PRIMARY_SITE_N400': 'C809', 'HISTOLOGIC_TYPE_ICD_O3_N522': '8070'],
+    ] as List<Map<String, Object>>
+
     void "test loading naaccr flat file"() {
         DBConfig.inMemoryDB("TR").withSql { Sql sql ->
             final claimed = TumorFile.NAACCR_Extract.loadFlatFile(
@@ -135,6 +209,9 @@ class TumorFileTest extends TestCase {
             assert claimed == 100
             final actual = sql.firstRow('select count(PRIMARY_SITE_N400) from TUMOR')[0]
             assert actual == claimed
+
+            final recode_in = sql.rows('select distinct primary_site_N400, HISTOLOGIC_TYPE_ICD_O3_N522 from TUMOR order by 1, 2')
+            assert recode_in == recode_in_100
 
             final rs = sql.connection.metaData.getColumns(null, null, 'TUMOR', null)
             def cols = []
@@ -263,7 +340,26 @@ class TumorFileTest extends TestCase {
         s.replaceFirst('\\s++$', "")
     }
 
-    static Map ranges(String txt, boolean sometimes = true) {
+    @Immutable
+    static class Range {
+        String lo
+        String hi = null
+    }
+
+    @Immutable
+    static class Ranges {
+        boolean excl
+        List<Range> bounds
+    }
+
+    @Immutable
+    static class Recode {
+        Ranges site
+        Ranges histology
+        String recode
+    }
+
+    static Ranges ranges(String txt, boolean sometimes = true) {
         final exc = ['All sites except ', 'excluding '].findAll { txt.startsWith((it)) }
         final String atoms = exc.size() > 0 ? txt.substring(exc[0].size()) : txt
         final ti0 = atoms.split(', and sometimes ') as List<String>
@@ -273,26 +369,32 @@ class TumorFileTest extends TestCase {
         def parseBounds = { String t ->
             if (t.contains('-')) {
                 final lo_hi = t.split('-', 2)
-                return [lo: lo_hi[0], hi: lo_hi[1]]
+                return [lo: lo_hi[0], hi: lo_hi[1]] as Range
             } else {
-                return [lo: t, hi: null]
+                return [lo: t, hi: null] as Range
             }
         }
 
-        return [excl: exc.size() > 0, bounds: hilos.findAll { it.length() > 0 }.collect(parseBounds)]
+        return [excl: exc.size() > 0, bounds: hilos.findAll { it.length() > 0 }.collect(parseBounds)] as Ranges
+    }
+
+    static boolean checkRanges(Ranges ranges, String target) {
+        final between = { Range b -> b.hi == null ? target == b.lo : (target >= b.lo && target <= b.hi) }
+        final found = ranges.bounds.find { between(it) }
+        (found != null) != ranges.excl
     }
 
     void "test SEER Recode"() {
         assert ranges('C530-C539', false) == [
-                excl: false, bounds: [[lo: 'C530', hi: 'C539']]]
+                excl: false, bounds: [[lo: 'C530', hi: 'C539'] as Range]] as Ranges
         assert ranges('excluding 9590-9989, and sometimes 9050-9055, 9140') == [
-                excl: true, bounds: [[lo: '9590', hi: '9989'], [lo: '9050', hi: '9055'], [lo: '9140', hi: null]]]
+                excl: true, bounds: [[lo: '9590', hi: '9989'] as Range, [lo: '9050', hi: '9055'] as Range, [lo: '9140', hi: null] as Range]] as Ranges
         assert ranges('excluding 9590-9989, and sometimes 9050-9055, 9140', false) == [
-                excl: true, bounds: [[lo: '9590', hi: '9989']]]
+                excl: true, bounds: [[lo: '9590', hi: '9989'] as Range]] as Ranges
         assert ranges('All sites except C024, C098-C099, C111, C142, C379, C422, C770-C779') == [
                 excl: true, bounds: [
-                [lo: 'C024', hi: null], [lo: 'C098', hi: 'C099'], [lo: 'C111', hi: null],
-                [lo: 'C142', hi: null], [lo: 'C379', hi: null], [lo: 'C422', hi: null], [lo: 'C770', hi: 'C779']]]
+                [lo: 'C024', hi: null] as Range, [lo: 'C098', hi: 'C099'] as Range, [lo: 'C111', hi: null] as Range,
+                [lo: 'C142', hi: null] as Range, [lo: 'C379', hi: null] as Range, [lo: 'C422', hi: null] as Range, [lo: 'C770', hi: 'C779'] as Range]] as Ranges
 
         final rules = TumorFile.SEERRecode.recode.text
                 .split('\n')
@@ -319,6 +421,16 @@ class TumorFileTest extends TestCase {
             ]
         }
         assert terms[2] == ['C_HLEVEL': 1, 'C_DIMCODE': 'Oral Cavity and Phar\\Tongue', 'C_NAME': 'Tongue', 'C_BASECODE': '20020', 'C_VISUALATTRIBUTES': 'LA']
+
+        final allRanges = rules.collect { [site: ranges(it.site), histology: ranges(it.histology), recode: it.recode] as Recode }
+        for (tumor in recode_in_100) {
+            final site = tumor.PRIMARY_SITE_N400 as String
+            final histology = tumor.HISTOLOGIC_TYPE_ICD_O3_N522 as String
+            final recodeRule = allRanges.find { Recode it -> it.recode > '' && checkRanges(it.site, site) && checkRanges(it.histology, histology) }
+            final recode = recodeRule == null ? '99999' : recodeRule.recode
+            assert recode.length() == '20010'.length()
+            assert recode.startsWith('2') || recode.startsWith('3') || recode == '99999'
+        }
     }
 
     void "test loading layout for id data extraction"() {
