@@ -394,7 +394,7 @@ class TumorFile {
                               boolean include_phi = false) {
         log.info("fact DML: {}", upload.insertStatement)
 
-        final layout = NAACCR_Extract.theLayout(flat_file)
+        final layout = NAACCR_Extract.theLayout(flat_file) as FixedColumnsLayout
 
         final itemInfo = TumorOnt.NAACCR_I2B2.tumor_item_type.iterator().collect {
             final num = it.getInt('naaccrNum')
@@ -413,6 +413,10 @@ class TumorFile {
                 'dateOfBirth', 'dateOfDiagnosis', 'dateOfLastContact',
                 'dateCaseCompleted', 'dateCaseLastChanged', 'dateCaseReportExported'
         ].collect { layout.getFieldByName(it) }
+
+        final recodeRules = SEERRecode.fromLines(SEERRecode.site_recode.text)
+        final siteField = layout.getFieldByName('primarySite')
+        final histologyField = layout.getFieldByName('histologicTypeIcdO3')
 
         dropIfExists(sql, upload.factTable)
         sql.execute(upload.getFactTableDDL(ColumnMeta.typeNames(sql.connection)))
@@ -448,8 +452,17 @@ class TumorFile {
                     if (record != null) {
                         ps.addBatch(record)
                         fact_qty += 1
+                        if (field == siteField) {
+                            final site = fieldValue(siteField, line)
+                            final histology = fieldValue(histologyField, line)
+                            if (site > '' && histology > '') {
+                                final recode = SEERRecode.getRecode(recodeRules, site, histology)
+                                ps.addBatch(record + [concept_cd: 'SEER_SITE:' + recode])
+                            }
+                        }
                     }
                 }
+
                 if (encounter_num % 1000 == 0) {
                     log.info('tumor {}: {} facts', encounter_num, fact_qty)
                 }

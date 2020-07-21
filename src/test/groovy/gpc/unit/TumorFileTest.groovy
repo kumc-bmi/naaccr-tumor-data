@@ -295,9 +295,16 @@ class TumorFileTest extends TestCase {
                      , count(distinct nval_num) numbers
                 from ${upload.factTable}
             """ as String)
-            assert actual as Map == ['RECORDS': 6711, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 552,
+            assert actual as Map == ['RECORDS': 6808, 'ENCOUNTERS': 97, 'PATIENTS': 91, 'CONCEPTS': 583,
                                      'DATES'  : 188, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 18]
             assert enc == 2100
+
+            final byCode = memdb.rows("""
+                select concept_cd, count(*) records
+                from ${upload.factTable} group by concept_cd
+            """ as String).collectEntries { [it.concept_cd, it.records] }
+            assert byCode['SEER_SITE:26000'] == 17 // Breast
+            assert byCode.findAll { (it.key as String).startsWith('NAACCR|400:C50') }.collect { it.value }.sum() == 17
         }
     }
 
@@ -351,14 +358,14 @@ class TumorFileTest extends TestCase {
                 [lo: 'C142', hi: null] as Range, [lo: 'C379', hi: null] as Range, [lo: 'C422', hi: null] as Range, [lo: 'C770', hi: 'C779'] as Range]] as Ranges
 
 
-        final allRanges = SEERRecode.fromLines(SEERRecode.site_recode.text)
-        final terms = allRanges.collect { it.asTerm() }
+        final recodeRules = SEERRecode.fromLines(SEERRecode.site_recode.text)
+        final terms = recodeRules.collect { it.asTerm() }
         assert terms[2] == ['C_HLEVEL': 1, 'C_DIMCODE': 'Oral Cavity and Phar\\Tongue', 'C_NAME': 'Tongue', 'C_BASECODE': '20020', 'C_VISUALATTRIBUTES': 'LA']
 
         for (tumor in recode_in_100) {
             final site = tumor.PRIMARY_SITE_N400 as String
             final histology = tumor.HISTOLOGIC_TYPE_ICD_O3_N522 as String
-            final recode = SEERRecode.getRecode(allRanges, site, histology)
+            final recode = SEERRecode.getRecode(recodeRules, site, histology)
             assert recode.length() == '20010'.length()
             assert recode.startsWith('2') || recode.startsWith('3') || recode == '99999'
         }

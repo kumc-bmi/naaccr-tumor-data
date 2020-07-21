@@ -115,7 +115,7 @@ class I2B2Star extends TestCase {
 
         }
 
-        void "test seer site recode"() {
+        void "test seer site recode terms"() {
         }
 
         void "test site-specific factors csterms"() {
