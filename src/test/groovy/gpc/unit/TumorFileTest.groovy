@@ -359,8 +359,6 @@ class TumorFileTest extends TestCase {
 
 
         final recodeRules = SEERRecode.fromLines(SEERRecode.site_recode.text)
-        final terms = recodeRules.collect { it.asTerm() }
-        assert terms[2] == ['C_HLEVEL': 1, 'C_DIMCODE': 'Oral Cavity and Phar\\Tongue', 'C_NAME': 'Tongue', 'C_BASECODE': '20020', 'C_VISUALATTRIBUTES': 'LA']
 
         for (tumor in recode_in_100) {
             final site = tumor.PRIMARY_SITE_N400 as String

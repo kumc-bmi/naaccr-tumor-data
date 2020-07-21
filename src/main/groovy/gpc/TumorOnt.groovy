@@ -107,10 +107,12 @@ class TumorOnt {
     }
 
     static final Map top = [
-            C_HLEVEL       : 1,
-            C_FULLNAME     : "\\i2b2\\naaccr\\",
-            C_NAME         : 'Cancer Cases (NAACCR Hierarchy)',
-            SOURCESYSTEM_CD: 'heron-admin@kumc.edu',
+            C_HLEVEL          : 1,
+            C_FULLNAME        : "\\i2b2\\naaccr\\",
+            C_DIMCODE         : "\\i2b2\\naaccr\\",
+            C_NAME            : 'Cancer Cases (NAACCR Hierarchy)',
+            SOURCESYSTEM_CD   : 'heron-admin@kumc.edu',
+            C_VISUALATTRIBUTES: 'FA',
     ] as Map
     static final Map normal_term = [
             C_SYNONYM_CD     : 'N',
@@ -160,6 +162,29 @@ class TumorOnt {
         ] as Map
     }
 
+    static URL seer_recode_terms = TumorOnt.getResource('seer_recode_terms.csv')
+    static Map seer_recode_folder = normal_term + [
+            C_HLEVEL          : top.C_HLEVEL as int + 1,
+            C_FULLNAME        : top.C_FULLNAME as String + 'SEER Site\\',
+            C_DIMCODE         : top.C_FULLNAME as String + 'SEER Site\\',
+            C_NAME            : "SEER Site Summary",
+            C_BASECODE        : null,
+            C_VISUALATTRIBUTES: 'FA',
+            C_TOOLTIP         : 'SEER Site Recode ICD-O-3/WHO 2008 Definition',
+    ] as Map
+
+    static Map makeRecodeTerm(Map item) {
+        final path = "${seer_recode_folder.C_FULLNAME}${item.path}\\".toString()
+        normal_term + [
+                C_HLEVEL          : seer_recode_folder.C_HLEVEL as int + 1,
+                C_FULLNAME        : path,
+                C_DIMCODE         : path,
+                C_NAME            : item.name,
+                C_BASECODE        : "SEER_SITE:${item.basecode}".toString(),
+                C_VISUALATTRIBUTES: item.visualattributes,
+                C_TOOLTIP         : null, // TODO
+        ] as Map
+    }
 
     static Table pcornet_fields = read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
 
@@ -234,13 +259,23 @@ class TumorOnt {
         }
 
         void run() {
-            final DBConfig mem = DBConfig.inMemoryDB("Ontology")
-            Table terms
-            mem.withSql { Sql sql ->
-                terms = NAACCR_I2B2.ont_view_in(sql, task_hash, update_date, who_cache)
-            }
             cdw.withSql { Sql sql ->
-                load_data_frame(sql, table_name, terms, true)
+                final toTypeName = Tabular.ColumnMeta.typeNames(sql.connection)
+                TumorFile.dropIfExists(sql, table_name)
+                sql.execute(Tabular.ColumnMeta.createStatement(table_name, metadataColumns, toTypeName))
+
+                final top_term = normal_term + top
+                final insert1 = Tabular.ColumnMeta.insertStatement(table_name, metadataColumns)
+                        .replace('?.UPDATE_DATE', 'current_timestamp')
+                sql.execute(insert1, top_term)
+                insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
+                insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
+                // TODO: codes from LOINC, R
+
+                sql.execute(insert1, seer_recode_folder)
+                insertTerms(sql, table_name, seer_recode_terms, { Map s -> makeRecodeTerm(s) })
+
+                // TODO: OncologyMeta
             }
         }
     }
@@ -250,7 +285,7 @@ class TumorOnt {
 
         static final URL field_info_csv = TumorOnt.getResource('naaccr_r_raw/field_info.csv')
         static final Map field_info_meta = [
-                tableSchema: [ columns : [
+                tableSchema: [columns: [
                         [number: 1, name: "code", datatype: "string", nulls: [""]],
                         [number: 2, name: "label", datatype: "string", nulls: [""]],
                         [number: 3, name: "means_missing", datatype: "boolean", nulls: [""]],

@@ -3,6 +3,7 @@ package gpc.unit
 import gpc.DBConfig
 import gpc.Tabular
 import gpc.Tabular.ColumnMeta
+import gpc.TumorFile
 import gpc.TumorOnt
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
@@ -62,6 +63,23 @@ class TumorOntTest extends TestCase {
         }
     }
 
+    void 'test SEER Recode terms'() {
+        final recodeRules = TumorFile.SEERRecode.fromLines(TumorFile.SEERRecode.site_recode.text)
+
+        final terms = recodeRules.collect { it.asTerm() }.unique()
+        assert terms[2] == [hlevel: 1, path: 'Oral Cavity and Phar\\Tongue', name: 'Tongue', basecode: '20020', visualattributes: 'LA']
+
+        final t2 = []
+        final meta = Tabular.columnDescriptions(TumorOnt.seer_recode_terms)
+        TumorOnt.seer_recode_terms.withInputStream { InputStream stream ->
+            Tabular.eachCSVRecord(stream, meta) { t2 << it; return }
+        }
+        [t2, terms].transpose().each {
+            final parts = it as List
+            assert parts[0] == parts[1]
+        }
+        assert t2.size() == terms.size()
+    }
 
     static final String cache = ',cache/'
 

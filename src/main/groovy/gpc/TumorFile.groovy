@@ -642,11 +642,11 @@ class TumorFile {
 
         Map<String, Object> asTerm() {
             [
-                    C_HLEVEL          : level as int - 1,
-                    C_DIMCODE         : path.collect { substr(it as String, 0, 20) }.join('\\'),
-                    C_NAME            : path[-1],
-                    C_BASECODE        : recode, // TODO: SEER_SITE:?
-                    C_VISUALATTRIBUTES: recode as String > '' ? 'LA' : 'FA'
+                    hlevel          : level as int - 1,
+                    path            : path.collect { substr(it as String, 0, 20) }.join('\\'),
+                    name            : path[-1],
+                    basecode        : recode > '' ? recode : null,
+                    visualattributes: recode as String > '' ? 'LA' : 'FA'
             ] as Map<String, Object>
         }
 
