@@ -8,6 +8,7 @@ import gpc.Tabular.ColumnMeta
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.transform.Immutable
 import groovy.util.logging.Slf4j
 import org.docopt.Docopt
 import tech.tablesaw.api.Row
@@ -542,8 +543,106 @@ class TumorFile {
         value
     }
 
+    @Immutable
     static class SEERRecode {
-        static URL recode = TumorFile.getResource('seer_site_recode.txt')
+        static URL site_recode = TumorFile.getResource('seer_site_recode.txt')
+
+        static String stripTrailing(String s) {
+            s.replaceFirst('\\s++$', "")
+        }
+
+        static String substr(String s, int lo, int hi) { hi < s.length() ? s.substring(lo, hi) : s.substring(lo) }
+
+        @Immutable
+        static class Range {
+            String lo
+            String hi = null
+        }
+
+        @Immutable
+        static class Ranges {
+            boolean excl
+            List<Range> bounds
+
+            static Ranges parse(String txt, boolean sometimes = true) {
+                final exc = ['All sites except ', 'excluding '].findAll { txt.startsWith((it)) }
+                final String atoms = exc.size() > 0 ? txt.substring(exc[0].size()) : txt
+                final ti0 = atoms.split(', and sometimes ') as List<String>
+                final t1 = (sometimes ? ti0 : ti0[0..<1]).join(',')
+                final hilos = t1.split(',').collect { it.strip() }
+
+                def parseBounds = { String t ->
+                    if (t.contains('-')) {
+                        final lo_hi = t.split('-', 2)
+                        return [lo: lo_hi[0], hi: lo_hi[1]] as Range
+                    } else {
+                        return [lo: t, hi: null] as Range
+                    }
+                }
+
+                new Ranges(excl: exc.size() > 0, bounds: hilos.findAll { it.length() > 0 }.collect(parseBounds))
+            }
+
+            boolean check(String target) {
+                final between = { Range b -> b.hi == null ? target == b.lo : (target >= b.lo && target <= b.hi) }
+                final found = bounds.find { between(it) }
+                (found != null) != excl
+            }
+        }
+
+        final String siteGroup
+        final Ranges site
+        final Ranges histology
+        final String recode
+        final int level
+        final List<String> path
+
+        static final List<SEERRecode> fromLines(String text) {
+            final parts = text
+                    .split('\n')
+                    .dropWhile { it.startsWith('Site ') }
+                    .collect { it.split(';') }
+                    .takeWhile { it.size() >= 4 }
+                    .collect {
+                        [
+                                siteGroup: stripTrailing(it[0]),
+                                site     : it[1],
+                                histology: it[2],
+                                recode   : stripTrailing(it[3])
+                        ]
+                    }
+            List<Map> path = []
+            parts.collect { rule ->
+                final indent = rule.siteGroup.takeWhile { it == ' ' }.length()
+                final label = rule.siteGroup.substring(indent)
+                path = path.findAll { it -> it.ix as int < indent } + [[ix: indent, segment: label] as Map]
+                new SEERRecode(
+                        siteGroup: rule.siteGroup,
+                        site: Ranges.parse(rule.site),
+                        histology: Ranges.parse(rule.histology),
+                        recode: rule.recode,
+                        level: path.size(),
+                        path: path.collect { Map it -> it.segment as String }
+                )
+            }
+        }
+
+        Map<String, Object> asTerm() {
+            [
+                    C_HLEVEL          : level as int - 1,
+                    C_DIMCODE         : path.collect { substr(it as String, 0, 20) }.join('\\'),
+                    C_NAME            : path[-1],
+                    C_BASECODE        : recode, // TODO: SEER_SITE:?
+                    C_VISUALATTRIBUTES: recode as String > '' ? 'LA' : 'FA'
+            ] as Map<String, Object>
+        }
+
+        static final String getRecode(List<SEERRecode> allRanges, String site, String histology) {
+            final recodeRule = allRanges.find { it ->
+                it.recode > '' && it.site.check(site) && it.histology.check(histology)
+            }
+            recodeRule == null ? '99999' : recodeRule.recode
+        }
     }
 
     static class LoadLayouts implements Task {
