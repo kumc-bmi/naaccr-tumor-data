@@ -4,10 +4,7 @@ import groovy.json.JsonSlurper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.transform.Immutable
-import tech.tablesaw.api.ColumnType
-import tech.tablesaw.api.Table
 
-import java.nio.file.Path
 import java.sql.Connection
 import java.sql.Types
 
@@ -82,6 +79,17 @@ class Tabular {
         }
     }
 
+    static List<Map<String, Object>> allCSVRecords(URL source) {
+        final meta = columnDescriptions(metadata(source))
+        source.withInputStream { text -> allCSVRecords(text, meta) }
+    }
+
+    static List<Map<String, Object>> allCSVRecords(InputStream text, List<ColumnMeta> schema) {
+        final out = []
+        eachCSVRecord(text, schema) { out << it; return }
+        out
+    }
+
     static void eachCSVRecord(InputStream text, List<ColumnMeta> schema, Closure<Void> f) {
         List<String> hd = null
         final byName = schema.collectEntries { [it.name, it] }
@@ -119,11 +127,12 @@ class Tabular {
         }
     }
 
-    static void eachCSVRow(InputStream text, Closure<Void> f) {
+    static void eachCSVRow(InputStream text, boolean tsv = false, Closure<Void> f) {
+        final sep = Character.codePointAt(tsv ? '\t' : ',', 0)
         String state = 'start'
         String cell = ''
         List<String> row = []
-        final go = {
+        final emit = {
             row << cell
             f(row)
             row = []
@@ -136,7 +145,7 @@ class Tabular {
         }
         do {
             if (state == 'start') {
-                if (ch == ',') {
+                if (ch == sep) {
                     row << cell
                     cell = ''
                 } else if (ch == '"') {
@@ -144,7 +153,7 @@ class Tabular {
                 } else if (ch == '\r') {
                     state = 'CR'
                 } else if (ch == '\n') {
-                    go()
+                    emit()
                 } else {
                     cell += Character.toChars(ch)
                 }
@@ -171,10 +180,8 @@ class Tabular {
                     continue
                 }
             } else if (state == 'CR') {
-                if (ch == '\n') {
-                    state = 'start'
-                } else {
-                    state = 'start'
+                emit()
+                if (ch != '\n') {
                     continue
                 }
             }
