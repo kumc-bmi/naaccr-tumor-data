@@ -7,6 +7,7 @@ import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
+import groovy.transform.Immutable
 import groovy.util.logging.Slf4j
 import tech.tablesaw.api.*
 import tech.tablesaw.columns.Column
@@ -344,7 +345,82 @@ class TumorOnt {
         }
     }
 
+    @Immutable
     static class OncologyMeta {
+        List<Map<String, Object>> topo
+        List<Map<String, Object>> morph2
+        List<Map<String, Object>> morph3
+
+        static OncologyMeta load(Path cache) {
+            final icdo2zip = new ZipFile(cache.resolve('ICD-O-2_CSV.zip').toFile())
+            final icdo3zip = new ZipFile(cache.resolve('ICD-O-3_CSV-metadata.zip').toFile())
+
+            final allRows = { ZipFile zip, String name ->
+                final List<List<String>> rows = []
+                final entry = zip.getInputStream(zip.getEntry(name))
+                println("@@@allRows ${[zip, name, entry, !name.endsWith('.csv')]}")
+                Tabular.eachCSVRow(entry, !name.endsWith('.csv')) { rows << (it as List<String>); return }
+                rows
+            }
+            final topo = allRows(icdo2zip, 'Topoenglish.txt')
+                .drop(1)
+                .collect {
+                    println("@@topo collect" + it)
+                    [Kode: it[0], Lvl: it[1], Title: it[2]]  as Map<String, Object>
+                }
+            final morph2 = allRows(icdo2zip, 'icd-o-3-morph.csv')
+                    .collect {  it ->
+                        [code: it[0].replace('M', ''), label: it[1] ] as Map<String, Object>
+                    }
+            final morph3 = allRows(icdo3zip, 'Morphenglish.txt')
+                    .drop(1)
+                    .collect { [code: it[0], struct: it[1], label: it[2] ] as Map<String, Object> }
+            new OncologyMeta(topo: topo, morph2: morph2, morph3: morph3)
+        }
+
+        List<Map> major() {
+            morph2.findAll { !(it.code as String).contains('/') }.collect { [level: 3 as Object] + it }
+        }
+
+        def primarySiteTerms() {
+            def major = topo.findAll { it.Lvl == '3' }.collect {[
+                    lvl: 3,
+                    concept_cd: it.Kode,
+                    c_visualattributes: 'FA',
+                    path: "${it.Kode}\\".toString(),
+                    concept_name: it.Title,
+            ]}
+
+            def minor = topo.findAll { it.Lvl == '4' }.collect {[
+                    lvl: 4,
+                    concept_cd: (it.Kode as String).replace('.', ''),
+                    c_visualattributes: 'LA',
+                    path: "${(it.Kode as String).replaceAll('\\..*', '')}\\${it.Kode}\\".toString(),
+                    concept_name: it.Title,
+            ]}
+            major + minor
+        }
+
+        List histBehaviorWIP() {
+            // ISSUE: this is actually designed for the combined 419, 521 items
+            final itemTerms = Tabular.allCSVRecords(TumorOnt.itemCSV)
+                    .findAll { ['histologyIcdO2', 'histologicTypeIcdO3'].contains(it.naaccrId) }
+                    .collect { Map s -> TumorOnt.makeItemTerm(s) }
+
+
+            itemTerms.collect { parent ->
+                major().collect {
+                    [
+                            level: parent.C_HLEVEL as int + 1,
+                            code: it.code, // TODO: more to it
+                            visualattributes: 'FA',
+                            path: "${parent.C_FULLNAME}${it.code}\\".toString(),
+                            concept_name: "${it.code} ${it.label}".toString(),
+                    ]
+                }
+            }.flatten()
+        }
+
         static Tuple morph3_info = new Tuple('ICD-O-2_CSV.zip', 'icd-o-3-morph.csv', ['code', 'label', 'notes'])
         static Tuple topo_info = new Tuple('ICD-O-2_CSV.zip', 'Topoenglish.txt', null)
         static String encoding = 'ISO-8859-1'
@@ -396,6 +472,7 @@ class TumorOnt {
         result
     }
 
+    @Deprecated
     static class SqlScript { // TODO: refactor: move SqlScript out of gpc.TumorOnt
         final String name
         final String code
