@@ -42,9 +42,6 @@ INFO all_naaccr.DAT: layout NAACCR 18 Incidence
 INFO inserted 100 records into TUMOR
 ```
 
-_Please excuse / ignore `WARNING: An illegal reflective access ...`;
-see [issue 30](https://github.com/kumc-bmi/naaccr-tumor-data/issues/30)._
-
 
 ---
 
