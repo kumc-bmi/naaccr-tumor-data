@@ -44,19 +44,20 @@ INFO all_naaccr.DAT: layout NAACCR 18 Incidence
 INFO inserted 100 records into TUMOR
 ```
 
-### Patient Mapping using a SQL update script
+### Patient Mapping using custom SQL
 
 The i2b2 `patient_mapping` table typically includes a crosswalk
 from MRN to `patient_num`, but the details seem to be somewhat idiosyncratic.
-For example, at KUMC, it involves stripping leading zeros:
+For example, to use NAACCR item 2300 (medical record number) from v15,
+which is 11 characters starting at column 3606:
 
 ```sql
 update naacr.tumor tr
 set tr.patient_num = (
     select pm.patient_num
-    from nightherondata.patient_mapping pm
-    where pm.patient_ide_source = 'SMS@kumed.com'
-    and pm.patient_ide = trim(leading '0' from tr.patient_Id_Number_N20)
+    from i2b2data.patient_mapping pm
+    where pm.patient_ide_source = 'MRN'
+    and pm.patient_ide = trim(leading ' ' from substr(observation_blob, 3606, 11))
     )
 ;
 commit;
@@ -68,6 +69,16 @@ to update the `patient_num` column of the `tumor` table.
 
 TODO: the tumor table should also have a `PATID VARCHAR` column
 ([issue 48](https://github.com/kumc-bmi/naaccr-tumor-data/issues/48)).
+
+When building i2b2 facts, set `--mrn-item=medicalRecordNumber` correspondingly
+(using NAACCR XML ids) and specify in `db.properties`:
+
+```properties
+i2b2.patient-mapping-query=select distinct tr.MRN, pm.patient_num
+  from i2b2data.patient_mapping pm
+  join (select trim(leading ' ' from substr(observation_blob, 3606, 11)) as MRN from tumor) tr
+  on tr.MRN = pm.patient_ide
+```
 
 ---
 

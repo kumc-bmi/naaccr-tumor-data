@@ -79,6 +79,40 @@ class I2B2Star extends TestCase {
         }
     }
 
+    void "test i2b2 facts from v16 flat file, mrnItem = 2300"() {
+        final URL sample50 = TumorFile.getResource('unit/synthetic50_v16.dat')
+        String patient_ide_source = 'MRN@UTSW'
+        final patientMapping = """
+            select distinct tr.MRN, pm.patient_num
+            from patient_mapping pm
+            join (select trim(leading ' ' from substr(observation_blob, 3606, 11)) as MRN from tumor) tr
+              on tr.MRN = pm.patient_ide
+        """
+        final io1 = Staging.io1(workDir, sample50,
+                ["i2b2.patient-mapping-query": patientMapping])
+        final cli = { List<String> args -> new DBConfig.CLI(TumorFile.docopt.parse(args), io1) }
+        final cli1 = cli(['tumor-table'])
+        TumorFile.run(cli1)
+
+        cli1.account().withSql { Sql sql ->
+            TumorFileTest.mockPatientMapping(sql, patient_ide_source, 150)
+            TumorFile.run(cli(['facts', '--upload-id=111234', '--mrn-item=medicalRecordNumber']))
+            final actual = sql.firstRow("""
+                select count(*) records
+                     , count(distinct encounter_num) encounters
+                     , count(distinct patient_num) patients
+                     , count(distinct concept_cd) concepts
+                     , count(distinct start_date) dates
+                     , count(distinct valtype_cd) types
+                     , count(distinct tval_char) texts
+                     , count(distinct nval_num) numbers
+                from OBSERVATION_FACT_111234
+            """ as String)
+            assert actual as Map == ['RECORDS': 9814, 'ENCOUNTERS': 50, 'PATIENTS': 50, 'CONCEPTS': 920,
+                                     'DATES'  : 702, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 72]
+        }
+    }
+
     void "test template table"() {
         String patient_ide_source = 'SMS@kumed.com'
         URL createFactTable = Loader.getResource('observation_fact.sql')
@@ -136,10 +170,6 @@ class I2B2Star extends TestCase {
 
     @Ignore
     static class ToDo {
-        void "test i2b2 facts from v16 flat file"() {
-
-        }
-
         void "test bc_qa variables"() {
 
         }
@@ -152,10 +182,6 @@ class I2B2Star extends TestCase {
         }
 
         void "test icd_o_meta terms"() {
-
-        }
-
-        void "test mrnItem = 2300"() {
 
         }
     }

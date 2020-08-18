@@ -401,7 +401,9 @@ class TumorFile {
             final lf = layout.getFieldByNaaccrItemNumber(num)
             if (lf != null) {
                 assert num == lf.naaccrItemNum
-                assert it.getString('naaccrId') == lf.name
+                if (it.getString('naaccrId') != lf.name) {
+                    log.warn("item #${num}: expected ${it.getString('naaccrId')}; layout has ${lf.name}")
+                }
             }
             [num       : num, layout: lf,
              valtype_cd: it.getString('valtype_cd')]
