@@ -31,7 +31,9 @@ i2b2.patient-mapping-query: select distinct MRN, patient_num from ...
 # i2b2.template-fact-table: i2b2demodata.observation_fact
 ```
 
-Then, to create the `TUMOR` table following draft PCORnet specifications:
+Then, to create the `TUMOR` table
+([less PATID column](https://github.com/kumc-bmi/naaccr-tumor-data/issues/48))
+following draft PCORnet specifications:
 
 ```shell script
 $ java -jar build/libs/naaccr-tumor-data.jar tumor-table
@@ -42,6 +44,30 @@ INFO all_naaccr.DAT: layout NAACCR 18 Incidence
 INFO inserted 100 records into TUMOR
 ```
 
+### Patient Mapping using a SQL update script
+
+The i2b2 `patient_mapping` table typically includes a crosswalk
+from MRN to `patient_num`, but the details seem to be somewhat idiosyncratic.
+For example, at KUMC, it involves stripping leading zeros:
+
+```sql
+update naacr.tumor tr
+set tr.patient_num = (
+    select pm.patient_num
+    from nightherondata.patient_mapping pm
+    where pm.patient_ide_source = 'SMS@kumed.com'
+    and pm.patient_ide = trim(leading '0' from tr.patient_Id_Number_N20)
+    )
+;
+commit;
+```
+
+Given a script such as the above, use
+`java -jar build/libs/naaccr-tumor-data.jar run patient_mapping.sql`
+to update the `patient_num` column of the `tumor` table.
+
+TODO: the tumor table should also have a `PATID VARCHAR` column
+([issue 48](https://github.com/kumc-bmi/naaccr-tumor-data/issues/48)).
 
 ---
 
