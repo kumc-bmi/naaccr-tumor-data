@@ -394,9 +394,9 @@ class TumorFileTest extends TestCase {
 
     void "test synthesizing data"() {
         final stats = TumorFileTest.getResource("tumor_data_stats.csv")
-        final dest = new File('synthetic1500.dat')
-        final qty = 150
         final writing = false
+        final qty = 50
+        final dest = new File("synthetic${qty}.dat")
 
         final cdw = DBConfig.inMemoryDB("TR", true)
         final rng = new Random(1)
@@ -447,6 +447,9 @@ class TumorFileTest extends TestCase {
                 return
             }
             final field = layout.getFieldByNaaccrItemNumber(item.getInt('NAACCRNUM'))
+            if (!field) {
+                return
+            }
             final splice = spliceField(field)
             final valtype_cd = item.getString('VALTYPE_CD')
             //noinspection GroovyFallthrough
