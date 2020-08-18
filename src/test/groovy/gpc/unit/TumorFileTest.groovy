@@ -3,6 +3,7 @@ package gpc.unit
 import com.imsweb.layout.Field
 import com.imsweb.layout.LayoutFactory
 import com.imsweb.layout.LayoutInfo
+import com.imsweb.layout.record.fixed.FixedColumnsField
 import com.imsweb.layout.record.fixed.FixedColumnsLayout
 import gpc.DBConfig
 import gpc.DBConfig.Task
@@ -395,21 +396,22 @@ class TumorFileTest extends TestCase {
         final stats = TumorFileTest.getResource("tumor_data_stats.csv")
         final dest = new File('synthetic1500.dat')
         final qty = 150
+        final writing = false
 
         final cdw = DBConfig.inMemoryDB("TR", true)
         final rng = new Random(1)
         final layout = LayoutFactory.getLayout(LayoutFactory.LAYOUT_ID_NAACCR_18_INCIDENCE) as FixedColumnsLayout
         cdw.withSql { Sql sql ->
             Tabular.importCSV(sql, "stats", stats, Tabular.metadata(stats))
-            final record = syntheticRecord(sql, layout, rng)
+            final record = syntheticRecord(sql, layout, rng, 1)
             assert record.length() == layout.layoutLineLength
             assert record.substring(0, 1) == 'I'
             assert TumorFile.fieldValue(layout.getFieldByName('dateOfDiagnosis'), record) == '20150516'
 
-            if (false) {
+            if (writing) {
                 dest.withPrintWriter { out ->
                     (1..qty).each {
-                        final txt = syntheticRecord(sql, layout, rng)
+                        final txt = syntheticRecord(sql, layout, rng, it)
                         out.println(txt)
                     }
                 }
@@ -422,11 +424,22 @@ class TumorFileTest extends TestCase {
         new String(new char[n]).replace("\0", s)
     }
 
-    static String syntheticRecord(Sql sql, FixedColumnsLayout layout, Random rng) {
+    static String syntheticRecord(Sql sql, FixedColumnsLayout layout, Random rng, int patientIdNumber) {
         String record = repeat(" ", layout.layoutLineLength)
         final dx_yrs = sql.rows("select distinct DX_YR from stats").collect { it.DX_YR as Integer }
         final dx_yr = dx_yrs.get(rng.nextInt(dx_yrs.size()))
         final dx_dt = LocalDate.of(dx_yr, rng.nextInt(12) + 1, rng.nextInt(28) + 1)
+        final spliceField = { FixedColumnsField field ->
+            { String it ->
+                assert field.length >= it.length()
+                final pad = repeat(field.padChar, field.length - it.length())
+                assert field.align == Field.FieldAlignment.LEFT || field.align == Field.FieldAlignment.RIGHT
+                final txt = field.align == Field.FieldAlignment.LEFT ? it + pad : pad + it
+                record = record.substring(0, field.start - 1) + txt + record.substring(field.start - 1 + field.length)
+            }
+        }
+        final patientIdFields = [20, 2300].collect { layout.getFieldByNaaccrItemNumber(it) }.findAll { it != null }
+        patientIdFields.each { spliceField(it)(patientIdNumber.toString()) };
         sql.eachRow(
                 "select distinct VALTYPE_CD, NAACCRNUM, PCT_PRESENT from stats where DX_YR = ${dx_yr} order by naaccrnum"
         ) { item ->
@@ -434,13 +447,7 @@ class TumorFileTest extends TestCase {
                 return
             }
             final field = layout.getFieldByNaaccrItemNumber(item.getInt('NAACCRNUM'))
-            final splice = { String it ->
-                assert field.length >= it.length()
-                final pad = repeat(field.padChar, field.length - it.length())
-                assert field.align == Field.FieldAlignment.LEFT || field.align == Field.FieldAlignment.RIGHT
-                final txt = field.align == Field.FieldAlignment.LEFT ? it + pad : pad + it
-                record = record.substring(0, field.start - 1) + txt + record.substring(field.start - 1 + field.length)
-            }
+            final splice = spliceField(field)
             final valtype_cd = item.getString('VALTYPE_CD')
             //noinspection GroovyFallthrough
             switch (valtype_cd) {
