@@ -50,6 +50,35 @@ class I2B2Star extends TestCase {
         TumorFile.run(cli(['facts', '--upload-id=111222']))
     }
 
+    void "test facts from 150 synthetic records"() {
+        final URL sample150 = TumorFile.getResource('unit/synthetic150.dat')
+        String patient_ide_source = 'SMS@kumed.com'
+
+        final io1 = Staging.io1(workDir, sample150,
+                ["i2b2.patient-mapping-query": patientMapping])
+        final cli = { List<String> args -> new DBConfig.CLI(TumorFile.docopt.parse(args), io1) }
+        final cli1 = cli(['tumor-table'])
+        TumorFile.run(cli1)
+
+        cli1.account().withSql { Sql sql ->
+            TumorFileTest.mockPatientMapping(sql, patient_ide_source, 150)
+            TumorFile.run(cli(['facts', '--upload-id=111234']))
+            final actual = sql.firstRow("""
+                select count(*) records
+                     , count(distinct encounter_num) encounters
+                     , count(distinct patient_num) patients
+                     , count(distinct concept_cd) concepts
+                     , count(distinct start_date) dates
+                     , count(distinct valtype_cd) types
+                     , count(distinct tval_char) texts
+                     , count(distinct nval_num) numbers
+                from OBSERVATION_FACT_111234
+            """ as String)
+            assert actual as Map == ['RECORDS': 34442, 'ENCOUNTERS': 150, 'PATIENTS': 150, 'CONCEPTS': 1802,
+                                     'DATES'  : 1619, 'TYPES': 3, 'TEXTS': 0, 'NUMBERS': 1261]
+        }
+    }
+
     void "test template table"() {
         String patient_ide_source = 'SMS@kumed.com'
         URL createFactTable = Loader.getResource('observation_fact.sql')
