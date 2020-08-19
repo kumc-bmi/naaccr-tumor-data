@@ -26,7 +26,7 @@ jobs:
           java-version: 1.11
 
       - name: Build fatjar package with JDBC drivers
-        run: ./gradlew fatjar
+        run: ./gradlew fatjar --stacktrace
 
       - name: Archive test report
         uses: actions/upload-artifact@v1
