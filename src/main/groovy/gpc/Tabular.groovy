@@ -7,6 +7,7 @@ import groovy.transform.Immutable
 
 import java.sql.Connection
 import java.sql.Types
+import java.time.LocalDateTime
 
 @CompileStatic
 class Tabular {
@@ -116,6 +117,9 @@ class Tabular {
                         case Types.INTEGER:
                             value = Integer.parseInt(lit)
                             break
+                        case Types.TIMESTAMP:
+                            value = LocalDateTime.parse(lit.replace(' ', 'T'))
+                            break
                         default:
                             throw new IllegalAccessException(col.dataType.toString())
                     }
@@ -148,31 +152,31 @@ class Tabular {
                 if (ch == sep) {
                     row << cell
                     cell = ''
-                } else if (ch == '"') {
+                } else if (ch as char == '"' as char) {
                     state = 'q1'
-                } else if (ch == '\r') {
+                } else if (ch as char == '\r' as char) {
                     state = 'CR'
-                } else if (ch == '\n') {
+                } else if (ch as char == '\n' as char) {
                     emit()
                 } else {
                     cell += Character.toChars(ch)
                 }
             } else if (state == 'q1') {
-                if (ch == '"') {
+                if (ch as char == '"' as char) {
                     cell += '"'
                     state = 'start'
                 } else {
-                    cell += Character.toChars(ch)
+                    cell += ch as char
                     state = 'quoted'
                 }
             } else if (state == 'quoted') {
-                if (ch == '"') {
+                if (ch as char == '"' as char) {
                     state = 'qq1'
                 } else {
                     cell += Character.toChars(ch)
                 }
             } else if (state == 'qq1') {
-                if (ch == '"') {
+                if (ch as char == '"' as char) {
                     cell += '"'
                     state = 'quoted'
                 } else {
@@ -181,11 +185,12 @@ class Tabular {
                 }
             } else if (state == 'CR') {
                 emit()
-                if (ch != '\n') {
+                if (ch as char != '\n' as char) {
                     continue
                 }
             }
-        } while ((ch = text.read()) != -1)
+            ch = text.read()
+        } while (ch != -1)
     }
 
     static void writeCSV(Writer out, List<String> hd, Closure eachRecord) {
