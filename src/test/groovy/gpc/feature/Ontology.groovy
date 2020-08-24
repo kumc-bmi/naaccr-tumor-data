@@ -13,11 +13,19 @@ import java.nio.file.Paths
 @CompileStatic
 @Slf4j
 class Ontology extends TestCase {
+    Path workDir
+
+    void setUp() {
+        workDir = Files.createTempDirectory('Staging')
+    }
+
+    void tearDown() {
+        Staging.deleteFolder(workDir.toFile())
+    }
+
     void "test build NAACCR_ONTOLOGY in a local disk h2 DB"() {
-        Staging.withTempDir('db1') { Path dbDir ->
-            final cli = Staging.cli1(['ontology'], dbDir)
-            TumorFile.run(cli)
-        }
+        final cli = Staging.cli1(['ontology'], workDir)
+        TumorFile.run(cli)
     }
 
     void "test ICO-O-3 OncologyMeta"() {
