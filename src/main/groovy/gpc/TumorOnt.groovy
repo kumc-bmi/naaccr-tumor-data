@@ -187,6 +187,20 @@ class TumorOnt {
         ] as Map
     }
 
+    static URL cs_terms = TumorOnt.getResource('heron_load/cs-terms.csv')
+
+    static Map makeCSTerm(Map item) {
+        normal_term + [
+                C_HLEVEL          : item.c_hlevel,
+                C_FULLNAME        : item.c_fullname,
+                C_DIMCODE         : item.c_fullname,
+                C_NAME            : item.c_name,
+                C_BASECODE        : item.c_basecode,
+                C_VISUALATTRIBUTES: item.c_visualattributes,
+                C_TOOLTIP         : item.c_tooltip,
+        ]
+    }
+
     static Table pcornet_fields = read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
 
     /**
@@ -272,11 +286,12 @@ class TumorOnt {
                 insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
                 insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
                 // TODO: codes from LOINC, R
+                // TODO: OncologyMeta
 
                 sql.execute(insert1, seer_recode_folder)
                 insertTerms(sql, table_name, seer_recode_terms, { Map s -> makeRecodeTerm(s) })
 
-                // TODO: OncologyMeta
+                insertTerms(sql, table_name, cs_terms, { Map s -> makeCSTerm(s) })
             }
         }
     }
