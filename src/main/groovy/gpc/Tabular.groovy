@@ -117,6 +117,9 @@ class Tabular {
                         case Types.INTEGER:
                             value = Integer.parseInt(lit)
                             break
+                        case Types.BOOLEAN:
+                            value = Boolean.parseBoolean(lit)
+                            break
                         case Types.TIMESTAMP:
                             value = LocalDateTime.parse(lit.replace(' ', 'T'))
                             break
@@ -226,6 +229,9 @@ class Tabular {
         columns.collect { Map it ->
             Integer dataType
             switch (it.datatype) {
+                case "boolean":
+                    dataType = Types.BOOLEAN
+                    break;
                 case "number":
                 case "integer":
                     dataType = Types.INTEGER
