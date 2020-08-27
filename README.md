@@ -93,7 +93,7 @@ Usage:
   naaccr-tumor-data load-layouts [--db=PF] [--layout-table=T]
   naaccr-tumor-data facts  [--db=F] --upload-id=NNN [--obs-src=S] [--mrn-item=N] [--encounter-start=N]
   naaccr-tumor-data summary  [--db=F] [--task-id=ID]
-  naaccr-tumor-data ontology [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
+  naaccr-tumor-data ontology [--db=F] [--table-name=N] [--version=V] [--task-hash=H] [--update-date=D] [--who-cache=D]
   naaccr-tumor-data import [--db=F] TABLE DATA META
   naaccr-tumor-data run SCRIPT [--db=F]
   naaccr-tumor-data query SQL [--db=F]
