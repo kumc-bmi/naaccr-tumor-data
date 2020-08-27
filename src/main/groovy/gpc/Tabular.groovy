@@ -107,6 +107,9 @@ class Tabular {
                 Map<String, Object> record = pairs.collectEntries { it ->
                     final pair = it as List<String>
                     final col = byName[pair[0]] as ColumnMeta
+                    if (col == null) {
+                        assert col != null
+                    }
                     String lit = pair[1]
                     if (col.nulls.contains(lit)) {
                         return [col.name, null]
@@ -256,6 +259,7 @@ class Tabular {
                 default:
                     throw new IllegalAccessException(it.datatype as String)
             }
+            assert it.null != null
             new ColumnMeta(
                     name: it.name,
                     dataType: dataType,
