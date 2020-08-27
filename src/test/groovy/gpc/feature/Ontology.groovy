@@ -26,6 +26,20 @@ class Ontology extends TestCase {
     void "test build NAACCR_ONTOLOGY in a local disk h2 DB"() {
         final cli = Staging.cli1(['ontology'], workDir)
         TumorFile.run(cli)
+
+        cli.account().withSql { Sql sql ->
+            final actual = sql.rows("""
+            select c_hlevel, count(*) qty from NAACCR_ONTOLOGY
+            group by c_hlevel order by c_hlevel
+            """)
+            assert actual == [
+                    ['C_HLEVEL':1, 'QTY':1],
+                    ['C_HLEVEL':2, 'QTY':19],
+                    ['C_HLEVEL':3, 'QTY':987],
+                    ['C_HLEVEL':4, 'QTY':2761],
+                    ['C_HLEVEL':5, 'QTY':10545],
+            ]
+        }
     }
 
     void "test ICO-O-3 OncologyMeta"() {

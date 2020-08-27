@@ -163,42 +163,46 @@ class TumorOnt {
         ] as Map
     }
 
-    static URL seer_recode_terms = TumorOnt.getResource('seer_recode_terms.csv')
-    static Map seer_recode_folder = normal_term + [
-            C_HLEVEL          : top.C_HLEVEL as int + 1,
-            C_FULLNAME        : top.C_FULLNAME as String + 'SEER Site\\',
-            C_DIMCODE         : top.C_FULLNAME as String + 'SEER Site\\',
-            C_NAME            : "SEER Site Summary",
-            C_BASECODE        : null,
-            C_VISUALATTRIBUTES: 'FA',
-            C_TOOLTIP         : 'SEER Site Recode ICD-O-3/WHO 2008 Definition',
-    ] as Map
-
-    static Map makeRecodeTerm(Map item) {
-        final path = "${seer_recode_folder.C_FULLNAME}${item.path}\\".toString()
-        normal_term + [
-                C_HLEVEL          : seer_recode_folder.C_HLEVEL as int + 1,
-                C_FULLNAME        : path,
-                C_DIMCODE         : path,
-                C_NAME            : item.name,
-                C_BASECODE        : "SEER_SITE:${item.basecode}".toString(),
-                C_VISUALATTRIBUTES: item.visualattributes,
-                C_TOOLTIP         : null, // TODO
+    static class SEERRecode {
+        static URL seer_recode_terms = TumorOnt.getResource('seer_recode_terms.csv')
+        static Map folder = normal_term + [
+                C_HLEVEL          : top.C_HLEVEL as int + 1,
+                C_FULLNAME        : top.C_FULLNAME as String + 'SEER Site\\',
+                C_DIMCODE         : top.C_FULLNAME as String + 'SEER Site\\',
+                C_NAME            : "SEER Site Summary",
+                C_BASECODE        : null,
+                C_VISUALATTRIBUTES: 'FA',
+                C_TOOLTIP         : 'SEER Site Recode ICD-O-3/WHO 2008 Definition',
         ] as Map
+
+        static Map makeTerm(Map item) {
+            final path = "${folder.C_FULLNAME}${item.path}\\".toString()
+            normal_term + [
+                    C_HLEVEL          : folder.C_HLEVEL as int + 1,
+                    C_FULLNAME        : path,
+                    C_DIMCODE         : path,
+                    C_NAME            : item.name,
+                    C_BASECODE        : "SEER_SITE:${item.basecode}".toString(),
+                    C_VISUALATTRIBUTES: item.visualattributes,
+                    C_TOOLTIP         : null, // TODO
+            ] as Map
+        }
     }
 
-    static URL cs_terms = TumorOnt.getResource('heron_load/cs-terms.csv')
+    static class CSTerms {
+        static URL cs_terms = TumorOnt.getResource('heron_load/cs-terms.csv')
 
-    static Map makeCSTerm(Map item) {
-        normal_term + [
-                C_HLEVEL          : item.c_hlevel,
-                C_FULLNAME        : item.c_fullname,
-                C_DIMCODE         : item.c_fullname,
-                C_NAME            : item.c_name,
-                C_BASECODE        : item.c_basecode,
-                C_VISUALATTRIBUTES: item.c_visualattributes,
-                C_TOOLTIP         : item.c_tooltip,
-        ]
+        static Map makeTerm(Map item) {
+            normal_term + [
+                    C_HLEVEL          : item.c_hlevel,
+                    C_FULLNAME        : item.c_fullname,
+                    C_DIMCODE         : item.c_fullname,
+                    C_NAME            : item.c_name,
+                    C_BASECODE        : item.c_basecode,
+                    C_VISUALATTRIBUTES: item.c_visualattributes,
+                    C_TOOLTIP         : item.c_tooltip,
+            ]
+        }
     }
 
     static Table pcornet_fields = read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
@@ -226,6 +230,7 @@ class TumorOnt {
         items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
     }
 
+    @Deprecated
     static Table ddictDF(String version = "180") {
         NaaccrDictionary baseDictionary = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version)
         final items = baseDictionary.items
@@ -285,13 +290,13 @@ class TumorOnt {
                 sql.execute(insert1, top_term)
                 insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
                 insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
-                // TODO: codes from LOINC, R
+                LOINC_NAACCR.insertTerms(sql, table_name)
                 // TODO: OncologyMeta
 
-                sql.execute(insert1, seer_recode_folder)
-                insertTerms(sql, table_name, seer_recode_terms, { Map s -> makeRecodeTerm(s) })
+                sql.execute(insert1, SEERRecode.folder)
+                insertTerms(sql, table_name, SEERRecode.seer_recode_terms, { Map s -> SEERRecode.makeTerm(s) })
 
-                insertTerms(sql, table_name, cs_terms, { Map s -> makeCSTerm(s) })
+                insertTerms(sql, table_name, CSTerms.cs_terms, { Map s -> CSTerms.makeTerm(s) })
             }
         }
     }
@@ -440,6 +445,7 @@ class TumorOnt {
         static Tuple topo_info = new Tuple('ICD-O-2_CSV.zip', 'Topoenglish.txt', null)
         static String encoding = 'ISO-8859-1'
 
+        @Deprecated
         static Table read_table(Path cache, Tuple info) {
             String zip = info[0] as String; String item = info[1] as String
             List<String> names = info[2] as List<String>
@@ -456,6 +462,7 @@ class TumorOnt {
             data
         }
 
+        @Deprecated
         static Table icd_o_topo(Table topo) {
             final major = topo.where(topo.stringColumn('Lvl').isEqualTo('3'))
             def minor = topo.where(topo.stringColumn('Lvl').isEqualTo('4'))
@@ -547,9 +554,54 @@ class TumorOnt {
     }
 
     static class LOINC_NAACCR {
-        // TODO: static final measure = read_csv(gpc.TumorOnt.getResource('loinc_naaccr/loinc_naaccr.csv'))
+        @Deprecated
         static final Table answer = read_csv(TumorOnt.getResource('loinc_naaccr/loinc_naaccr_answer.csv'))
         // TODO? static final answer_struct = answer.columns().collect { Column<?> it -> it.copy().setName(it.name().toLowerCase()) }
+        // TODO: static final measure = read_csv(gpc.TumorOnt.getResource('loinc_naaccr/loinc_naaccr.csv'))
+
+        // LOINC_NUMBER,COMPONENT,CODE_SYSTEM,CODE_VALUE,AnswerListId,AnswerListName,ANSWER_CODE,SEQUENCE_NO,ANSWER_STRING
+        static URL loinc_naaccr_answer = TumorOnt.getResource('loinc_naaccr/loinc_naaccr_answer.csv')
+
+        static void eachTerm(Closure<Void> thunk) {
+            final Map<Integer, Map> byNum = Tabular.allCSVRecords(itemCSV)
+                    .findAll { it.valtype_cd == '@' }
+                    .collectEntries { [it.naaccrNum as int, it ] }
+            Tabular.allCSVRecords(loinc_naaccr_answer)
+                    .findAll {
+                        if (it.ANSWER_CODE as String <= '') {
+                            return false
+                        }
+                        final item = byNum[it.CODE_VALUE as int]
+                        if (item == null) {
+                            return false
+                        }
+                        it.AnswerListId == item.AnswerListId
+                    }
+                    .collect {
+                        final c_name = substr("${it.ANSWER_CODE} ${it.ANSWER_STRING}", 0, 200)
+                        final item = byNum[it.CODE_VALUE as int]
+                        final ic = makeItemTerm(item)
+                        String c_basecode = "NAACCR|${item.naaccrNum}:${it.ANSWER_CODE}"
+                        String path = "${ic.C_FULLNAME}${substr(c_name, 0, 40)}\\"
+                        thunk(normal_term + [
+                                C_HLEVEL          : ic.C_HLEVEL as int + 1,
+                                C_FULLNAME        : path,
+                                C_DIMCODE         : path,
+                                C_NAME            : c_name,
+                                C_BASECODE        : c_basecode,
+                                C_VISUALATTRIBUTES: 'LA',
+                                C_TOOLTIP         : null,  // TODO
+                        ])
+                    }
+        }
+
+        static void insertTerms(Sql sql, String table_name) {
+            final insert = Tabular.ColumnMeta.insertStatement(table_name, TumorOnt.metadataColumns)
+                    .replace('?.UPDATE_DATE', 'current_timestamp')
+            sql.withBatch(16, insert) { ps ->
+                eachTerm { ps.addBatch(it) }
+            }
+        }
     }
 
     static class NAACCR_I2B2 {
@@ -731,6 +783,7 @@ class TumorOnt {
         }
     }
 
+    @Deprecated
     static Table importCSV(Sql sql, String name, URL data, URL meta) {
         ColumnType[] schema = tabularTypes(new JsonSlurper().parse(meta))
         final Table df = read_csv(data, schema)
@@ -738,6 +791,7 @@ class TumorOnt {
         df
     }
 
+    @Deprecated
     static Table read_csv(URL url, ColumnType[] _schema = null, int skiprows = 0) {
         ColumnType[] schema = _schema ? _schema : tabularTypes(Tabular.metadata(url))
         final BufferedReader input = new BufferedReader(new InputStreamReader(url.openStream()))

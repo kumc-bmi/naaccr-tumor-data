@@ -69,7 +69,7 @@ class TumorOntTest extends TestCase {
         final terms = recodeRules.collect { it.asTerm() }.unique()
         assert terms[2] == [hlevel: 1, path: 'Oral Cavity and Phar\\Tongue', name: 'Tongue', basecode: '20020', visualattributes: 'LA']
 
-        final t2 = Tabular.allCSVRecords(TumorOnt.seer_recode_terms)
+        final t2 = Tabular.allCSVRecords(TumorOnt.SEERRecode.seer_recode_terms)
         [t2, terms].transpose().each {
             final parts = it as List
             assert parts[0] == parts[1]
@@ -85,6 +85,15 @@ class TumorOntTest extends TestCase {
         assert per_section
                 .where(per_section.stringColumn("section").isEqualTo("Record ID"))
                 .row(0).getInt("sectionid") == 9
+    }
+
+    void "test loinc answer codes"() {
+        def qty = 0
+        TumorOnt.LOINC_NAACCR.eachTerm { Map it ->
+            qty += 1
+            assert (it.C_BASECODE as String).matches('NAACCR\\|\\d+:.+')
+        }
+        assert qty > 100
     }
 
     void testLoinc() {
