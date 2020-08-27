@@ -2,6 +2,7 @@ package gpc.feature
 
 import gpc.TumorFile
 import gpc.TumorOnt
+import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
@@ -32,13 +33,7 @@ class Ontology extends TestCase {
             select c_hlevel, count(*) qty from NAACCR_ONTOLOGY
             group by c_hlevel order by c_hlevel
             """)
-            assert actual == [
-                    ['C_HLEVEL':1, 'QTY':1],
-                    ['C_HLEVEL':2, 'QTY':19],
-                    ['C_HLEVEL':3, 'QTY':987],
-                    ['C_HLEVEL':4, 'QTY':2761],
-                    ['C_HLEVEL':5, 'QTY':10545],
-            ]
+            assert actual.collectEntries { [it.C_HLEVEL, it.QTY] } == [1:1, 2:19, 3:987, 4:7013, 5:10545]
         }
     }
 

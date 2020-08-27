@@ -3,6 +3,7 @@ package gpc
 import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
 import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
 import gpc.DBConfig.Task
+import gpc.Tabular.ColumnMeta
 import groovy.json.JsonSlurper
 import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
@@ -52,36 +53,42 @@ class TumorOnt {
      * create_postgresql_i2b2metadata_tables.sql
      * https://github.com/i2b2/i2b2-data/blob/master/edu.harvard.i2b2.data/Release_1-7/NewInstall/Metadata/scripts/
      */
-    static List<Tabular.ColumnMeta> metadataColumns = [
-            new Tabular.ColumnMeta(name: 'C_HLEVEL', dataType: Types.INTEGER, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_FULLNAME', size: 700, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_NAME', size: 2000, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_SYNONYM_CD', dataType: Types.CHAR, size: 1, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_VISUALATTRIBUTES', dataType: Types.CHAR, size: 3, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_TOTALNUM', dataType: Types.INTEGER),
-            new Tabular.ColumnMeta(name: 'C_BASECODE', size: 50),
-            new Tabular.ColumnMeta(name: 'C_METADATAXML', dataType: Types.CLOB),
-            new Tabular.ColumnMeta(name: 'C_FACTTABLECOLUMN', size: 50, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_TABLENAME', size: 50, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_COLUMNNAME', size: 50, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_COLUMNDATATYPE', size: 50, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_OPERATOR', size: 10, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_DIMCODE', size: 700, nullable: false),
-            new Tabular.ColumnMeta(name: 'C_COMMENT', dataType: Types.CLOB),
-            new Tabular.ColumnMeta(name: 'C_TOOLTIP', size: 900),
-            new Tabular.ColumnMeta(name: 'M_APPLIED_PATH', size: 700, nullable: false),
-            new Tabular.ColumnMeta(name: 'UPDATE_DATE', dataType: Types.TIMESTAMP, nullable: false),
-            new Tabular.ColumnMeta(name: 'DOWNLOAD_DATE', dataType: Types.TIMESTAMP),
-            new Tabular.ColumnMeta(name: 'IMPORT_DATE', dataType: Types.TIMESTAMP),
-            new Tabular.ColumnMeta(name: 'SOURCESYSTEM_CD', size: 50),
-            new Tabular.ColumnMeta(name: 'VALUETYPE_CD', size: 50),
-            new Tabular.ColumnMeta(name: 'M_EXCLUSION_CD', size: 25),
-            new Tabular.ColumnMeta(name: 'C_PATH', size: 700),
-            new Tabular.ColumnMeta(name: 'C_SYMBOL', size: 50),
+    static List<ColumnMeta> metadataColumns = [
+            new ColumnMeta(name: 'C_HLEVEL', dataType: Types.INTEGER, nullable: false),
+            new ColumnMeta(name: 'C_FULLNAME', size: 700, nullable: false),
+            new ColumnMeta(name: 'C_NAME', size: 2000, nullable: false),
+            new ColumnMeta(name: 'C_SYNONYM_CD', dataType: Types.CHAR, size: 1, nullable: false),
+            new ColumnMeta(name: 'C_VISUALATTRIBUTES', dataType: Types.CHAR, size: 3, nullable: false),
+            new ColumnMeta(name: 'C_TOTALNUM', dataType: Types.INTEGER),
+            new ColumnMeta(name: 'C_BASECODE', size: 50),
+            new ColumnMeta(name: 'C_METADATAXML', dataType: Types.CLOB),
+            new ColumnMeta(name: 'C_FACTTABLECOLUMN', size: 50, nullable: false),
+            new ColumnMeta(name: 'C_TABLENAME', size: 50, nullable: false),
+            new ColumnMeta(name: 'C_COLUMNNAME', size: 50, nullable: false),
+            new ColumnMeta(name: 'C_COLUMNDATATYPE', size: 50, nullable: false),
+            new ColumnMeta(name: 'C_OPERATOR', size: 10, nullable: false),
+            new ColumnMeta(name: 'C_DIMCODE', size: 700, nullable: false),
+            new ColumnMeta(name: 'C_COMMENT', dataType: Types.CLOB),
+            new ColumnMeta(name: 'C_TOOLTIP', size: 900),
+            new ColumnMeta(name: 'M_APPLIED_PATH', size: 700, nullable: false),
+            new ColumnMeta(name: 'UPDATE_DATE', dataType: Types.TIMESTAMP, nullable: false),
+            new ColumnMeta(name: 'DOWNLOAD_DATE', dataType: Types.TIMESTAMP),
+            new ColumnMeta(name: 'IMPORT_DATE', dataType: Types.TIMESTAMP),
+            new ColumnMeta(name: 'SOURCESYSTEM_CD', size: 50),
+            new ColumnMeta(name: 'VALUETYPE_CD', size: 50),
+            new ColumnMeta(name: 'M_EXCLUSION_CD', size: 25),
+            new ColumnMeta(name: 'C_PATH', size: 700),
+            new ColumnMeta(name: 'C_SYMBOL', size: 50),
     ]
     static final URL sectionCSV = TumorOnt.getResource('heron_load/section.csv')
     static final URL itemCSV = TumorOnt.getResource('heron_load/tumor_item_type.csv')
 
+    static Map<Integer, Map> itemsByNum() {
+        final Map<Integer, Map> byNum = Tabular.allCSVRecords(itemCSV)
+                .findAll { it.valtype_cd == '@' }
+                .collectEntries { [it.naaccrNum as int, it] }
+        byNum
+    }
 
     static void writeTerms(Writer out, LocalDate update_date, URL curated, Closure<Map> makeTerm) {
         final hd = TumorOnt.metadataColumns.collect { it.name }
@@ -95,7 +102,7 @@ class TumorOnt {
     }
 
     static void insertTerms(Sql sql, String table_name, URL curated, Closure<Map> makeTerm) {
-        final insert = Tabular.ColumnMeta.insertStatement(table_name, TumorOnt.metadataColumns)
+        final insert = ColumnMeta.insertStatement(table_name, TumorOnt.metadataColumns)
                 .replace('?.UPDATE_DATE', 'current_timestamp')
         sql.withBatch(16, insert) { ps ->
             curated.withInputStream { stream ->
@@ -280,22 +287,35 @@ class TumorOnt {
 
         void run() {
             cdw.withSql { Sql sql ->
-                final toTypeName = Tabular.ColumnMeta.typeNames(sql.connection)
+                final toTypeName = ColumnMeta.typeNames(sql.connection)
                 TumorFile.dropIfExists(sql, table_name)
-                sql.execute(Tabular.ColumnMeta.createStatement(table_name, metadataColumns, toTypeName))
+                sql.execute(ColumnMeta.createStatement(table_name, metadataColumns, toTypeName))
 
                 final top_term = normal_term + top
-                final insert1 = Tabular.ColumnMeta.insertStatement(table_name, metadataColumns)
+                final insert1 = ColumnMeta.insertStatement(table_name, metadataColumns)
                         .replace('?.UPDATE_DATE', 'current_timestamp')
                 sql.execute(insert1, top_term)
                 insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
                 insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
-                LOINC_NAACCR.insertTerms(sql, table_name)
+
+                sql.withBatch(16, insert1) { ps ->
+                    final done = []
+                    NAACCR_R.eachCodeTerm { Map it ->
+                        ps.addBatch(it)
+                        done << it.C_FULLNAME
+                    }
+                    LOINC_NAACCR.eachAnswerTerm { Map it ->
+                        if (!done.contains(it.C_FULLNAME)) {
+                            ps.addBatch(it)
+                        }
+                    }
+                }
+
                 // TODO: OncologyMeta
 
                 sql.execute(insert1, SEERRecode.folder)
-                insertTerms(sql, table_name, SEERRecode.seer_recode_terms, { Map s -> SEERRecode.makeTerm(s) })
 
+                insertTerms(sql, table_name, SEERRecode.seer_recode_terms, { Map s -> SEERRecode.makeTerm(s) })
                 insertTerms(sql, table_name, CSTerms.cs_terms, { Map s -> CSTerms.makeTerm(s) })
             }
         }
@@ -305,14 +325,82 @@ class TumorOnt {
         // Names assumed by naaccr_txform.sql
 
         static final URL field_info_csv = TumorOnt.getResource('naaccr_r_raw/field_info.csv')
-        static final Map field_info_meta = [
+        static final URL field_code_scheme_csv = TumorOnt.getResource('naaccr_r_raw/field_code_scheme.csv')
+        static final List<ColumnMeta> field_info_meta = [
+                new ColumnMeta(name: "item", dataType: Types.INTEGER),
+                new ColumnMeta(name: "name"),
+                new ColumnMeta(name: "type"),
+        ]
+        static final Map code_label_meta = [
                 tableSchema: [columns: [
-                        [number: 1, name: "code", datatype: "string", nulls: [""]],
-                        [number: 2, name: "label", datatype: "string", nulls: [""]],
-                        [number: 3, name: "means_missing", datatype: "boolean", nulls: [""]],
-                        [number: 4, name: "description", datatype: "string", nulls: [""]],
+                        [number: 1, name: "code", datatype: "string", null: [""]],
+                        [number: 2, name: "label", datatype: "string", null: [""]],
+                        [number: 3, name: "means_missing", datatype: "boolean", null: [""]],
+                        [number: 4, name: "description", datatype: "string", null: [""]],
                 ]]
         ]
+        static final List<ColumnMeta> field_code_scheme_meta = [
+                new ColumnMeta(name: "name"),
+                new ColumnMeta(name: "scheme"),
+        ]
+        static final URL _code_labels = TumorOnt.getResource('naaccr_r_raw/code-labels/')
+
+        static void eachFieldScheme(Closure thunk) {
+            field_code_scheme_csv.withInputStream { fs ->
+                Tabular.eachCSVRecord(fs, field_code_scheme_meta) { Map it ->
+                    final url = new URL(_code_labels, "${it.scheme}.csv")
+                    thunk(it + [url: url])
+                    return
+                }
+            }
+        }
+
+        static void eachCodeLabel(Closure thunk,
+                                  List<String> implicit = ['iso_country']) {
+            Map<Integer, Map> byNum = itemsByNum()
+            Map byName = field_info_csv.withInputStream { csv ->
+                Tabular.allCSVRecords(csv, field_info_meta)
+                        .collectEntries { it -> [it.name as String, it] }
+            }
+            eachFieldScheme { Map fs ->
+                if (implicit.contains(fs.scheme)) {
+                    return
+                }
+
+                final field = byName[fs.name] as Map
+                assert field != null
+                final ty = byNum[field.item as int]
+                if (ty == null) {
+                    log.warn("no tumor_item_type info about ${field}")
+                    return
+                }
+                final ic = makeItemTerm(ty)
+                new URL(fs.url as String).withInputStream { csv ->
+                    Tabular.eachCSVRecord(csv, Tabular.columnDescriptions(code_label_meta)) { Map code ->
+                        thunk(fs + field + ty + ic + code)
+                        return
+                    }
+                }
+            }
+        }
+
+        static void eachCodeTerm(Closure thunk) {
+            eachCodeLabel { Map it ->
+                final c_name = substr("${it.code} ${it.label}", 0, 200)
+                String c_basecode = "NAACCR|${it.naaccrNum}:${it.code}"
+                String path = "${it.C_FULLNAME}${it.code}\\"
+                thunk(normal_term + [
+                        C_HLEVEL          : it.C_HLEVEL as int + 1,
+                        C_FULLNAME        : path,
+                        C_DIMCODE         : path,
+                        C_NAME            : c_name,
+                        C_BASECODE        : c_basecode,
+                        C_VISUALATTRIBUTES: 'LA',
+                        C_TOOLTIP         : it.description,
+                ])
+            }
+        }
+
         static final Table field_info = read_csv(field_info_csv, Table.create(
                 IntColumn.create("item"),
                 StringColumn.create("name"),
@@ -323,13 +411,11 @@ class TumorOnt {
                 StringColumn.create("label"),
                 BooleanColumn.create("means_missing"),
                 StringColumn.create("description"))
-        static final URL field_code_scheme_csv = TumorOnt.getResource('naaccr_r_raw/field_code_scheme.csv')
         static final Table field_code_scheme = read_csv(field_code_scheme_csv, Table.create(
                 StringColumn.create("name"),
                 StringColumn.create("scheme"),
         ).columnTypes())
 
-        static final URL _code_labels = TumorOnt.getResource('naaccr_r_raw/code-labels/')
 
         static Table code_labels(List<String> implicit = ['iso_country']) {
             Table all_schemes = null
@@ -562,10 +648,8 @@ class TumorOnt {
         // LOINC_NUMBER,COMPONENT,CODE_SYSTEM,CODE_VALUE,AnswerListId,AnswerListName,ANSWER_CODE,SEQUENCE_NO,ANSWER_STRING
         static URL loinc_naaccr_answer = TumorOnt.getResource('loinc_naaccr/loinc_naaccr_answer.csv')
 
-        static void eachTerm(Closure<Void> thunk) {
-            final Map<Integer, Map> byNum = Tabular.allCSVRecords(itemCSV)
-                    .findAll { it.valtype_cd == '@' }
-                    .collectEntries { [it.naaccrNum as int, it ] }
+        static void eachAnswerTerm(Closure<Void> thunk) {
+            Map<Integer, Map> byNum = itemsByNum()
             Tabular.allCSVRecords(loinc_naaccr_answer)
                     .findAll {
                         if (it.ANSWER_CODE as String <= '') {
@@ -593,14 +677,6 @@ class TumorOnt {
                                 C_TOOLTIP         : null,  // TODO
                         ])
                     }
-        }
-
-        static void insertTerms(Sql sql, String table_name) {
-            final insert = Tabular.ColumnMeta.insertStatement(table_name, TumorOnt.metadataColumns)
-                    .replace('?.UPDATE_DATE', 'current_timestamp')
-            sql.withBatch(16, insert) { ps ->
-                eachTerm { ps.addBatch(it) }
-            }
         }
     }
 

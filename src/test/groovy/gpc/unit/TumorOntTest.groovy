@@ -89,7 +89,7 @@ class TumorOntTest extends TestCase {
 
     void "test loinc answer codes"() {
         def qty = 0
-        TumorOnt.LOINC_NAACCR.eachTerm { Map it ->
+        TumorOnt.LOINC_NAACCR.eachAnswerTerm { Map it ->
             qty += 1
             assert (it.C_BASECODE as String).matches('NAACCR\\|\\d+:.+')
         }
@@ -101,6 +101,18 @@ class TumorOntTest extends TestCase {
         assert answers.columnNames().size() == 9
         assert answers.columnNames().first() == 'LOINC_NUMBER'
         assert answers.columnNames().last() == 'ANSWER_STRING'
+    }
+
+    void "test R code labels"() {
+        TumorOnt.NAACCR_R.eachFieldScheme {
+            println(it)
+        }
+        TumorOnt.NAACCR_R.eachCodeLabel {
+            println(it)
+        }
+        TumorOnt.NAACCR_R.eachCodeTerm {
+            println(it)
+        }
     }
 
     void testR() {
