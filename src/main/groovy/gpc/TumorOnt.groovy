@@ -582,7 +582,7 @@ class TumorOnt {
                         final item = byNum[it.CODE_VALUE as int]
                         final ic = makeItemTerm(item)
                         String c_basecode = "NAACCR|${item.naaccrNum}:${it.ANSWER_CODE}"
-                        String path = "${ic.C_FULLNAME}${substr(c_name, 0, 40)}\\"
+                        String path = "${ic.C_FULLNAME}${it.ANSWER_CODE}\\"
                         thunk(normal_term + [
                                 C_HLEVEL          : ic.C_HLEVEL as int + 1,
                                 C_FULLNAME        : path,
