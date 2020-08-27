@@ -96,6 +96,11 @@ class Tabular {
         final byName = schema.collectEntries { [it.name, it] }
         eachCSVRow(text) { List<String> row ->
             if (hd == null) {
+                if (row[0].startsWith(('#'))) {
+                    // TODO: only do this when commentPrefix = "#"
+                    // https://www.w3.org/TR/2015/REC-tabular-metadata-20151217/#dialect-commentPrefix
+                    return
+                }
                 hd = row
             } else {
                 List<List<String>> pairs = GroovyCollections.transpose([hd, row])
