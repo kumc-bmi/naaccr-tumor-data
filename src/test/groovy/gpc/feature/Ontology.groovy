@@ -8,6 +8,7 @@ import groovy.util.logging.Slf4j
 import junit.framework.TestCase
 import org.junit.Ignore
 
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
