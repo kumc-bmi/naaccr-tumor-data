@@ -584,7 +584,7 @@ class TumorFile {
                 final String atoms = exc.size() > 0 ? txt.substring(exc[0].size()) : txt
                 final ti0 = atoms.split(', and sometimes ') as List<String>
                 final t1 = (sometimes ? ti0 : ti0[0..<1]).join(',')
-                final hilos = t1.split(',').collect { it.strip() }
+                final hilos = t1.split(',').collect { it.trim() }
 
                 def parseBounds = { String t ->
                     if (t.contains('-')) {
