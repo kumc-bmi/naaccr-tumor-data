@@ -9,12 +9,7 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
-import tech.tablesaw.api.ColumnType
-import tech.tablesaw.api.StringColumn
-import tech.tablesaw.api.Table
 
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.time.LocalDate
 
 @CompileStatic
@@ -56,9 +51,9 @@ class TumorOntTest extends TestCase {
             TumorOnt.insertTerms(sql, table_name, TumorOnt.itemCSV, { Map s -> TumorOnt.makeItemTerm(s) })
             final actual = sql.firstRow('select min(c_fullname) fn1, min(c_name) n1, count(*) qty from NAACCR_ONTOLOGY')
             assert actual == [
-                    'FN1':'\\i2b2\\naaccr\\S:1 Cancer Identification\\0380 Sequence Number--Central\\',
-                    'N1':'0010 Record Type',
-                    'QTY':732,
+                    'FN1': '\\i2b2\\naaccr\\S:1 Cancer Identification\\0380 Sequence Number--Central\\',
+                    'N1' : '0010 Record Type',
+                    'QTY': 732,
             ]
         }
     }
@@ -80,27 +75,23 @@ class TumorOntTest extends TestCase {
     static final String cache = ',cache/'
 
     void testLoadCSV() {
-        final Table per_section = TumorOnt.read_csv(TumorOnt.getResource('heron_load/section.csv'))
-        assert per_section.columnTypes() as List == [ColumnType.INTEGER, ColumnType.STRING]
+        final res = TumorOnt.getResource('heron_load/section.csv')
+        final meta = Tabular.columnDescriptions(res)
+        assert meta.collect { it.dataType } == [java.sql.Types.INTEGER, java.sql.Types.VARCHAR]
+        final per_section = Tabular.allCSVRecords(res)
         assert per_section
-                .where(per_section.stringColumn("section").isEqualTo("Record ID"))
-                .row(0).getInt("sectionid") == 9
+                .findAll { it.section == "Record ID" }
+                .collect { it.sectionid } == [9]
     }
 
     void "test loinc answer codes"() {
         def qty = 0
         TumorOnt.LOINC_NAACCR.eachAnswerTerm { Map it ->
             qty += 1
+            assert it.keySet().size() == 19
             assert (it.C_BASECODE as String).matches('NAACCR\\|\\d+:.+')
         }
         assert qty > 100
-    }
-
-    void testLoinc() {
-        final Table answers = TumorOnt.LOINC_NAACCR.answer
-        assert answers.columnNames().size() == 9
-        assert answers.columnNames().first() == 'LOINC_NUMBER'
-        assert answers.columnNames().last() == 'ANSWER_STRING'
     }
 
     void "test R code labels"() {
@@ -109,27 +100,16 @@ class TumorOntTest extends TestCase {
         }
         TumorOnt.NAACCR_R.eachCodeLabel {
             println(it)
+            final expected = ['code', 'label', 'means_missing', 'description', 'scheme'] as Set<String>
+            final actual = (it as Map).keySet() as Set<String>
+            assert expected - actual == [] as Set
         }
         TumorOnt.NAACCR_R.eachCodeTerm {
             println(it)
         }
     }
 
-    void testR() {
-        final scheme = 'peritonealCytology'
-        final info = TumorOnt.NAACCR_R._code_labels.toURI().resolve(scheme + '.csv').toURL()
-        Table codes = TumorOnt.read_csv(info, TumorOnt.NAACCR_R.field_info_schema.columnTypes())
-        codes.addColumns(StringColumn.create('scheme', [scheme] * codes.rowCount()))
-        assert codes.columnNames() == ['code', 'label', 'means_missing', 'description', 'scheme']
-        final Table with_fields = codes.joinOn('scheme').inner(TumorOnt.NAACCR_R.field_code_scheme, 'scheme')
-        Table item_name = TumorOnt.NAACCR_R.field_info.select('item', 'name')
-        final Table with_field_info = with_fields.joinOn('name').inner(item_name, 'name')
-        assert with_field_info.columnCount() == 7
-
-        final Table labels = TumorOnt.NAACCR_R.code_labels()
-        assert labels.columnCount() == 7
-    }
-
+    /*@@@
     void testOncologyMeta() {
         Path cachePath = Paths.get(cache)
         if (!cachePath.toFile().exists()) {
@@ -150,84 +130,65 @@ class TumorOntTest extends TestCase {
         final icd_o_topo = meta.icd_o_topo(topo)
         assert icd_o_topo.columnNames() == ['lvl', 'concept_cd', 'c_visualattributes', 'path', 'concept_name']
     }
-
-
-    void testLoadTable() {
-        Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
-        DBConfig.inMemoryDB("load", true).withSql { Sql sql ->
-            TumorOnt.load_data_frame(sql, "tumor_item_type", aTable)
-
-            Map rowMap = sql.firstRow("select * from tumor_item_type limit 1")
-            assert rowMap['SECTION'] == 'Cancer Identification'
-            assert sql.firstRow("select count(*) from tumor_item_type")[0] == 732
-        }
-    }
+*/
 
     void testTableSql() {
-        Table aTable = TumorOnt.NAACCR_I2B2.tumor_item_type
+        final metadataColumns = TumorOnt.metadataColumns
+        DBConfig.inMemoryDB("ont", true).withSql { Sql sql ->
+            final toTypeName = ColumnMeta.typeNames(sql.connection)
 
-        final create = TumorOnt.SqlScript.create_ddl("tumor_item_type", aTable.columns())
-        assert create.startsWith("create table tumor_item_type (")
-        assert create.contains("\"LENGTH\" INTEGER")
-        assert create.endsWith("\"PHI_ID_KIND\" VARCHAR(1024))")
+            final create = ColumnMeta.createStatement("tumor_item_type", metadataColumns, toTypeName)
+                    .replaceAll('\\s+', ' ')
+            assert create.startsWith("create table tumor_item_type (")
+            assert create.contains("C_HLEVEL INTEGER")
+            assert create.endsWith('C_SYMBOL VARCHAR(50) )')
 
-        final insert = TumorOnt.SqlScript.insert_dml("tumor_item_type", aTable.columns())
-        assert insert.contains("(\"NAACCRNUM\", \"SECTIONID\"")
-        assert insert.contains("\"PHI_ID_KIND\")")
-        assert insert.contains("(?, ?, ?")
-
-        def update_date = LocalDate.of(2000, 1, 1)
-        def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
-        final create_top = TumorOnt.SqlScript.create_ddl("top", top.columns())
-        assert create_top.contains("\"C_HLEVEL\" INTEGER")
-    }
-
-    void testDDict() {
-        final dd = TumorOnt.ddictDF()
-        assert dd.rowCount() > 700
-
-        final primarySite = dd.where(dd.intColumn("naaccrNum").isEqualTo(400))
-
-        assert primarySite[0].getString("naaccrId") == "primarySite"
-        assert primarySite[0].getString("naaccrName") == 'Primary Site'
-        assert primarySite[0].getInt("startColumn") == 554
-        assert primarySite[0].getInt("length") == 4
-        assert primarySite[0].getString("parentXmlElement") == 'Tumor'
+            final insert = ColumnMeta.insertStatement("tumor_item_type", metadataColumns)
+                    .replaceAll('\\s+', ' ')
+            assert insert.contains("( C_HLEVEL, C_FULLNAME")
+            assert insert.contains("C_SYMBOL)")
+            assert insert.contains("(?.C_HLEVEL, ?.C_FULLNAME")
+        }
     }
 
     void testOnt() {
         def update_date = LocalDate.of(2000, 1, 1)
-        def top = TumorOnt.NAACCR_I2B2.naaccr_top(update_date)
-        assert top.get(0, 0) == 1
+        def top = TumorOnt.top
+        assert top.C_HLEVEL == 1
 
         DBConfig.inMemoryDB("ont", true).withSql { Sql sql ->
-            final Table actual = TumorOnt.NAACCR_I2B2.ont_view_in(sql, "task123", update_date, Paths.get(cache))
-            assert actual.columnCount() == 21
-            assert actual.columnNames().contains("C_FULLNAME")
-            // top concept
-            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(1)).rowCount() == 1
+            TumorOnt.createTable(sql, "META") // TODO: Paths.get(cache)
 
-            // section concepts
-            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(2)
-                    & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() == 17
-            // item concepts
-            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(3)
-                    & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() > 500
+            final sections = sql.rows("""
+                select * from META where c_hlevel = 2 and c_fullname like '\\i2b2\\naaccr\\S:%' escape '@' """)
+            assert sections[0].keySet().size() == 25
+            assert sections[0].keySet().contains("C_FULLNAME")
+            // top concept
+            assert sql.firstRow("select count(*) qty from META where C_HLEVEL = 1").qty == 1
+
+            assert sections.size() == 17
+
+            assert sql.firstRow("""
+                select count(*) qty from META where c_hlevel = 3
+                and c_fullname like '\\i2b2\\naaccr\\S:%' escape '@' """).qty as int > 500
 
             // TODO: separate LOINC, R codes?
             // code concepts
-            assert actual.where(actual.intColumn("C_HLEVEL").isEqualTo(4)
-                    & actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\S:")).rowCount() > 5000
+            assert sql.firstRow("""
+                select count(*) qty from META where c_hlevel = 4
+                and c_fullname like '\\i2b2\\naaccr\\S:%' escape '@' """).qty as int > 5000
 
             // TODO: separate SEER site table method?
             // seer site
-            assert actual.where(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\SEER Site\\")).rowCount() == 103
+            assert sql.firstRow("""
+                select count(*) qty from META
+                where c_fullname like '\\i2b2\\naaccr\\SEER Site\\%' escape '@' """).qty == 103
 
             // TODO: separate site-specific factor method?
             // cancer staging site-specific terms
-            assert actual.where(actual.stringColumn("C_FULLNAME").startsWith("\\i2b2\\naaccr\\csterms\\")).rowCount() > 10000
-
-            assert actual.rowCount() > 100
+            assert sql.firstRow("""
+                select count(*) qty from META
+                where c_fullname like '\\i2b2\\naaccr\\csterms\\%' escape '@' """).qty as int > 10000
         }
     }
 
@@ -239,22 +200,4 @@ class TumorOntTest extends TestCase {
             assert sql.firstRow("select 1 from (values('X')) where not regexp_like('XXXX.9', '^[0-9].*')")[0] == 1
         }
     }
-
-    void testTableExpr() {
-        final records = [
-                [c_facttablecolumn: "x", c_comment: "xx", c_totalnum: 1],
-                [c_facttablecolumn: "CONCEPT_CD", c_comment: null, c_totalnum: null]
-        ] as List<Map<String, Object>>
-        final actual = TumorOnt.fromRecords(records)
-        assert actual.columnTypes() == [ColumnType.STRING, ColumnType.STRING, ColumnType.INTEGER] as ColumnType[]
-        assert actual.rowCount() == 2
-    }
-
-    void testSqlScript() {
-        String sql = TumorOnt.resourceText('heron_load/naaccr_concepts_load.sql')
-        assert sql.indexOf('select') > 0
-        final script = TumorOnt.NAACCR_I2B2.ont_script
-        assert script.objects.last().first == 'naaccr_ontology'
-    }
-
 }

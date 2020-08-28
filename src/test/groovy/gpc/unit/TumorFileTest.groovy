@@ -17,8 +17,6 @@ import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import junit.framework.TestCase
-import tech.tablesaw.api.Row
-import tech.tablesaw.api.Table
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -223,7 +221,7 @@ class TumorFileTest extends TestCase {
             }
             assert cols.size() == 635
 
-            final pcf = TumorOnt.pcornet_fields.stringColumn('FIELD_NAME').asList()
+            final pcf = TumorOnt.pcornet_fields.collect { it.FIELD_NAME }
             assert pcf.size() == 640
             // 10 fields are missing due to:
             // WARN item not found in naaccr-18-incidence: 7320 PATH_DATE_SPEC_COLLECT1_N7320
@@ -256,18 +254,13 @@ class TumorFileTest extends TestCase {
      In Date of Last Contact, we've also seen 19919999
      */
     void testDates() {
-        final actual = date_cases.stringColumn('text').iterator().collect { String it -> TumorFile.parseDate(it) }
-        assert date_cases_ymd == actual
+        Tabular.allCSVRecords(date_cases).each { Map it ->
+            final expected = it.year == null ? null : LocalDate.of(it.year as int, it.month as int, it.day as int)
+            assert expected == TumorFile.parseDate(it.text as String)
+        }
     }
 
-    static final Table date_cases = TumorOnt.read_csv(TumorFileTest.getResource('date_cases.csv'))
-    static final List<LocalDate> date_cases_ymd = date_cases.iterator().collect { Row it ->
-        it.isMissing('year') ?
-                null : LocalDate.of(
-                it.getInt('year'),
-                it.getInt('month'),
-                it.getInt('day'))
-    }
+    static final URL date_cases = TumorFileTest.getResource('date_cases.csv')
 
     void "test i2b2 fact table"() {
         final sourcesystem_cd = 'my-naaccr-file'
@@ -317,33 +310,34 @@ class TumorFileTest extends TestCase {
     }
 
     void testTumorFields() {
-        Table actual = TumorOnt.fields(false)
-        assert actual.rowCount() == 640
-        assert actual.rowCount() > 100
-        assert actual.where(actual.stringColumn('FIELD_NAME').isEqualTo('RECORD_TYPE_N10')).rowCount() == 1
+        final actual = TumorOnt.fields(false)
+        assert actual.size() == 640
+        assert actual.size() > 100
+        assert actual.findAll { it.FIELD_NAME == 'RECORD_TYPE_N10' }.size() == 1
 
-        Table pcornet_spec = TumorOnt.read_csv(TumorFileTest.getResource('tumor table.version1.2.csv')).select(
-                'NAACCR Item', 'FLAG', 'FIELD_NAME'
-        )
-        assert pcornet_spec.rowCount() == 775
-        pcornet_spec = pcornet_spec.where(pcornet_spec.stringColumn('FLAG').isNotEqualTo('PRIVATE'))
-        assert pcornet_spec.rowCount() == 775 - 109
+        final pcornet_spec0 = Tabular.allCSVRecords(TumorFileTest.getResource('tumor table.version1.2.csv'))
+        // 'NAACCR Item', 'FLAG', 'FIELD_NAME'
+        assert pcornet_spec0.size() == 775
+        final pcornet_spec = pcornet_spec0.findAll { it.FLAG != 'PRIVATE' }
+        assert pcornet_spec.size() == 775 - 109
 
-        actual.column('FIELD_NAME').setName('name_test')
-        Table items = pcornet_spec.joinOn('NAACCR Item').fullOuter(actual, 'naaccrNum')
-        // println(items.first(3))
-        Table problems = items.first(0)
-        for (Row item : items) {
-            if (item.getString('FIELD_NAME') != item.getString('name_test')) {
-                problems.addRow(item)
-            }
+        final actualByNum = actual.collectEntries { [it.naaccrNum as Integer, it] }
+        final specByNum = pcornet_spec.collectEntries { [it['NAACCR Item'] as Integer, it] }
+        final items = (actualByNum.keySet() + specByNum.keySet()).collect {
+            final a = actualByNum[it] as Map
+            final p = specByNum[it] as Map
+            final aout = (a != null ? [naaccrNum: a.naaccrNum, naaccrId: a.naaccrId, name_test: a.FIELD_NAME] : [:]) as Map
+            final pout = (p != null ? [naaccrNum: p['NAACCR Item'], FIELD_NAME: p.FIELD_NAME] : [:]) as Map
+            aout + pout
         }
-        def missingId = problems.where(problems.column('naaccrId').isMissing())
-        assert missingId.rowCount() == 26
-        def noMatch = problems.where(problems.column('name_test').isMissing())
-        assert noMatch.rowCount() == 26
-        def renamed = problems.where(problems.stringColumn('name_test').isNotIn(''))
-        assert renamed.rowCount() == 23
+        // println(items.first(3))
+        final problems = items.findAll { it.FIELD_NAME != it.name_test }
+        def missingId = problems.findAll { it.naaccrId == null }
+        assert missingId.size() == 26
+        def noMatch = problems.findAll { it.name_test == null }
+        assert noMatch.size() == 26
+        def renamed = problems.findAll { it.name_test != null && it.name_test != '' }.collect { [spec: it.FIELD_NAME, code: it.name_test] }
+        assert renamed.size() == 23
     }
 
     void "test SEER Recode"() {

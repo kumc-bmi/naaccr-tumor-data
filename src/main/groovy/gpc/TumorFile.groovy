@@ -11,10 +11,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.Immutable
 import groovy.util.logging.Slf4j
 import org.docopt.Docopt
-import tech.tablesaw.api.Row
-import tech.tablesaw.api.Table
 
-import javax.annotation.Nullable
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.sql.DriverManager
@@ -151,12 +148,9 @@ class TumorFile {
 
         @Override
         void run() {
-            Table fields = TumorOnt.pcornet_fields.copy()
-
             // PCORnet spec doesn't include MRN column, but we need it for patient mapping.
-            Row patid = fields.appendRow()
-            patid.setInt('item', 20)
-            patid.setString('FIELD_NAME', 'PATIENT_ID_NUMBER_N20')
+            final mrnField = [item: 20, 'FIELD_NAME': 'PATIENT_ID_NUMBER_N20'] as Map<String, Object>
+            final fields = TumorOnt.pcornet_fields + [mrnField]
 
             cdw.withSql { Sql sql ->
                 dropIfExists(sql, tb.table_name)
@@ -171,7 +165,8 @@ class TumorFile {
             }
         }
 
-        static int loadFlatFile(Sql sql, Path flat_file, String table_name, String task_id, Table fields,
+        static int loadFlatFile(Sql sql, Path flat_file, String table_name, String task_id,
+                                List<Map<String, Object>> fields,
                                 int encounter_num = 0,
                                 boolean create = true, boolean update = true,
                                 int batchSize = 64) {
@@ -240,10 +235,10 @@ class TumorFile {
             layout
         }
 
-        static List<Tuple2<Integer, ColumnMeta>> columnInfo(Table fields, FixedColumnsLayout layout) {
+        static List<Tuple2<Integer, ColumnMeta>> columnInfo(List<Map<String, Object>> fields, FixedColumnsLayout layout) {
             fields.collect {
-                final num = it.getInt("item")
-                final name = it.getString("FIELD_NAME")
+                final num = it.item as int
+                final name = it.FIELD_NAME
                 final item = layout.getFieldByNaaccrItemNumber(num)
                 [num: num, name: name, item: item]
             }.findAll {
@@ -321,12 +316,12 @@ class TumorFile {
     }
 
     static class I2B2Upload {
-        final String schema
-        final Integer upload_id
+        final String schema // @Nullable
+        final Integer upload_id // @Nullable
         final String sourcesystem_cd
         final String template_table = null
 
-        I2B2Upload(@Nullable String schema, @Nullable Integer upload_id, String sourcesystem_cd,
+        I2B2Upload(String schema, Integer upload_id, String sourcesystem_cd,
                    String template_table = null) {
             this.schema = schema
             this.upload_id = upload_id
@@ -388,6 +383,8 @@ class TumorFile {
         static final not_null = '@'
     }
 
+    // TODO: recode facts? TumorOnt.getResource('heron_load/seer_recode_terms.csv'))
+
     static int makeTumorFacts(Path flat_file, int encounter_num,
                               Sql sql, String mrnItem, Map<String, Integer> toPatientNum,
                               I2B2Upload upload,
@@ -396,17 +393,17 @@ class TumorFile {
 
         final layout = NAACCR_Extract.theLayout(flat_file) as FixedColumnsLayout
 
-        final itemInfo = TumorOnt.NAACCR_I2B2.tumor_item_type.iterator().collect {
-            final num = it.getInt('naaccrNum')
+        final itemInfo = Tabular.allCSVRecords(TumorOnt.itemCSV).collect {
+            final num = it.naaccrNum as int
             final lf = layout.getFieldByNaaccrItemNumber(num)
             if (lf != null) {
                 assert num == lf.naaccrItemNum
-                if (it.getString('naaccrId') != lf.name) {
-                    log.warn("item #${num}: expected ${it.getString('naaccrId')}; layout has ${lf.name}")
+                if (it.naaccrId != lf.name) {
+                    log.warn("item #${num}: expected ${it.naaccrId}; layout has ${lf.name}")
                 }
             }
             [num       : num, layout: lf,
-             valtype_cd: it.getString('valtype_cd')]
+             valtype_cd: it.valtype_cd]
         }.findAll { it.layout != null && (include_phi || !(it.valtype_cd as String).contains('i')) }
 
         final patIdField = layout.getFieldByName(mrnItem)
@@ -546,10 +543,14 @@ class TumorFile {
     }
 
     static LocalDate parseDate(String txt) {
+        if (txt == null) {
+            return null
+        }
         LocalDate value
-        int nch = txt.length()
+        String tidy = txt.trim()
+        int nch = tidy.length()
         // final y2k = { String yymmdd -> (yymmdd < '50' ? '20' : '19') + yymmdd }
-        String full = nch == 4 ? txt + '0101' : nch == 6 ? txt + '01' : txt
+        String full = nch == 4 ? tidy + '0101' : nch == 6 ? tidy + '01' : tidy
         try {
             value = LocalDate.parse(full, DateTimeFormatter.BASIC_ISO_DATE) // 'yyyyMMdd'
         } catch (DateTimeParseException ignored) {

@@ -1,23 +1,17 @@
 package gpc
 
 import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
-import com.imsweb.naaccrxml.entity.dictionary.NaaccrDictionary
 import gpc.DBConfig.Task
 import gpc.Tabular.ColumnMeta
-import groovy.json.JsonSlurper
-import groovy.sql.BatchingPreparedStatementWrapper
 import groovy.sql.Sql
 import groovy.transform.CompileStatic
 import groovy.transform.Immutable
 import groovy.util.logging.Slf4j
-import tech.tablesaw.api.*
-import tech.tablesaw.columns.Column
-import tech.tablesaw.io.csv.CsvReadOptions
 
-import java.nio.charset.Charset
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.sql.*
+import java.sql.SQLException
+import java.sql.Types
 import java.time.LocalDate
 import java.util.zip.ZipFile
 
@@ -212,7 +206,7 @@ class TumorOnt {
         }
     }
 
-    static Table pcornet_fields = read_csv(TumorOnt.getResource('fields.csv')).setName("FIELDS")
+    static List<Map<String, Object>> pcornet_fields = Tabular.allCSVRecords(TumorOnt.getResource('fields.csv'))
 
     /**
      * PCORnet tumor table fields
@@ -220,35 +214,18 @@ class TumorOnt {
      * @param includePrivate - include PHI fields?
      * @return Table
      */
-    static Table fields(boolean strict = true) {
-        Table pcornet_spec = read_csv(TumorOnt.getResource('fields.csv')).select(
-                'item', 'FIELD_NAME'
-        )
-        // get naaccr-xml naaccrId
-        final dd = ddictDF()
-        Table items
-        if (strict) {
-            items = pcornet_spec.joinOn('item').inner(dd, 'naaccrNum')
-        } else {
-            items = pcornet_spec.joinOn('item').leftOuter(dd, 'naaccrNum')
+    static List<Map<String, Object>> fields(boolean strict = true, String version = "180") {
+        final pcornet_spec = pcornet_fields.collect { [item: it.item, FIELD_NAME: it.FIELD_NAME] }
+
+        final byNum = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version).items
+                .collectEntries { [it.naaccrNum, it.naaccrId] }
+        def items = pcornet_spec.collect {
+            [naaccrId: byNum[it.item as int], naaccrNum: it.item, FIELD_NAME: it.FIELD_NAME] as Map<String, Object>
         }
-        items.column("item").setName("naaccrNum")
-        items.setName("TUMOR")
-        items.select('naaccrNum', 'naaccrId', 'FIELD_NAME')
-    }
-
-    @Deprecated
-    static Table ddictDF(String version = "180") {
-        NaaccrDictionary baseDictionary = NaaccrXmlDictionaryUtils.getBaseDictionaryByVersion(version)
-        final items = baseDictionary.items
-        Table.create(
-                IntColumn.create("naaccrNum", items.collect { it.naaccrNum } as int[]),
-                StringColumn.create("naaccrId", items.collect { it.naaccrId }),
-                StringColumn.create("naaccrName", items.collect { it.naaccrName }),
-                IntColumn.create("startColumn", items.collect { it.startColumn } as int[]),
-                IntColumn.create("length", items.collect { it.length } as int[]),
-                StringColumn.create("parentXmlElement", items.collect { it.parentXmlElement }))
-
+        if (strict) {
+            items = items.findAll { it.naaccrId != null }
+        }
+        items
     }
 
     static class Ontology1 implements Task {
@@ -276,7 +253,7 @@ class TumorOnt {
                         select 1 from ${table_name}
                             where c_fullname = ?.fullname
                             and c_basecode = ?.code
-                        """, [fullname: NAACCR_I2B2.top_folder, code: version + task_hash])
+                        """, [fullname: top.C_FULLNAME, code: version + task_hash])
                     return row && row[0] == 1
                 }
             } catch (SQLException problem) {
@@ -287,38 +264,44 @@ class TumorOnt {
 
         void run() {
             cdw.withSql { Sql sql ->
-                final toTypeName = ColumnMeta.typeNames(sql.connection)
-                TumorFile.dropIfExists(sql, table_name)
-                sql.execute(ColumnMeta.createStatement(table_name, metadataColumns, toTypeName))
-
-                final top_term = normal_term + top
-                final insert1 = ColumnMeta.insertStatement(table_name, metadataColumns)
-                        .replace('?.UPDATE_DATE', 'current_timestamp')
-                sql.execute(insert1, top_term)
-                insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
-                insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
-
-                sql.withBatch(16, insert1) { ps ->
-                    final done = []
-                    NAACCR_R.eachCodeTerm { Map it ->
-                        ps.addBatch(it)
-                        done << it.C_FULLNAME
-                    }
-                    LOINC_NAACCR.eachAnswerTerm { Map it ->
-                        if (!done.contains(it.C_FULLNAME)) {
-                            ps.addBatch(it)
-                        }
-                    }
-                }
-
-                // TODO: OncologyMeta
-
-                sql.execute(insert1, SEERRecode.folder)
-
-                insertTerms(sql, table_name, SEERRecode.seer_recode_terms, { Map s -> SEERRecode.makeTerm(s) })
-                insertTerms(sql, table_name, CSTerms.cs_terms, { Map s -> CSTerms.makeTerm(s) })
+                createTable(sql, table_name)
             }
         }
+
+
+    }
+
+    static void createTable(Sql sql, String table_name) {
+        final toTypeName = ColumnMeta.typeNames(sql.connection)
+        TumorFile.dropIfExists(sql, table_name)
+        sql.execute(ColumnMeta.createStatement(table_name, metadataColumns, toTypeName))
+
+        final top_term = normal_term + top
+        final insert1 = ColumnMeta.insertStatement(table_name, metadataColumns)
+                .replace('?.UPDATE_DATE', 'current_timestamp')
+        sql.execute(insert1, top_term)
+        insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
+        insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
+
+        sql.withBatch(16, insert1) { ps ->
+            final done = []
+            NAACCR_R.eachCodeTerm { Map it ->
+                ps.addBatch(it)
+                done << it.C_FULLNAME
+            }
+            LOINC_NAACCR.eachAnswerTerm { Map it ->
+                if (!done.contains(it.C_FULLNAME)) {
+                    ps.addBatch(it)
+                }
+            }
+        }
+
+        // TODO: OncologyMeta
+
+        sql.execute(insert1, SEERRecode.folder)
+
+        insertTerms(sql, table_name, SEERRecode.seer_recode_terms, { Map s -> SEERRecode.makeTerm(s) })
+        insertTerms(sql, table_name, CSTerms.cs_terms, { Map s -> CSTerms.makeTerm(s) })
     }
 
     static class NAACCR_R {
@@ -400,55 +383,6 @@ class TumorOnt {
                 ])
             }
         }
-
-        static final Table field_info = read_csv(field_info_csv, Table.create(
-                IntColumn.create("item"),
-                StringColumn.create("name"),
-                StringColumn.create("type"),
-        ).columnTypes())
-        static final Table field_info_schema = Table.create(
-                StringColumn.create("code"),
-                StringColumn.create("label"),
-                BooleanColumn.create("means_missing"),
-                StringColumn.create("description"))
-        static final Table field_code_scheme = read_csv(field_code_scheme_csv, Table.create(
-                StringColumn.create("name"),
-                StringColumn.create("scheme"),
-        ).columnTypes())
-
-
-        static Table code_labels(List<String> implicit = ['iso_country']) {
-            Table all_schemes = null
-            for (String scheme : field_code_scheme.stringColumn('scheme').unique()) {
-                if (implicit.contains(scheme)) {
-                    continue
-                }
-                final info = new URL(_code_labels.toString() + scheme + '.csv')  // ugh.
-                int skiprows = 0
-                info.withReader() { Reader it ->
-                    if (it.readLine().startsWith('#')) {
-                        skiprows = 1
-                    }
-                    null
-                }
-                final codes = read_csv(info, field_info_schema.columnTypes(), skiprows)
-                final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
-                codes.addColumns(constS('scheme', codes, Pathlib.stem(info)))
-                if (!codes.columnNames().contains('code') || !codes.columnNames().contains('label')) {
-                    throw new IllegalArgumentException([info, codes.columnNames()].toString())
-                }
-                if (all_schemes == null) {
-                    all_schemes = codes
-                } else {
-                    all_schemes = all_schemes.append(codes)
-                }
-            }
-            final Table with_fields = all_schemes.joinOn('scheme')
-                    .inner(field_code_scheme, 'scheme')
-            final Table with_field_info = with_fields.joinOn('name')
-                    .inner(field_info.select('item', 'name'), 'name')
-            with_field_info
-        }
     }
 
     @Immutable
@@ -457,9 +391,11 @@ class TumorOnt {
         List<Map<String, Object>> morph2
         List<Map<String, Object>> morph3
 
-        static OncologyMeta load(Path cache) {
-            final icdo2zip = new ZipFile(cache.resolve('ICD-O-2_CSV.zip').toFile())
-            final icdo3zip = new ZipFile(cache.resolve('ICD-O-3_CSV-metadata.zip').toFile())
+        static OncologyMeta load(Path cache,
+                                 String zip2 = 'ICD-O-2_CSV.zip',
+                                 String zip3 = 'ICD-O-3_CSV-metadata.zip') {
+            final icdo2zip = new ZipFile(cache.resolve(zip2).toFile())
+            final icdo3zip = new ZipFile(cache.resolve(zip3).toFile())
 
             final allRows = { ZipFile zip, String name ->
                 final List<List<String>> rows = []
@@ -469,18 +405,18 @@ class TumorOnt {
                 rows
             }
             final topo = allRows(icdo2zip, 'Topoenglish.txt')
-                .drop(1)
-                .collect {
-                    println("@@topo collect" + it)
-                    [Kode: it[0], Lvl: it[1], Title: it[2]]  as Map<String, Object>
-                }
+                    .drop(1)
+                    .collect {
+                        println("@@topo collect" + it)
+                        [Kode: it[0], Lvl: it[1], Title: it[2]] as Map<String, Object>
+                    }
             final morph2 = allRows(icdo2zip, 'icd-o-3-morph.csv')
-                    .collect {  it ->
-                        [code: it[0].replace('M', ''), label: it[1] ] as Map<String, Object>
+                    .collect { it ->
+                        [code: it[0].replace('M', ''), label: it[1]] as Map<String, Object>
                     }
             final morph3 = allRows(icdo3zip, 'Morphenglish.txt')
                     .drop(1)
-                    .collect { [code: it[0], struct: it[1], label: it[2] ] as Map<String, Object> }
+                    .collect { [code: it[0], struct: it[1], label: it[2]] as Map<String, Object> }
             new OncologyMeta(topo: topo, morph2: morph2, morph3: morph3)
         }
 
@@ -489,21 +425,25 @@ class TumorOnt {
         }
 
         def primarySiteTerms() {
-            def major = topo.findAll { it.Lvl == '3' }.collect {[
-                    lvl: 3,
-                    concept_cd: it.Kode,
-                    c_visualattributes: 'FA',
-                    path: "${it.Kode}\\".toString(),
-                    concept_name: it.Title,
-            ]}
+            def major = topo.findAll { it.Lvl == '3' }.collect {
+                [
+                        lvl               : 3,
+                        concept_cd        : it.Kode,
+                        c_visualattributes: 'FA',
+                        path              : "${it.Kode}\\".toString(),
+                        concept_name      : it.Title,
+                ]
+            }
 
-            def minor = topo.findAll { it.Lvl == '4' }.collect {[
-                    lvl: 4,
-                    concept_cd: (it.Kode as String).replace('.', ''),
-                    c_visualattributes: 'LA',
-                    path: "${(it.Kode as String).replaceAll('\\..*', '')}\\${it.Kode}\\".toString(),
-                    concept_name: it.Title,
-            ]}
+            def minor = topo.findAll { it.Lvl == '4' }.collect {
+                [
+                        lvl               : 4,
+                        concept_cd        : (it.Kode as String).replace('.', ''),
+                        c_visualattributes: 'LA',
+                        path              : "${(it.Kode as String).replaceAll('\\..*', '')}\\${it.Kode}\\".toString(),
+                        concept_name      : it.Title,
+                ]
+            }
             major + minor
         }
 
@@ -517,60 +457,14 @@ class TumorOnt {
             itemTerms.collect { parent ->
                 major().collect {
                     [
-                            level: parent.C_HLEVEL as int + 1,
-                            code: it.code, // TODO: more to it
+                            level           : parent.C_HLEVEL as int + 1,
+                            code            : it.code, // TODO: more to it
                             visualattributes: 'FA',
-                            path: "${parent.C_FULLNAME}${it.code}\\".toString(),
-                            concept_name: "${it.code} ${it.label}".toString(),
+                            path            : "${parent.C_FULLNAME}${it.code}\\".toString(),
+                            concept_name    : "${it.code} ${it.label}".toString(),
                     ]
                 }
             }.flatten()
-        }
-
-        static Tuple morph3_info = new Tuple('ICD-O-2_CSV.zip', 'icd-o-3-morph.csv', ['code', 'label', 'notes'])
-        static Tuple topo_info = new Tuple('ICD-O-2_CSV.zip', 'Topoenglish.txt', null)
-        static String encoding = 'ISO-8859-1'
-
-        @Deprecated
-        static Table read_table(Path cache, Tuple info) {
-            String zip = info[0] as String; String item = info[1] as String
-            List<String> names = info[2] as List<String>
-            def archive = new ZipFile(cache.resolve(zip).toFile())
-            def infp = new InputStreamReader(archive.getInputStream(archive.getEntry(item)), Charset.forName(encoding))
-            CsvReadOptions options = CsvReadOptions.builder(infp)
-                    .separator((item.endsWith(".csv") ? ',' : '\t') as char)
-                    .header(names == null)
-                    .build()
-            Table data = Table.read().csv(options)
-            if (names) {
-                listZip(names, data.columns()) { String name, Column<?> col -> col.setName(name) }
-            }
-            data
-        }
-
-        @Deprecated
-        static Table icd_o_topo(Table topo) {
-            final major = topo.where(topo.stringColumn('Lvl').isEqualTo('3'))
-            def minor = topo.where(topo.stringColumn('Lvl').isEqualTo('4'))
-            minor = minor.addColumns(
-                    minor.stringColumn('Kode').replaceAll('\\..*', '').setName('major'))
-            final constN = { String name, Table t, int val -> IntColumn.create(name, [val] * t.rowCount() as int[]) }
-            final constS = { String name, Table t, String val -> StringColumn.create(name, [val] * t.rowCount() as String[]) }
-            final out3 = Table.create(
-                    constN('lvl', major, 3),
-                    major.stringColumn('Kode').copy().setName('concept_cd'),
-                    constS('c_visualattributes', major, 'FA'),
-                    major.stringColumn('Kode').map({ String it -> it + '\\' }).setName('path'),
-                    major.stringColumn('Title').copy().setName('concept_name'))
-            final out4 = Table.create(
-                    constN('lvl', minor, 4),
-                    minor.stringColumn('Kode').map({ String v -> v.replace('.', '') }).setName('concept_cd'),
-                    constS('c_visualattributes', minor, 'LA'),
-                    StringColumn.create('path',
-                            minor.iterator().collect({ Row it -> it.getString('major') + '\\' + it.getString('Kode') + '\\' })),
-                    minor.stringColumn('Title').copy().setName('concept_name'),
-            )
-            out3.append(out4)
         }
     }
 
@@ -580,68 +474,7 @@ class TumorOnt {
         result
     }
 
-    @Deprecated
-    static class SqlScript { // TODO: refactor: move SqlScript out of gpc.TumorOnt
-        final String name
-        final String code
-        final List<Tuple3<String, String, List<String>>> objects
-
-        SqlScript(String _name, String _code, List<Tuple2<String, List<String>>> object_info) {
-            name = _name
-            code = _code
-            objects = object_info.collect { new Tuple3(it.first, find_ddl(it.first, code), it.second) }
-        }
-
-        static String find_ddl(String name, String script) {
-            String comment_pattern = '((--[^\\n]*(?:\\n|$))\\s*|(?:/\\*(?:[^*]|(\\*(?!/)))*\\*/)\\s*)*'
-            Scanner stmts = new Scanner(script).useDelimiter(';\n\\s*' + comment_pattern)
-            while (stmts.hasNext()) {
-                String stmt = stmts.next().trim()
-                if (stmt.startsWith('create ')) {
-                    String firstLine = stmt.split('\n')[0]
-                    if (firstLine.split().contains(name)) {
-                        return stmt
-                    }
-                }
-            }
-            throw new IllegalArgumentException(name)
-        }
-
-
-        static String sql_list(List items) {
-            String.join(', ', items)
-        }
-
-        static String create_ddl(String name, List<Column<?>> schema, int varchars = 1024) {
-            final sqlName = { ColumnType it ->
-                switch (it) {
-                    case ColumnType.STRING:
-                        return "VARCHAR($varchars)"
-                    case ColumnType.BOOLEAN:
-                        return "NUMBER(1)"
-                    case ColumnType.DOUBLE:
-                        return "NUMERIC"
-                    case ColumnType.LOCAL_DATE:
-                        return "DATE"
-                    case ColumnType.LOCAL_DATE_TIME:
-                        return "TIMESTAMP"
-                    default:
-                        return it.toString()
-                }
-            }
-            final coldefs = schema.collect { Column it -> "\"${it.name().toUpperCase()}\" ${sqlName(it.type())}" }
-            "create table $name (${sql_list(coldefs)})"
-        }
-
-        static String insert_dml(String name, List<Column<?>> schema) {
-            final colnames = schema.collect { col -> "\"${col.name().toUpperCase()}\"" }
-            "insert into ${name} (${sql_list(colnames)}) values (${sql_list(schema.collect { '?' })})"
-        }
-    }
-
     static class LOINC_NAACCR {
-        @Deprecated
-        static final Table answer = read_csv(TumorOnt.getResource('loinc_naaccr/loinc_naaccr_answer.csv'))
         // TODO? static final answer_struct = answer.columns().collect { Column<?> it -> it.copy().setName(it.name().toLowerCase()) }
         // TODO: static final measure = read_csv(gpc.TumorOnt.getResource('loinc_naaccr/loinc_naaccr.csv'))
 
@@ -680,270 +513,8 @@ class TumorOnt {
         }
     }
 
-    static class NAACCR_I2B2 {
-        static final String top_folder = "\\i2b2\\naaccr\\"
-        static final String c_name = 'Cancer Cases (NAACCR Hierarchy)'
-        static final String sourcesystem_cd = 'heron-admin@kumc.edu'
-
-        static final Table tumor_item_type = read_csv(TumorOnt.getResource('heron_load/tumor_item_type.csv'))
-        static final Table seer_recode_terms = read_csv(TumorOnt.getResource('heron_load/seer_recode_terms.csv'))
-
-        static final Table cs_terms = read_csv(TumorOnt.getResource('heron_load/cs-terms.csv'))
-
-        /* obsolete
-        static final tx_script = new SqlScript(
-                'naaccr_txform.sql',
-                resourceText(gpc.TumorOnt.getResource('heron_load/naaccr_txform.sql')), [])
-        */
-
-        static final String per_item_view = 'tumor_item_type'
-        static final Table per_section = read_csv(TumorOnt.getResource('heron_load/section.csv'))
-
-        static SqlScript ont_script = new SqlScript(
-                'naaccr_concepts_load.sql',
-                resourceText('heron_load/naaccr_concepts_load.sql'),
-                [
-                        new Tuple2('i2b2_path_concept', []),
-                        new Tuple2('naaccr_top_concept', ['naaccr_top', 'current_task']),
-                        new Tuple2('section_concepts', ['section', 'naaccr_top']),
-                        new Tuple2('item_concepts', [per_item_view]),
-                        new Tuple2('code_concepts', [per_item_view, 'loinc_naaccr_answer', 'code_labels']),
-                        new Tuple2('primary_site_concepts', ['icd_o_topo']),
-                        // TODO: morphology
-                        new Tuple2('seer_recode_concepts', ['seer_site_terms', 'naaccr_top']),
-                        new Tuple2('site_schema_concepts', ['cs_terms']),
-                        new Tuple2('naaccr_ontology', []),
-                ])
-
-        static Table naaccr_top(LocalDate update_date) {
-            fromRecords([[c_hlevel       : 1,
-                          c_fullname     : top_folder,
-                          c_name         : c_name,
-                          update_date    : update_date,
-                          sourcesystem_cd: sourcesystem_cd] as Map])
-        }
-
-        static Table ont_view_in(Sql sql, String task_hash, LocalDate update_date, Path who_cache = null) {
-            Table icd_o_topo
-            if (who_cache != null && who_cache.toFile().exists()) {
-                final Table who_topo = OncologyMeta.read_table(who_cache, OncologyMeta.topo_info)
-                icd_o_topo = OncologyMeta.icd_o_topo(who_topo)
-            } else {
-                log.warn('skipping WHO Topology terms')
-                icd_o_topo = fromRecords([[
-                                                  lvl : 3, concept_cd: 'C00', c_visualattributes: 'FA',
-                                                  path: 'abc', concept_path: 'LIP', concept_name: 'x'] as Map])
-            }
-
-            final current_task = fromRecords([[task_hash: task_hash] as Map]).setName("current_task")
-            // KLUDGE: mutable.
-            if (cs_terms.columnNames().contains('update_date')) {
-                cs_terms.removeColumns('update_date', 'sourcesystem_cd')
-            }
-            final tables = [
-                    current_task       : current_task,
-                    naaccr_top         : naaccr_top(update_date),
-                    section            : per_section,
-                    tumor_item_type    : tumor_item_type,
-                    loinc_naaccr_answer: LOINC_NAACCR.answer,
-                    code_labels        : NAACCR_R.code_labels(),
-                    icd_o_topo         : icd_o_topo,
-                    cs_terms           : cs_terms,
-                    seer_site_terms    : seer_recode_terms,
-            ] as Map
-            final views = create_objects(sql, ont_script, tables)
-            final String name = ont_script.objects.last().first
-            views[name](sql)
-        }
-    }
-
-    static Map<String, Closure<Table>> create_objects(Sql sql, SqlScript script,
-                                                      Map<String, Table> tables) {
-        final Set provided = tables.keySet()
-        tables.each { key, df ->
-            log.info("${script.name}: $key = ${df.columnNames()}")
-            load_data_frame(sql, key, df)
-        }
-        script.objects.collectEntries {
-            final name = it.first
-            final Set missing = it.third.toSet() - provided
-            if (!missing.isEmpty()) {
-                throw new IllegalArgumentException(missing.toString())
-            }
-            log.info("${script.name}: create $name")
-            dropObject(sql, name)
-            sql.execute(it.second)
-            Closure<Table> getDF = { Sql sql2 ->
-                Table dft = null
-                sql2.query("select * from $name".toString()) { ResultSet results ->
-                    dft = Table.read().db(results, name)
-                }
-                dft
-            }
-            [(name): getDF]
-        }
-    }
-
-    private static void dropObject(Sql sql, String name) {
-        try {
-            sql.execute("drop table if exists $name".toString())
-        } catch (SQLException ignored) {
-        }
-        try {
-            sql.execute("drop view if exists $name".toString())
-        } catch (SQLException ignored) {
-        }
-    }
-
     static String _logged(String txt) {
         log.info(txt)
         txt
-    }
-
-    @Deprecated
-    static void load_data_frame(Sql sql, String name, Table data,
-                                boolean dropFirst = false) {
-        assert name
-        if (dropFirst) {
-            try {
-                sql.execute("drop table $name".toString())
-            } catch (SQLException problem) {
-                log.warn("drop $name: $problem")
-            }
-        }
-        log.debug("creating table ${name}")
-        sql.execute(SqlScript.create_ddl(name, data.columns()))
-        append_data_frame(data, name, sql)
-    }
-
-    @Deprecated
-    static void append_data_frame(Table data, String name, Sql sql) {
-        log.debug("inserting ${data.rowCount()} rows into ${name}")
-        sql.withBatch(SqlScript.insert_dml(name, data.columns())) { BatchingPreparedStatementWrapper ps ->
-            for (Row row : data) {
-                final params = []
-                for (Column col : data.columns()) {
-                    if (row.isMissing(col.name())) {
-                        params << null
-                        continue
-                    }
-                    switch (col.type()) {
-                        case ColumnType.INTEGER:
-                            params << row.getInt(params.size())
-                            break
-                        case ColumnType.LONG:
-                            params << row.getLong(params.size())
-                            break
-                        case ColumnType.STRING:
-                            params << row.getString(params.size())
-                            break
-                        case ColumnType.LOCAL_DATE:
-                            params << Date.valueOf(row.getDate((params.size())))
-                            break
-                        case ColumnType.LOCAL_DATE_TIME:
-                            params << Timestamp.valueOf(row.getDateTime((params.size())))
-                            break
-                        case ColumnType.BOOLEAN:
-                            params << row.getBoolean(params.size())
-                            break
-                        case ColumnType.DOUBLE:
-                            params << row.getDouble(params.size())
-                            break
-                        default:
-                            throw new IllegalArgumentException(col.type().toString())
-                    }
-                }
-                ps.addBatch(params)
-            }
-            log.debug("inserted ${data.rowCount()} rows into ${name}")
-        }
-    }
-
-    @Deprecated
-    static Table importCSV(Sql sql, String name, URL data, URL meta) {
-        ColumnType[] schema = tabularTypes(new JsonSlurper().parse(meta))
-        final Table df = read_csv(data, schema)
-        load_data_frame(sql, name, df)
-        df
-    }
-
-    @Deprecated
-    static Table read_csv(URL url, ColumnType[] _schema = null, int skiprows = 0) {
-        ColumnType[] schema = _schema ? _schema : tabularTypes(Tabular.metadata(url))
-        final BufferedReader input = new BufferedReader(new InputStreamReader(url.openStream()))
-        skiprows.times { input.readLine() }
-        Table.read().usingOptions(CsvReadOptions.builder(input).columnTypes(schema).maxCharsPerColumn(32767))
-    }
-
-    static ColumnType[] tabularTypes(Object meta) {
-        final schema = Tabular.columnDescriptions(meta)
-        schema.collect {
-            switch (it.dataType) {
-                case Types.INTEGER:
-                    return ColumnType.INTEGER
-                case Types.DOUBLE:
-                    return ColumnType.DOUBLE
-                case Types.VARCHAR:
-                    return ColumnType.STRING
-                default:
-                    throw new IllegalAccessException(it.dataType.toString())
-            }
-        } as ColumnType[]
-    }
-
-    static String resourceText(String s) {
-        TumorOnt.getResourceAsStream(s).text
-    }
-
-
-    static class Pathlib {
-        static String stem(URL path) {
-            final String[] segments = path.path.split('/')
-            segments.last().replaceFirst('[.][^.]+$', "")
-        }
-    }
-
-    @Deprecated
-    static Table fromRecords(List<Map<String, Object>> obj) {
-        Collection<Column<?>> cols = ((obj.first().collect { k, v ->
-            switch (v) {
-                case String:
-                    return StringColumn.create(k)
-                case Integer:
-                    return IntColumn.create(k)
-                case LocalDate:
-                    return DateColumn.create(k)
-                case Boolean:
-                    return BooleanColumn.create(k)
-                default:
-                    throw new IllegalArgumentException("Expected String or Int in 1st record, not:" + v)
-            }
-        }) as Collection<Column<?>>)
-        Table data = Table.create("t1", cols)
-        obj.each { Map<String, Object> m ->
-            Row row = data.appendRow()
-            for (it in m) {
-                switch (it.value) {
-                    case String:
-                        row.setString(it.key, it.value as String)
-                        break
-                    case Integer:
-                        row.setInt(it.key, it.value as Integer)
-                        break
-                    case LocalDate:
-                        row.setDate(it.key, it.value as LocalDate)
-                        break
-                    case Boolean:
-                        row.setBoolean(it.key, it.value as boolean)
-                        break
-                    case null:
-                        row.setMissing(it.key)
-                        break
-                    default:
-                        throw new IllegalArgumentException("not supported " + it.value)
-                }
-            }
-        }
-        data
     }
 }

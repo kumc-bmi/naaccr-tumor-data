@@ -23,7 +23,7 @@ dependencies {
     compile 'org.codehaus.groovy:groovy-templates:3.0.4'
     compile 'com.imsweb:naaccr-xml:6.6'
     compile 'com.imsweb:layout:2.0'
-    compile 'tech.tablesaw:tablesaw-core:0.37.2'
+
     // https://mvnrepository.com/artifact/com.h2database/h2/1.4.200
     compile 'com.h2database:h2:1.4.200'
 

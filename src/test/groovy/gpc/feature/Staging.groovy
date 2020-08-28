@@ -16,7 +16,10 @@ import java.sql.DriverManager
 
 /**
  * CAUTION: ambient access to temp dir to write config file, DB.
- * TODO: consider renaming Staging to something about PCORNet tumor table
+ *
+ * ISSUE: Staging might be a bit of a misnomer;
+ *        something about the PCORNet tumor table
+ *        might be better.
  */
 @CompileStatic
 @Slf4j
@@ -62,6 +65,7 @@ class Staging extends TestCase {
     }
 
     void "test load multiple NAACCR file versions in a local disk h2 DB"() {
+        // note v16 first doesn't work https://github.com/kumc-bmi/naaccr-tumor-data/issues/49
         final installed = [TumorFileTest.sample100, v16_file].collect { installTestData(workDir, it) }
         def argv = ['tumor-files'] + installed.collect { it.toString() }
         final cli = cli1(argv, workDir)
@@ -106,12 +110,12 @@ class Staging extends TestCase {
             testData = TumorFileTest.sample100
         }
         final flat_file = installTestData(workDir, testData)
-        ps.putAll(["db.url"                    : "jdbc:h2:file:${workDir}/DB1;create=true".toString(),
-                   "db.driver"                 : 'org.h2.Driver',
-                   "db.username"               : 'SA',
-                   "db.password"               : '',
-                   "naaccr.flat-file"          : flat_file.toString(),
-                   "naaccr.tumor-table"        : "TUMOR",
+        ps.putAll(["db.url"            : "jdbc:h2:file:${workDir}/DB1;create=true".toString(),
+                   "db.driver"         : 'org.h2.Driver',
+                   "db.username"       : 'SA',
+                   "db.password"       : '',
+                   "naaccr.flat-file"  : flat_file.toString(),
+                   "naaccr.tumor-table": "TUMOR",
         ] + extraProperties)
         buildIO(ps, workDir)
     }
@@ -177,10 +181,6 @@ class Staging extends TestCase {
         }
 
         void "test that tumor table has patid varchar column"() {
-
-        }
-
-        void "test loading v16 and v18 in that order"() {
 
         }
     }
