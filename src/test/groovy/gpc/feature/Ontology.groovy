@@ -33,7 +33,7 @@ class Ontology extends TestCase {
             select c_hlevel, count(*) qty from NAACCR_ONTOLOGY
             group by c_hlevel order by c_hlevel
             """)
-            assert actual.collectEntries { [it.C_HLEVEL, it.QTY] } == [1: 1, 2: 19, 3: 987, 4: 7013, 5: 10545]
+            assert actual.collectEntries { [it.C_HLEVEL, it.QTY] } == [1: 1, 2: 19, 3: 987, 4: 6836, 5: 10545]
         }
     }
 

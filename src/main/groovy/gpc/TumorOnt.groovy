@@ -358,8 +358,14 @@ class TumorOnt {
                     return
                 }
                 final ic = makeItemTerm(ty)
+                final seen = [:]
                 new URL(fs.url as String).withInputStream { csv ->
                     Tabular.eachCSVRecord(csv, Tabular.columnDescriptions(code_label_meta)) { Map code ->
+                        if (seen[code.code]) {
+                            log.debug("ignoring duplicate code for ${fs.name}: ${code}")
+                            return
+                        }
+                        seen[code.code] = true
                         thunk(fs + field + ty + ic + code)
                         return
                     }

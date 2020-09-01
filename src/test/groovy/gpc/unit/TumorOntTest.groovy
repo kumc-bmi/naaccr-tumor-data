@@ -109,6 +109,20 @@ class TumorOntTest extends TestCase {
         }
     }
 
+    void "test that R code terms are distinct"() {
+        final seen = [:]
+        int dups = 0
+        TumorOnt.NAACCR_R.eachCodeTerm { Map it ->
+            final key = it.C_FULLNAME
+            final dup = seen[key]
+            if (dup !== null) {
+                dups += 1
+            }
+            seen[key] = it
+        }
+        assert dups == 0
+    }
+
     /*@@@
     void testOncologyMeta() {
         Path cachePath = Paths.get(cache)
