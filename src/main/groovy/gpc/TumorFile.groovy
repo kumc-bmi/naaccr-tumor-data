@@ -424,11 +424,11 @@ class TumorFile {
             new Scanner(flat_file).useDelimiter("\r\n|\n") each { String line ->
                 encounter_num += 1
                 String patientId = fieldValue(patIdField, line)
-                if (!toPatientNum.containsKey(patientId)) {
+                final patient_num = toPatientNum[patientId]
+                if (patient_num == null) {
                     log.warn('tumor {}: cannot find {} in patient_mapping', encounter_num, patientId)
                     return
                 }
-                final patient_num = toPatientNum[patientId]
                 Map<String, LocalDate> dates = dateFields.collectEntries { FixedColumnsField dtf ->
                     [dtf.name, parseDate(fieldValue(dtf, line))]
                 }
