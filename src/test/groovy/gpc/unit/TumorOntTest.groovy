@@ -1,5 +1,8 @@
 package gpc.unit
 
+import com.imsweb.staging.Staging
+import com.imsweb.staging.cs.CsDataProvider
+import com.imsweb.staging.cs.CsDataProvider.CsVersion
 import gpc.DBConfig
 import gpc.Tabular
 import gpc.Tabular.ColumnMeta
@@ -213,5 +216,10 @@ class TumorOntTest extends TestCase {
             assert sql.firstRow("select lpad(9, 2, '0') || ' xyz' from (values(1))")[0] == "09 xyz"
             assert sql.firstRow("select 1 from (values('X')) where not regexp_like('XXXX.9', '^[0-9].*')")[0] == 1
         }
+    }
+
+    void testPrimarySite() {
+        def head = TumorOnt.primarySiteTable().findAll { it[0] == 'C760' }
+        assert head == [['C760', 'Head, face & neck, NOS']]
     }
 }

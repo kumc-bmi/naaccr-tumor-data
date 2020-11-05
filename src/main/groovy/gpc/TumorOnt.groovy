@@ -1,6 +1,8 @@
 package gpc
 
 import com.imsweb.naaccrxml.NaaccrXmlDictionaryUtils
+import com.imsweb.staging.Staging
+import com.imsweb.staging.cs.CsDataProvider
 import gpc.DBConfig.Task
 import gpc.Tabular.ColumnMeta
 import groovy.sql.Sql
@@ -522,5 +524,10 @@ class TumorOnt {
     static String _logged(String txt) {
         log.info(txt)
         txt
+    }
+
+    static Staging staging = Staging.getInstance(CsDataProvider.getInstance(CsDataProvider.CsVersion.v020550));
+    static List<List<String>> primarySiteTable() {
+        staging.getTable("primary_site").rawRows
     }
 }

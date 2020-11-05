@@ -23,6 +23,7 @@ dependencies {
     compile 'org.codehaus.groovy:groovy-templates:3.0.4'
     compile 'com.imsweb:naaccr-xml:6.6'
     compile 'com.imsweb:layout:2.0'
+    compile 'com.imsweb:staging-algorithm-cs:02.05.50.4'
 
     // https://mvnrepository.com/artifact/com.h2database/h2/1.4.200
     compile 'com.h2database:h2:1.4.200'
