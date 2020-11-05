@@ -29,11 +29,21 @@ class Ontology extends TestCase {
         TumorFile.run(cli)
 
         cli.account().withSql { Sql sql ->
+            final siteInfo = sql.rows("""
+            select c_visualattributes, count(*) qty
+            from NAACCR_ONTOLOGY
+            where c_hlevel >= 4
+            and c_fullname like '%0400 Primary Site%'
+            group by c_visualattributes
+            order by c_visualattributes
+            """)
+            assert siteInfo.collectEntries { [it.C_VISUALATTRIBUTES, it.QTY] } == ['FA': 43, 'LA': 330]
+
             final actual = sql.rows("""
             select c_hlevel, count(*) qty from NAACCR_ONTOLOGY
             group by c_hlevel order by c_hlevel
             """)
-            assert actual.collectEntries { [it.C_HLEVEL, it.QTY] } == [1: 1, 2: 19, 3: 987, 4: 6836, 5: 10545]
+            assert actual.collectEntries { [it.C_HLEVEL, it.QTY] } == [1: 1, 2: 19, 3: 987, 4: 6934, 5: 10820]
         }
     }
 

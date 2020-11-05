@@ -285,6 +285,15 @@ class TumorOnt {
         insertTerms(sql, table_name, sectionCSV, { Map s -> makeSectionTerm(s) })
         insertTerms(sql, table_name, itemCSV, { Map s -> makeItemTerm(s) })
 
+        def primarySiteRecord = Tabular.allCSVRecords(itemCSV).find { it.naaccrNum == 400 }
+        def primarySiteTerm = makeItemTerm(primarySiteRecord)
+        sql.withBatch(16, insert1) { ps ->
+            TumorOnt.primarySiteTerms(primarySiteTerm).each { Map it ->
+                ps.addBatch(it)
+            }
+        }
+
+        // get code labels from NAACCR_R or LOINC_NAACCR
         sql.withBatch(16, insert1) { ps ->
             final done = []
             NAACCR_R.eachCodeTerm { Map it ->
@@ -432,6 +441,7 @@ class TumorOnt {
             morph2.findAll { !(it.code as String).contains('/') }.collect { [level: 3 as Object] + it }
         }
 
+        @Deprecated
         def primarySiteTerms() {
             def major = topo.findAll { it.Lvl == '3' }.collect {
                 [
@@ -527,7 +537,47 @@ class TumorOnt {
     }
 
     static Staging staging = Staging.getInstance(CsDataProvider.getInstance(CsDataProvider.CsVersion.v020550));
+
     static List<List<String>> primarySiteTable() {
         staging.getTable("primary_site").rawRows
+    }
+
+    static List<Map> primarySiteTerms(Map parent) {
+        def topo = primarySiteTable()
+        def major = topo.findAll { it[0].endsWith('9') && it[1].endsWith(' NOS') }.collectEntries {
+            def code = it[0].substring(0, 3)
+            def label = it[1].replace(', NOS', '')
+            def path = "${parent.C_FULLNAME}${code}\\".toString()
+            def term = normal_term + [
+                    C_HLEVEL          : parent.C_HLEVEL as int + 1,
+                    C_FULLNAME        : path,
+                    C_DIMCODE         : path,
+                    C_NAME            : "${code} ${label}".toString(),
+                    C_BASECODE        : null,
+                    C_VISUALATTRIBUTES: 'FA',
+                    C_TOOLTIP         : null, // TODO
+            ] as Map
+            [code, term]
+        }
+
+        def minor = topo.collect {
+            def code = it[0]
+            def label = it[1]
+            def majorCode = code.substring(0, 3)
+            def majorTerm = major[majorCode] as Map
+            def parentTerm = majorTerm != null ? majorTerm : parent
+            def path = "${parentTerm.C_FULLNAME}\\${code}\\".toString()
+
+            normal_term + [
+                    C_HLEVEL          : parentTerm.C_HLEVEL as int + 1,
+                    C_FULLNAME        : path,
+                    C_DIMCODE         : path,
+                    C_NAME            : "${code} ${label}".toString(),
+                    C_BASECODE        : "${parent.C_BASECODE}${code}".toString(),
+                    C_VISUALATTRIBUTES: 'LA',
+                    C_TOOLTIP         : null, // TODO
+            ] as Map
+        }
+        major.values() as List<Map> + minor
     }
 }

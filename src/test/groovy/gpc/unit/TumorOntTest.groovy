@@ -1,8 +1,6 @@
 package gpc.unit
 
-import com.imsweb.staging.Staging
-import com.imsweb.staging.cs.CsDataProvider
-import com.imsweb.staging.cs.CsDataProvider.CsVersion
+
 import gpc.DBConfig
 import gpc.Tabular
 import gpc.Tabular.ColumnMeta
@@ -221,5 +219,37 @@ class TumorOntTest extends TestCase {
     void testPrimarySite() {
         def head = TumorOnt.primarySiteTable().findAll { it[0] == 'C760' }
         assert head == [['C760', 'Head, face & neck, NOS']]
+    }
+
+    void testPrimarySiteTerms() {
+        def primarySiteRecord = Tabular.allCSVRecords(TumorOnt.itemCSV).find { it.naaccrNum == 400 }
+        def primarySiteTerm = TumorOnt.makeItemTerm(primarySiteRecord)
+        def terms = TumorOnt.primarySiteTerms(primarySiteTerm)
+
+        def folders = terms.findAll { it.C_VISUALATTRIBUTES == 'FA' }
+        def eyeball = folders.collect { it.C_NAME }.take(3)
+        assert eyeball == ['C00 Lip', 'C02 Tongue', 'C03 Gum']
+        assert folders.size() >= 40
+        assert folders[0].C_NAME == 'C00 Lip'
+        assert folders[0].C_FULLNAME == '\\i2b2\\naaccr\\S:1 Cancer Identification\\0400 Primary Site\\C00\\'
+
+        def leaves = terms.findAll { it.C_VISUALATTRIBUTES == 'LA' }
+        assert leaves.size() > 300
+        assert leaves[0].C_BASECODE == 'NAACCR|400:C000'
+        assert leaves[0].C_NAME == 'C000 External upper lip'
+        assert leaves[0].C_FULLNAME == '\\i2b2\\naaccr\\S:1 Cancer Identification\\0400 Primary Site\\C00\\\\C000\\'
+        def eyeball2 = leaves.collect { [it.C_HLEVEL, it.C_NAME] }.take(10)
+        assert eyeball2 == [
+                [5, 'C000 External upper lip'],
+                [5, 'C001 External lower lip'],
+                [5, 'C002 External lip, NOS'],
+                [5, 'C003 Inner aspect, upper lip'],
+                [5, 'C004 Inner aspect, lower lip'],
+                [5, 'C005 Inner aspect of lip, NOS'],
+                [5, 'C006 Commissure of lip'],
+                [5, 'C008 Overlapping lesion of lip'],
+                [5, 'C009 Lip, NOS'],
+                [4, 'C019 Base of tongue'], // no major parent
+        ]
     }
 }
