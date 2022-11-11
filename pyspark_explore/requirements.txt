@@ -9,7 +9,7 @@
 ##
 # Runtime deps
 
-pyspark==2.4.4
+pyspark==3.2.2
 pandas==0.25.1
 luigi==2.8.9
 eliot==1.10.0
@@ -130,7 +130,7 @@ pyOpenSSL==19.0.0
 pyparsing==2.4.2
 pyrsistent==0.15.4
 PySocks==1.7.0
-pyspark==2.4.4
+pyspark==3.2.2
 pyspark-stubs==2.4.0.post5
 python-daemon==2.1.2
 python-dateutil==2.8.0
